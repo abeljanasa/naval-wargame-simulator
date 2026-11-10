@@ -15,12 +15,12 @@ pub mod synthetic;
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Carrier, Command, CommandPayload, Doctrine, DoctrineScope, Domain, EmitterEntry, Environment,
-    GeoPoint, Issuer, JammerSpec, Posture, SensorKind, SensorSpec, SideId, Simulation, Tick,
-    UnitId, UnitSpawn,
+    Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
+    Environment, GeoPoint, Guidance, Issuer, JammerSpec, Posture, SensorKind, SensorSpec, SideId,
+    Simulation, Tick, UnitId, UnitSpawn, WeaponKind, WeaponSpec,
 };
 use sim_db::PlatformDb;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 pub const SCENARIO_FORMAT: &str = "nws-scenario";
@@ -269,6 +269,10 @@ impl Scenario {
         // Environment, the ESM emitter library, postures and doctrine first, so they are in
         // force when the units spawn.
         let mut c2 = Vec::new();
+        let catalog = weapon_catalog(&spawns, db)?;
+        if !catalog.is_empty() {
+            c2.push(CommandPayload::SetWeaponCatalog { weapons: catalog });
+        }
         let library = emitter_library(&spawns, db)?;
         if !library.is_empty() {
             c2.push(CommandPayload::SetEmitterLibrary { entries: library });
@@ -324,76 +328,98 @@ impl Scenario {
 
 fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, ScenarioError> {
     let invalid = |msg: String| ScenarioError::Invalid(format!("unit {}: {msg}", u.id));
-    let (domain, max_speed, cruise, accel, sensors, rcs, turn, noise, category, length) =
-        match &u.platform {
-            Some(pid) => {
-                let p = db
-                    .platform(pid)?
-                    .ok_or_else(|| invalid(format!("unknown platform {pid}")))?;
-                let db_domain = domain_from_db(&p.domain).ok_or_else(|| {
-                    invalid(format!("platform {pid} has unknown domain {}", p.domain))
-                })?;
-                if let Some(d) = u.domain {
-                    if d != db_domain {
-                        return Err(invalid(format!(
-                            "domain {d:?} contradicts platform {pid} ({db_domain:?})"
-                        )));
-                    }
+    let (
+        domain,
+        max_speed,
+        cruise,
+        accel,
+        sensors,
+        rcs,
+        turn,
+        noise,
+        category,
+        length,
+        stores,
+        damage,
+    ) = match &u.platform {
+        Some(pid) => {
+            let p = db
+                .platform(pid)?
+                .ok_or_else(|| invalid(format!("unknown platform {pid}")))?;
+            let db_domain = domain_from_db(&p.domain).ok_or_else(|| {
+                invalid(format!("platform {pid} has unknown domain {}", p.domain))
+            })?;
+            if let Some(d) = u.domain {
+                if d != db_domain {
+                    return Err(invalid(format!(
+                        "domain {d:?} contradicts platform {pid} ({db_domain:?})"
+                    )));
                 }
-                let sensors = db
-                    .sensors_of(pid)?
-                    .into_iter()
-                    .map(|s| {
-                        let kind = SensorKind::from_db(&s.kind).ok_or_else(|| {
-                            invalid(format!(
-                                "sensor {} has unknown kind {}",
-                                s.sensor_id, s.kind
-                            ))
-                        })?;
-                        Ok(SensorSpec {
-                            sensor_id: s.sensor_id,
-                            kind,
-                            mount_height_m: s.mount_height_m,
-                            min_range_m: s.min_range_m,
-                            max_range_m: s.max_range_m,
-                            ref_range_m: s.ref_detect_range_m,
-                            ref_rcs_m2: s.ref_target_rcs_m2,
-                            max_target_altitude_m: s.max_target_altitude_m,
-                            clutter_db_per_sea_state: s.clutter_db_per_sea_state,
-                            beamwidth_deg: s.beamwidth_deg,
-                            active: s.is_active,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, ScenarioError>>()?;
-                (
-                    db_domain,
-                    u.max_speed_mps.unwrap_or(p.max_speed_mps),
-                    p.cruise_speed_mps,
-                    u.accel_mps2.unwrap_or(p.accel_mps2),
-                    sensors,
-                    db.rcs_m2(pid)?,
-                    turn_performance(&p.category, p.length_m),
-                    radiated_noise_db(&p.category),
-                    Some(p.category.clone()),
-                    p.length_m,
-                )
             }
-            // `validate` guarantees these are present when there is no platform.
-            None => (
-                u.domain.ok_or_else(|| invalid("missing domain".into()))?,
-                u.max_speed_mps
-                    .ok_or_else(|| invalid("missing max_speed_mps".into()))?,
-                0.0,
-                u.accel_mps2
-                    .ok_or_else(|| invalid("missing accel_mps2".into()))?,
-                vec![],
-                None,
-                (None, None),
-                None,
-                None,
-                None,
-            ),
-        };
+            let sensors = db
+                .sensors_of(pid)?
+                .into_iter()
+                .map(|s| {
+                    let kind = SensorKind::from_db(&s.kind).ok_or_else(|| {
+                        invalid(format!(
+                            "sensor {} has unknown kind {}",
+                            s.sensor_id, s.kind
+                        ))
+                    })?;
+                    Ok(SensorSpec {
+                        sensor_id: s.sensor_id,
+                        kind,
+                        mount_height_m: s.mount_height_m,
+                        min_range_m: s.min_range_m,
+                        max_range_m: s.max_range_m,
+                        ref_range_m: s.ref_detect_range_m,
+                        ref_rcs_m2: s.ref_target_rcs_m2,
+                        max_target_altitude_m: s.max_target_altitude_m,
+                        clutter_db_per_sea_state: s.clutter_db_per_sea_state,
+                        beamwidth_deg: s.beamwidth_deg,
+                        active: s.is_active,
+                    })
+                })
+                .collect::<Result<Vec<_>, ScenarioError>>()?;
+            (
+                db_domain,
+                u.max_speed_mps.unwrap_or(p.max_speed_mps),
+                p.cruise_speed_mps,
+                u.accel_mps2.unwrap_or(p.accel_mps2),
+                sensors,
+                db.rcs_m2(pid)?,
+                turn_performance(&p.category, p.length_m),
+                radiated_noise_db(&p.category),
+                Some(p.category.clone()),
+                p.length_m,
+                db.stores_of(pid)?.into_iter().collect(),
+                db.damage_profile_of(pid)?
+                    .map(|(dp, mk, fire, flood)| DamageProfile {
+                        damage_points: dp,
+                        mission_kill_fraction: mk,
+                        fire_susceptibility: fire,
+                        flooding_susceptibility: flood,
+                    }),
+            )
+        }
+        // `validate` guarantees these are present when there is no platform.
+        None => (
+            u.domain.ok_or_else(|| invalid("missing domain".into()))?,
+            u.max_speed_mps
+                .ok_or_else(|| invalid("missing max_speed_mps".into()))?,
+            0.0,
+            u.accel_mps2
+                .ok_or_else(|| invalid("missing accel_mps2".into()))?,
+            vec![],
+            None,
+            (None, None),
+            None,
+            None,
+            None,
+            BTreeMap::new(),
+            None,
+        ),
+    };
     Ok(UnitSpawn {
         id: u.id,
         name: u.name.clone(),
@@ -417,7 +443,42 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         radiated_noise_db: noise,
         category,
         length_m: length,
+        stores,
+        damage_profile: damage,
     })
+}
+
+/// The weapon catalogue: every weapon carried by a unit in this scenario, from the database.
+fn weapon_catalog(spawns: &[UnitSpawn], db: &PlatformDb) -> Result<Vec<WeaponSpec>, ScenarioError> {
+    let ids: BTreeSet<&str> = spawns
+        .iter()
+        .flat_map(|s| s.stores.keys())
+        .map(String::as_str)
+        .collect();
+    let mut out = Vec::new();
+    for want in ids {
+        let Some((id, name, kind, guidance, min, max, speed, warhead, ph, domains)) =
+            db.weapon(want)?
+        else {
+            return Err(ScenarioError::Invalid(format!("unknown weapon {want}")));
+        };
+        let kind = WeaponKind::from_db(&kind).ok_or_else(|| {
+            ScenarioError::Invalid(format!("weapon {id} has unknown kind {kind}"))
+        })?;
+        out.push(WeaponSpec {
+            id,
+            name,
+            kind,
+            guidance: Guidance::from_db(&guidance),
+            min_range_m: min,
+            max_range_m: max,
+            speed_mps: speed,
+            warhead_kg: warhead,
+            base_ph: ph,
+            target_domains: domains.split(',').map(|d| d.trim().to_owned()).collect(),
+        });
+    }
+    Ok(out)
 }
 
 /// The ESM emitter library for the radars fitted in this scenario: each radar type with every

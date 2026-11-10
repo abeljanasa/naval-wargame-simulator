@@ -1,6 +1,7 @@
 //! Save games: full world state + RNG state + command log, MessagePack-encoded and versioned.
 
 use crate::c2::C2State;
+use crate::combat::{Health, Magazine, WeaponCatalog, WeaponsInFlight};
 use crate::command::LoggedCommand;
 use crate::components::{Kinematics, Position, Route, Unit};
 use crate::detection::{ContactRecord, SensorSuite, Signature};
@@ -35,7 +36,10 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 8: adds visual/EO/IR/MAD: environment start time and visibility, unit category and length,
 ///   and their detection events. Older saves load with a 1970 start, 40 km visibility and the
 ///   domain length defaults.
-pub const SAVE_FORMAT_VERSION: u32 = 8;
+/// * 9: adds weapons and damage: unit magazines and health, the weapon catalogue, and weapons
+///   in flight. Older saves load with empty magazines and undamaged units on the domain
+///   damage profile.
+pub const SAVE_FORMAT_VERSION: u32 = 9;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +55,11 @@ pub struct UnitRecord {
     pub signature: Option<Signature>,
     #[serde(default)]
     pub jammer: Option<JammerSpec>,
+    #[serde(default)]
+    pub magazine: Magazine,
+    /// `None` in saves before format 9: an undamaged unit on the domain profile.
+    #[serde(default)]
+    pub health: Option<Health>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +87,10 @@ pub struct SaveGame {
     pub bearings: BearingTable,
     #[serde(default)]
     pub emitter_library: EmitterLibrary,
+    #[serde(default)]
+    pub weapon_catalog: WeaponCatalog,
+    #[serde(default)]
+    pub weapons_in_flight: WeaponsInFlight,
 }
 
 impl SaveGame {
@@ -102,7 +115,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=7 | SAVE_FORMAT_VERSION => {
+            1..=8 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

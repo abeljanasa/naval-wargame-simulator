@@ -3799,6 +3799,7 @@ dependencies = [
  "sim-c2",
  "sim-geo",
  "sim-sensors",
+ "sim-weapons",
  "specta",
  "thiserror 2.0.21",
 ]
@@ -3848,6 +3849,14 @@ dependencies = [
  "libm",
  "serde",
  "sim-geo",
+ "specta",
+]
+
+[[package]]
+name = "sim-weapons"
+version = "0.1.0"
+dependencies = [
+ "serde",
  "specta",
 ]
 

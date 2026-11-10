@@ -198,6 +198,96 @@ impl PlatformDb {
         Ok(v)
     }
 
+    /// Rounds a platform carries by default, by weapon id (sorted): its magazines' default
+    /// contents, or for a platform without magazines (aircraft) its first loadout by id.
+    pub fn stores_of(&self, platform_id: &str) -> Result<Vec<(String, u32)>, DbError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT mc.weapon_id, SUM(mc.quantity)
+               FROM magazines m JOIN magazine_contents mc ON mc.magazine_id = m.id
+              WHERE m.platform_id = ?1
+              GROUP BY mc.weapon_id ORDER BY mc.weapon_id",
+        )?;
+        let mut v = stmt
+            .query_map([platform_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<Result<Vec<(String, u32)>, _>>()?;
+        if v.is_empty() {
+            let mut stmt = self.conn.prepare(
+                "SELECT weapon_id, quantity FROM loadout_items
+                  WHERE loadout_id = (SELECT id FROM loadouts WHERE platform_id = ?1
+                                      ORDER BY id LIMIT 1)
+                  ORDER BY weapon_id",
+            )?;
+            v = stmt
+                .query_map([platform_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        Ok(v)
+    }
+
+    /// A weapon's figures: (id, name, kind, guidance, min range m, max range m, speed m/s,
+    /// warhead kg, base Ph, comma-separated target domains).
+    #[allow(clippy::type_complexity)]
+    pub fn weapon(
+        &self,
+        id: &str,
+    ) -> Result<
+        Option<(
+            String,
+            String,
+            String,
+            String,
+            f64,
+            f64,
+            f64,
+            f64,
+            f64,
+            String,
+        )>,
+        DbError,
+    > {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id, name, kind, guidance, min_range_m, max_range_m, speed_mps, warhead_kg,
+                        base_ph, target_domains FROM weapons WHERE id = ?1",
+                [id],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get(4)?,
+                        r.get(5)?,
+                        r.get(6)?,
+                        r.get(7)?,
+                        r.get(8)?,
+                        r.get(9)?,
+                    ))
+                },
+            )
+            .optional()?)
+    }
+
+    /// A platform's damage profile: (damage points, mission-kill fraction, fire susceptibility,
+    /// flooding susceptibility).
+    pub fn damage_profile_of(
+        &self,
+        platform_id: &str,
+    ) -> Result<Option<(f64, f64, f64, f64)>, DbError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT d.damage_points, d.mission_kill_fraction, d.fire_susceptibility,
+                        d.flooding_susceptibility
+                   FROM platforms p JOIN damage_profiles d ON d.id = p.damage_profile_id
+                  WHERE p.id = ?1",
+                [platform_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .optional()?)
+    }
+
     /// The platform's all-aspect, any-speed radar cross-section (m²), falling back to the
     /// most general RCS entry available.
     pub fn rcs_m2(&self, platform_id: &str) -> Result<Option<f64>, DbError> {

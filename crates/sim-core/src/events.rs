@@ -134,6 +134,68 @@ pub enum SimEventKind {
         range_error_m: Option<f64>,
         bearing_error_deg: Option<f64>,
     },
+    /// A missile or torpedo left its launcher.
+    WeaponLaunched {
+        weapon_id: u64,
+        weapon: String,
+        shooter: UnitId,
+        side: SideId,
+        contact: u32,
+    },
+    /// A seeker's one acquisition draw.
+    SeekerAcquisition {
+        weapon_id: u64,
+        range_m: f64,
+        pd: f64,
+        draw: f64,
+        acquired: bool,
+    },
+    /// Probability-of-hit roll with its modifiers (`weapon_id` is `None` for guns and other
+    /// weapons resolved at once).
+    HitRoll {
+        weapon_id: Option<u64>,
+        weapon: String,
+        target: UnitId,
+        base_ph: f64,
+        size_modifier: f64,
+        speed_modifier: f64,
+        sea_modifier: f64,
+        ph: f64,
+        draw: f64,
+        hit: bool,
+    },
+    WeaponMissed {
+        weapon_id: u64,
+        reason: String,
+    },
+    /// A hit's damage and its critical, fire and flooding draws.
+    DamageTaken {
+        unit: UnitId,
+        damage_dp: f64,
+        total_dp: f64,
+        critical_draw: f64,
+        critical: Option<sim_weapons::System>,
+        fire_draw: f64,
+        fire_started: bool,
+        flood_draw: f64,
+        flooding_started: bool,
+        status: sim_weapons::Status,
+    },
+    /// A minute of fire, flooding and damage control.
+    DamageControl {
+        unit: UnitId,
+        fire_dp: f64,
+        flood_dp: f64,
+        total_dp: f64,
+        /// One draw per fire, then one for flooding.
+        draws: Vec<f64>,
+        fires_out: u32,
+        flooding_stopped: bool,
+        status: sim_weapons::Status,
+    },
+    UnitDestroyed {
+        unit: UnitId,
+    },
     /// One MAD detection draw.
     MadAttempt {
         observer: UnitId,

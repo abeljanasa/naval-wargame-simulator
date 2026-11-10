@@ -63,6 +63,8 @@ fn spawn(
             radiated_noise_db: None,
             category: None,
             length_m: None,
+            stores: Default::default(),
+            damage_profile: None,
         }),
     }
 }

@@ -1,6 +1,10 @@
 //! The `Simulation` facade: the only public way to drive the world.
 
 use crate::c2::C2State;
+use crate::combat::{
+    damage_control_system, default_damage_profile, engage, weapons_system, Health, Magazine,
+    WeaponCatalog, WeaponsInFlight,
+};
 use crate::command::DoctrineScope;
 use crate::command::{Command, CommandPayload, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
 use crate::components::{Domain, Kinematics, Position, Route, Unit};
@@ -16,12 +20,14 @@ use crate::movement::movement_system;
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
 use crate::snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
+use crate::snapshot::{StoreView, WeaponView};
 use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
 use sim_c2::track_affiliation;
 use sim_geo::land::LandMask;
 use sim_geo::GeoPoint;
+use sim_weapons::Status;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -78,7 +84,7 @@ fn plan_sea_route(
 
 /// Stable unit id → ECS entity.
 #[derive(Debug, Default, Resource)]
-struct UnitIndex(BTreeMap<UnitId, Entity>);
+pub(crate) struct UnitIndex(pub(crate) BTreeMap<UnitId, Entity>);
 
 /// A deterministic simulation run.
 pub struct Simulation {
@@ -108,6 +114,8 @@ impl Simulation {
         world.insert_resource(C2State::default());
         world.insert_resource(EnvState::default());
         world.insert_resource(BearingTable::default());
+        world.insert_resource(WeaponCatalog::default());
+        world.insert_resource(WeaponsInFlight::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
         Self {
@@ -184,6 +192,13 @@ impl Simulation {
         &self.world.resource::<EventLog>().events
     }
 
+    /// Missiles and torpedoes in flight, in launch order (ground truth: for tests, AAR and the
+    /// white cell, never for a side's picture).
+    #[must_use]
+    pub fn weapons_in_flight(&self) -> &[crate::combat::WeaponInFlight] {
+        &self.world.resource::<WeaponsInFlight>().list
+    }
+
     /// Rebuilds a run from a seed and a command log, then advances to `until`.
     pub fn replay(seed: u64, log: &[LoggedCommand], until: Tick) -> Result<Self, SimError> {
         let mut sim = Self::new(seed);
@@ -205,10 +220,12 @@ impl Simulation {
             &SensorSuite,
             &Signature,
             &Jammer,
+            &Magazine,
+            &Health,
         )>();
         let mut v: Vec<UnitRecord> = q
             .iter(&self.world)
-            .map(|(u, p, k, r, s, sig, j)| UnitRecord {
+            .map(|(u, p, k, r, s, sig, j, m, hl)| UnitRecord {
                 unit: u.clone(),
                 position: *p,
                 kinematics: *k,
@@ -216,6 +233,8 @@ impl Simulation {
                 sensors: s.clone(),
                 signature: Some(*sig),
                 jammer: j.0,
+                magazine: m.clone(),
+                health: Some(hl.clone()),
             })
             .collect();
         v.sort_by_key(|r| r.unit.id);
@@ -245,6 +264,26 @@ impl Simulation {
                 UnitView {
                     doctrine,
                     doctrine_set: r.unit.doctrine,
+                    status: r.health.as_ref().map_or(Status::Operational, |h| h.status),
+                    damage_fraction: r
+                        .health
+                        .as_ref()
+                        .map_or(0.0, |h| h.damage / h.profile.damage_points),
+                    criticals: r
+                        .health
+                        .as_ref()
+                        .map_or_else(Vec::new, |h| h.criticals.clone()),
+                    fires: r.health.as_ref().map_or(0, |h| h.fires),
+                    flooding: r.health.as_ref().is_some_and(|h| h.flooding),
+                    stores: r
+                        .magazine
+                        .0
+                        .iter()
+                        .map(|(w, n)| StoreView {
+                            weapon: w.clone(),
+                            count: *n,
+                        })
+                        .collect(),
                     group: r.unit.group.clone(),
                     id: r.unit.id,
                     name: r.unit.name,
@@ -308,6 +347,26 @@ impl Simulation {
                 })
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
+            weapons: self
+                .world
+                .resource::<WeaponsInFlight>()
+                .list
+                .iter()
+                .filter(|w| match viewer {
+                    Viewer::WhiteCell => true,
+                    Viewer::Side { side } => w.side == side,
+                })
+                .map(|w| WeaponView {
+                    #[allow(clippy::cast_possible_truncation)]
+                    id: w.id as u32,
+                    side: w.side,
+                    weapon: w.weapon.clone(),
+                    position: w.position,
+                    altitude_m: w.altitude_m,
+                    heading_deg: w.heading_deg,
+                    homing: w.homing,
+                })
+                .collect(),
             bearings: self.world.resource::<BearingTable>().views(
                 match viewer {
                     Viewer::WhiteCell => None,
@@ -366,6 +425,20 @@ impl Simulation {
             h.opt_f64(r.signature.and_then(|s| s.radiated_noise_db));
             h.opt_f64(r.signature.and_then(|s| s.length_m));
             h.opt_str(r.unit.category.as_deref());
+            h.u64(r.magazine.0.len() as u64);
+            for (w, n) in &r.magazine.0 {
+                h.str(w);
+                h.u64(u64::from(*n));
+            }
+            if let Some(hl) = &r.health {
+                h.f64(hl.profile.damage_points);
+                h.f64(hl.damage);
+                h.u64(u64::from(hl.fires));
+                h.u8(u8::from(hl.flooding));
+                for c in &hl.criticals {
+                    h.u8(c.code());
+                }
+            }
             h.u64(r.sensors.0.len() as u64);
             for s in &r.sensors.0 {
                 h.str(&s.sensor_id);
@@ -381,6 +454,31 @@ impl Simulation {
                 h.u8(u8::from(s.active));
             }
             h.opt_f64(r.jammer.map(|j| j.jn_db_at_1km));
+        }
+        let catalog = self.world.resource::<WeaponCatalog>();
+        h.u64(catalog.0.len() as u64);
+        for (id, w) in &catalog.0 {
+            h.str(id);
+            h.u8(w.kind.code());
+            h.f64(w.min_range_m);
+            h.f64(w.max_range_m);
+            h.f64(w.speed_mps);
+            h.f64(w.warhead_kg);
+            h.f64(w.base_ph);
+        }
+        let wif = self.world.resource::<WeaponsInFlight>();
+        h.u64(wif.next_id);
+        for w in &wif.list {
+            h.u64(w.id);
+            h.str(&w.weapon);
+            h.u16(w.side.0);
+            h.u64(w.target.0);
+            h.f64(w.position.lat_deg);
+            h.f64(w.position.lon_deg);
+            h.f64(w.aim.lat_deg);
+            h.f64(w.aim.lon_deg);
+            h.f64(w.range_left_m);
+            h.u8(u8::from(w.seeker_tried) | (u8::from(w.homing) << 1));
         }
         let lib = self.world.resource::<EmitterLibrary>();
         h.u64(lib.0.len() as u64);
@@ -478,6 +576,8 @@ impl Simulation {
             environment: self.world.resource::<EnvState>().0,
             bearings: self.world.resource::<BearingTable>().clone(),
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
+            weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
+            weapons_in_flight: self.world.resource::<WeaponsInFlight>().clone(),
         }
     }
 
@@ -507,6 +607,8 @@ impl Simulation {
         sim.world.insert_resource(EnvState(save.environment));
         sim.world.insert_resource(save.bearings);
         sim.world.insert_resource(save.emitter_library);
+        sim.world.insert_resource(save.weapon_catalog);
+        sim.world.insert_resource(save.weapons_in_flight);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -520,6 +622,9 @@ impl Simulation {
                 radiated_noise_db: None,
                 length_m: None,
             });
+            let health = r
+                .health
+                .unwrap_or_else(|| Health::new(default_damage_profile(r.unit.domain)));
             let e = sim
                 .world
                 .spawn((
@@ -530,6 +635,8 @@ impl Simulation {
                     r.sensors,
                     signature,
                     Jammer(r.jammer),
+                    health,
+                    r.magazine,
                 ))
                 .id();
             if index.insert(id, e).is_some() {
@@ -555,6 +662,8 @@ fn build_schedule() -> Schedule {
         (
             apply_commands_system,
             movement_system,
+            weapons_system,
+            damage_control_system,
             detection_system,
             advance_clock_system,
         )
@@ -650,6 +759,26 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
             }
             world.insert_resource(lib);
             Ok(())
+        }
+        CommandPayload::SetWeaponCatalog { weapons } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set the weapon catalogue".into());
+            }
+            let mut cat = WeaponCatalog::default();
+            for w in weapons {
+                cat.0.insert(w.id.clone(), w.clone());
+            }
+            world.insert_resource(cat);
+            Ok(())
+        }
+        CommandPayload::Engage {
+            shooter,
+            contact,
+            weapon,
+            rounds,
+        } => {
+            let entity = authorised_entity(world, cmd, *shooter)?;
+            engage(world, cmd, *shooter, *contact, weapon, *rounds, entity)
         }
         CommandPayload::SetEnvironment { environment } => {
             if !cmd.issuer.is_privileged() {
@@ -765,6 +894,11 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 length_m: s.length_m,
             },
             Jammer(s.jammer),
+            Magazine(s.stores.clone()),
+            Health::new(
+                s.damage_profile
+                    .unwrap_or_else(|| default_damage_profile(s.domain)),
+            ),
             Kinematics {
                 heading_deg: sim_geo::normalize_azimuth_deg(s.heading_deg),
                 speed_mps: s.speed_mps.clamp(0.0, s.max_speed_mps),

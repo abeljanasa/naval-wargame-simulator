@@ -31,6 +31,8 @@ fn spawn(id: u64, side: u16, lat: f64, lon: f64, route: Vec<GeoPoint>) -> Comman
             radiated_noise_db: None,
             category: None,
             length_m: None,
+            stores: Default::default(),
+            damage_profile: None,
         }),
     }
 }

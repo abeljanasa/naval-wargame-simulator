@@ -9,13 +9,14 @@ publish.workspace = true
 [features]
 default = []
 # Derives `specta::Type` on protocol types so the desktop app can generate TypeScript bindings.
-specta = ["dep:specta", "sim-geo/specta", "sim-sensors/specta", "sim-c2/specta"]
+specta = ["dep:specta", "sim-geo/specta", "sim-sensors/specta", "sim-c2/specta", "sim-weapons/specta"]
 
 [dependencies]
 sim-geo.workspace = true
 libm.workspace = true
 sim-sensors.workspace = true
 sim-c2.workspace = true
+sim-weapons.workspace = true
 bevy_ecs.workspace = true
 rand_chacha.workspace = true
 rmp-serde.workspace = true

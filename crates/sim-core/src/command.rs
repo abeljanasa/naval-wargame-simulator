@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use sim_c2::{Doctrine, Posture};
 use sim_geo::GeoPoint;
 use sim_sensors::{Carrier, Environment, JammerSpec};
+use sim_weapons::{DamageProfile, WeaponSpec};
+use std::collections::BTreeMap;
 
 /// Version of the command and snapshot wire protocol. Bump it on any breaking change to
 /// [`Command`], [`CommandPayload`] or [`crate::Snapshot`], and add a migration.
@@ -100,6 +102,12 @@ pub struct UnitSpawn {
     /// Length overall, metres; `None` uses the domain default.
     #[serde(default)]
     pub length_m: Option<f64>,
+    /// Rounds carried, by weapon id.
+    #[serde(default)]
+    pub stores: BTreeMap<String, u32>,
+    /// Damage profile; `None` uses the domain default.
+    #[serde(default)]
+    pub damage_profile: Option<DamageProfile>,
 }
 
 /// One emitter type and the platform classes known to carry it.
@@ -160,6 +168,17 @@ pub enum CommandPayload {
     SetEmitterLibrary {
         entries: Vec<EmitterEntry>,
     },
+    /// Replaces the weapon catalogue (from the platform database). Scenario and white cell only.
+    SetWeaponCatalog {
+        weapons: Vec<WeaponSpec>,
+    },
+    /// Fire `rounds` of `weapon` from `shooter` at the shooter side's contact `contact`.
+    Engage {
+        shooter: UnitId,
+        contact: u32,
+        weapon: String,
+        rounds: u32,
+    },
 }
 
 impl CommandPayload {
@@ -172,11 +191,13 @@ impl CommandPayload {
             | CommandPayload::SetDoctrine {
                 scope: DoctrineScope::Unit { unit },
                 ..
-            } => Some(*unit),
+            }
+            | CommandPayload::Engage { shooter: unit, .. } => Some(*unit),
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
             | CommandPayload::SetEnvironment { .. }
             | CommandPayload::SetEmitterLibrary { .. }
+            | CommandPayload::SetWeaponCatalog { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -213,6 +234,9 @@ impl CommandPayload {
                 }
                 for sensor in &s.sensors {
                     sensor.validate()?;
+                }
+                if let Some(d) = &s.damage_profile {
+                    d.validate()?;
                 }
                 if s.length_m.is_some_and(|l| !(l.is_finite() && l >= 0.0)) {
                     return Err("length_m must be finite and >= 0".into());
@@ -252,6 +276,16 @@ impl CommandPayload {
             } if group.trim().is_empty() => Err("group name is empty".into()),
             CommandPayload::SetDoctrine { .. } => Ok(()),
             CommandPayload::SetEnvironment { environment } => environment.validate(),
+            CommandPayload::SetWeaponCatalog { weapons } => {
+                weapons.iter().try_for_each(WeaponSpec::validate)
+            }
+            CommandPayload::Engage { rounds, weapon, .. } => {
+                if *rounds == 0 || weapon.trim().is_empty() {
+                    Err("engage needs a weapon and at least one round".into())
+                } else {
+                    Ok(())
+                }
+            }
             CommandPayload::SetEmitterLibrary { entries } => {
                 if entries.iter().any(|e| e.emitter.trim().is_empty()) {
                     Err("emitter library entry has no emitter name".into())

@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use sim_c2::{Doctrine, Posture, ResolvedDoctrine};
 use sim_geo::GeoPoint;
 use sim_sensors::{Classification, Environment, ErrorEllipse};
+use sim_weapons::{Status, System};
 
 /// Whose picture a snapshot shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,6 +54,36 @@ pub struct UnitView {
     pub doctrine: ResolvedDoctrine,
     /// Doctrine set on the unit itself (unset fields are inherited).
     pub doctrine_set: Doctrine,
+    pub status: Status,
+    /// Damage taken as a fraction of the unit's damage points.
+    pub damage_fraction: f64,
+    pub criticals: Vec<System>,
+    pub fires: u32,
+    pub flooding: bool,
+    /// Rounds carried, by weapon id (sorted).
+    pub stores: Vec<StoreView>,
+}
+
+/// Rounds of one weapon carried.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct StoreView {
+    pub weapon: String,
+    pub count: u32,
+}
+
+/// A missile or torpedo in flight, as shown to its own side (and the white cell).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct WeaponView {
+    pub id: u32,
+    pub side: SideId,
+    pub weapon: String,
+    pub position: GeoPoint,
+    pub altitude_m: f64,
+    pub heading_deg: f64,
+    /// The seeker has acquired its target.
+    pub homing: bool,
 }
 
 /// How `side` regards `toward`.
@@ -110,4 +141,6 @@ pub struct Snapshot {
     pub environment: Environment,
     /// Side viewer: that side's recent ESM bearing lines. White cell: every side's.
     pub bearings: Vec<BearingView>,
+    /// Side viewer: its own weapons in flight. White cell: every weapon in flight.
+    pub weapons: Vec<WeaponView>,
 }
