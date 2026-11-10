@@ -319,6 +319,17 @@ impl PlatformDb {
             .optional()?)
     }
 
+    /// Every weapon as (id, name, kind), sorted by id.
+    pub fn weapons(&self) -> Result<Vec<(String, String, String)>, DbError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, kind FROM weapons ORDER BY id")?;
+        let v = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(v)
+    }
+
     /// Every platform, sorted by id.
     pub fn platforms(&self) -> Result<Vec<PlatformSummary>, DbError> {
         let mut stmt = self

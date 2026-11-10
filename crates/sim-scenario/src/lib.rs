@@ -10,6 +10,7 @@
 //! * v2: optional `platform` reference; inline values become optional overrides. v1 files still load.
 //! * v3: `events`, and `reserve` units held off the board until an event brings them in. v1 and
 //!   v2 files still load.
+//! * v4: `reference_points` (named map points for planning and briefing). Older files still load.
 
 #![forbid(unsafe_code)]
 
@@ -27,7 +28,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 pub const SCENARIO_FORMAT: &str = "nws-scenario";
-pub const SCENARIO_FORMAT_VERSION: u32 = 3;
+pub const SCENARIO_FORMAT_VERSION: u32 = 4;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioError {
@@ -47,6 +48,7 @@ pub enum ScenarioError {
     Sim(#[from] sim_core::SimError),
 }
 
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SideDef {
     pub id: SideId,
@@ -59,6 +61,7 @@ pub struct SideDef {
     pub doctrine: Doctrine,
 }
 
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SidePosture {
@@ -67,6 +70,7 @@ pub struct SidePosture {
 }
 
 /// A named group (task group, formation) of one side, with its doctrine.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroupDef {
@@ -77,6 +81,7 @@ pub struct GroupDef {
 }
 
 /// A minefield laid before the scenario starts.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioMinefield {
@@ -93,6 +98,7 @@ fn is_default<T: Default + PartialEq>(v: &T) -> bool {
 }
 
 /// A unit as written in a scenario file.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioUnit {
@@ -136,6 +142,7 @@ pub struct ScenarioUnit {
     pub reserve: bool,
 }
 
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
     pub format: String,
@@ -144,8 +151,11 @@ pub struct Scenario {
     #[serde(default)]
     pub description: String,
     /// Default RNG seed. Batch runs override it per replication.
+    // Exported to TypeScript as a number: seeds written by people stay far below 2^53.
+    #[cfg_attr(feature = "specta", specta(type = f64))]
     pub seed: u64,
     /// Default run length in game seconds.
+    #[cfg_attr(feature = "specta", specta(type = f64))]
     pub duration_s: u64,
     pub sides: Vec<SideDef>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -167,6 +177,41 @@ pub struct Scenario {
     /// (`Scenario::seats_or_default`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seats: Vec<Seat>,
+    /// Named map points for planning and briefing (format 4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reference_points: Vec<ReferencePoint>,
+}
+
+/// A named point on the map (a rendezvous, a waypoint name, a briefing mark). It has no effect
+/// on the simulation; the desktop shows it to the sides that may see it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(deny_unknown_fields)]
+pub struct ReferencePoint {
+    pub name: String,
+    pub position: GeoPoint,
+    /// Shown to this side only (and the white cell); `None`: every side.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side: Option<SideId>,
+}
+
+/// How serious a scenario problem is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum Severity {
+    /// The scenario cannot be saved or played.
+    Error,
+    /// Allowed, but probably a mistake.
+    Warning,
+}
+
+/// One problem found by [`Scenario::check`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct ScenarioIssue {
+    pub severity: Severity,
+    pub message: String,
 }
 
 fn domain_from_db(s: &str) -> Option<Domain> {
@@ -206,72 +251,69 @@ impl Scenario {
     }
 
     /// Structural checks: unique side and unit ids, every unit on a declared side, and every
-    /// unit without a platform carrying its own domain, max speed and acceleration.
+    /// unit without a platform carrying its own domain, max speed and acceleration. Fails with
+    /// the first problem; [`Scenario::check`] lists them all.
     /// Per-unit value checks run when the spawn command is submitted.
     pub fn validate(&self) -> Result<(), ScenarioError> {
+        match self.structural_issues().into_iter().next() {
+            Some(e) => Err(ScenarioError::Invalid(e)),
+            None => Ok(()),
+        }
+    }
+
+    fn structural_issues(&self) -> Vec<String> {
+        let mut out = Vec::new();
         let mut sides = BTreeSet::new();
         for s in &self.sides {
             if !sides.insert(s.id) {
-                return Err(ScenarioError::Invalid(format!(
-                    "duplicate side id {}",
-                    s.id
-                )));
+                out.push(format!("duplicate side id {}", s.id));
             }
         }
         for s in &self.sides {
             for p in &s.postures {
                 if p.toward == s.id || !sides.contains(&p.toward) {
-                    return Err(ScenarioError::Invalid(format!(
+                    out.push(format!(
                         "side {} has a posture toward {}, which is itself or undeclared",
                         s.id, p.toward
-                    )));
+                    ));
                 }
             }
         }
         let mut groups = BTreeSet::new();
         for g in &self.groups {
             if !sides.contains(&g.side) || g.name.trim().is_empty() {
-                return Err(ScenarioError::Invalid(format!(
+                out.push(format!(
                     "group {:?} needs a declared side and a name",
                     g.name
-                )));
+                ));
             }
             if !groups.insert((g.side, g.name.clone())) {
-                return Err(ScenarioError::Invalid(format!(
-                    "duplicate group {:?} on side {}",
-                    g.name, g.side
-                )));
+                out.push(format!("duplicate group {:?} on side {}", g.name, g.side));
             }
         }
         let mut units = BTreeSet::new();
         for u in &self.units {
             if let Some(g) = &u.group {
                 if !groups.contains(&(u.side, g.clone())) {
-                    return Err(ScenarioError::Invalid(format!(
+                    out.push(format!(
                         "unit {} is in group {g:?}, which its side does not declare",
                         u.id
-                    )));
+                    ));
                 }
             }
             if !units.insert(u.id) {
-                return Err(ScenarioError::Invalid(format!(
-                    "duplicate unit id {}",
-                    u.id
-                )));
+                out.push(format!("duplicate unit id {}", u.id));
             }
             if !sides.contains(&u.side) {
-                return Err(ScenarioError::Invalid(format!(
-                    "unit {} is on undeclared side {}",
-                    u.id, u.side
-                )));
+                out.push(format!("unit {} is on undeclared side {}", u.id, u.side));
             }
             if u.platform.is_none()
                 && (u.domain.is_none() || u.max_speed_mps.is_none() || u.accel_mps2.is_none())
             {
-                return Err(ScenarioError::Invalid(format!(
+                out.push(format!(
                     "unit {} has no platform, so it needs domain, max_speed_mps and accel_mps2",
                     u.id
-                )));
+                ));
             }
         }
         for m in &self.minefields {
@@ -279,47 +321,149 @@ impl Scenario {
                 || !(m.radius_m.is_finite() && m.radius_m > 0.0)
                 || m.mines == 0
             {
-                return Err(ScenarioError::Invalid(format!(
+                out.push(format!(
                     "minefield of {} × {} needs a declared side, a radius > 0 and mines > 0",
                     m.mines, m.weapon
-                )));
+                ));
             }
         }
-        self.environment
-            .validate()
-            .map_err(|e| ScenarioError::Invalid(format!("environment: {e}")))?;
-        self.validate_events(&sides)?;
+        if let Err(e) = self.environment.validate() {
+            out.push(format!("environment: {e}"));
+        }
+        out.extend(self.event_issues(&sides));
         if !self.seats.is_empty() {
-            sim_core::validate_seats(&self.seats).map_err(ScenarioError::Invalid)?;
+            if let Err(e) = sim_core::validate_seats(&self.seats) {
+                out.push(e);
+            }
             for s in &self.seats {
                 if let SeatRole::Side { side } = s.role {
                     if !sides.contains(&side) {
-                        return Err(ScenarioError::Invalid(format!(
-                            "seat {:?} plays undeclared side {side}",
-                            s.name
-                        )));
+                        out.push(format!("seat {:?} plays undeclared side {side}", s.name));
                     }
                 }
             }
         }
-        if self.duration_s == 0 {
-            return Err(ScenarioError::Invalid("duration_s must be > 0".into()));
+        let mut names = BTreeSet::new();
+        for r in &self.reference_points {
+            if r.name.trim().is_empty() {
+                out.push("a reference point has no name".into());
+            } else if !names.insert(r.name.trim()) {
+                out.push(format!("duplicate reference point {:?}", r.name));
+            }
+            if !r.position.is_valid() {
+                out.push(format!(
+                    "reference point {:?} has an invalid position",
+                    r.name
+                ));
+            }
+            if r.side.is_some_and(|s| !sides.contains(&s)) {
+                out.push(format!(
+                    "reference point {:?} is for an undeclared side",
+                    r.name
+                ));
+            }
         }
-        Ok(())
+        if self.duration_s == 0 {
+            out.push("duration_s must be > 0".into());
+        }
+        out
+    }
+
+    /// Every problem the scenario editor should show: the structural checks, each unit's
+    /// platform resolution, minefield mine types, and a trial build (commands and scripts),
+    /// then warnings for likely mistakes. Errors first.
+    #[must_use]
+    pub fn check(&self, db: &PlatformDb) -> Vec<ScenarioIssue> {
+        let error = |message: String| ScenarioIssue {
+            severity: Severity::Error,
+            message,
+        };
+        let warning = |message: String| ScenarioIssue {
+            severity: Severity::Warning,
+            message,
+        };
+        let mut issues: Vec<ScenarioIssue> =
+            self.structural_issues().into_iter().map(error).collect();
+        for u in &self.units {
+            if let Err(e) = resolve_unit(u, db) {
+                issues.push(error(match e {
+                    ScenarioError::Invalid(m) => m,
+                    e => format!("unit {}: {e}", u.id),
+                }));
+            }
+        }
+        for m in &self.minefields {
+            match db.weapon(&m.weapon) {
+                Ok(Some(w)) if w.2 == "mine" => {}
+                Ok(Some(_)) => issues.push(error(format!(
+                    "minefield weapon {} is not a mine",
+                    m.weapon
+                ))),
+                Ok(None) => issues.push(error(format!(
+                    "minefield weapon {} is not in the platform database",
+                    m.weapon
+                ))),
+                Err(e) => issues.push(error(format!("platform database: {e}"))),
+            }
+        }
+        if issues.is_empty() {
+            // Everything the loader checks when the commands are submitted, including scripts.
+            if let Err(e) = self.build(None, db) {
+                issues.push(error(e.to_string()));
+            }
+        }
+        // Warnings.
+        for s in &self.sides {
+            if !self.units.iter().any(|u| u.side == s.id && !u.reserve) {
+                issues.push(warning(format!(
+                    "side {} ({}) starts with no units",
+                    s.id, s.name
+                )));
+            }
+        }
+        let land = sim_geo::land::embedded();
+        let mut seen = BTreeSet::new();
+        for u in &self.units {
+            if !seen.insert(u.name.trim()) {
+                issues.push(warning(format!(
+                    "more than one unit is called {:?}",
+                    u.name
+                )));
+            }
+            let sea = match u.domain {
+                Some(d) => matches!(d, Domain::Surface | Domain::Subsurface),
+                None => u
+                    .platform
+                    .as_deref()
+                    .and_then(|p| db.platform(p).ok().flatten())
+                    .is_some_and(|p| p.domain == "surface" || p.domain == "subsurface"),
+            };
+            if sea && u.position.is_valid() && land.is_land(u.position) {
+                issues.push(warning(format!(
+                    "unit {} ({}) starts on land",
+                    u.id, u.name
+                )));
+            }
+        }
+        issues.sort_by_key(|i| i.severity);
+        issues
     }
 
     /// Events: their own checks, then every side and unit they name must be declared, and
     /// `spawn_reserve` must name a reserve unit.
-    fn validate_events(&self, sides: &BTreeSet<SideId>) -> Result<(), ScenarioError> {
+    fn event_issues(&self, sides: &BTreeSet<SideId>) -> Vec<String> {
         use sim_core::{Audience, Condition, DoctrineTarget, EventAction, Trigger};
-        sim_core::validate_events(&self.events, &self.injects).map_err(ScenarioError::Invalid)?;
+        let mut out = Vec::new();
+        if let Err(e) = sim_core::validate_events(&self.events, &self.injects) {
+            out.push(e);
+        }
         for i in &self.injects {
             if let Audience::Side { side } = i.to {
                 if !sides.contains(&SideId(side)) {
-                    return Err(ScenarioError::Invalid(format!(
+                    out.push(format!(
                         "inject {:?} is addressed to undeclared side S{side}",
                         i.id
-                    )));
+                    ));
                 }
             }
         }
@@ -372,28 +516,22 @@ impl Scenario {
                     | EventAction::SetRoute { unit, .. }
                     | EventAction::AssignMission { unit, .. } => unit_refs.push(*unit),
                     EventAction::SpawnReserve { unit } if !reserves.contains(unit) => {
-                        return Err(ScenarioError::Invalid(format!(
+                        out.push(format!(
                             "event {:?} spawns U{unit}, which is not a reserve unit",
                             e.id
-                        )));
+                        ));
                     }
                     _ => {}
                 }
             }
             if let Some(s) = side_refs.iter().find(|s| !sides.contains(&SideId(**s))) {
-                return Err(ScenarioError::Invalid(format!(
-                    "event {:?} names undeclared side S{s}",
-                    e.id
-                )));
+                out.push(format!("event {:?} names undeclared side S{s}", e.id));
             }
             if let Some(u) = unit_refs.iter().find(|u| !units.contains(u)) {
-                return Err(ScenarioError::Invalid(format!(
-                    "event {:?} names undeclared unit U{u}",
-                    e.id
-                )));
+                out.push(format!("event {:?} names undeclared unit U{u}", e.id));
             }
         }
-        Ok(())
+        out
     }
 
     /// The scenario's seats, or the default: seat 0 `White cell`, then seat n for the n-th side,
@@ -1006,6 +1144,128 @@ mod tests {
             ),
         ] {
             let bad = WITH_EVENTS.replacen(from, to, 1);
+            assert!(
+                matches!(Scenario::from_json(&bad), Err(ScenarioError::Invalid(_))),
+                "{to}"
+            );
+        }
+    }
+
+    /// A scenario as the editor sends it: parsed without the loader's first-error check.
+    fn raw(json: &str) -> Scenario {
+        serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn check_lists_every_error_at_once_errors_first() {
+        let s = raw(r#"{
+            "format": "nws-scenario", "format_version": 4, "name": "t", "seed": 1, "duration_s": 0,
+            "sides": [{"id": 1, "name": "Blue"}, {"id": 2, "name": "Red"}],
+            "minefields": [{"side": 1, "centre": {"lat_deg": 0.0, "lon_deg": 0.0},
+                            "radius_m": 1000.0, "mines": 5, "weapon": "WPN-GUN-127"}],
+            "units": [
+                {"id": 1, "name": "A", "side": 1, "platform": "GEN-FFG",
+                 "position": {"lat_deg": 0.0, "lon_deg": 0.0}},
+                {"id": 1, "name": "B", "side": 3, "platform": "GEN-FFG",
+                 "position": {"lat_deg": 0.0, "lon_deg": 0.1}},
+                {"id": 2, "name": "C", "side": 1, "platform": "NO-SUCH",
+                 "position": {"lat_deg": 0.0, "lon_deg": 0.2}}
+            ]
+        }"#);
+        let issues = s.check(&db());
+        let errors: Vec<&str> = issues
+            .iter()
+            .filter(|i| i.severity == Severity::Error)
+            .map(|i| i.message.as_str())
+            .collect();
+        for expected in [
+            "duplicate unit id",
+            "undeclared side",
+            "unknown platform NO-SUCH",
+            "duration_s",
+            "is not a mine",
+        ] {
+            assert!(
+                errors.iter().any(|e| e.contains(expected)),
+                "{expected}: {errors:?}"
+            );
+        }
+        // Red has no units: a warning, listed after every error.
+        let first_warning = issues
+            .iter()
+            .position(|i| i.severity == Severity::Warning)
+            .unwrap();
+        assert!(issues[first_warning..]
+            .iter()
+            .all(|i| i.severity == Severity::Warning));
+        assert!(issues[first_warning].message.contains("Red"));
+    }
+
+    #[test]
+    fn a_clean_scenario_has_only_warnings_and_builds() {
+        // A frigate placed in central Australia, and two units with the same name.
+        let s = raw(r#"{
+            "format": "nws-scenario", "format_version": 4, "name": "t", "seed": 1, "duration_s": 60,
+            "sides": [{"id": 1, "name": "Blue"}],
+            "units": [
+                {"id": 1, "name": "A", "side": 1, "platform": "GEN-FFG",
+                 "position": {"lat_deg": -25.0, "lon_deg": 134.0}},
+                {"id": 2, "name": "A", "side": 1, "platform": "GEN-FFG",
+                 "position": {"lat_deg": -39.0, "lon_deg": 146.0}}
+            ]
+        }"#);
+        let issues = s.check(&db());
+        assert!(
+            issues.iter().all(|i| i.severity == Severity::Warning),
+            "{issues:?}"
+        );
+        assert!(issues.iter().any(|i| i.message.contains("starts on land")));
+        assert!(issues
+            .iter()
+            .any(|i| i.message.contains("more than one unit")));
+        assert!(s.build(None, &db()).is_ok());
+        // The shipped scenarios are clean.
+        for name in [
+            "phase1-strait-transit",
+            "phase2-surface-action",
+            "phase3-ttx-demo",
+        ] {
+            let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../data/scenarios")
+                .join(format!("{name}.json"));
+            let s = Scenario::load(path).unwrap();
+            let errors: Vec<_> = s
+                .check(&db())
+                .into_iter()
+                .filter(|i| i.severity == Severity::Error)
+                .collect();
+            assert!(errors.is_empty(), "{name}: {errors:?}");
+        }
+    }
+
+    #[test]
+    fn reference_points_load_round_trip_and_are_checked() {
+        let json = r#"{
+            "format": "nws-scenario", "format_version": 4, "name": "t", "seed": 1, "duration_s": 60,
+            "sides": [{"id": 1, "name": "Blue"}],
+            "units": [],
+            "reference_points": [
+                {"name": "RV Alpha", "position": {"lat_deg": -39.0, "lon_deg": 146.0}},
+                {"name": "Blue box", "position": {"lat_deg": -39.5, "lon_deg": 146.5}, "side": 1}
+            ]
+        }"#;
+        let s = Scenario::from_json(json).unwrap();
+        assert_eq!(s.reference_points.len(), 2);
+        assert_eq!(s.reference_points[1].side, Some(SideId(1)));
+        let back = Scenario::from_json(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(back.reference_points, s.reference_points);
+        for (from, to) in [
+            (r#""name": "Blue box""#, r#""name": "RV Alpha""#),
+            (r#""side": 1}"#, r#""side": 7}"#),
+            (r#""name": "RV Alpha""#, r#""name": " ""#),
+            (r#""lat_deg": -39.0"#, r#""lat_deg": 99.0"#),
+        ] {
+            let bad = json.replacen(from, to, 1);
             assert!(
                 matches!(Scenario::from_json(&bad), Err(ScenarioError::Invalid(_))),
                 "{to}"

@@ -72,6 +72,17 @@
 - **`nws-batch aar`:** replays a record, or runs a scenario and records it, then writes the five CSV tables. It fails if the replay does not match.
 - **Save format 16:** hit rolls record the firing unit and side (golden hashes unchanged).
 
+### Added (Phase 3, slice 7: scenario editor)
+
+- **Desktop scenario editor** (`docs/models/scenario-editor.md`, DL-0027):
+  - Edit the loaded scenario, start a new one, or edit a file.
+  - Forms for the overview and environment; sides and postures; units (platform, position, heading, speed, route, mission, reserve); minefields; and reference points.
+  - Map picking for positions, routes, patrol centres, destinations and minefields.
+  - Events, injects, seats and groups as JSON, with event templates.
+  - The map shows the draft while editing.
+- **Validation by the engine:** `Scenario::check` lists every error and warning at once. Errors block Save and Play.
+- **Scenario format 4:** `reference_points`, shown on the map to the seats that may see them.
+
 ### Changed
 
 - Save format 15 (events, injects, messages, seats).

@@ -3940,6 +3940,7 @@ dependencies = [
  "sim-core",
  "sim-db",
  "sim-geo",
+ "specta",
  "thiserror 2.0.21",
 ]
 

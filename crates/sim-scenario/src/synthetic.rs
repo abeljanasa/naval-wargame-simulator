@@ -74,5 +74,6 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
         events: vec![],
         injects: vec![],
         seats: vec![],
+        reference_points: vec![],
     }
 }
