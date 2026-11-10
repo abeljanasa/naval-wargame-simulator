@@ -158,3 +158,40 @@ fn golden_replays() {
         failures.join("\n")
     );
 }
+
+/// Gate 2 (core combat): the shipped surface-action scenario exercises the whole chain with its
+/// own seed. Both sides launch; layered point defence (interceptors and decoys) engages; hits
+/// do damage and at least one unit is destroyed; ships run the minefield's transit risk; the
+/// neutral merchant is never engaged.
+#[test]
+fn gate2_demo_detects_engages_defends_and_damages() {
+    use sim_core::SimEventKind as K;
+    let s = Scenario::from_json(
+        &std::fs::read_to_string(repo_root().join("data/scenarios/phase2-surface-action.json"))
+            .unwrap(),
+    )
+    .unwrap();
+    let mut sim = s.build(None, &db()).unwrap();
+    sim.run_until(s.duration_ticks());
+    let ev = sim.events();
+    let count = |f: &dyn Fn(&K) -> bool| ev.iter().filter(|e| f(&e.kind)).count();
+    let launched_by =
+        |side: u16| count(&|k| matches!(k, K::WeaponLaunched { side: s, .. } if s.0 == side));
+    assert!(launched_by(1) > 0 && launched_by(2) > 0, "both sides fire");
+    assert!(count(&|k| matches!(k, K::PointDefenceShot { .. })) > 0);
+    assert!(count(&|k| matches!(k, K::InterceptRoll { killed: true, .. })) > 0);
+    assert!(count(&|k| matches!(k, K::DecoyLaunched { .. })) > 0);
+    assert!(count(&|k| matches!(k, K::HitRoll { hit: true, .. })) > 0);
+    assert!(count(&|k| matches!(k, K::DamageTaken { .. })) > 0);
+    assert!(count(&|k| matches!(k, K::UnitDestroyed { .. })) >= 1);
+    assert!(count(&|k| matches!(k, K::MineEncounter { .. })) > 0);
+    // The merchant (unit 5) is never shot at or damaged.
+    assert_eq!(
+        count(&|k| matches!(
+            k,
+            K::HitRoll { target, .. } | K::DamageTaken { unit: target, .. }
+                if target.0 == 5
+        )),
+        0
+    );
+}

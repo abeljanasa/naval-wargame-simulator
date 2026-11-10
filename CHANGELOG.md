@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 12: Gate 2 pack)
+
+- **Combat demo scenario** `data/scenarios/phase2-surface-action.json`: Blue destroyer and frigate against two Red missile corvettes in Bass Strait, weapons free, with a Red minefield and a neutral merchant. It is included in the golden replays and the cross-OS determinism matrix.
+- **Gate 2 scenario test** `gate2_demo_detects_engages_defends_and_damages`: both sides fire, point defence and decoys engage, hits do damage, a unit is destroyed, the minefield is run, and the neutral is untouched.
+- **Duel-test index** `docs/gate2/duel-tests.md`: every model's duel and hand-value tests.
+
 ### Added (Phase 2, slice 11: basic mines)
 
 - **Minefields** (`docs/models/weapons-damage.md` §Mines, DL-0020):

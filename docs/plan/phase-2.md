@@ -25,9 +25,11 @@ Each slice is one or more small PRs that leave CI green, with its model doc, des
 | 9 ✅ | **Point defence and soft kill:** engagement opportunities from reaction time, range and fire channels (saturation emerges); chaff, flares, decoys, ECM, torpedo countermeasures | 7, 8 | Reaction time per system; soft-kill seduction probabilities |
 | 10 ✅ | **Basic missions:** patrol (area), strike, escort/screen, ferry; automated target assignment under ROE/WCS | 2, 7 | Mission set for Phase 2; AI cadence (every 10–30 s per §6.2) |
 | 11 ✅ | **Basic mines (P1):** laying, fields, transit risk | 7, 8 | Actuation probability per transit; field density |
-| 12 | **Gate 2 pack:** the full duel suite, a combat demo scenario, golden replays, a review pack | all | — |
+| 12 ✅ | **Gate 2 pack:** the full duel suite, a combat demo scenario, golden replays, a review pack | all | — |
 
 Out of phase (stay in the backlog): sound-velocity profiles, layers and convergence zones; weather zones; air ops and sortie generation; Lua events; scenario editor; operational planning layer.
+
+Gate 2 evidence: [gate2/duel-tests.md](../gate2/duel-tests.md).
 
 ## Data
 
