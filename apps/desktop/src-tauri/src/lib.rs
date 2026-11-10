@@ -196,7 +196,15 @@ pub fn run() {
             std::process::exit(1);
         }
     };
-    let host = match Host::new(scenario) {
+    // The open platform database is compiled into the app: no data files, works air-gapped.
+    let platforms = match sim_db::embedded::open_platform_db() {
+        Ok(db) => db,
+        Err(e) => {
+            eprintln!("built-in platform database is invalid: {e}");
+            std::process::exit(1);
+        }
+    };
+    let host = match Host::new(scenario, &platforms) {
         Ok(h) => Arc::new(Mutex::new(h)),
         Err(e) => {
             eprintln!("cannot start simulation: {e}");

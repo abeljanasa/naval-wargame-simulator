@@ -10,6 +10,10 @@ use sim_core::{SaveGame, Simulation, Tick};
 use sim_scenario::Scenario;
 use std::path::{Path, PathBuf};
 
+fn db() -> sim_db::PlatformDb {
+    sim_db::embedded::open_platform_db().unwrap()
+}
+
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -34,7 +38,7 @@ fn shipped_scenarios() -> Vec<(String, Scenario)> {
 }
 
 fn run(s: &Scenario, seed: u64) -> u64 {
-    let mut sim = s.build(Some(seed)).unwrap();
+    let mut sim = s.build(Some(seed), &db()).unwrap();
     sim.run_until(s.duration_ticks());
     sim.state_hash()
 }
@@ -48,12 +52,42 @@ fn every_scenario_is_deterministic_per_seed() {
     }
 }
 
+/// Gate 1 criterion ("units move and detect") on the shipped demonstrator.
+#[test]
+fn gate1_demo_units_move_and_detect() {
+    let s = Scenario::load(repo_root().join("data/scenarios/phase1-strait-transit.json")).unwrap();
+    let mut sim = s.build(None, &db()).unwrap();
+    sim.step();
+    let start = sim.snapshot(sim_core::Viewer::WhiteCell);
+    sim.run_until(s.duration_ticks());
+    let end = sim.snapshot(sim_core::Viewer::WhiteCell);
+    for (a, b) in start.units.iter().zip(&end.units) {
+        assert_ne!(a.position, b.position, "{} did not move", a.name);
+    }
+    let gained: Vec<(u16, u64)> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            sim_core::SimEventKind::ContactGained { side, target, .. } => Some((side.0, target.0)),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        gained.contains(&(1, 2)),
+        "frigate never detected the merchant: {gained:?}"
+    );
+    assert!(
+        gained.contains(&(2, 1)),
+        "merchant never detected the frigate: {gained:?}"
+    );
+}
+
 #[test]
 fn save_midway_and_resume_matches_uninterrupted_run() {
     for (name, s) in shipped_scenarios() {
         let end = s.duration_ticks();
         let mid = Tick(end.0 / 2);
-        let mut a = s.build(None).unwrap();
+        let mut a = s.build(None, &db()).unwrap();
         a.run_until(mid);
         let bytes = a.save().to_bytes().unwrap();
         let mut b = Simulation::from_save(SaveGame::from_bytes(&bytes).unwrap()).unwrap();

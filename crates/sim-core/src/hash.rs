@@ -40,6 +40,24 @@ impl StateHash {
         self.u64(s.len() as u64);
         self.bytes(s.as_bytes());
     }
+    pub fn opt_f64(&mut self, v: Option<f64>) {
+        match v {
+            Some(x) => {
+                self.u8(1);
+                self.f64(x);
+            }
+            None => self.u8(0),
+        }
+    }
+    pub fn opt_str(&mut self, v: Option<&str>) {
+        match v {
+            Some(s) => {
+                self.u8(1);
+                self.str(s);
+            }
+            None => self.u8(0),
+        }
+    }
     #[must_use]
     pub fn finish(&self) -> u64 {
         self.0

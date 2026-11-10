@@ -2,6 +2,7 @@
 
 use crate::command::{Command, CommandPayload, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
 use crate::components::{Kinematics, Position, Route, Unit};
+use crate::detection::{default_rcs_m2, detection_system, ContactTable, SensorSuite, Signature};
 use crate::error::SimError;
 use crate::events::{EventLog, SimEvent, SimEventKind};
 use crate::hash::StateHash;
@@ -9,7 +10,7 @@ use crate::ids::UnitId;
 use crate::movement::movement_system;
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
-use crate::snapshot::{RouteView, Snapshot, UnitView, Viewer};
+use crate::snapshot::{ContactView, RouteView, Snapshot, UnitView, Viewer};
 use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
@@ -72,6 +73,7 @@ impl Simulation {
         world.insert_resource(EventLog::default());
         world.insert_resource(CommandLog::default());
         world.insert_resource(UnitIndex::default());
+        world.insert_resource(ContactTable::default());
         Self {
             world,
             schedule: build_schedule(),
@@ -153,16 +155,23 @@ impl Simulation {
     }
 
     fn unit_records(&mut self) -> Vec<UnitRecord> {
-        let mut q = self
-            .world
-            .query::<(&Unit, &Position, &Kinematics, &Route)>();
+        let mut q = self.world.query::<(
+            &Unit,
+            &Position,
+            &Kinematics,
+            &Route,
+            &SensorSuite,
+            &Signature,
+        )>();
         let mut v: Vec<UnitRecord> = q
             .iter(&self.world)
-            .map(|(u, p, k, r)| UnitRecord {
+            .map(|(u, p, k, r, s, sig)| UnitRecord {
                 unit: u.clone(),
                 position: *p,
                 kinematics: *k,
                 route: r.clone(),
+                sensors: s.clone(),
+                signature: Some(*sig),
             })
             .collect();
         v.sort_by_key(|r| r.unit.id);
@@ -196,8 +205,27 @@ impl Simulation {
                     speed_mps: r.kinematics.speed_mps,
                     ordered_speed_mps: r.kinematics.ordered_speed_mps,
                     max_speed_mps: r.kinematics.max_speed_mps,
+                    platform: r.unit.platform,
                     route,
                 }
+            })
+            .collect();
+        let contacts = self
+            .world
+            .resource::<ContactTable>()
+            .iter()
+            .filter(|(side, _)| match viewer {
+                Viewer::WhiteCell => true,
+                Viewer::Side { side: s } => *side == s,
+            })
+            .map(|(side, c)| ContactView {
+                side,
+                number: c.number,
+                position: c.position,
+                first_seen_s: c.first_seen.seconds(),
+                last_seen_s: c.last_seen.seconds(),
+                detected_by: c.detected_by,
+                sensor_id: c.sensor_id.clone(),
             })
             .collect();
         Snapshot {
@@ -206,6 +234,7 @@ impl Simulation {
             game_time_s: tick.seconds(),
             viewer,
             units,
+            contacts,
         }
     }
 
@@ -241,6 +270,35 @@ impl Simulation {
                 h.f64(w.lat_deg);
                 h.f64(w.lon_deg);
             }
+            h.opt_str(r.unit.platform.as_deref());
+            h.f64(r.signature.map_or(0.0, |s| s.rcs_m2));
+            h.u64(r.sensors.0.len() as u64);
+            for s in &r.sensors.0 {
+                h.str(&s.sensor_id);
+                h.u8(s.kind.code());
+                h.f64(s.mount_height_m);
+                h.f64(s.min_range_m);
+                h.f64(s.max_range_m);
+                h.opt_f64(s.ref_range_m);
+                h.opt_f64(s.ref_rcs_m2);
+                h.f64(s.max_target_altitude_m);
+            }
+        }
+        let contacts = self.world.resource::<ContactTable>();
+        for (side, n) in contacts.next_numbers() {
+            h.u16(side.0);
+            h.u64(u64::from(n));
+        }
+        for (side, c) in contacts.iter() {
+            h.u16(side.0);
+            h.u64(u64::from(c.number));
+            h.u64(c.target.0);
+            h.u64(c.first_seen.0);
+            h.u64(c.last_seen.0);
+            h.f64(c.position.lat_deg);
+            h.f64(c.position.lon_deg);
+            h.u64(c.detected_by.0);
+            h.str(&c.sensor_id);
         }
         h.finish()
     }
@@ -259,6 +317,8 @@ impl Simulation {
             rng: self.world.resource::<RngStreams>().clone(),
             units,
             events: self.events().to_vec(),
+            contacts: self.world.resource::<ContactTable>().records(),
+            next_contact_numbers: self.world.resource::<ContactTable>().next_numbers(),
         }
     }
 
@@ -284,13 +344,27 @@ impl Simulation {
             log.entries.insert((c.command.tick, c.seq), c.command);
         }
         sim.world.insert_resource(log);
+        sim.world.insert_resource(ContactTable::restore(
+            save.contacts,
+            save.next_contact_numbers,
+        ));
 
         let mut index = BTreeMap::new();
         for r in save.units {
             let id = r.unit.id;
+            let signature = r.signature.unwrap_or(Signature {
+                rcs_m2: default_rcs_m2(r.unit.domain),
+            });
             let e = sim
                 .world
-                .spawn((r.unit, r.position, r.kinematics, r.route))
+                .spawn((
+                    r.unit,
+                    r.position,
+                    r.kinematics,
+                    r.route,
+                    r.sensors,
+                    signature,
+                ))
                 .id();
             if index.insert(id, e).is_some() {
                 return Err(SimError::CorruptSave(format!("duplicate unit {id}")));
@@ -305,7 +379,15 @@ fn build_schedule() -> Schedule {
     let mut schedule = Schedule::default();
     // ADR-0003 §3: single-threaded, fixed order.
     schedule.set_executor(SingleThreadedExecutor::new());
-    schedule.add_systems((apply_commands_system, movement_system, advance_clock_system).chain());
+    schedule.add_systems(
+        (
+            apply_commands_system,
+            movement_system,
+            detection_system,
+            advance_clock_system,
+        )
+            .chain(),
+    );
     schedule
 }
 
@@ -383,10 +465,15 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 name: s.name.clone(),
                 side: s.side,
                 domain: s.domain,
+                platform: s.platform.clone(),
             },
             Position {
                 point: s.position,
                 altitude_m: s.altitude_m,
+            },
+            SensorSuite(s.sensors.clone()),
+            Signature {
+                rcs_m2: s.rcs_m2.unwrap_or_else(|| default_rcs_m2(s.domain)),
             },
             Kinematics {
                 heading_deg: sim_geo::normalize_azimuth_deg(s.heading_deg),

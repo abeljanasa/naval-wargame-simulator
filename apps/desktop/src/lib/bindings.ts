@@ -35,6 +35,23 @@ export type ClockStatus = {
 	scenario_duration_s: number | null,
 };
 
+/**
+ *  One entry in a side's perceived picture. It deliberately carries no target unit id, so a
+ *  side's client cannot learn ground truth from the stream (fog of war, design principle 4).
+ */
+export type ContactView = {
+	/**  The side holding the contact. */
+	side: SideId,
+	/**  Contact number within that side's picture (C1, C2, …). */
+	number: number,
+	position: GeoPoint,
+	first_seen_s: number | null,
+	last_seen_s: number | null,
+	/**  Own unit whose sensor last detected it. */
+	detected_by: UnitId,
+	sensor_id: string,
+};
+
 /**  Broad physical domain of a unit. */
 export type Domain = "surface" | "subsurface" | "air" | "land";
 
@@ -93,6 +110,8 @@ export type Snapshot_Deserialize = {
 	game_time_s: number | null,
 	viewer: Viewer,
 	units: UnitView_Deserialize[],
+	/**  Side viewer: that side's contacts. White cell: every side's contacts. */
+	contacts: ContactView[],
 };
 
 /**  A full state snapshot for one viewer. Units are sorted by `id`. */
@@ -102,6 +121,8 @@ export type Snapshot_Serialize = {
 	game_time_s: number | null,
 	viewer: Viewer,
 	units: UnitView_Serialize[],
+	/**  Side viewer: that side's contacts. White cell: every side's contacts. */
+	contacts: ContactView[],
 };
 
 /**  A simulation tick number. Tick `n` covers game time `[n, n+1)` × [`TICK_SECONDS`]. */
@@ -131,6 +152,8 @@ export type UnitView_Deserialize = {
 	speed_mps: number | null,
 	ordered_speed_mps: number | null,
 	max_speed_mps: number | null,
+	/**  Platform database class, e.g. `GEN-FFG`. */
+	platform?: string | null,
 	/**  Present for units the viewer controls. */
 	route?: RouteView | null,
 };
@@ -146,6 +169,8 @@ export type UnitView_Serialize = {
 	speed_mps: number | null,
 	ordered_speed_mps: number | null,
 	max_speed_mps: number | null,
+	/**  Platform database class, e.g. `GEN-FFG`. */
+	platform: string | null,
 	/**  Present for units the viewer controls. */
 	route: RouteView | null,
 };

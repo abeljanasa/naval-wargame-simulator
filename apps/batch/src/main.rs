@@ -39,6 +39,10 @@ enum Cmd {
         /// Also write the results as a JSON array to this file.
         #[arg(long)]
         out: Option<PathBuf>,
+        /// Open platform database file (built with `sim-db build`). Defaults to the database
+        /// embedded in this binary.
+        #[arg(long)]
+        db: Option<PathBuf>,
     },
 }
 
@@ -60,7 +64,14 @@ fn main() -> Result<()> {
             seeds,
             ticks,
             out,
+            db,
         } => {
+            let platforms = match db {
+                Some(path) => sim_db::PlatformDb::open(&sim_db::DbSource::Open(path.clone()))
+                    .with_context(|| format!("opening platform database {}", path.display()))?,
+                None => sim_db::embedded::open_platform_db()
+                    .context("building the embedded platform database")?,
+            };
             let mut results = vec![];
             for path in &scenarios {
                 let scenario =
@@ -76,7 +87,7 @@ fn main() -> Result<()> {
                 };
                 let end = ticks.map_or_else(|| scenario.duration_ticks(), Tick);
                 for seed in run_seeds {
-                    let mut sim = scenario.build(Some(seed))?;
+                    let mut sim = scenario.build(Some(seed), &platforms)?;
                     sim.run_until(end);
                     let r = RunResult {
                         scenario: name.clone(),

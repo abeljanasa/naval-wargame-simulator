@@ -41,8 +41,27 @@ pub struct UnitView {
     pub speed_mps: f64,
     pub ordered_speed_mps: f64,
     pub max_speed_mps: f64,
+    /// Platform database class, e.g. `GEN-FFG`.
+    pub platform: Option<String>,
     /// Present for units the viewer controls.
     pub route: Option<RouteView>,
+}
+
+/// One entry in a side's perceived picture. It deliberately carries no target unit id, so a
+/// side's client cannot learn ground truth from the stream (fog of war, design principle 4).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct ContactView {
+    /// The side holding the contact.
+    pub side: SideId,
+    /// Contact number within that side's picture (C1, C2, …).
+    pub number: u32,
+    pub position: GeoPoint,
+    pub first_seen_s: f64,
+    pub last_seen_s: f64,
+    /// Own unit whose sensor last detected it.
+    pub detected_by: UnitId,
+    pub sensor_id: String,
 }
 
 /// A full state snapshot for one viewer. Units are sorted by `id`.
@@ -54,4 +73,6 @@ pub struct Snapshot {
     pub game_time_s: f64,
     pub viewer: Viewer,
     pub units: Vec<UnitView>,
+    /// Side viewer: that side's contacts. White cell: every side's contacts.
+    pub contacts: Vec<ContactView>,
 }

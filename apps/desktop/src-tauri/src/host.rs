@@ -68,8 +68,11 @@ pub struct Host {
 }
 
 impl Host {
-    pub fn new(scenario: Scenario) -> Result<Self, sim_scenario::ScenarioError> {
-        let sim = scenario.build(None)?;
+    pub fn new(
+        scenario: Scenario,
+        platforms: &sim_db::PlatformDb,
+    ) -> Result<Self, sim_scenario::ScenarioError> {
+        let sim = scenario.build(None, platforms)?;
         let first_side = scenario.sides.first().map(|s| s.id);
         Ok(Self {
             scenario,
@@ -197,7 +200,7 @@ mod tests {
             "../../../../data/scenarios/phase1-strait-transit.json"
         ))
         .unwrap();
-        Host::new(s).unwrap()
+        Host::new(s, &sim_db::embedded::open_platform_db().unwrap()).unwrap()
     }
 
     #[test]

@@ -1,8 +1,8 @@
 {
   "format": "nws-scenario",
-  "format_version": 1,
+  "format_version": 2,
   "name": "Phase 1 — Strait transit",
-  "description": "Gate 1 movement demonstrator. A generic frigate transits a strait on a four-leg route while a generic merchant dead-reckons across its track. Both are generic classes with no real-world platform values.",
+  "description": "Gate 1 demonstrator: units move and detect. A generic frigate transits a strait westbound on a four-leg route while a generic bulk carrier transits eastbound; the ships close at about 30 kn and each side's radar picks up the other once inside the radar horizon (about 34 km). All platforms are generic database classes with no real-world values.",
   "seed": 20261110,
   "duration_s": 86400,
   "sides": [
@@ -14,12 +14,10 @@
       "id": 1,
       "name": "Generic frigate (FFG) — Alpha",
       "side": 1,
-      "domain": "surface",
+      "platform": "GEN-FFG",
       "position": { "lat_deg": -38.9, "lon_deg": 148.6 },
       "heading_deg": 250.0,
       "speed_mps": 9.0,
-      "max_speed_mps": 15.0,
-      "accel_mps2": 0.05,
       "route": [
         { "lat_deg": -39.2, "lon_deg": 147.0 },
         { "lat_deg": -39.4, "lon_deg": 145.5 },
@@ -31,12 +29,10 @@
       "id": 2,
       "name": "Generic bulk carrier — Bravo",
       "side": 2,
-      "domain": "surface",
-      "position": { "lat_deg": -40.2, "lon_deg": 145.0 },
-      "heading_deg": 20.0,
-      "speed_mps": 6.5,
-      "max_speed_mps": 7.5,
-      "accel_mps2": 0.01
+      "platform": "GEN-MV-BULK",
+      "position": { "lat_deg": -39.3, "lon_deg": 144.0 },
+      "heading_deg": 90.0,
+      "speed_mps": 6.5
     }
   ]
 }

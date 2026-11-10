@@ -20,6 +20,9 @@ fn spawn(id: u64, side: u16, lat: f64, lon: f64, route: Vec<GeoPoint>) -> Comman
             max_speed_mps: 15.0,
             accel_mps2: 0.05,
             route,
+            platform: None,
+            sensors: vec![],
+            rcs_m2: None,
         }),
     }
 }

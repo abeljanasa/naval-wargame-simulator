@@ -32,6 +32,9 @@ pub struct Unit {
     pub name: String,
     pub side: SideId,
     pub domain: Domain,
+    /// Platform database class, if the unit came from one.
+    #[serde(default)]
+    pub platform: Option<String>,
 }
 
 /// Geodetic position. `altitude_m` is height above MSL; negative values are depth.

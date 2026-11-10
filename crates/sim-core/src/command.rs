@@ -1,6 +1,7 @@
 //! Commands: the only way anything outside the core changes simulation state.
 
 use crate::components::Domain;
+use crate::detection::SensorSpec;
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
@@ -65,6 +66,17 @@ pub struct UnitSpawn {
     pub accel_mps2: f64,
     #[serde(default)]
     pub route: Vec<GeoPoint>,
+    /// Platform database id this unit was resolved from (e.g. `GEN-FFG`), if any.
+    #[serde(default)]
+    pub platform: Option<String>,
+    /// Fitted sensors, copied from the platform database when the scenario is built. Carrying the
+    /// data in the command (instead of a database reference) keeps replays independent of later
+    /// database edits.
+    #[serde(default)]
+    pub sensors: Vec<SensorSpec>,
+    /// Radar cross-section, m². `None` falls back to a domain default (see `detection`).
+    #[serde(default)]
+    pub rcs_m2: Option<f64>,
 }
 
 /// What a command does.
@@ -114,8 +126,17 @@ impl CommandPayload {
                 if !(s.max_speed_mps.is_finite() && s.max_speed_mps >= 0.0) {
                     return Err("max_speed_mps must be finite and >= 0".into());
                 }
-                if !(s.accel_mps2.is_finite() && s.accel_mps2 > 0.0) {
-                    return Err("accel_mps2 must be finite and > 0".into());
+                // Fixed sites (max speed 0) may have zero acceleration; anything mobile may not.
+                if !(s.accel_mps2.is_finite()
+                    && (s.accel_mps2 > 0.0 || (s.max_speed_mps == 0.0 && s.accel_mps2 == 0.0)))
+                {
+                    return Err("accel_mps2 must be finite and > 0 for a mobile unit".into());
+                }
+                if s.rcs_m2.is_some_and(|r| !(r.is_finite() && r >= 0.0)) {
+                    return Err("rcs_m2 must be finite and >= 0".into());
+                }
+                for sensor in &s.sensors {
+                    sensor.validate()?;
                 }
                 if !(s.speed_mps.is_finite()
                     && s.heading_deg.is_finite()

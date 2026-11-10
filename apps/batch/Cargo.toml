@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 sim-core.workspace = true
 sim-scenario.workspace = true
+sim-db.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true
