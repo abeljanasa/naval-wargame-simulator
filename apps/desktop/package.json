@@ -10,7 +10,9 @@
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "licenses": "node scripts/check-licenses.mjs",
+    "bench:map": "node scripts/map-fps.mjs"
   },
   "dependencies": {
     "@deck.gl/core": "^9.4.1",
@@ -27,6 +29,7 @@
     "eslint": "^10.14.0",
     "eslint-plugin-svelte": "^3.24.1",
     "globals": "^17.14.0",
+    "playwright": "^1.65.0",
     "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.57.3",

@@ -23,8 +23,20 @@ function rgb([r, g, b]: [number, number, number]) {
   return `rgb(${r},${g},${b})`;
 }
 
-/** An SVG data URL for a frame, selected or not. */
+const urlCache = new Map<string, string>();
+
+/** An SVG data URL for a frame, selected or not. Cached: the map asks for it once per unit per frame. */
 export function symbolUrl(aff: Affiliation, selected: boolean): string {
+  const key = `${aff}-${selected}`;
+  let url = urlCache.get(key);
+  if (url === undefined) {
+    url = buildSymbolUrl(aff, selected);
+    urlCache.set(key, url);
+  }
+  return url;
+}
+
+function buildSymbolUrl(aff: Affiliation, selected: boolean): string {
   const fill = rgb(AFFILIATION_COLOUR[aff]);
   const stroke = selected ? "#ffffff" : "#0b1b2b";
   const sw = selected ? 5 : 3;

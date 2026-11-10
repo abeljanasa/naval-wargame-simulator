@@ -15,6 +15,20 @@ import { n, project } from "./format";
 import { AFFILIATION_COLOUR, symbolUrl, type Affiliation } from "./symbols";
 
 type LonLat = [number, number];
+
+/** Above this many units on the map, unit name labels are decluttered (selected unit only). */
+export const LABEL_LIMIT = 1500;
+
+// Fixed glyph set for SDF labels. "auto" rescans every label on every update, which is costly at
+// 10,000 units. Printable ASCII plus the punctuation used in names and contact labels.
+const LABEL_CHARSET = [
+  ...Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)),
+  "—",
+  "–",
+  "·",
+  "°",
+  "′",
+];
 type RGBA = [number, number, number, number];
 const rgba = (c: [number, number, number], a: number): RGBA => [c[0], c[1], c[2], a];
 
@@ -43,7 +57,7 @@ function graticule(stepDeg: number): GeoJSON.FeatureCollection {
 
 export function createMap(container: HTMLElement, center: LonLat) {
   maplibregl.setWorkerUrl(new URL(workerUrl, window.location.href).href);
-  const landUrl = new URL("basemap/ne_50m_land.geojson", window.location.href).href;
+  const landUrl = new URL("/basemap/ne_50m_land.geojson", window.location.href).href;
   const map = new maplibregl.Map({
     container,
     center,
@@ -112,7 +126,9 @@ export function buildLayers(s: SceneInput): Layer[] {
     }));
   const waypoints = routes.flatMap((r) => r.path.slice(1).map((p) => ({ p, colour: r.colour })));
   // Leader: where the unit will be in 6 minutes at its current speed and heading.
+  // Decluttered like labels above LABEL_LIMIT units (selected unit only).
   const leaders = s.units
+    .filter((u) => s.units.length <= LABEL_LIMIT || u.id === s.selected)
     .filter((u) => n(u.speed_mps) > 0)
     .map((u) => ({
       from: pt(u.position),
@@ -193,7 +209,9 @@ export function buildLayers(s: SceneInput): Layer[] {
     }),
     new TextLayer<UnitView>({
       id: "labels",
-      data: s.units,
+      // Declutter: past LABEL_LIMIT units, labels overlap into noise and re-laying them out on every
+      // snapshot costs the frame budget, so only the selected unit keeps its label.
+      data: s.units.length <= LABEL_LIMIT ? s.units : s.units.filter((u) => u.id === s.selected),
       getPosition: (u) => pt(u.position),
       getText: (u) => u.name,
       getSize: 12,
@@ -203,7 +221,7 @@ export function buildLayers(s: SceneInput): Layer[] {
       outlineWidth: 2,
       outlineColor: [11, 27, 43, 255],
       fontSettings: { sdf: true },
-      characterSet: "auto",
+      characterSet: LABEL_CHARSET,
     }),
     // Contacts: what the viewing side believes is out there. Unknown frame until Phase 2
     // classification; no ground-truth identity is available to draw.
@@ -227,7 +245,7 @@ export function buildLayers(s: SceneInput): Layer[] {
       outlineWidth: 2,
       outlineColor: [11, 27, 43, 255],
       fontSettings: { sdf: true },
-      characterSet: "auto",
+      characterSet: LABEL_CHARSET,
       updateTriggers: { getText: [s.gameTimeS] },
     }),
   ];
