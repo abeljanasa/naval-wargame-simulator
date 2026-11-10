@@ -56,6 +56,14 @@ pub struct Kinematics {
     pub max_speed_mps: f64,
     /// Magnitude of acceleration and deceleration, m/s².
     pub accel_mps2: f64,
+    /// Turn-rate cap, deg/s. `None` = heading changes instantly (Phase 1 behaviour, kept for
+    /// units without turn data).
+    #[serde(default)]
+    pub max_turn_rate_dps: Option<f64>,
+    /// Minimum turn radius, metres (0 = no radius limit). The achievable turn rate is
+    /// min(cap, speed / radius).
+    #[serde(default)]
+    pub min_turn_radius_m: f64,
 }
 
 /// Ordered route. `next` indexes the waypoint being steered for. The route is finished when `next == waypoints.len()`.

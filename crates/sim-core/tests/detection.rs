@@ -52,6 +52,8 @@ fn spawn(
             platform: None,
             sensors,
             rcs_m2: Some(rcs),
+            max_turn_rate_dps: None,
+            min_turn_radius_m: None,
         }),
     }
 }

@@ -50,7 +50,12 @@ From rest with a = 0.1 m/s² and v_ordered = 10 m/s:
 
 ## 4. Assumptions and limitations (Phase 1)
 
-- **No turn-rate limit.** Heading changes instantly at waypoints. (Backlog: turn-rate and turning circle.)
+- **Turning** (added 2026-11-10). A unit with turn data steers toward its waypoint at most at rate ω = min(ω_max, v / r_min) (deg/s), then moves along its new heading.
+  - It cannot turn while stopped.
+  - A waypoint counts as reached within max(r_min, 50 m, the tick's distance). The unit is not snapped onto it.
+  - Units without turn data keep the instant-turn behaviour.
+  - The database has no turn data yet, so scenario resolution uses generic class values: ships and submarines r_min = 2.5 × hull length (tactical diameter ≈ 5 lengths), ω_max = 3°/s; fighters 15°/s; helicopters and UAVs 8°/s; patrol, AEW and tanker aircraft 3°/s; land units unlimited.
+  - **Worked example:** a frigate (135 m) at 10 m/s turns at min(3, 10 / 337.5 rad/s) = 1.70°/s, so a 180° reversal takes about 106 s. The unit test reverses a 10 m/s, 400 m-radius unit onto a waypoint 5 km behind it: the turn takes about 126 s and it arrives within 500–700 s.
 - **No land or shallow-water blocking, and no draft limits.** Units can cross land. (Backlog: needs coastline and bathymetry sampling plus navigable-water pathfinding.)
 - **No sea-state speed penalty, no fuel burn, no altitude or depth bands.** Altitude is stored but not changed.
 - **All-stop is instantaneous on completing a route.** The unit does not decelerate into the final waypoint.

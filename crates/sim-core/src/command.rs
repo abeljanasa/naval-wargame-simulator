@@ -77,6 +77,12 @@ pub struct UnitSpawn {
     /// Radar cross-section, m². `None` falls back to a domain default (see `detection`).
     #[serde(default)]
     pub rcs_m2: Option<f64>,
+    /// Turn-rate cap, deg/s. `None` = instant heading changes.
+    #[serde(default)]
+    pub max_turn_rate_dps: Option<f64>,
+    /// Minimum turn radius, metres (0 or absent = no radius limit).
+    #[serde(default)]
+    pub min_turn_radius_m: Option<f64>,
 }
 
 /// What a command does.
@@ -131,6 +137,10 @@ impl CommandPayload {
                     && (s.accel_mps2 > 0.0 || (s.max_speed_mps == 0.0 && s.accel_mps2 == 0.0)))
                 {
                     return Err("accel_mps2 must be finite and > 0 for a mobile unit".into());
+                }
+                let bad = |v: Option<f64>| v.is_some_and(|x| !(x.is_finite() && x >= 0.0));
+                if bad(s.max_turn_rate_dps) || bad(s.min_turn_radius_m) {
+                    return Err("turn rate and turn radius must be finite and >= 0".into());
                 }
                 if s.rcs_m2.is_some_and(|r| !(r.is_finite() && r >= 0.0)) {
                     return Err("rcs_m2 must be finite and >= 0".into());

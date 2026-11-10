@@ -21,7 +21,8 @@ Items deferred out of the current change, or requested out of phase (master prom
 - [x] npm licence audit of production dependencies (`npm run licenses`, in CI). 52 packages, 0 rejected.
 - [x] A basic detection model for Gate 1: the interim radar model (DL-0006).
 - [ ] Desktop app: visual check of contacts during a live run. Covered by engine tests so far; there is no automated UI test yet.
-- [ ] Turn-rate / turning-circle limits on movement.
+- [x] Turn-rate / turning-circle limits on movement (geodesy-and-movement model doc §Turning).
+- [ ] Turn performance as platform-database fields (generic class values are derived in scenario resolution today).
 - [ ] Land and shallow-water blocking with pathfinding on a navigable-water graph honouring draft limits (needs coastline and bathymetry sampling in `sim-geo`).
 - [ ] Snapshot diffs instead of full snapshots on the UI stream (the protocol is versioned for this).
 - [ ] Scenario loading from file in the desktop app (Phase 1 embeds the demo scenario).

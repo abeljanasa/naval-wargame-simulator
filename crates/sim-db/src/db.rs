@@ -29,6 +29,7 @@ pub struct PlatformSummary {
     pub accel_mps2: f64,
     pub max_altitude_m: Option<f64>,
     pub max_depth_m: Option<f64>,
+    pub length_m: Option<f64>,
 }
 
 impl PlatformSummary {
@@ -43,6 +44,7 @@ impl PlatformSummary {
             accel_mps2: r.get(6)?,
             max_altitude_m: r.get(7)?,
             max_depth_m: r.get(8)?,
+            length_m: r.get(9)?,
         })
     }
 }
@@ -61,7 +63,7 @@ pub struct MountedSensor {
     pub max_target_altitude_m: f64,
 }
 
-const SUMMARY_COLS: &str = "id, name, category, domain, max_speed_mps, cruise_speed_mps, accel_mps2, max_altitude_m, max_depth_m";
+const SUMMARY_COLS: &str = "id, name, category, domain, max_speed_mps, cruise_speed_mps, accel_mps2, max_altitude_m, max_depth_m, length_m";
 
 /// A validated, read-only platform database.
 pub struct PlatformDb {

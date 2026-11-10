@@ -264,6 +264,8 @@ impl Simulation {
             h.f64(r.kinematics.ordered_speed_mps);
             h.f64(r.kinematics.max_speed_mps);
             h.f64(r.kinematics.accel_mps2);
+            h.opt_f64(r.kinematics.max_turn_rate_dps);
+            h.f64(r.kinematics.min_turn_radius_m);
             h.u64(r.route.next as u64);
             h.u64(r.route.waypoints.len() as u64);
             for w in &r.route.waypoints {
@@ -481,6 +483,8 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 ordered_speed_mps: s.speed_mps.clamp(0.0, s.max_speed_mps),
                 max_speed_mps: s.max_speed_mps,
                 accel_mps2: s.accel_mps2,
+                max_turn_rate_dps: s.max_turn_rate_dps,
+                min_turn_radius_m: s.min_turn_radius_m.unwrap_or(0.0),
             },
             Route {
                 waypoints: s.route.clone(),

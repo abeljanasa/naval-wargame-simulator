@@ -199,7 +199,7 @@ impl Scenario {
 
 fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, ScenarioError> {
     let invalid = |msg: String| ScenarioError::Invalid(format!("unit {}: {msg}", u.id));
-    let (domain, max_speed, cruise, accel, sensors, rcs) = match &u.platform {
+    let (domain, max_speed, cruise, accel, sensors, rcs, turn) = match &u.platform {
         Some(pid) => {
             let p = db
                 .platform(pid)?
@@ -243,6 +243,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
                 u.accel_mps2.unwrap_or(p.accel_mps2),
                 sensors,
                 db.rcs_m2(pid)?,
+                turn_performance(&p.category, p.length_m),
             )
         }
         // `validate` guarantees these are present when there is no platform.
@@ -255,6 +256,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
                 .ok_or_else(|| invalid("missing accel_mps2".into()))?,
             vec![],
             None,
+            (None, None),
         ),
     };
     Ok(UnitSpawn {
@@ -272,7 +274,25 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         platform: u.platform.clone(),
         sensors,
         rcs_m2: rcs,
+        max_turn_rate_dps: turn.0,
+        min_turn_radius_m: turn.1,
     })
+}
+
+/// Generic turn performance by platform class (the database has no turn data yet; see
+/// docs/models/geodesy-and-movement.md §Turning). Returns (max rate deg/s, min radius m).
+fn turn_performance(category: &str, length_m: Option<f64>) -> (Option<f64>, Option<f64>) {
+    match category {
+        // Ships: tactical diameter ≈ 5 hull lengths → radius 2.5 lengths, capped at 3°/s.
+        "surface_combatant" | "auxiliary" | "merchant" | "submarine" => {
+            (Some(3.0), Some(2.5 * length_m.unwrap_or(100.0)))
+        }
+        "fighter" => (Some(15.0), None),
+        "helicopter" | "uav" => (Some(8.0), None),
+        "mpa" | "aew" | "tanker" => (Some(3.0), None),
+        // Land units and fixed sites: no turn limit.
+        _ => (None, None),
+    }
 }
 
 #[cfg(test)]
