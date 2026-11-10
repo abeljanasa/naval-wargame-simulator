@@ -1,19 +1,22 @@
 //! The `Simulation` facade: the only public way to drive the world.
 
+use crate::c2::C2State;
+use crate::command::DoctrineScope;
 use crate::command::{Command, CommandPayload, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
 use crate::components::{Domain, Kinematics, Position, Route, Unit};
 use crate::detection::{default_rcs_m2, detection_system, ContactTable, SensorSuite, Signature};
 use crate::error::SimError;
 use crate::events::{EventLog, SimEvent, SimEventKind};
 use crate::hash::StateHash;
-use crate::ids::UnitId;
+use crate::ids::{SideId, UnitId};
 use crate::movement::movement_system;
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
-use crate::snapshot::{ContactView, RouteView, Snapshot, UnitView, Viewer};
+use crate::snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
 use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
+use sim_c2::track_affiliation;
 use sim_geo::land::LandMask;
 use sim_geo::GeoPoint;
 use std::collections::BTreeMap;
@@ -99,6 +102,7 @@ impl Simulation {
         world.insert_resource(CommandLog::default());
         world.insert_resource(UnitIndex::default());
         world.insert_resource(ContactTable::default());
+        world.insert_resource(C2State::default());
         world.insert_resource(LandMaskRes::default());
         Self {
             world,
@@ -213,8 +217,11 @@ impl Simulation {
     /// State as seen by `viewer`.
     pub fn snapshot(&mut self, viewer: Viewer) -> Snapshot {
         let tick = self.tick();
-        let units = self
-            .unit_records()
+        let c2 = self.world.resource::<C2State>().clone();
+        let records = self.unit_records();
+        let side_of: BTreeMap<UnitId, SideId> =
+            records.iter().map(|r| (r.unit.id, r.unit.side)).collect();
+        let units = records
             .into_iter()
             .filter(|r| match viewer {
                 Viewer::WhiteCell => true,
@@ -226,7 +233,11 @@ impl Simulation {
                     next: r.route.next as u32,
                     waypoints: r.route.waypoints,
                 });
+                let doctrine = c2.doctrine_for(&r.unit);
                 UnitView {
+                    doctrine,
+                    doctrine_set: r.unit.doctrine,
+                    group: r.unit.group.clone(),
                     id: r.unit.id,
                     name: r.unit.name,
                     side: r.unit.side,
@@ -257,6 +268,9 @@ impl Simulation {
                 error: c.error_at(tick),
                 classification: c.classification,
                 domain: c.domain,
+                affiliation: side_of
+                    .get(&c.target)
+                    .and_then(|t| track_affiliation(c.classification, c2.posture(side, *t))),
                 first_seen_s: c.first_seen.seconds(),
                 last_seen_s: c.last_seen.seconds(),
                 detected_by: c.detected_by,
@@ -270,6 +284,19 @@ impl Simulation {
             viewer,
             units,
             contacts,
+            postures: c2
+                .postures
+                .iter()
+                .filter(|((side, _), _)| match viewer {
+                    Viewer::WhiteCell => true,
+                    Viewer::Side { side: s } => *side == s,
+                })
+                .map(|(&(side, toward), &posture)| PostureView {
+                    side,
+                    toward,
+                    posture,
+                })
+                .collect(),
         }
     }
 
@@ -315,6 +342,8 @@ impl Simulation {
                 h.f64(w.lon_deg);
             }
             h.opt_str(r.unit.platform.as_deref());
+            h.opt_str(r.unit.group.as_deref());
+            hash_doctrine(&mut h, &r.unit.doctrine);
             h.f64(r.signature.map_or(0.0, |s| s.rcs_m2));
             h.u64(r.sensors.0.len() as u64);
             for s in &r.sensors.0 {
@@ -327,6 +356,23 @@ impl Simulation {
                 h.opt_f64(s.ref_rcs_m2);
                 h.f64(s.max_target_altitude_m);
             }
+        }
+        let c2 = self.world.resource::<C2State>();
+        for (&(side, toward), posture) in &c2.postures {
+            h.u16(side.0);
+            h.u16(toward.0);
+            h.u8(posture.code());
+        }
+        h.u64(c2.side_doctrine.len() as u64);
+        for (side, d) in &c2.side_doctrine {
+            h.u16(side.0);
+            hash_doctrine(&mut h, d);
+        }
+        h.u64(c2.group_doctrine.len() as u64);
+        for ((side, group), d) in &c2.group_doctrine {
+            h.u16(side.0);
+            h.str(group);
+            hash_doctrine(&mut h, d);
         }
         let contacts = self.world.resource::<ContactTable>();
         for (side, n) in contacts.next_numbers() {
@@ -368,6 +414,7 @@ impl Simulation {
             events: self.events().to_vec(),
             contacts: self.world.resource::<ContactTable>().records(),
             next_contact_numbers: self.world.resource::<ContactTable>().next_numbers(),
+            c2: self.world.resource::<C2State>().clone(),
         }
     }
 
@@ -393,6 +440,7 @@ impl Simulation {
             log.entries.insert((c.command.tick, c.seq), c.command);
         }
         sim.world.insert_resource(log);
+        sim.world.insert_resource(save.c2);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -422,6 +470,12 @@ impl Simulation {
         sim.world.insert_resource(UnitIndex(index));
         Ok(sim)
     }
+}
+
+fn hash_doctrine(h: &mut StateHash, d: &sim_c2::Doctrine) {
+    h.u8(d.wcs.map_or(255, sim_c2::Wcs::code));
+    h.u8(d.emcon.map_or(255, sim_c2::Emcon::code));
+    h.u8(d.engage_unfriendly.map_or(255, u8::from));
 }
 
 fn build_schedule() -> Schedule {
@@ -500,6 +554,57 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
             kin.ordered_speed_mps = *speed_mps;
             Ok(())
         }
+        CommandPayload::SetPosture {
+            side,
+            toward,
+            posture,
+        } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set postures".into());
+            }
+            world
+                .resource_mut::<C2State>()
+                .postures
+                .insert((*side, *toward), *posture);
+            Ok(())
+        }
+        CommandPayload::SetDoctrine { scope, doctrine } => match scope {
+            DoctrineScope::Side { side } => {
+                authorised_side(cmd, *side)?;
+                world
+                    .resource_mut::<C2State>()
+                    .side_doctrine
+                    .insert(*side, *doctrine);
+                Ok(())
+            }
+            DoctrineScope::Group { side, group } => {
+                authorised_side(cmd, *side)?;
+                world
+                    .resource_mut::<C2State>()
+                    .group_doctrine
+                    .insert((*side, group.clone()), *doctrine);
+                Ok(())
+            }
+            DoctrineScope::Unit { unit } => {
+                let entity = authorised_entity(world, cmd, *unit)?;
+                world
+                    .get_mut::<Unit>(entity)
+                    .ok_or_else(|| format!("{unit} has no identity"))?
+                    .doctrine = *doctrine;
+                Ok(())
+            }
+        },
+    }
+}
+
+fn authorised_side(cmd: &Command, side: SideId) -> Result<(), String> {
+    if cmd.issuer.is_privileged() || cmd.side == Some(side) {
+        Ok(())
+    } else {
+        Err(format!(
+            "side {} doctrine is not the issuing side's",
+            side.0
+        ))
     }
 }
 
@@ -555,6 +660,8 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 side: s.side,
                 domain: s.domain,
                 platform: s.platform.clone(),
+                group: s.group.clone(),
+                doctrine: s.doctrine,
             },
             Position {
                 point: s.position,

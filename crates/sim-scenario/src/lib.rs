@@ -15,8 +15,8 @@ pub mod synthetic;
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Command, CommandPayload, Domain, GeoPoint, Issuer, SensorKind, SensorSpec, SideId, Simulation,
-    Tick, UnitId, UnitSpawn,
+    Command, CommandPayload, Doctrine, DoctrineScope, Domain, GeoPoint, Issuer, Posture,
+    SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn,
 };
 use sim_db::PlatformDb;
 use std::collections::BTreeSet;
@@ -47,6 +47,33 @@ pub enum ScenarioError {
 pub struct SideDef {
     pub id: SideId,
     pub name: String,
+    /// How this side regards the others. Sides not listed are neutral.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub postures: Vec<SidePosture>,
+    /// Side-wide doctrine; groups and units inherit unset fields from it.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub doctrine: Doctrine,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SidePosture {
+    pub toward: SideId,
+    pub posture: Posture,
+}
+
+/// A named group (task group, formation) of one side, with its doctrine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GroupDef {
+    pub side: SideId,
+    pub name: String,
+    #[serde(default)]
+    pub doctrine: Doctrine,
+}
+
+fn is_default<T: Default + PartialEq>(v: &T) -> bool {
+    *v == T::default()
 }
 
 /// A unit as written in a scenario file.
@@ -75,6 +102,12 @@ pub struct ScenarioUnit {
     pub accel_mps2: Option<f64>,
     #[serde(default)]
     pub route: Vec<GeoPoint>,
+    /// Group within the side (declared in `groups`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// Doctrine set on this unit; unset fields inherit from its group and side.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub doctrine: Doctrine,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +122,8 @@ pub struct Scenario {
     /// Default run length in game seconds.
     pub duration_s: u64,
     pub sides: Vec<SideDef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<GroupDef>,
     pub units: Vec<ScenarioUnit>,
 }
 
@@ -141,8 +176,41 @@ impl Scenario {
                 )));
             }
         }
+        for s in &self.sides {
+            for p in &s.postures {
+                if p.toward == s.id || !sides.contains(&p.toward) {
+                    return Err(ScenarioError::Invalid(format!(
+                        "side {} has a posture toward {}, which is itself or undeclared",
+                        s.id, p.toward
+                    )));
+                }
+            }
+        }
+        let mut groups = BTreeSet::new();
+        for g in &self.groups {
+            if !sides.contains(&g.side) || g.name.trim().is_empty() {
+                return Err(ScenarioError::Invalid(format!(
+                    "group {:?} needs a declared side and a name",
+                    g.name
+                )));
+            }
+            if !groups.insert((g.side, g.name.clone())) {
+                return Err(ScenarioError::Invalid(format!(
+                    "duplicate group {:?} on side {}",
+                    g.name, g.side
+                )));
+            }
+        }
         let mut units = BTreeSet::new();
         for u in &self.units {
+            if let Some(g) = &u.group {
+                if !groups.contains(&(u.side, g.clone())) {
+                    return Err(ScenarioError::Invalid(format!(
+                        "unit {} is in group {g:?}, which its side does not declare",
+                        u.id
+                    )));
+                }
+            }
             if !units.insert(u.id) {
                 return Err(ScenarioError::Invalid(format!(
                     "duplicate unit id {}",
@@ -187,6 +255,40 @@ impl Scenario {
         let mut sim = Simulation::new(seed.unwrap_or(self.seed));
         // Ships and submarines navigate round the bundled coastline (docs/models/land-avoidance.md).
         sim.set_land_mask(sim_geo::land::embedded());
+        // Postures and doctrine first, so they are in force when the units spawn.
+        let mut c2 = Vec::new();
+        for s in &self.sides {
+            for p in &s.postures {
+                c2.push(CommandPayload::SetPosture {
+                    side: s.id,
+                    toward: p.toward,
+                    posture: p.posture,
+                });
+            }
+            if s.doctrine != Doctrine::default() {
+                c2.push(CommandPayload::SetDoctrine {
+                    scope: DoctrineScope::Side { side: s.id },
+                    doctrine: s.doctrine,
+                });
+            }
+        }
+        for g in &self.groups {
+            c2.push(CommandPayload::SetDoctrine {
+                scope: DoctrineScope::Group {
+                    side: g.side,
+                    group: g.name.clone(),
+                },
+                doctrine: g.doctrine,
+            });
+        }
+        for payload in c2 {
+            sim.submit(Command {
+                tick: Tick(0),
+                issuer: Issuer::Scenario,
+                side: None,
+                payload,
+            })?;
+        }
         for s in spawns {
             sim.submit(Command {
                 tick: Tick(0),
@@ -278,6 +380,8 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         rcs_m2: rcs,
         max_turn_rate_dps: turn.0,
         min_turn_radius_m: turn.1,
+        group: u.group.clone(),
+        doctrine: u.doctrine,
     })
 }
 
@@ -395,5 +499,48 @@ mod tests {
             Scenario::from_json(&bad_side),
             Err(ScenarioError::Invalid(_))
         ));
+    }
+
+    const WITH_C2: &str = r#"{
+        "format": "nws-scenario", "format_version": 2, "name": "c2", "seed": 1, "duration_s": 10,
+        "sides": [
+            {"id": 1, "name": "Blue", "postures": [{"toward": 2, "posture": "hostile"}],
+             "doctrine": {"wcs": "free", "emcon": "silent"}},
+            {"id": 2, "name": "Red"}
+        ],
+        "groups": [{"side": 1, "name": "TG1", "doctrine": {"wcs": "hold"}}],
+        "units": [{"id": 1, "name": "A", "side": 1, "domain": "surface", "group": "TG1",
+                   "doctrine": {"emcon": "active"},
+                   "position": {"lat_deg": 0.0, "lon_deg": 0.0},
+                   "max_speed_mps": 10.0, "accel_mps2": 0.1}]
+    }"#;
+
+    #[test]
+    fn postures_groups_and_doctrine_load_and_apply() {
+        let s = Scenario::from_json(WITH_C2).unwrap();
+        let mut sim = s.build(None, &db()).unwrap();
+        sim.step();
+        let snap = sim.snapshot(sim_core::Viewer::Side { side: SideId(1) });
+        let d = snap.units[0].doctrine;
+        assert_eq!(d.wcs, sim_core::Wcs::Hold, "group over side");
+        assert_eq!(d.emcon, sim_core::Emcon::Active, "unit over side");
+        assert_eq!(snap.postures.len(), 1);
+        assert_eq!(snap.postures[0].posture, Posture::Hostile);
+    }
+
+    #[test]
+    fn bad_postures_and_groups_are_rejected() {
+        for (from, to) in [
+            (r#""toward": 2"#, r#""toward": 1"#),
+            (r#""toward": 2"#, r#""toward": 9"#),
+            (r#""group": "TG1""#, r#""group": "TG9""#),
+            (r#""side": 1, "name": "TG1""#, r#""side": 7, "name": "TG1""#),
+        ] {
+            let bad = WITH_C2.replacen(from, to, 1);
+            assert!(
+                matches!(Scenario::from_json(&bad), Err(ScenarioError::Invalid(_))),
+                "{to}"
+            );
+        }
     }
 }

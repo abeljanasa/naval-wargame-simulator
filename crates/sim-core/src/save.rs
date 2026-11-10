@@ -1,5 +1,6 @@
 //! Save games: full world state + RNG state + command log, MessagePack-encoded and versioned.
 
+use crate::c2::C2State;
 use crate::command::LoggedCommand;
 use crate::components::{Kinematics, Position, Route, Unit};
 use crate::detection::{ContactRecord, SensorSuite, Signature};
@@ -20,7 +21,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 3: contacts become tracks with a covariance, classification and domain, and detection events
 ///   carry measurement errors. A v2 save loads with zero covariance, `unknown` classification and
 ///   no measurement errors (serde defaults).
-pub const SAVE_FORMAT_VERSION: u32 = 3;
+/// * 4: adds postures and side/group doctrine (`c2`), and unit group and doctrine. Older saves
+///   load with no postures set (all neutral) and no doctrine (defaults).
+pub const SAVE_FORMAT_VERSION: u32 = 4;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +56,8 @@ pub struct SaveGame {
     pub contacts: Vec<ContactRecord>,
     #[serde(default)]
     pub next_contact_numbers: Vec<(SideId, u32)>,
+    #[serde(default)]
+    pub c2: C2State,
 }
 
 impl SaveGame {
@@ -77,7 +82,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1 | 2 | SAVE_FORMAT_VERSION => {
+            1..=3 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

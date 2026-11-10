@@ -6,8 +6,13 @@
   "seed": 20261110,
   "duration_s": 86400,
   "sides": [
-    { "id": 1, "name": "Blue" },
-    { "id": 2, "name": "Neutral shipping" }
+    {
+      "id": 1,
+      "name": "Blue",
+      "postures": [{ "toward": 2, "posture": "neutral" }],
+      "doctrine": { "wcs": "hold", "emcon": "active" }
+    },
+    { "id": 2, "name": "Neutral shipping", "postures": [{ "toward": 1, "posture": "neutral" }] }
   ],
   "units": [
     {

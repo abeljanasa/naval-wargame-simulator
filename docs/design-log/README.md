@@ -24,3 +24,4 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0008](DL-0008-land-avoidance.md) | Land avoidance and route planning | Project spec §8 + Natural Earth + original design |
 | [DL-0009](DL-0009-database-browser.md) | In-app platform database browser | Project spec §9 + original design |
 | [DL-0010](DL-0010-tracks.md) | Tracks: measurement error, fusion, error growth, classification | Project spec §8 + textbook estimation + original design |
+| [DL-0011](DL-0011-c2-doctrine.md) | Postures, doctrine inheritance, WCS, EMCON, ROE | Project spec §8 + public naval usage + original design |

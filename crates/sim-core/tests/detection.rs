@@ -54,6 +54,8 @@ fn spawn(
             rcs_m2: Some(rcs),
             max_turn_rate_dps: None,
             min_turn_radius_m: None,
+            group: None,
+            doctrine: Doctrine::default(),
         }),
     }
 }
@@ -406,4 +408,251 @@ fn track_error_grows_with_time_since_update() {
 
 fn sim_sensors_cov(sigma_m: f64) -> Cov2 {
     Cov2::isotropic(sigma_m)
+}
+
+// ---- C2: EMCON, doctrine inheritance, postures (docs/models/c2-doctrine.md) ----
+
+fn order(tick: u64, issuer: Issuer, side: Option<u16>, payload: CommandPayload) -> Command {
+    Command {
+        tick: Tick(tick),
+        issuer,
+        side: side.map(SideId),
+        payload,
+    }
+}
+
+fn doctrine_emcon(emcon: Emcon) -> Doctrine {
+    Doctrine {
+        emcon: Some(emcon),
+        ..Doctrine::default()
+    }
+}
+
+fn detection_draws(sim: &Simulation) -> usize {
+    attempts(sim).len()
+}
+
+#[test]
+fn emcon_silent_radar_detects_nothing_until_active_again() {
+    let (mut sim, _) = surface_track_run(21, 0);
+    let player = Issuer::Player { seat: 1 };
+    sim.submit(order(
+        0,
+        player.clone(),
+        Some(1),
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Unit { unit: UnitId(1) },
+            doctrine: doctrine_emcon(Emcon::Silent),
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(100);
+    assert_eq!(detection_draws(&sim), 0, "silent radar takes no draws");
+    assert!(sim
+        .snapshot(Viewer::Side { side: SideId(1) })
+        .contacts
+        .is_empty());
+
+    // Clearing the unit setting falls back to the default (active).
+    sim.submit(order(
+        100,
+        player,
+        Some(1),
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Unit { unit: UnitId(1) },
+            doctrine: Doctrine::default(),
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(10);
+    assert!(detection_draws(&sim) > 0);
+    assert_eq!(
+        sim.snapshot(Viewer::Side { side: SideId(1) })
+            .contacts
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn doctrine_inherits_side_then_group_then_unit() {
+    let mut sim = Simulation::new(1);
+    let mut s = spawn(
+        1,
+        1,
+        Domain::Surface,
+        ORIGIN,
+        0.0,
+        0.0,
+        0.0,
+        vec![radar()],
+        5000.0,
+    );
+    if let CommandPayload::SpawnUnit(u) = &mut s.payload {
+        u.group = Some("TG1".into());
+    }
+    sim.submit(s).unwrap();
+    let set = |scope, doctrine| {
+        order(
+            0,
+            Issuer::Scenario,
+            None,
+            CommandPayload::SetDoctrine { scope, doctrine },
+        )
+    };
+    sim.submit(set(
+        DoctrineScope::Side { side: SideId(1) },
+        Doctrine {
+            wcs: Some(Wcs::Free),
+            emcon: Some(Emcon::Silent),
+            engage_unfriendly: Some(true),
+        },
+    ))
+    .unwrap();
+    sim.submit(set(
+        DoctrineScope::Group {
+            side: SideId(1),
+            group: "TG1".into(),
+        },
+        Doctrine {
+            wcs: Some(Wcs::Hold),
+            ..Doctrine::default()
+        },
+    ))
+    .unwrap();
+    sim.submit(set(
+        DoctrineScope::Unit { unit: UnitId(1) },
+        doctrine_emcon(Emcon::Active),
+    ))
+    .unwrap();
+    sim.step();
+    let u = &sim.snapshot(Viewer::Side { side: SideId(1) }).units[0];
+    assert_eq!(u.group.as_deref(), Some("TG1"));
+    assert_eq!(u.doctrine.wcs, Wcs::Hold, "group over side");
+    assert_eq!(u.doctrine.emcon, Emcon::Active, "unit over side");
+    assert!(u.doctrine.engage_unfriendly, "from side");
+    assert_eq!(u.doctrine_set, doctrine_emcon(Emcon::Active));
+}
+
+#[test]
+fn players_cannot_set_postures_or_another_sides_doctrine() {
+    let (mut sim, _) = surface_track_run(3, 0);
+    let red = Issuer::Player { seat: 2 };
+    sim.submit(order(
+        0,
+        red.clone(),
+        Some(2),
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Side { side: SideId(1) },
+            doctrine: doctrine_emcon(Emcon::Silent),
+        },
+    ))
+    .unwrap();
+    sim.submit(order(
+        0,
+        red.clone(),
+        Some(2),
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Unit { unit: UnitId(1) },
+            doctrine: doctrine_emcon(Emcon::Silent),
+        },
+    ))
+    .unwrap();
+    sim.submit(order(
+        0,
+        red,
+        Some(2),
+        CommandPayload::SetPosture {
+            side: SideId(2),
+            toward: SideId(1),
+            posture: Posture::Hostile,
+        },
+    ))
+    .unwrap();
+    sim.step();
+    let rejected = sim
+        .events()
+        .iter()
+        .filter(|e| matches!(e.kind, SimEventKind::CommandRejected { .. }))
+        .count();
+    assert_eq!(rejected, 3);
+    assert!(detection_draws(&sim) > 0, "blue radar still active");
+    // A side's posture toward itself is refused at submission.
+    assert!(sim
+        .submit(order(
+            1,
+            Issuer::Scenario,
+            None,
+            CommandPayload::SetPosture {
+                side: SideId(1),
+                toward: SideId(1),
+                posture: Posture::Hostile,
+            },
+        ))
+        .is_err());
+}
+
+#[test]
+fn postures_are_shown_per_side_and_radar_tracks_have_no_affiliation() {
+    let (mut sim, _) = surface_track_run(4, 0);
+    for (side, toward, posture) in [(1, 2, Posture::Hostile), (2, 1, Posture::Unfriendly)] {
+        sim.submit(order(
+            0,
+            Issuer::Scenario,
+            None,
+            CommandPayload::SetPosture {
+                side: SideId(side),
+                toward: SideId(toward),
+                posture,
+            },
+        ))
+        .unwrap();
+    }
+    sim.run_ticks(6);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(
+        blue.postures,
+        vec![PostureView {
+            side: SideId(1),
+            toward: SideId(2),
+            posture: Posture::Hostile
+        }]
+    );
+    // Radar classifies to domain only, so the side does not know whose the track is.
+    assert_eq!(blue.contacts[0].affiliation, None);
+    assert_eq!(sim.snapshot(Viewer::WhiteCell).postures.len(), 2);
+}
+
+#[test]
+fn save_and_resume_keeps_c2_state() {
+    let (mut a, _) = surface_track_run(8, 0);
+    a.submit(order(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetPosture {
+            side: SideId(1),
+            toward: SideId(2),
+            posture: Posture::Hostile,
+        },
+    ))
+    .unwrap();
+    a.submit(order(
+        20,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Side { side: SideId(1) },
+            doctrine: doctrine_emcon(Emcon::Silent),
+        },
+    ))
+    .unwrap();
+    a.run_ticks(50);
+    let bytes = a.save().to_bytes().unwrap();
+    let mut b = Simulation::from_save(SaveGame::from_bytes(&bytes).unwrap()).unwrap();
+    assert_eq!(a.state_hash(), b.state_hash());
+    a.run_ticks(100);
+    b.run_ticks(100);
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert_eq!(a.events(), b.events());
 }

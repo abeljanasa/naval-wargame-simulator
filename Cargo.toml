@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/sim-c2",
     "crates/sim-core",
     "crates/sim-geo",
     "crates/sim-sensors",
@@ -17,6 +18,7 @@ license = "LicenseRef-Proprietary"
 publish = false
 
 [workspace.dependencies]
+sim-c2 = { path = "crates/sim-c2" }
 sim-core = { path = "crates/sim-core" }
 sim-db = { path = "crates/sim-db" }
 sim-geo = { path = "crates/sim-geo" }

@@ -1,6 +1,7 @@
 use crate::ids::{SideId, UnitId};
 use bevy_ecs::prelude::Component;
 use serde::{Deserialize, Serialize};
+use sim_c2::Doctrine;
 use sim_geo::GeoPoint;
 
 /// Broad physical domain of a unit.
@@ -35,6 +36,12 @@ pub struct Unit {
     /// Platform database class, if the unit came from one.
     #[serde(default)]
     pub platform: Option<String>,
+    /// Group (task group, formation) within the side, for doctrine inheritance.
+    #[serde(default)]
+    pub group: Option<String>,
+    /// Doctrine set on this unit; unset fields inherit from the group and the side.
+    #[serde(default)]
+    pub doctrine: Doctrine,
 }
 
 /// Geodetic position. `altitude_m` is height above MSL; negative values are depth.

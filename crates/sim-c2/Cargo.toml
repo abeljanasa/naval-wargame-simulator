@@ -1,0 +1,22 @@
+[package]
+name = "sim-c2"
+description = "Command and control models: postures, doctrine inheritance, ROE, weapons control status, EMCON. Pure functions, no ECS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+specta = ["dep:specta", "sim-sensors/specta"]
+
+[dependencies]
+sim-sensors.workspace = true
+serde.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

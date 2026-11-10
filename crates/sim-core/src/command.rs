@@ -5,6 +5,7 @@ use crate::detection::SensorSpec;
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
+use sim_c2::{Doctrine, Posture};
 use sim_geo::GeoPoint;
 
 /// Version of the command and snapshot wire protocol. Bump it on any breaking change to
@@ -83,12 +84,29 @@ pub struct UnitSpawn {
     /// Minimum turn radius, metres (0 or absent = no radius limit).
     #[serde(default)]
     pub min_turn_radius_m: Option<f64>,
+    #[serde(default)]
+    pub group: Option<String>,
+    #[serde(default)]
+    pub doctrine: Doctrine,
+}
+
+/// Where a doctrine setting applies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(tag = "level", rename_all = "snake_case")]
+pub enum DoctrineScope {
+    Side { side: SideId },
+    Group { side: SideId, group: String },
+    Unit { unit: UnitId },
 }
 
 /// What a command does.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
+// Spawns are much larger than orders, but commands are few (thousands per run, not millions) and
+// boxing would change every constructor and the serialised form's Rust API for no measurable gain.
+#[allow(clippy::large_enum_variant)]
 pub enum CommandPayload {
     SpawnUnit(UnitSpawn),
     /// Replace the unit's route. An empty list clears it, and the unit holds its current course.
@@ -101,6 +119,18 @@ pub enum CommandPayload {
         unit: UnitId,
         speed_mps: f64,
     },
+    /// How `side` regards `toward`. Scenario and white cell only.
+    SetPosture {
+        side: SideId,
+        toward: SideId,
+        posture: Posture,
+    },
+    /// Replaces the doctrine set at `scope` (unset fields inherit). A player may set doctrine
+    /// for their own side, its groups and its units.
+    SetDoctrine {
+        scope: DoctrineScope,
+        doctrine: Doctrine,
+    },
 }
 
 impl CommandPayload {
@@ -108,10 +138,15 @@ impl CommandPayload {
     #[must_use]
     pub fn target_unit(&self) -> Option<UnitId> {
         match self {
-            CommandPayload::SpawnUnit(_) => None,
-            CommandPayload::SetRoute { unit, .. } | CommandPayload::SetSpeed { unit, .. } => {
-                Some(*unit)
-            }
+            CommandPayload::SetRoute { unit, .. }
+            | CommandPayload::SetSpeed { unit, .. }
+            | CommandPayload::SetDoctrine {
+                scope: DoctrineScope::Unit { unit },
+                ..
+            } => Some(*unit),
+            CommandPayload::SpawnUnit(_)
+            | CommandPayload::SetPosture { .. }
+            | CommandPayload::SetDoctrine { .. } => None,
         }
     }
 
@@ -164,6 +199,18 @@ impl CommandPayload {
                     Err("speed must be finite and >= 0".into())
                 }
             }
+            CommandPayload::SetPosture { side, toward, .. } => {
+                if side == toward {
+                    Err("a side is always friendly to itself".into())
+                } else {
+                    Ok(())
+                }
+            }
+            CommandPayload::SetDoctrine {
+                scope: DoctrineScope::Group { group, .. },
+                ..
+            } if group.trim().is_empty() => Err("group name is empty".into()),
+            CommandPayload::SetDoctrine { .. } => Ok(()),
         }
     }
 }

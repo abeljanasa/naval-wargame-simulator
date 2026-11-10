@@ -4,8 +4,8 @@
 #![allow(clippy::unwrap_used)] // test harness
 
 use sim_core::{
-    Command, CommandPayload, Domain, GeoPoint, Issuer, SideId, SimEventKind, Simulation, Tick,
-    UnitId, UnitSpawn, Viewer,
+    Command, CommandPayload, Doctrine, Domain, GeoPoint, Issuer, SideId, SimEventKind, Simulation,
+    Tick, UnitId, UnitSpawn, Viewer,
 };
 
 fn ship(at: GeoPoint, heading: f64, speed: f64) -> Command {
@@ -30,6 +30,8 @@ fn ship(at: GeoPoint, heading: f64, speed: f64) -> Command {
             rcs_m2: None,
             max_turn_rate_dps: Some(3.0),
             min_turn_radius_m: Some(300.0),
+            group: None,
+            doctrine: Doctrine::default(),
         }),
     }
 }

@@ -22,6 +22,7 @@
 //! Not modelled yet: clutter, jamming, weather, terrain masking, ESM, sonar, visual/EO/IR,
 //! velocity estimation, association errors (tracks are keyed by the true target), data links.
 
+use crate::c2::C2State;
 use crate::components::{Domain, Position, Unit};
 use crate::events::{EventLog, SimEventKind};
 use crate::ids::{SideId, UnitId};
@@ -29,6 +30,7 @@ use crate::rng::{RngStreams, StreamId};
 use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
+use sim_c2::Emcon;
 use sim_geo::{inverse, radar_horizon_m, GeoPoint};
 pub use sim_sensors::{detection_range_m, pd_per_scan, SensorKind};
 use sim_sensors::{
@@ -313,6 +315,8 @@ struct Observed<'a> {
     position: Position,
     sensors: &'a SensorSuite,
     rcs_m2: f64,
+    /// EMCON allows active emissions (radar).
+    emits: bool,
 }
 
 pub(crate) fn detection_system(
@@ -320,6 +324,7 @@ pub(crate) fn detection_system(
     mut rng: ResMut<RngStreams>,
     mut contacts: ResMut<ContactTable>,
     mut log: ResMut<EventLog>,
+    c2: Res<C2State>,
     units: Query<(&Unit, &Position, &SensorSuite, &Signature)>,
 ) {
     let tick = clock.tick;
@@ -335,6 +340,7 @@ pub(crate) fn detection_system(
             position: *p,
             sensors: s,
             rcs_m2: sig.rcs_m2,
+            emits: c2.doctrine_for(u).emcon == Emcon::Active,
         })
         .collect();
     all.sort_by_key(|o| o.id);
@@ -355,6 +361,10 @@ pub(crate) fn detection_system(
     let mut candidates: Vec<usize> = Vec::new();
 
     for obs in &all {
+        // EMCON silent: radar does not transmit, so it detects nothing and draws nothing.
+        if !obs.emits {
+            continue;
+        }
         for sensor in obs.sensors.0.iter().filter(|s| s.kind == SensorKind::Radar) {
             let (Some(ref_range), Some(ref_rcs)) = (sensor.ref_range_m, sensor.ref_rcs_m2) else {
                 continue;

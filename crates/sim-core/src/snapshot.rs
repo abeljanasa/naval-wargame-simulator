@@ -8,6 +8,7 @@ use crate::components::Domain;
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
+use sim_c2::{Doctrine, Posture, ResolvedDoctrine};
 use sim_geo::GeoPoint;
 use sim_sensors::{Classification, ErrorEllipse};
 
@@ -46,6 +47,20 @@ pub struct UnitView {
     pub platform: Option<String>,
     /// Present for units the viewer controls.
     pub route: Option<RouteView>,
+    pub group: Option<String>,
+    /// Doctrine in force (unit, then group, then side, then default).
+    pub doctrine: ResolvedDoctrine,
+    /// Doctrine set on the unit itself (unset fields are inherited).
+    pub doctrine_set: Doctrine,
+}
+
+/// How `side` regards `toward`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct PostureView {
+    pub side: SideId,
+    pub toward: SideId,
+    pub posture: Posture,
 }
 
 /// One entry in a side's perceived picture. It deliberately carries no target unit id, so a
@@ -64,6 +79,8 @@ pub struct ContactView {
     pub classification: Classification,
     /// Present once the classification reaches `domain`.
     pub domain: Option<Domain>,
+    /// The holding side's posture toward the track's side, once identified to class level.
+    pub affiliation: Option<Posture>,
     pub first_seen_s: f64,
     pub last_seen_s: f64,
     /// Own unit whose sensor last detected it.
@@ -82,4 +99,6 @@ pub struct Snapshot {
     pub units: Vec<UnitView>,
     /// Side viewer: that side's contacts. White cell: every side's contacts.
     pub contacts: Vec<ContactView>,
+    /// Side viewer: that side's postures toward the others. White cell: every posture set.
+    pub postures: Vec<PostureView>,
 }
