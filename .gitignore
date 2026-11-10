@@ -5,3 +5,6 @@ apps/desktop/src-tauri/gen/
 *.nwssave
 .DS_Store
 Thumbs.db
+*.stackdump
+nws-sbom.json
+sbom-rust.json

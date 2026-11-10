@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added (Phase 1, delivery)
+
+- **Performance:** an exact latitude broad phase in detection with bit-identical results. 1,000 units run at 203× real time and 10,000 at 2.2× (budgets: 60× and 1×). Measure with `nws-batch bench`.
+- **Release scan:** `sim-db scan <dirs>` checks database files against `data/db/release-allowlist.txt`, recognising them by header, and fails on any record or JSON classification other than UNCLASSIFIED.
+- **Dependency policy** (`deny.toml`): no GPL/AGPL/LGPL; `cargo deny check` passes.
+- **CI:** dependency audit, a performance gate, and an air-gapped (vendored, `--offline`) build.
+- **Release workflow:** MSI/NSIS, DMG, AppImage/deb/rpm installers, signed when secrets are configured, with the release scan and CycloneDX SBOMs (Rust and npm).
+- **Docs:** `docs/build/performance.md`, `releasing.md`, `air-gapped.md`.
+
 ### Added (Phase 1, Gate 1: units move and detect)
 
 - **Scenario format v2:**

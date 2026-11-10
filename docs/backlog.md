@@ -8,9 +8,15 @@ Items deferred out of the current change, or requested out of phase (master prom
 - [x] Scenarios reference database platforms (`"platform": "GEN-FFG"`) (DL-0007).
 - [ ] In-app database editor (search, record diff, citation entry, live validation). It edits the JSON source (ADR-0004).
 - [ ] Planning-layer facility attributes for airbases and ports (runways, berths, draft limit, repair/rearm), needed by §7.1 in Phase 3.
-- [ ] Release scan in CI (open-data allowlist; fail on any record with `classification != "UNCLASSIFIED"`).
-- [ ] Signed installers (MSI/NSIS, DMG, AppImage/deb), SBOM generation, a `cargo deny` licence audit, and an air-gapped vendored build.
-- [ ] Criterion benchmarks with CI regression gates: 1 000 entities at ≥ 60×, 10 000 at ≥ 1×.
+- [x] Release scan (`sim-db scan`), run in the release workflow.
+- [x] Installers, signed when secrets are configured, plus SBOMs and a `cargo deny` licence audit (docs/build/releasing.md).
+- [x] Air-gapped vendored build, with the engine verified offline (docs/build/air-gapped.md).
+- [x] Throughput budgets met (`nws-batch bench`; docs/build/performance.md), with a CI gate on 1,000 units at ≥ 60×.
+- [ ] Code-signing certificates: the client provides them as Actions secrets. Until then installers are unsigned.
+- [ ] Criterion micro-benchmarks and an automatic "> 15 % regression against the stored baseline" CI check.
+- [ ] Map at 60 fps with 10,000 symbols: needs an automated UI performance test.
+- [ ] Build the full desktop bundle on a disconnected machine, with pre-staged WiX/NSIS tools.
+- [ ] npm dependency licence audit (the Rust side is covered by cargo deny).
 - [x] A basic detection model for Gate 1: the interim radar model (DL-0006).
 - [ ] Desktop app: visual check of contacts during a live run. Covered by engine tests so far; there is no automated UI test yet.
 - [ ] Turn-rate / turning-circle limits on movement.

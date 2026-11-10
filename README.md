@@ -44,6 +44,10 @@ In the app:
 
 Planned crates, not yet created: `sim-sensors`, `sim-weapons`, `sim-c2`, `sim-ai` and `sim-events` (Phase 2–3); `sim-analysis` (Phase 4); `sim-net` (Phase 5).
 
+## Building releases
+
+See [docs/build/releasing.md](docs/build/releasing.md) for installers, signing, the release scan and SBOMs, [docs/build/air-gapped.md](docs/build/air-gapped.md) for offline builds, and [docs/build/performance.md](docs/build/performance.md) for the performance budgets.
+
 ## Ground rules
 
 - **Clean room:** we match published features, never another product's code, data, names or UI. Every feature has a design-log entry ([docs/design-log](docs/design-log/README.md)).
