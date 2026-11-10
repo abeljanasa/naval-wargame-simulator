@@ -284,7 +284,15 @@ pub(crate) fn engage(
             );
         } else {
             // Guns, CIWS, bombs, depth charges, ASW rockets: resolved at once.
-            apply_hit_roll(world, &spec, None, None, track.target, tick);
+            apply_hit_roll(
+                world,
+                &spec,
+                None,
+                None,
+                (Some(shooter), Some(side)),
+                track.target,
+                tick,
+            );
         }
     }
     Ok(())
@@ -296,6 +304,7 @@ pub(crate) fn apply_hit_roll(
     spec: &WeaponSpec,
     weapon_id: Option<u64>,
     decoy_effect: Option<f64>,
+    (shooter, by_side): (Option<UnitId>, Option<SideId>),
     target: UnitId,
     tick: Tick,
 ) {
@@ -331,6 +340,8 @@ pub(crate) fn apply_hit_roll(
         SimEventKind::HitRoll {
             weapon_id,
             weapon: spec.id.clone(),
+            shooter,
+            side: by_side,
             target,
             base_ph: spec.base_ph,
             size_modifier: size,
@@ -526,7 +537,15 @@ pub(crate) fn weapons_system(world: &mut World) {
             };
             match miss {
                 None => {
-                    apply_hit_roll(world, &spec, Some(w.id), w.decoy_effect, w.target, tick);
+                    apply_hit_roll(
+                        world,
+                        &spec,
+                        Some(w.id),
+                        w.decoy_effect,
+                        (Some(w.shooter), Some(w.side)),
+                        w.target,
+                        tick,
+                    );
                     continue;
                 }
                 Some("") => {}

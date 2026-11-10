@@ -181,7 +181,7 @@ pub(crate) fn mine_system(world: &mut World) {
                 {
                     field.mines -= 1;
                 }
-                apply_hit_roll(world, spec, None, None, id, tick);
+                apply_hit_roll(world, spec, None, None, (None, Some(f.side)), id, tick);
                 if !world.resource::<UnitIndex>().0.contains_key(&id) {
                     break; // sunk
                 }

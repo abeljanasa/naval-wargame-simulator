@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "nws-batch"
 description = "Headless batch runner: runs scenarios without a display or Tauri"
 version.workspace = true
@@ -11,6 +11,7 @@ name = "nws-batch"
 path = "src/main.rs"
 
 [dependencies]
+sim-aar.workspace = true
 sim-core.workspace = true
 sim-scenario.workspace = true
 sim-db.workspace = true

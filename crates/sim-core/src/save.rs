@@ -53,7 +53,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 14: adds scenario events (definitions, state, reserves, injects) and the message log.
 ///   Older saves load with neither.
 /// * 15: adds the seat table. Older saves load with none (no seat checks).
-pub const SAVE_FORMAT_VERSION: u32 = 15;
+/// * 16: hit rolls record the firing unit and side. Older saves load with neither.
+pub const SAVE_FORMAT_VERSION: u32 = 16;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,7 +144,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=14 | SAVE_FORMAT_VERSION => {
+            1..=15 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

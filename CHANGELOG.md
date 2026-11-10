@@ -59,6 +59,19 @@
   - Only the main window and white-cell seats run the clock.
 - **Seat management** in the white-cell console: add, remove, open a window.
 
+### Added (Phase 3, slice 6: replay and AAR)
+
+- **`sim-aar` crate** (`docs/models/replay-aar.md`, DL-0026):
+  - **Exercise records** (`.nwsrec`): seed, coastline, command log, final hash, and the scenario.
+  - **Replay:** rebuilt from the record and checked against the final hash, with keyframes for seeking.
+  - **AAR tables:** side summary, losses with cause and credit, weapons expended against effective (fired, hits, missed, shot down, kills), detections, and a timeline. CSV export (RFC 4180, formula-safe).
+- **Desktop exercise review:**
+  - Replay the live exercise, or open a saved record.
+  - Scrubber; every seat window follows the replay; orders are refused until Back to live.
+  - AAR overlay with click-to-jump and Save CSV.
+- **`nws-batch aar`:** replays a record, or runs a scenario and records it, then writes the five CSV tables. It fails if the replay does not match.
+- **Save format 16:** hit rolls record the firing unit and side (golden hashes unchanged).
+
 ### Changed
 
 - Save format 15 (events, injects, messages, seats).

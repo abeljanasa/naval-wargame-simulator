@@ -148,6 +148,16 @@ impl Simulation {
         self.world.insert_resource(LandMaskRes(Some(mask)));
     }
 
+    /// The id of the coastline in use, if any (record it to replay the run).
+    #[must_use]
+    pub fn land_mask_id(&self) -> Option<String> {
+        self.world
+            .resource::<LandMaskRes>()
+            .0
+            .as_ref()
+            .map(|m| m.id().to_owned())
+    }
+
     #[must_use]
     pub fn seed(&self) -> u64 {
         self.world.resource::<RngStreams>().seed()
@@ -685,6 +695,17 @@ impl Simulation {
 
     /// Captures everything needed to resume this run exactly.
     pub fn save(&mut self) -> SaveGame {
+        self.save_with(true)
+    }
+
+    /// A save without the event log: a replay keyframe. The run continues exactly from it (the
+    /// model reads only the current tick's events), but its state hash differs from the original
+    /// run's, which also counts past events.
+    pub fn keyframe(&mut self) -> SaveGame {
+        self.save_with(false)
+    }
+
+    fn save_with(&mut self, with_events: bool) -> SaveGame {
         let units = self.unit_records();
         let log = self.world.resource::<CommandLog>();
         SaveGame {
@@ -696,7 +717,11 @@ impl Simulation {
             commands: log.in_seq_order(),
             rng: self.world.resource::<RngStreams>().clone(),
             units,
-            events: self.events().to_vec(),
+            events: if with_events {
+                self.events().to_vec()
+            } else {
+                Vec::new()
+            },
             contacts: self.world.resource::<ContactTable>().records(),
             next_contact_numbers: self.world.resource::<ContactTable>().next_numbers(),
             c2: self.world.resource::<C2State>().clone(),

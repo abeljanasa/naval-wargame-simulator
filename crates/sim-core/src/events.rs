@@ -155,6 +155,12 @@ pub enum SimEventKind {
     HitRoll {
         weapon_id: Option<u64>,
         weapon: String,
+        /// The firing unit (none for mines). Absent before save format 16.
+        #[serde(default)]
+        shooter: Option<UnitId>,
+        /// The firing side (the minefield's side for mines). Absent before save format 16.
+        #[serde(default)]
+        side: Option<SideId>,
         target: UnitId,
         base_ph: f64,
         size_modifier: f64,
