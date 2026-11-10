@@ -195,3 +195,73 @@ fn gate2_demo_detects_engages_defends_and_damages() {
         0
     );
 }
+
+/// Gate 3 (facilitated exercise): the shipped TTX demonstrator's events brief the players,
+/// report first contact, escalate to hostilities (after which the fight is decided), and prompt
+/// the white cell; a Blue loss ruled by the umpire brings in the reserve frigate.
+#[test]
+fn gate3_demo_events_drive_the_exercise() {
+    use sim_core::{
+        Adjudication, Command, CommandPayload, Issuer, SideId, SimEventKind as K, UnitId, Viewer,
+    };
+    let s = Scenario::load(repo_root().join("data/scenarios/phase3-ttx-demo.json")).unwrap();
+    let fired = |sim: &Simulation| -> Vec<String> {
+        sim.events()
+            .iter()
+            .filter_map(|e| match &e.kind {
+                K::ScenarioEventFired { event } => Some(event.clone()),
+                _ => None,
+            })
+            .collect()
+    };
+    let mut sim = s.build(None, &db()).unwrap();
+    sim.run_until(s.duration_ticks());
+    let f = fired(&sim);
+    for e in [
+        "e01-startex",
+        "e02-intel",
+        "e03-first-contact",
+        "e04-escalation",
+    ] {
+        assert_eq!(
+            f.iter().filter(|x| *x == e).count(),
+            1,
+            "{e} fires once: {f:?}"
+        );
+    }
+    assert_eq!(f.iter().filter(|x| *x == "e06-sitrep").count(), 3, "{f:?}");
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, K::UnitDestroyed { .. })));
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(blue.messages.len(), 4);
+    assert_eq!(
+        sim.snapshot(Viewer::Side { side: SideId(2) })
+            .messages
+            .len(),
+        2
+    );
+    assert_eq!(sim.snapshot(Viewer::WhiteCell).messages.len(), 7);
+
+    let mut sim = s.build(None, &db()).unwrap();
+    sim.submit(Command {
+        tick: Tick(1200),
+        issuer: Issuer::WhiteCell {
+            umpire: "TTX".into(),
+        },
+        side: None,
+        payload: CommandPayload::Adjudicate {
+            reason: "Bastion ruled lost to a mine".into(),
+            action: Adjudication::DestroyUnit { unit: UnitId(2) },
+        },
+    })
+    .unwrap();
+    sim.run_until(Tick(1300));
+    assert!(fired(&sim).contains(&"e05-reinforce".to_owned()));
+    assert!(sim
+        .snapshot(Viewer::WhiteCell)
+        .units
+        .iter()
+        .any(|u| u.id == UnitId(11)));
+}

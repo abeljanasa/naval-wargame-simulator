@@ -23,6 +23,7 @@ use crate::movement::movement_system;
 use crate::point_defence::{point_defence_system, PointDefence};
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
+use crate::scenario_events::{scenario_events_system, EventEngine, MessageLog};
 use crate::snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
 use crate::snapshot::{StoreView, WeaponView};
 use crate::time::{SimClock, Tick};
@@ -123,6 +124,8 @@ impl Simulation {
         world.insert_resource(PointDefence::default());
         world.insert_resource(Minefields::default());
         world.insert_resource(AdjudicationLog::default());
+        world.insert_resource(EventEngine::default());
+        world.insert_resource(MessageLog::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
         Self {
@@ -365,6 +368,10 @@ impl Simulation {
                 }
                 Viewer::Side { .. } => Vec::new(),
             },
+            messages: self.world.resource::<MessageLog>().visible(match viewer {
+                Viewer::WhiteCell => None,
+                Viewer::Side { side } => Some(side),
+            }),
             minefields: self.world.resource::<Minefields>().visible(match viewer {
                 Viewer::WhiteCell => None,
                 Viewer::Side { side } => Some(side),
@@ -511,6 +518,31 @@ impl Simulation {
             h.str(&a.umpire);
             h.str(&a.reason);
         }
+        let ev = self.world.resource::<EventEngine>();
+        h.u64(ev.events.len() as u64);
+        for (id, rt) in &ev.runtime {
+            h.str(id);
+            h.u8(u8::from(rt.enabled));
+            h.u64(u64::from(rt.fired));
+            h.u64(rt.inside.len() as u64);
+            for u in &rt.inside {
+                h.u64(*u);
+            }
+        }
+        for id in ev.reserves.keys() {
+            h.u64(id.0);
+        }
+        for (u, side) in &ev.sides {
+            h.u64(u.0);
+            h.u16(side.0);
+        }
+        let msgs = self.world.resource::<MessageLog>();
+        h.u64(msgs.0.len() as u64);
+        for m in &msgs.0 {
+            h.u64(m.tick.0);
+            h.str(&m.from);
+            h.str(&m.text);
+        }
         let mf = self.world.resource::<Minefields>();
         h.u64(u64::from(mf.next_id));
         for f in &mf.fields {
@@ -647,6 +679,8 @@ impl Simulation {
             point_defence: self.world.resource::<PointDefence>().clone(),
             minefields: self.world.resource::<Minefields>().clone(),
             adjudications: self.world.resource::<AdjudicationLog>().clone(),
+            events_engine: self.world.resource::<EventEngine>().clone(),
+            messages: self.world.resource::<MessageLog>().clone(),
         }
     }
 
@@ -681,6 +715,8 @@ impl Simulation {
         sim.world.insert_resource(save.point_defence);
         sim.world.insert_resource(save.minefields);
         sim.world.insert_resource(save.adjudications);
+        sim.world.insert_resource(save.events_engine);
+        sim.world.insert_resource(save.messages);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -772,6 +808,7 @@ fn build_schedule() -> Schedule {
             damage_control_system,
             detection_system,
             ai_system,
+            scenario_events_system,
             advance_clock_system,
         )
             .chain(),
@@ -796,7 +833,7 @@ fn apply_commands_system(world: &mut World) {
     }
 }
 
-fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
+pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
     match &cmd.payload {
         CommandPayload::SpawnUnit(spawn) => {
             if !cmd.issuer.is_privileged() {
@@ -891,6 +928,19 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
             Issuer::WhiteCell { umpire } => adjudicate(world, umpire, reason, action),
             _ => Err("only the white cell may adjudicate".into()),
         },
+        CommandPayload::SetEvents { events, reserves } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set events".into());
+            }
+            let index = &world.resource::<UnitIndex>().0;
+            if let Some(r) = reserves.iter().find(|r| index.contains_key(&r.id)) {
+                return Err(format!("reserve {} is already in play", r.id));
+            }
+            world
+                .resource_mut::<EventEngine>()
+                .load(events.clone(), reserves.clone());
+            Ok(())
+        }
         CommandPayload::CreateMinefield {
             side,
             centre,

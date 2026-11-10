@@ -1,13 +1,15 @@
 //! Scenario files: JSON, versioned, validated on load.
 //!
-//! Phase 1 holds the seed, sides and initial units. A unit names a platform-database class
-//! (`"platform": "GEN-FFG"`), which supplies its domain, performance, sensors and radar
-//! cross-section. Any of the performance values can be overridden per unit. Missions, events
-//! (triggers → conditions → actions), Lua scripts and planning objects arrive in Phase 3.
+//! A scenario holds the seed, sides, groups, minefields, environment, units and events. A unit
+//! names a platform-database class (`"platform": "GEN-FFG"`), which supplies its domain,
+//! performance, sensors and radar cross-section. Any of the performance values can be overridden
+//! per unit. Events (triggers → conditions → actions) are in `docs/models/events.md`.
 //!
 //! Format history:
 //! * v1: units carried domain, max speed and acceleration inline.
 //! * v2: optional `platform` reference; inline values become optional overrides. v1 files still load.
+//! * v3: `events`, and `reserve` units held off the board until an event brings them in. v1 and
+//!   v2 files still load.
 
 #![forbid(unsafe_code)]
 
@@ -16,15 +18,15 @@ pub mod synthetic;
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
-    Environment, GeoPoint, Guidance, Issuer, JammerSpec, Mission, Posture, SensorKind, SensorSpec,
-    SideId, Simulation, Tick, UnitId, UnitSpawn, WeaponKind, WeaponSpec,
+    Environment, GeoPoint, Guidance, Issuer, JammerSpec, Mission, Posture, ScenarioEvent,
+    SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn, WeaponKind, WeaponSpec,
 };
 use sim_db::PlatformDb;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 pub const SCENARIO_FORMAT: &str = "nws-scenario";
-pub const SCENARIO_FORMAT_VERSION: u32 = 2;
+pub const SCENARIO_FORMAT_VERSION: u32 = 3;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioError {
@@ -128,6 +130,9 @@ pub struct ScenarioUnit {
     /// Mission at start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mission: Option<Mission>,
+    /// Held off the board until an event's `spawn_reserve` action brings it in.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reserve: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,6 +156,9 @@ pub struct Scenario {
     #[serde(default, skip_serializing_if = "is_default")]
     pub environment: Environment,
     pub units: Vec<ScenarioUnit>,
+    /// Scenario events, checked every tick (`docs/models/events.md`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<ScenarioEvent>,
 }
 
 fn domain_from_db(s: &str) -> Option<Domain> {
@@ -272,8 +280,87 @@ impl Scenario {
         self.environment
             .validate()
             .map_err(|e| ScenarioError::Invalid(format!("environment: {e}")))?;
+        self.validate_events(&sides)?;
         if self.duration_s == 0 {
             return Err(ScenarioError::Invalid("duration_s must be > 0".into()));
+        }
+        Ok(())
+    }
+
+    /// Events: their own checks, then every side and unit they name must be declared, and
+    /// `spawn_reserve` must name a reserve unit.
+    fn validate_events(&self, sides: &BTreeSet<SideId>) -> Result<(), ScenarioError> {
+        use sim_core::{Audience, Condition, DoctrineTarget, EventAction, Trigger};
+        sim_core::validate_events(&self.events).map_err(ScenarioError::Invalid)?;
+        let reserves: BTreeSet<u64> = self
+            .units
+            .iter()
+            .filter(|u| u.reserve)
+            .map(|u| u.id.0)
+            .collect();
+        let units: BTreeSet<u64> = self.units.iter().map(|u| u.id.0).collect();
+        for e in &self.events {
+            let mut side_refs: Vec<u16> = Vec::new();
+            let mut unit_refs: Vec<u64> = Vec::new();
+            match &e.trigger {
+                Trigger::AreaEntered { side, unit, .. } | Trigger::UnitDestroyed { side, unit } => {
+                    side_refs.extend(side);
+                    unit_refs.extend(unit);
+                }
+                Trigger::ContactGained { side, target_side } => {
+                    side_refs.push(*side);
+                    side_refs.extend(target_side);
+                }
+                Trigger::Time { .. } | Trigger::Every { .. } => {}
+            }
+            for c in &e.conditions {
+                match c {
+                    Condition::UnitAlive { unit } | Condition::UnitGone { unit } => {
+                        unit_refs.push(*unit);
+                    }
+                    Condition::UnitsAlive { side, .. } => side_refs.push(*side),
+                    _ => {}
+                }
+            }
+            for a in &e.actions {
+                match a {
+                    EventAction::Message {
+                        to: Audience::Side { side },
+                        ..
+                    } => side_refs.push(*side),
+                    EventAction::SetPosture { side, toward, .. } => {
+                        side_refs.extend([*side, *toward]);
+                    }
+                    EventAction::SetDoctrine { scope, .. } => match scope {
+                        DoctrineTarget::Side { side } | DoctrineTarget::Group { side, .. } => {
+                            side_refs.push(*side);
+                        }
+                        DoctrineTarget::Unit { unit } => unit_refs.push(*unit),
+                    },
+                    EventAction::SetSpeed { unit, .. }
+                    | EventAction::SetRoute { unit, .. }
+                    | EventAction::AssignMission { unit, .. } => unit_refs.push(*unit),
+                    EventAction::SpawnReserve { unit } if !reserves.contains(unit) => {
+                        return Err(ScenarioError::Invalid(format!(
+                            "event {:?} spawns U{unit}, which is not a reserve unit",
+                            e.id
+                        )));
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(s) = side_refs.iter().find(|s| !sides.contains(&SideId(**s))) {
+                return Err(ScenarioError::Invalid(format!(
+                    "event {:?} names undeclared side S{s}",
+                    e.id
+                )));
+            }
+            if let Some(u) = unit_refs.iter().find(|u| !units.contains(u)) {
+                return Err(ScenarioError::Invalid(format!(
+                    "event {:?} names undeclared unit U{u}",
+                    e.id
+                )));
+            }
         }
         Ok(())
     }
@@ -357,12 +444,29 @@ impl Scenario {
                 payload,
             })?;
         }
-        for s in spawns {
+        let mut reserves = Vec::new();
+        for (s, u) in spawns.into_iter().zip(&self.units) {
+            if u.reserve {
+                reserves.push(s);
+                continue;
+            }
             sim.submit(Command {
                 tick: Tick(0),
                 issuer: Issuer::Scenario,
                 side: None,
                 payload: CommandPayload::SpawnUnit(s),
+            })?;
+        }
+        // Last, so area triggers see the units already placed.
+        if !self.events.is_empty() || !reserves.is_empty() {
+            sim.submit(Command {
+                tick: Tick(0),
+                issuer: Issuer::Scenario,
+                side: None,
+                payload: CommandPayload::SetEvents {
+                    events: self.events.clone(),
+                    reserves,
+                },
             })?;
         }
         Ok(sim)
@@ -760,5 +864,53 @@ mod tests {
             Scenario::from_json(&rough),
             Err(ScenarioError::Invalid(_))
         ));
+    }
+    const WITH_EVENTS: &str = r#"{
+        "format": "nws-scenario", "format_version": 3, "name": "t", "seed": 1, "duration_s": 100,
+        "sides": [{"id": 1, "name": "Blue"}, {"id": 2, "name": "Red"}],
+        "units": [{"id": 1, "name": "A", "side": 1, "platform": "GEN-FFG",
+                   "position": {"lat_deg": 0.0, "lon_deg": 0.0}},
+                  {"id": 2, "name": "B", "side": 1, "platform": "GEN-FFG", "reserve": true,
+                   "position": {"lat_deg": 0.5, "lon_deg": 0.0}}],
+        "events": [{"id": "in", "trigger": {"type": "time", "at_s": 50},
+                    "actions": [{"type": "spawn_reserve", "unit": 2},
+                                {"type": "message", "to": "side", "side": 1, "text": "B joins"}]}]
+    }"#;
+
+    #[test]
+    fn events_and_reserves_load_and_a_reserve_waits_for_its_event() {
+        let s = Scenario::from_json(WITH_EVENTS).unwrap();
+        let mut sim = s.build(None, &db()).unwrap();
+        sim.run_until(Tick(10));
+        let ids = |sim: &mut Simulation| -> Vec<u64> {
+            sim.snapshot(sim_core::Viewer::WhiteCell)
+                .units
+                .iter()
+                .map(|u| u.id.0)
+                .collect()
+        };
+        assert_eq!(ids(&mut sim), vec![1]);
+        sim.run_until(Tick(60));
+        assert_eq!(ids(&mut sim), vec![1, 2]);
+        // Written back out, the reserve flag and the events survive.
+        let again = Scenario::from_json(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert!(again.units[1].reserve);
+        assert_eq!(again.events, s.events);
+    }
+
+    #[test]
+    fn events_naming_undeclared_sides_or_units_or_non_reserves_are_rejected() {
+        for (from, to) in [
+            (r#""side": 1, "text""#, r#""side": 9, "text""#),
+            (r#""unit": 2}"#, r#""unit": 1}"#),
+            (r#""unit": 2}"#, r#""unit": 7}"#),
+            (r#""at_s": 50"#, r#""at_s": -1"#),
+        ] {
+            let bad = WITH_EVENTS.replacen(from, to, 1);
+            assert!(
+                matches!(Scenario::from_json(&bad), Err(ScenarioError::Invalid(_))),
+                "{to}"
+            );
+        }
     }
 }

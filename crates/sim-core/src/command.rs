@@ -8,6 +8,7 @@ use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_ai::Mission;
 use sim_c2::{Doctrine, Posture};
+use sim_events::ScenarioEvent;
 use sim_geo::GeoPoint;
 use sim_sensors::{Carrier, Environment, JammerSpec};
 use sim_weapons::{DamageProfile, WeaponSpec};
@@ -35,10 +36,14 @@ pub enum Issuer {
 }
 
 impl Issuer {
-    /// Issuers allowed to act on units of any side.
+    /// Issuers allowed to act on units of any side. Scenario events and scripts are written by
+    /// the scenario author, so they have the scenario's authority.
     #[must_use]
     pub fn is_privileged(&self) -> bool {
-        matches!(self, Issuer::Scenario | Issuer::WhiteCell { .. })
+        matches!(
+            self,
+            Issuer::Scenario | Issuer::WhiteCell { .. } | Issuer::Script
+        )
     }
 }
 
@@ -189,6 +194,13 @@ pub enum CommandPayload {
         reason: String,
         action: Adjudication,
     },
+    /// Replaces the scenario events and the reserve units they can bring in. Scenario and white
+    /// cell only.
+    SetEvents {
+        events: Vec<ScenarioEvent>,
+        #[serde(default)]
+        reserves: Vec<UnitSpawn>,
+    },
     /// Creates a minefield. Scenario and white cell only.
     CreateMinefield {
         side: SideId,
@@ -231,6 +243,7 @@ impl CommandPayload {
             | CommandPayload::SetWeaponCatalog { .. }
             | CommandPayload::CreateMinefield { .. }
             | CommandPayload::Adjudicate { .. }
+            | CommandPayload::SetEvents { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -329,6 +342,15 @@ impl CommandPayload {
                 } else {
                     Ok(())
                 }
+            }
+            CommandPayload::SetEvents { events, reserves } => {
+                sim_events::validate_events(events)?;
+                for r in reserves {
+                    CommandPayload::SpawnUnit(r.clone())
+                        .validate()
+                        .map_err(|e| format!("reserve {}: {e}", r.id))?;
+                }
+                Ok(())
             }
             CommandPayload::Adjudicate { reason, action } => {
                 if reason.trim().is_empty() {

@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/sim-ai",
     "crates/sim-c2",
+    "crates/sim-events",
     "crates/sim-core",
     "crates/sim-geo",
     "crates/sim-sensors",
@@ -24,6 +25,7 @@ sim-ai = { path = "crates/sim-ai" }
 sim-c2 = { path = "crates/sim-c2" }
 sim-core = { path = "crates/sim-core" }
 sim-db = { path = "crates/sim-db" }
+sim-events = { path = "crates/sim-events" }
 sim-geo = { path = "crates/sim-geo" }
 sim-scenario = { path = "crates/sim-scenario" }
 sim-sensors = { path = "crates/sim-sensors" }

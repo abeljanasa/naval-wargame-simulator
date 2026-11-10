@@ -1,0 +1,171 @@
+{
+  "format": "nws-scenario",
+  "format_version": 3,
+  "name": "Phase 3 — Escalation in Bass Strait (TTX)",
+  "description": "Gate 3 demonstrator: a facilitated exercise. Blue and Red patrols start unfriendly with weapons tight. Scenario events brief the players, report first contact, escalate to hostilities when Red enters the Blue patrol box, bring in a Blue reserve frigate after a loss, and prompt the white cell for situation reports. All platforms are generic database classes with no real-world values.",
+  "seed": 20261112,
+  "duration_s": 7200,
+  "environment": { "sea_state": 3, "start_unix_s": 1794268800 },
+  "sides": [
+    {
+      "id": 1,
+      "name": "Blue",
+      "postures": [{ "toward": 2, "posture": "unfriendly" }],
+      "doctrine": { "wcs": "tight", "emcon": "active" }
+    },
+    {
+      "id": 2,
+      "name": "Red",
+      "postures": [{ "toward": 1, "posture": "unfriendly" }],
+      "doctrine": { "wcs": "tight", "emcon": "active" }
+    }
+  ],
+  "units": [
+    {
+      "id": 1,
+      "name": "Blue destroyer (DDG) — Anvil",
+      "side": 1,
+      "platform": "GEN-DDG",
+      "position": { "lat_deg": -39.6, "lon_deg": 146.3 },
+      "heading_deg": 90.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": { "lat_deg": -39.62, "lon_deg": 146.45 },
+        "radius_m": 10000
+      }
+    },
+    {
+      "id": 2,
+      "name": "Blue frigate (FFG) — Bastion",
+      "side": 1,
+      "platform": "GEN-FFG",
+      "position": { "lat_deg": -39.65, "lon_deg": 146.25 },
+      "heading_deg": 90.0,
+      "mission": { "kind": "escort", "escorted": 1, "bearing_deg": 135.0, "range_m": 4000 }
+    },
+    {
+      "id": 3,
+      "name": "Red corvette (FFL) — Cinder",
+      "side": 2,
+      "platform": "GEN-FFL",
+      "position": { "lat_deg": -39.6, "lon_deg": 146.9 },
+      "heading_deg": 270.0,
+      "mission": { "kind": "ferry", "destination": { "lat_deg": -39.62, "lon_deg": 146.45 } }
+    },
+    {
+      "id": 4,
+      "name": "Red corvette (FFL) — Dross",
+      "side": 2,
+      "platform": "GEN-FFL",
+      "position": { "lat_deg": -39.65, "lon_deg": 146.95 },
+      "heading_deg": 270.0,
+      "mission": { "kind": "escort", "escorted": 3, "bearing_deg": 225.0, "range_m": 4000 }
+    },
+    {
+      "id": 11,
+      "name": "Blue frigate (FFG) — Citadel (reserve)",
+      "side": 1,
+      "platform": "GEN-FFG",
+      "position": { "lat_deg": -39.4, "lon_deg": 146.2 },
+      "heading_deg": 135.0,
+      "reserve": true,
+      "mission": {
+        "kind": "patrol",
+        "centre": { "lat_deg": -39.62, "lon_deg": 146.45 },
+        "radius_m": 10000
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "e01-startex",
+      "name": "Exercise control",
+      "trigger": { "type": "time", "at_s": 0 },
+      "actions": [
+        {
+          "type": "message",
+          "to": "all",
+          "text": "STARTEX. Postures unfriendly, weapons tight. Report all contacts."
+        }
+      ]
+    },
+    {
+      "id": "e02-intel",
+      "name": "Maritime operations centre",
+      "trigger": { "type": "time", "at_s": 600 },
+      "actions": [
+        {
+          "type": "message",
+          "to": "side",
+          "side": 1,
+          "text": "Intelligence: two Red corvettes sailed east of the patrol box, intent unknown."
+        }
+      ]
+    },
+    {
+      "id": "e03-first-contact",
+      "name": "Maritime operations centre",
+      "trigger": { "type": "contact_gained", "side": 1, "target_side": 2 },
+      "actions": [
+        {
+          "type": "message",
+          "to": "side",
+          "side": 1,
+          "text": "First contact on Red units. Classify and report; do not engage."
+        }
+      ]
+    },
+    {
+      "id": "e04-escalation",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "area_entered",
+        "side": 2,
+        "area": {
+          "shape": "polygon",
+          "points": [
+            { "lat_deg": -39.5, "lon_deg": 146.3 },
+            { "lat_deg": -39.5, "lon_deg": 146.6 },
+            { "lat_deg": -39.75, "lon_deg": 146.6 },
+            { "lat_deg": -39.75, "lon_deg": 146.3 }
+          ]
+        }
+      },
+      "actions": [
+        { "type": "set_posture", "side": 1, "toward": 2, "posture": "hostile" },
+        { "type": "set_posture", "side": 2, "toward": 1, "posture": "hostile" },
+        { "type": "set_doctrine", "scope": { "level": "side", "side": 1 }, "doctrine": { "wcs": "free", "emcon": "active" } },
+        { "type": "set_doctrine", "scope": { "level": "side", "side": 2 }, "doctrine": { "wcs": "free", "emcon": "active" } },
+        {
+          "type": "message",
+          "to": "all",
+          "text": "Red has entered the Blue patrol box. Both sides declared hostile; weapons free."
+        }
+      ]
+    },
+    {
+      "id": "e05-reinforce",
+      "name": "Fleet headquarters",
+      "trigger": { "type": "unit_destroyed", "side": 1 },
+      "actions": [
+        { "type": "spawn_reserve", "unit": 11 },
+        {
+          "type": "message",
+          "to": "side",
+          "side": 1,
+          "text": "Citadel detached to reinforce; she is on her way to the patrol box."
+        }
+      ]
+    },
+    {
+      "id": "e06-sitrep",
+      "name": "Exercise control",
+      "repeatable": true,
+      "trigger": { "type": "every", "period_s": 1800, "start_s": 1800 },
+      "conditions": [{ "type": "units_alive", "side": 1, "cmp": "ge", "count": 1 }],
+      "actions": [
+        { "type": "message", "to": "white_cell", "text": "SITREP due from both sides." }
+      ]
+    }
+  ]
+}

@@ -167,6 +167,21 @@ pub enum SimEventKind {
         draw: f64,
         hit: bool,
     },
+    /// A scenario event fired (its actions follow).
+    ScenarioEventFired {
+        event: String,
+    },
+    /// A scenario event's trigger occurred but condition `condition` (0-based) did not hold.
+    ScenarioEventHeld {
+        event: String,
+        condition: u32,
+    },
+    /// Action `action` (0-based) of a fired event could not be carried out.
+    ScenarioActionFailed {
+        event: String,
+        action: u32,
+        reason: String,
+    },
     /// A white-cell override, with who made it and why.
     Adjudicated {
         umpire: String,

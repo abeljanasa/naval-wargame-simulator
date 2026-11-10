@@ -1,0 +1,25 @@
+[package]
+name = "sim-events"
+description = "Scenario event engine: triggers, conditions and actions, evaluated deterministically. Pure functions, no ECS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+specta = ["dep:specta", "sim-geo/specta", "sim-c2/specta", "sim-ai/specta", "sim-sensors/specta"]
+
+[dependencies]
+sim-geo.workspace = true
+sim-c2.workspace = true
+sim-ai.workspace = true
+sim-sensors.workspace = true
+serde.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

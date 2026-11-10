@@ -10,9 +10,23 @@
   - Every override is logged with umpire and reason before it takes effect, saved, and replays exactly.
 - **Desktop white-cell console:** reason box; Repair, Destroy and Remove for the selected unit; Hit and Miss for weapons in flight; the override log.
 
+### Added (Phase 3, slice 2: event engine)
+
+- **`sim-events` crate and the event engine** (`docs/models/events.md`, DL-0022):
+  - Triggers: time, every, area entered, unit destroyed, contact gained.
+  - Conditions: event fired or not, unit alive or gone, units alive, time window, probability.
+  - Actions: message, posture, doctrine, environment, speed, route, mission, spawn a reserve, enable an event.
+  - Checked once per tick in id order. Firings, held events and failed actions are logged.
+- **Scenario format 3:** `events` and `reserve` units.
+- **Message logs per side** in every picture.
+- **Desktop Messages panel.**
+- **New demonstrator:** `data/scenarios/phase3-ttx-demo.json`, an escalation exercise.
+
 ### Changed
 
-- Save format 13. Golden hashes: phase 1 `897a23ff0e619af2`, phase 2 `1b01a1518913d807`.
+- Save format 14 (events, messages).
+- Golden hashes: phase 1 `dd64421cfad317f2`, phase 2 `3930306360d8e447`, phase 3 `fbd8dfd736e8745d`.
+- Save format 13 (adjudication log).
 
 ### Added (Phase 2, slice 12: Gate 2 pack)
 

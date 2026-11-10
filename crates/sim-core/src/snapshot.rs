@@ -9,6 +9,7 @@ use crate::components::Domain;
 use crate::esm::BearingView;
 use crate::ids::{SideId, UnitId};
 use crate::mines::Minefield;
+use crate::scenario_events::Message;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_ai::Mission;
@@ -152,4 +153,7 @@ pub struct Snapshot {
     pub minefields: Vec<Minefield>,
     /// White cell only: the most recent overrides, newest last.
     pub adjudications: Vec<AdjudicationRecord>,
+    /// The viewer's message log (the latest 100, oldest first). The white cell sees every
+    /// message.
+    pub messages: Vec<Message>,
 }
