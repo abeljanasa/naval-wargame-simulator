@@ -1,0 +1,16 @@
+[package]
+name = "sim-scenario"
+description = "Scenario file format (JSON), validation and loading into a Simulation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+sim-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

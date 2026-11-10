@@ -1,0 +1,42 @@
+{
+  "format": "nws-scenario",
+  "format_version": 1,
+  "name": "Phase 1 — Strait transit",
+  "description": "Gate 1 movement demonstrator. A generic frigate transits a strait on a four-leg route while a generic merchant dead-reckons across its track. Both are generic classes with no real-world platform values.",
+  "seed": 20261110,
+  "duration_s": 86400,
+  "sides": [
+    { "id": 1, "name": "Blue" },
+    { "id": 2, "name": "Neutral shipping" }
+  ],
+  "units": [
+    {
+      "id": 1,
+      "name": "Generic frigate (FFG) — Alpha",
+      "side": 1,
+      "domain": "surface",
+      "position": { "lat_deg": -38.9, "lon_deg": 148.6 },
+      "heading_deg": 250.0,
+      "speed_mps": 9.0,
+      "max_speed_mps": 15.0,
+      "accel_mps2": 0.05,
+      "route": [
+        { "lat_deg": -39.2, "lon_deg": 147.0 },
+        { "lat_deg": -39.4, "lon_deg": 145.5 },
+        { "lat_deg": -39.3, "lon_deg": 143.5 },
+        { "lat_deg": -38.9, "lon_deg": 142.4 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Generic bulk carrier — Bravo",
+      "side": 2,
+      "domain": "surface",
+      "position": { "lat_deg": -40.2, "lon_deg": 145.0 },
+      "heading_deg": 20.0,
+      "speed_mps": 6.5,
+      "max_speed_mps": 7.5,
+      "accel_mps2": 0.01
+    }
+  ]
+}

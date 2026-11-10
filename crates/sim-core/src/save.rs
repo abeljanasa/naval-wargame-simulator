@@ -1,0 +1,71 @@
+//! Save games: full world state + RNG state + command log, MessagePack-encoded and versioned.
+
+use crate::command::LoggedCommand;
+use crate::components::{Kinematics, Position, Route, Unit};
+use crate::error::SimError;
+use crate::events::SimEvent;
+use crate::rng::RngStreams;
+use crate::time::Tick;
+use serde::{Deserialize, Serialize};
+
+pub const SAVE_MAGIC: &str = "NWS-SAVE";
+/// Increment on any change to [`SaveGame`] and add a migration in [`SaveGame::from_bytes`].
+pub const SAVE_FORMAT_VERSION: u32 = 1;
+
+/// Every component of one unit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnitRecord {
+    pub unit: Unit,
+    pub position: Position,
+    pub kinematics: Kinematics,
+    pub route: Route,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveGame {
+    pub magic: String,
+    pub format_version: u32,
+    pub protocol_version: u16,
+    pub tick: Tick,
+    pub next_seq: u64,
+    pub rng: RngStreams,
+    /// Sorted by unit id.
+    pub units: Vec<UnitRecord>,
+    /// Every accepted command, in sequence order, including future-scheduled ones not yet applied.
+    pub commands: Vec<LoggedCommand>,
+    pub events: Vec<SimEvent>,
+}
+
+impl SaveGame {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, SimError> {
+        Ok(rmp_serde::to_vec_named(self)?)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, SimError> {
+        // Read only the header first, so a newer, unknown format gets a clear error instead of a decode failure.
+        #[derive(Deserialize)]
+        struct Header {
+            magic: String,
+            format_version: u32,
+        }
+        let header: Header = rmp_serde::from_slice(bytes).map_err(|_| SimError::NotASave)?;
+        if header.magic != SAVE_MAGIC {
+            return Err(SimError::NotASave);
+        }
+        match header.format_version {
+            v if v > SAVE_FORMAT_VERSION => Err(SimError::UnknownFutureVersion {
+                found: v,
+                supported: SAVE_FORMAT_VERSION,
+            }),
+            SAVE_FORMAT_VERSION => {
+                let save: SaveGame = rmp_serde::from_slice(bytes)?;
+                if !save.rng.is_complete() {
+                    return Err(SimError::CorruptSave("missing RNG stream".into()));
+                }
+                Ok(save)
+            }
+            // No older formats exist yet. Migrations from v(N-1) go here as the format evolves.
+            v => Err(SimError::UnsupportedVersion { found: v }),
+        }
+    }
+}

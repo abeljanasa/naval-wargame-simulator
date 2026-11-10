@@ -1,0 +1,28 @@
+[package]
+name = "sim-core"
+description = "Headless, deterministic simulation core: ECS world, fixed-step clock, RNG streams, commands and snapshots"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Derives `specta::Type` on protocol types so the desktop app can generate TypeScript bindings.
+specta = ["dep:specta", "sim-geo/specta"]
+
+[dependencies]
+sim-geo.workspace = true
+bevy_ecs.workspace = true
+rand_chacha.workspace = true
+rmp-serde.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

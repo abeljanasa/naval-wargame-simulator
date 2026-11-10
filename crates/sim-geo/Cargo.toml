@@ -1,0 +1,22 @@
+[package]
+name = "sim-geo"
+description = "WGS-84 geodesy, great-circle motion and radar horizon, deterministic across platforms"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+specta = ["dep:specta"]
+
+[dependencies]
+libm.workspace = true
+serde.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true
