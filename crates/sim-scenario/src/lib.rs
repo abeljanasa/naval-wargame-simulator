@@ -15,8 +15,9 @@ pub mod synthetic;
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Command, CommandPayload, Doctrine, DoctrineScope, Domain, Environment, GeoPoint, Issuer,
-    JammerSpec, Posture, SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn,
+    Carrier, Command, CommandPayload, Doctrine, DoctrineScope, Domain, EmitterEntry, Environment,
+    GeoPoint, Issuer, JammerSpec, Posture, SensorKind, SensorSpec, SideId, Simulation, Tick,
+    UnitId, UnitSpawn,
 };
 use sim_db::PlatformDb;
 use std::collections::BTreeSet;
@@ -265,8 +266,13 @@ impl Scenario {
         let mut sim = Simulation::new(seed.unwrap_or(self.seed));
         // Ships and submarines navigate round the bundled coastline (docs/models/land-avoidance.md).
         sim.set_land_mask(sim_geo::land::embedded());
-        // Environment, postures and doctrine first, so they are in force when the units spawn.
+        // Environment, the ESM emitter library, postures and doctrine first, so they are in
+        // force when the units spawn.
         let mut c2 = Vec::new();
+        let library = emitter_library(&spawns, db)?;
+        if !library.is_empty() {
+            c2.push(CommandPayload::SetEmitterLibrary { entries: library });
+        }
         if self.environment != Environment::default() {
             c2.push(CommandPayload::SetEnvironment {
                 environment: self.environment,
@@ -401,6 +407,38 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         doctrine: u.doctrine,
         jammer: u.jammer,
     })
+}
+
+/// The ESM emitter library for the radars fitted in this scenario: each radar type with every
+/// database platform class that carries it (not only the classes present in the scenario).
+fn emitter_library(
+    spawns: &[UnitSpawn],
+    db: &PlatformDb,
+) -> Result<Vec<EmitterEntry>, ScenarioError> {
+    let radars: BTreeSet<&str> = spawns
+        .iter()
+        .flat_map(|s| s.sensors.iter())
+        .filter(|s| s.kind == SensorKind::Radar)
+        .map(|s| s.sensor_id.as_str())
+        .collect();
+    radars
+        .into_iter()
+        .map(|r| {
+            let carriers = db
+                .carriers_of(r)?
+                .into_iter()
+                .map(|(platform, category, domain)| Carrier {
+                    platform,
+                    category,
+                    domain,
+                })
+                .collect();
+            Ok(EmitterEntry {
+                emitter: r.to_owned(),
+                carriers,
+            })
+        })
+        .collect()
 }
 
 /// Generic turn performance by platform class (the database has no turn data yet; see

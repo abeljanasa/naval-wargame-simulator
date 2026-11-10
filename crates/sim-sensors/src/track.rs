@@ -108,7 +108,7 @@ pub struct ErrorEllipse {
 }
 
 /// A point in the local east/north plane centred on `origin`, metres.
-fn to_local(origin: GeoPoint, p: GeoPoint) -> [f64; 2] {
+pub(crate) fn to_local(origin: GeoPoint, p: GeoPoint) -> [f64; 2] {
     let inv = inverse(origin, p);
     if inv.distance_m == 0.0 {
         return [0.0, 0.0];
@@ -120,7 +120,7 @@ fn to_local(origin: GeoPoint, p: GeoPoint) -> [f64; 2] {
     ]
 }
 
-fn from_local(origin: GeoPoint, v: [f64; 2]) -> GeoPoint {
+pub(crate) fn from_local(origin: GeoPoint, v: [f64; 2]) -> GeoPoint {
     let d = libm::hypot(v[0], v[1]);
     if d == 0.0 {
         return origin;

@@ -10,6 +10,7 @@ mod command;
 mod components;
 mod detection;
 mod error;
+mod esm;
 mod events;
 mod hash;
 mod ids;
@@ -22,7 +23,8 @@ mod time;
 
 pub use c2::C2State;
 pub use command::{
-    Command, CommandPayload, DoctrineScope, Issuer, LoggedCommand, UnitSpawn, PROTOCOL_VERSION,
+    Command, CommandPayload, DoctrineScope, EmitterEntry, Issuer, LoggedCommand, UnitSpawn,
+    PROTOCOL_VERSION,
 };
 pub use components::{Domain, Kinematics, Position, Route, Unit};
 pub use detection::{
@@ -31,6 +33,9 @@ pub use detection::{
     SensorSpec, SensorSuite, Signature, CONTACT_TIMEOUT_TICKS, SENSOR_PERIOD_TICKS,
 };
 pub use error::SimError;
+pub use esm::{
+    BearingRecord, BearingTable, BearingView, EmitterLibrary, BEARING_MAX_AGE_TICKS, JAMMER_EMITTER,
+};
 pub use events::{SimEvent, SimEventKind};
 pub use hash::StateHash;
 pub use ids::{SideId, UnitId};
@@ -38,7 +43,9 @@ pub use rng::{RngStreams, StreamId};
 pub use save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
 pub use sim::Simulation;
 pub use sim_c2::{Doctrine, Emcon, Posture, ResolvedDoctrine, Wcs};
-pub use sim_sensors::{Classification, Cov2, Environment, ErrorEllipse, JammerSpec};
+pub use sim_sensors::{
+    BearingLine, Carrier, Classification, Cov2, Environment, ErrorEllipse, JammerSpec,
+};
 pub use snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
 pub use time::{SimClock, Tick, TICK_SECONDS};
 

@@ -180,6 +180,21 @@ impl PlatformDb {
         Ok(v)
     }
 
+    /// Every platform class that mounts `sensor_id`, as (platform id, category, domain), sorted
+    /// by platform id: the ESM emitter library entry for that sensor.
+    pub fn carriers_of(&self, sensor_id: &str) -> Result<Vec<(String, String, String)>, DbError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT p.id, p.category, p.domain
+               FROM mounts m JOIN platforms p ON p.id = m.platform_id
+              WHERE m.kind = 'sensor' AND m.sensor_id = ?1
+              ORDER BY p.id",
+        )?;
+        let v = stmt
+            .query_map([sensor_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(v)
+    }
+
     /// The platform's all-aspect, any-speed radar cross-section (m²), falling back to the
     /// most general RCS entry available.
     pub fn rcs_m2(&self, platform_id: &str) -> Result<Option<f64>, DbError> {

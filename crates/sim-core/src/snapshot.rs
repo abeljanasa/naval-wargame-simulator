@@ -5,6 +5,7 @@
 //! is only ever sent to the white cell.
 
 use crate::components::Domain;
+use crate::esm::BearingView;
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
@@ -81,6 +82,10 @@ pub struct ContactView {
     pub domain: Option<Domain>,
     /// The holding side's posture toward the track's side, once identified to class level.
     pub affiliation: Option<Posture>,
+    /// Platform category, once classified to category.
+    pub category: Option<String>,
+    /// Platform class, once classified to class.
+    pub platform: Option<String>,
     pub first_seen_s: f64,
     pub last_seen_s: f64,
     /// Own unit whose sensor last detected it.
@@ -103,4 +108,6 @@ pub struct Snapshot {
     pub postures: Vec<PostureView>,
     /// Sea state and weather, known to every side.
     pub environment: Environment,
+    /// Side viewer: that side's recent ESM bearing lines. White cell: every side's.
+    pub bearings: Vec<BearingView>,
 }

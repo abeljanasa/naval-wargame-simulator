@@ -394,6 +394,8 @@ fn track_error_grows_with_time_since_update() {
         cov: sim_sensors_cov(100.0),
         classification: Classification::Domain,
         domain: Some(Domain::Surface),
+        category: None,
+        platform: None,
         detected_by: UnitId(1),
         sensor_id: "TEST-RADAR".into(),
     };
@@ -850,4 +852,198 @@ fn environment_is_set_by_the_white_cell_and_shown_to_every_side() {
             },
         ))
         .is_err());
+}
+
+// ---- ESM: intercept, bearings, fixes, identification (docs/models/esm.md) ----
+
+fn esm_sensor() -> SensorSpec {
+    SensorSpec {
+        sensor_id: "TEST-ESM".into(),
+        kind: SensorKind::Esm,
+        mount_height_m: 25.0,
+        min_range_m: 0.0,
+        max_range_m: 400_000.0,
+        ref_range_m: None,
+        ref_rcs_m2: None,
+        max_target_altitude_m: 30_000.0,
+        clutter_db_per_sea_state: None,
+        beamwidth_deg: None,
+    }
+}
+
+fn set_library(sim: &mut Simulation, carriers: &[(&str, &str)]) {
+    sim.submit(order(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetEmitterLibrary {
+            entries: vec![EmitterEntry {
+                emitter: "TEST-RADAR".into(),
+                carriers: carriers
+                    .iter()
+                    .map(|(p, c)| Carrier {
+                        platform: (*p).into(),
+                        category: (*c).into(),
+                        domain: "surface".into(),
+                    })
+                    .collect(),
+            }],
+        },
+    ))
+    .unwrap();
+}
+
+/// Two blue ESM-only ships 20 km apart; a red ship with a radar 25 km north of their midpoint
+/// (26.9 km from each, inside the 41.2 km horizon between 25 m masts). Intercept range
+/// 2.5 × 120 km = 300 km, so Pd ≈ 1.
+fn esm_scene(seed: u64, observers: u64) -> (Simulation, GeoPoint) {
+    let mut sim = Simulation::new(seed);
+    let west = ORIGIN;
+    let east = direct(ORIGIN, 90.0, 20_000.0).point;
+    for (id, at) in [(1, west), (2, east)].into_iter().take(observers as usize) {
+        sim.submit(spawn(
+            id,
+            1,
+            Domain::Surface,
+            at,
+            0.0,
+            0.0,
+            0.0,
+            vec![esm_sensor()],
+            5000.0,
+        ))
+        .unwrap();
+    }
+    let target = direct(direct(ORIGIN, 90.0, 10_000.0).point, 0.0, 25_000.0).point;
+    sim.submit(spawn(
+        10,
+        2,
+        Domain::Surface,
+        target,
+        0.0,
+        0.0,
+        0.0,
+        vec![radar()],
+        5000.0,
+    ))
+    .unwrap();
+    (sim, target)
+}
+
+#[test]
+fn two_bearings_fix_an_emitter_and_a_unique_emitter_identifies_its_class() {
+    let (mut sim, truth) = esm_scene(31, 2);
+    set_library(&mut sim, &[("GEN-FFG", "surface_combatant")]);
+    sim.run_ticks(1);
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::EsmFix { bearings: 2, .. })));
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(blue.bearings.len(), 2);
+    assert!(blue.bearings.iter().all(|b| b.emitter == "TEST-RADAR"));
+    let c = &blue.contacts[0];
+    assert_eq!(c.classification, Classification::Class);
+    assert_eq!(c.platform.as_deref(), Some("GEN-FFG"));
+    assert_eq!(c.category.as_deref(), Some("surface_combatant"));
+    assert_eq!(c.domain, Some(Domain::Surface));
+    // Identified to class: the side's posture toward red (neutral by default) is known.
+    assert_eq!(c.affiliation, Some(Posture::Neutral));
+    // Fix σ at 26.9 km with 2° bearings is about 0.94 km; the estimate is within 4σ of truth.
+    let miss = sim_geo::inverse(truth, c.position).distance_m;
+    assert!(
+        miss < 4.0 * c.error.semi_major_m,
+        "miss {miss}, {:?}",
+        c.error
+    );
+}
+
+#[test]
+fn a_single_bearing_shows_a_line_but_makes_no_track() {
+    let (mut sim, _) = esm_scene(32, 1);
+    sim.run_ticks(1);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(blue.bearings.len(), 1);
+    assert!(
+        blue.contacts.is_empty(),
+        "one bearing does not place the target"
+    );
+    // The bearing is logged with its inputs and error.
+    assert!(sim.events().iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::EsmIntercept {
+            detected: true,
+            bearing_error_deg: Some(_),
+            ..
+        }
+    )));
+    // Lines fade after 60 s once the emitter falls silent.
+    sim.submit(order(
+        1,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Unit { unit: UnitId(10) },
+            doctrine: doctrine_emcon(Emcon::Silent),
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(70);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert!(blue.bearings.is_empty());
+    let late = sim
+        .events()
+        .iter()
+        .filter(|e| e.tick.0 > 0 && matches!(e.kind, SimEventKind::EsmIntercept { .. }))
+        .count();
+    assert_eq!(late, 0, "a silent emitter cannot be intercepted");
+}
+
+#[test]
+fn esm_raises_a_radar_track_to_category() {
+    // Blue has radar and ESM on one ship; the radar track is classified to domain, and a single
+    // bearing on an emitter carried only by surface combatants raises it to category.
+    let mut sim = Simulation::new(33);
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Surface,
+        ORIGIN,
+        0.0,
+        0.0,
+        0.0,
+        vec![radar(), esm_sensor()],
+        5000.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 90.0, 20_000.0).point;
+    sim.submit(spawn(
+        2,
+        2,
+        Domain::Surface,
+        at,
+        0.0,
+        0.0,
+        0.0,
+        vec![radar()],
+        5000.0,
+    ))
+    .unwrap();
+    set_library(
+        &mut sim,
+        &[
+            ("GEN-FFG", "surface_combatant"),
+            ("GEN-DDG", "surface_combatant"),
+        ],
+    );
+    sim.run_ticks(1);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    let c = &blue.contacts[0];
+    assert_eq!(c.classification, Classification::Category);
+    assert_eq!(c.category.as_deref(), Some("surface_combatant"));
+    assert_eq!(c.platform, None);
+    assert_eq!(
+        c.affiliation, None,
+        "category does not reveal whose ship it is"
+    );
 }

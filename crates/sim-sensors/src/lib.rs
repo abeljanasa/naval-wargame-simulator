@@ -7,12 +7,17 @@
 #![forbid(unsafe_code)]
 
 mod classify;
+mod esm;
 mod kind;
 mod measurement;
 mod radar;
 mod track;
 
 pub use classify::{radar_classification, Classification};
+pub use esm::{
+    identify, intercept_range_m, triangulate, BearingLine, Carrier, Identification,
+    ESM_RANGE_FACTOR, MIN_CROSSING_DEG,
+};
 pub use kind::SensorKind;
 pub use measurement::{gaussian_pair, measurement_error, MeasurementError};
 pub use radar::{

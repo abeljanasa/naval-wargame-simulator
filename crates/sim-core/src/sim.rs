@@ -8,6 +8,7 @@ use crate::detection::{
     default_rcs_m2, detection_system, ContactTable, EnvState, Jammer, SensorSuite, Signature,
 };
 use crate::error::SimError;
+use crate::esm::{BearingTable, EmitterLibrary};
 use crate::events::{EventLog, SimEvent, SimEventKind};
 use crate::hash::StateHash;
 use crate::ids::{SideId, UnitId};
@@ -106,6 +107,8 @@ impl Simulation {
         world.insert_resource(ContactTable::default());
         world.insert_resource(C2State::default());
         world.insert_resource(EnvState::default());
+        world.insert_resource(BearingTable::default());
+        world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
         Self {
             world,
@@ -273,6 +276,8 @@ impl Simulation {
                 error: c.error_at(tick),
                 classification: c.classification,
                 domain: c.domain,
+                category: c.category.clone(),
+                platform: c.platform.clone(),
                 affiliation: side_of
                     .get(&c.target)
                     .and_then(|t| track_affiliation(c.classification, c2.posture(side, *t))),
@@ -303,6 +308,13 @@ impl Simulation {
                 })
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
+            bearings: self.world.resource::<BearingTable>().views(
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+                tick,
+            ),
         }
     }
 
@@ -366,6 +378,33 @@ impl Simulation {
             }
             h.opt_f64(r.jammer.map(|j| j.jn_db_at_1km));
         }
+        let lib = self.world.resource::<EmitterLibrary>();
+        h.u64(lib.0.len() as u64);
+        for (emitter, carriers) in &lib.0 {
+            h.str(emitter);
+            h.u64(carriers.len() as u64);
+            for c in carriers {
+                h.str(&c.platform);
+                h.str(&c.category);
+                h.str(&c.domain);
+            }
+        }
+        let bearings = self.world.resource::<BearingTable>();
+        for (side, targets) in &bearings.by_side {
+            for (target, observers) in targets {
+                for (observer, r) in observers {
+                    h.u16(side.0);
+                    h.u64(target.0);
+                    h.u64(observer.0);
+                    h.u64(r.tick.0);
+                    h.f64(r.line.from.lat_deg);
+                    h.f64(r.line.from.lon_deg);
+                    h.f64(r.line.bearing_deg);
+                    h.f64(r.line.sigma_deg);
+                    h.str(&r.emitter);
+                }
+            }
+        }
         let env = self.world.resource::<EnvState>().0;
         h.u8(env.sea_state);
         h.f64(env.weather_loss_db);
@@ -404,6 +443,8 @@ impl Simulation {
             h.f64(c.cov.nn);
             h.u8(c.classification.code());
             h.u8(c.domain.map_or(255, Domain::code));
+            h.opt_str(c.category.as_deref());
+            h.opt_str(c.platform.as_deref());
             h.u64(c.detected_by.0);
             h.str(&c.sensor_id);
         }
@@ -428,6 +469,8 @@ impl Simulation {
             next_contact_numbers: self.world.resource::<ContactTable>().next_numbers(),
             c2: self.world.resource::<C2State>().clone(),
             environment: self.world.resource::<EnvState>().0,
+            bearings: self.world.resource::<BearingTable>().clone(),
+            emitter_library: self.world.resource::<EmitterLibrary>().clone(),
         }
     }
 
@@ -455,6 +498,8 @@ impl Simulation {
         sim.world.insert_resource(log);
         sim.world.insert_resource(save.c2);
         sim.world.insert_resource(EnvState(save.environment));
+        sim.world.insert_resource(save.bearings);
+        sim.world.insert_resource(save.emitter_library);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -581,6 +626,20 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
                 .resource_mut::<C2State>()
                 .postures
                 .insert((*side, *toward), *posture);
+            Ok(())
+        }
+        CommandPayload::SetEmitterLibrary { entries } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set the emitter library".into());
+            }
+            let mut lib = EmitterLibrary::default();
+            for e in entries {
+                let mut carriers = e.carriers.clone();
+                carriers.sort();
+                carriers.dedup();
+                lib.0.insert(e.emitter.clone(), carriers);
+            }
+            world.insert_resource(lib);
             Ok(())
         }
         CommandPayload::SetEnvironment { environment } => {

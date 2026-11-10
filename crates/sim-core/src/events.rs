@@ -81,6 +81,27 @@ pub enum SimEventKind {
     LandAhead {
         unit: UnitId,
     },
+    /// One ESM intercept draw against one emitter, with every model input.
+    EsmIntercept {
+        observer: UnitId,
+        sensor: String,
+        emitter_unit: UnitId,
+        /// Emitter type (database sensor id or `JAMMER`).
+        emitter: String,
+        range_m: f64,
+        horizon_m: f64,
+        intercept_range_m: f64,
+        pd: f64,
+        draw: f64,
+        detected: bool,
+        bearing_error_deg: Option<f64>,
+    },
+    /// Bearings from several observers of a side were combined into a position fix.
+    EsmFix {
+        side: SideId,
+        target: UnitId,
+        bearings: u32,
+    },
     ContactLost {
         side: SideId,
         number: u32,

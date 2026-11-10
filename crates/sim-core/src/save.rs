@@ -5,6 +5,7 @@ use crate::command::LoggedCommand;
 use crate::components::{Kinematics, Position, Route, Unit};
 use crate::detection::{ContactRecord, SensorSuite, Signature};
 use crate::error::SimError;
+use crate::esm::{BearingTable, EmitterLibrary};
 use crate::events::SimEvent;
 use crate::ids::SideId;
 use crate::rng::RngStreams;
@@ -27,7 +28,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 5: adds the environment (sea state, weather), unit jammers, radar clutter and beamwidth
 ///   figures, and clutter/weather/jamming on detection events. Older saves load with a calm sea,
 ///   no weather, no jammers and the radar defaults.
-pub const SAVE_FORMAT_VERSION: u32 = 5;
+/// * 6: adds ESM bearing lines, the emitter library, and contact category and class. Older saves
+///   load with none of these.
+pub const SAVE_FORMAT_VERSION: u32 = 6;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +69,10 @@ pub struct SaveGame {
     pub c2: C2State,
     #[serde(default)]
     pub environment: Environment,
+    #[serde(default)]
+    pub bearings: BearingTable,
+    #[serde(default)]
+    pub emitter_library: EmitterLibrary,
 }
 
 impl SaveGame {
@@ -90,7 +97,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=4 | SAVE_FORMAT_VERSION => {
+            1..=5 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

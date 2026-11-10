@@ -24,6 +24,7 @@
 
 use crate::c2::C2State;
 use crate::components::{Domain, Position, Unit};
+use crate::esm::{esm_pass, BearingTable, EmitterLibrary};
 use crate::events::{EventLog, SimEventKind};
 use crate::ids::{SideId, UnitId};
 use crate::rng::{RngStreams, StreamId};
@@ -31,7 +32,7 @@ use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use sim_c2::Emcon;
-use sim_geo::{inverse, radar_horizon_m, GeoPoint};
+use sim_geo::{chord_m, ecef_surface, inverse, radar_horizon_m, GeoPoint};
 use sim_sensors::{
     clutter_loss_db, detection_range_with_loss_m, gaussian_pair, in_main_beam, jamming_to_noise,
     measured_point, measurement_error, pd_jammed, radar_classification, Classification,
@@ -206,6 +207,12 @@ pub struct Contact {
     /// The target's domain, once the classification reaches [`Classification::Domain`].
     #[serde(default)]
     pub domain: Option<Domain>,
+    /// Platform category (e.g. `surface_combatant`), once classified to category.
+    #[serde(default)]
+    pub category: Option<String>,
+    /// Platform class (e.g. `GEN-FFG`), once classified to class.
+    #[serde(default)]
+    pub platform: Option<String>,
     pub detected_by: UnitId,
     pub sensor_id: String,
 }
@@ -230,13 +237,40 @@ impl Contact {
 }
 
 /// One detection, as the tracker receives it.
-struct Measurement<'a> {
-    point: GeoPoint,
-    cov: Cov2,
-    classification: Classification,
-    domain: Domain,
-    observer: UnitId,
-    sensor_id: &'a str,
+pub(crate) struct Measurement<'a> {
+    pub(crate) point: GeoPoint,
+    pub(crate) cov: Cov2,
+    pub(crate) classification: Classification,
+    pub(crate) category: Option<String>,
+    pub(crate) platform: Option<String>,
+    pub(crate) domain: Domain,
+    pub(crate) observer: UnitId,
+    pub(crate) sensor_id: &'a str,
+}
+
+impl Contact {
+    /// Climbs the classification ladder (never descends). Category and class come with the
+    /// level that supports them.
+    fn raise(
+        &mut self,
+        level: Classification,
+        category: Option<&String>,
+        platform: Option<&String>,
+        domain: Domain,
+    ) {
+        if level > self.classification {
+            self.classification = level;
+            if level >= Classification::Category {
+                self.category = category.cloned();
+            }
+            if level >= Classification::Class {
+                self.platform = platform.cloned();
+            }
+        }
+        if self.classification >= Classification::Domain {
+            self.domain = Some(domain);
+        }
+    }
 }
 
 /// Every side's contacts.
@@ -256,7 +290,7 @@ pub struct ContactRecord {
 impl ContactTable {
     /// Creates a track or fuses the measurement into the existing one. Returns the new contact
     /// number if a track was created.
-    fn record(
+    pub(crate) fn record(
         &mut self,
         side: SideId,
         target: UnitId,
@@ -269,10 +303,12 @@ impl ContactTable {
             c.position = post.position;
             c.cov = post.cov;
             c.last_seen = tick;
-            c.classification = c.classification.max(m.classification);
-            if c.classification >= Classification::Domain {
-                c.domain = Some(m.domain);
-            }
+            c.raise(
+                m.classification,
+                m.category.as_ref(),
+                m.platform.as_ref(),
+                m.domain,
+            );
             c.detected_by = m.observer;
             m.sensor_id.clone_into(&mut c.sensor_id);
             return None;
@@ -291,11 +327,38 @@ impl ContactTable {
                 cov: m.cov,
                 classification: m.classification,
                 domain: (m.classification >= Classification::Domain).then_some(m.domain),
+                category: m
+                    .category
+                    .clone()
+                    .filter(|_| m.classification >= Classification::Category),
+                platform: m
+                    .platform
+                    .clone()
+                    .filter(|_| m.classification >= Classification::Class),
                 detected_by: m.observer,
                 sensor_id: m.sensor_id.to_owned(),
             },
         );
         Some(number)
+    }
+
+    /// Raises an existing track's classification from an identification that carries no
+    /// position (a single ESM bearing). Does nothing if the side holds no track on the target.
+    pub(crate) fn classify(
+        &mut self,
+        side: SideId,
+        target: UnitId,
+        ident: &sim_sensors::Identification,
+        domain: Domain,
+    ) {
+        if let Some(c) = self.by_side.get_mut(&side).and_then(|m| m.get_mut(&target)) {
+            c.raise(
+                ident.classification,
+                ident.category.as_ref(),
+                ident.platform.as_ref(),
+                domain,
+            );
+        }
     }
 
     /// Drops stale contacts. Returns (side, number, target) of each dropped one, in key order.
@@ -348,18 +411,20 @@ impl ContactTable {
     }
 }
 
-struct Observed<'a> {
-    id: UnitId,
-    side: SideId,
-    domain: Domain,
-    position: Position,
-    sensors: &'a SensorSuite,
+pub(crate) struct Observed<'a> {
+    pub(crate) id: UnitId,
+    pub(crate) side: SideId,
+    pub(crate) domain: Domain,
+    pub(crate) position: Position,
+    pub(crate) sensors: &'a SensorSuite,
     rcs_m2: f64,
     /// EMCON allows active emissions (radar, jammer).
-    emits: bool,
-    jammer: Option<JammerSpec>,
+    pub(crate) emits: bool,
+    pub(crate) jammer: Option<JammerSpec>,
 }
 
+// A bevy system takes its world access as parameters; grouping them would only hide that.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn detection_system(
     clock: Res<SimClock>,
     mut rng: ResMut<RngStreams>,
@@ -367,6 +432,8 @@ pub(crate) fn detection_system(
     mut log: ResMut<EventLog>,
     c2: Res<C2State>,
     env: Res<EnvState>,
+    mut bearings: ResMut<BearingTable>,
+    library: Res<EmitterLibrary>,
     units: Query<(&Unit, &Position, &SensorSuite, &Signature, &Jammer)>,
 ) {
     let env = env.0;
@@ -388,6 +455,8 @@ pub(crate) fn detection_system(
         })
         .collect();
     all.sort_by_key(|o| o.id);
+    // Surface ECEF positions for the exact chord pre-check (performance only).
+    let ecef: Vec<[f64; 3]> = all.iter().map(|o| ecef_surface(o.position.point)).collect();
 
     // Broad phase (performance only; results are bit-identical to checking every pair).
     // Radar-visible targets, sorted by latitude, plus the tallest target height this scan.
@@ -411,7 +480,7 @@ pub(crate) fn detection_system(
         .filter_map(|(i, o)| o.jammer.map(|j| (i, j)))
         .collect();
 
-    for obs in &all {
+    for (obs_index, obs) in all.iter().enumerate() {
         // EMCON silent: radar does not transmit, so it detects nothing and draws nothing.
         if !obs.emits {
             continue;
@@ -475,6 +544,10 @@ pub(crate) fn detection_system(
                 // meridional radius, so this skips only pairs the range checks below would skip.
                 let bound = sensor.max_range_m.min(radar_horizon_m(h_s, h_t));
                 if (tgt.position.point.lat_deg - lat0).abs() * MIN_METRES_PER_DEG_LAT > bound {
+                    continue;
+                }
+                // Exact: the chord is never longer than the geodesic (1 m margin for rounding).
+                if chord_m(ecef[obs_index], ecef[i]) > bound + 1.0 {
                     continue;
                 }
                 let inv = inverse(obs.position.point, tgt.position.point);
@@ -553,6 +626,8 @@ pub(crate) fn detection_system(
                         point,
                         cov,
                         classification: radar_classification(),
+                        category: None,
+                        platform: None,
                         domain: tgt.domain,
                         observer: obs.id,
                         sensor_id: &sensor.sensor_id,
@@ -571,6 +646,16 @@ pub(crate) fn detection_system(
             }
         }
     }
+    esm_pass(
+        &all,
+        &ecef,
+        tick,
+        &mut rng,
+        &mut contacts,
+        &mut log,
+        &mut bearings,
+        &library,
+    );
     for (side, number, target) in contacts.expire(tick) {
         log.push(
             tick,

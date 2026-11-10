@@ -31,6 +31,21 @@ The improvement comes from an exact latitude broad phase in `detection.rs`.
 - **Why it's safe:** the geodesic between two points is at least |Δlat| × the minimum meridional radius (110,574 m per degree). So each radar only needs to look at targets inside the latitude band it can possibly reach.
 - **Proof the output is unchanged:** the skipped pairs are exactly pairs the model would have skipped anyway, so draw order and results are bit-identical. The golden replay hash is unchanged, and the 1,000-unit, 120-tick benchmark gives hash `14c631676919c2af` both before and after.
 
+### Phase 2: ESM and the chord pre-check (2026-11-10)
+
+The models now include tracks, C2, radar clutter and jamming, and ESM, against fully fitted generic frigates (five radars and an ESM suite each).
+
+| Units | Phase 2 radar only | With ESM, latitude broad phase only | With ESM and the chord pre-check |
+|---|---|---|---|
+| 1,000 | 204× | 86.6× | **451×** |
+| 10,000 | 2.4× | 0.90× (fails the 1× budget) | **5.0×** |
+
+Two optimisations, both exact (the golden replay hash did not change when they went in):
+- **Chord pre-check.** For each surviving pair, the straight-line distance between surface ECEF points is compared with the range bound. A chord is never longer than the geodesic, so a chord above the bound plus 1 m (a margin for rounding) proves the pair is out of range, and the costly Vincenty inverse is skipped.
+- **Geodesic reuse.** The ESM pass solves one geodesic per (observer, emitter unit), shared by all of that unit's radars.
+
+See DL-0013.
+
 ## Map rendering (10,000 symbols at 60 fps)
 
 `apps/desktop/bench/map-fps.html` drives the **production map code** (`createMap` and `buildLayers`) with N unit symbols.

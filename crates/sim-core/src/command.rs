@@ -7,7 +7,7 @@ use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_c2::{Doctrine, Posture};
 use sim_geo::GeoPoint;
-use sim_sensors::{Environment, JammerSpec};
+use sim_sensors::{Carrier, Environment, JammerSpec};
 
 /// Version of the command and snapshot wire protocol. Bump it on any breaking change to
 /// [`Command`], [`CommandPayload`] or [`crate::Snapshot`], and add a migration.
@@ -93,6 +93,14 @@ pub struct UnitSpawn {
     pub jammer: Option<JammerSpec>,
 }
 
+/// One emitter type and the platform classes known to carry it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct EmitterEntry {
+    pub emitter: String,
+    pub carriers: Vec<Carrier>,
+}
+
 /// Where a doctrine setting applies.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -138,6 +146,11 @@ pub enum CommandPayload {
     SetEnvironment {
         environment: Environment,
     },
+    /// Replaces the ESM emitter library (built from the platform database). Scenario and white
+    /// cell only.
+    SetEmitterLibrary {
+        entries: Vec<EmitterEntry>,
+    },
 }
 
 impl CommandPayload {
@@ -154,6 +167,7 @@ impl CommandPayload {
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
             | CommandPayload::SetEnvironment { .. }
+            | CommandPayload::SetEmitterLibrary { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -223,6 +237,13 @@ impl CommandPayload {
             } if group.trim().is_empty() => Err("group name is empty".into()),
             CommandPayload::SetDoctrine { .. } => Ok(()),
             CommandPayload::SetEnvironment { environment } => environment.validate(),
+            CommandPayload::SetEmitterLibrary { entries } => {
+                if entries.iter().any(|e| e.emitter.trim().is_empty()) {
+                    Err("emitter library entry has no emitter name".into())
+                } else {
+                    Ok(())
+                }
+            }
         }
     }
 }
