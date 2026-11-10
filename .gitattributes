@@ -1,0 +1,7 @@
+# Same line endings on every OS: scenarios, golden files and database sources are hashed or
+# parsed in cross-platform tests (ADR-0003).
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary
+*.sqlite binary
