@@ -1,0 +1,20 @@
+[package]
+name = "sim-sensors"
+description = "Sensor and track models: detection probability, measurement error, track fusion and classification. Pure functions, no ECS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+specta = ["dep:specta", "sim-geo/specta"]
+
+[dependencies]
+sim-geo.workspace = true
+libm.workspace = true
+serde.workspace = true
+specta = { workspace = true, optional = true }
+
+[lints]
+workspace = true

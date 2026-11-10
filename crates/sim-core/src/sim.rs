@@ -254,6 +254,9 @@ impl Simulation {
                 side,
                 number: c.number,
                 position: c.position,
+                error: c.error_at(tick),
+                classification: c.classification,
+                domain: c.domain,
                 first_seen_s: c.first_seen.seconds(),
                 last_seen_s: c.last_seen.seconds(),
                 detected_by: c.detected_by,
@@ -338,6 +341,11 @@ impl Simulation {
             h.u64(c.last_seen.0);
             h.f64(c.position.lat_deg);
             h.f64(c.position.lon_deg);
+            h.f64(c.cov.ee);
+            h.f64(c.cov.en);
+            h.f64(c.cov.nn);
+            h.u8(c.classification.code());
+            h.u8(c.domain.map_or(255, Domain::code));
             h.u64(c.detected_by.0);
             h.str(&c.sensor_id);
         }

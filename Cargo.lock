@@ -3786,6 +3786,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sim-geo",
+ "sim-sensors",
  "specta",
  "thiserror 2.0.21",
 ]
@@ -3826,6 +3827,16 @@ dependencies = [
  "sim-db",
  "sim-geo",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "sim-sensors"
+version = "0.1.0"
+dependencies = [
+ "libm",
+ "serde",
+ "sim-geo",
+ "specta",
 ]
 
 [[package]]

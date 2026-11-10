@@ -17,7 +17,10 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 1: Phase 1 movement.
 /// * 2: adds sensors, signatures and contacts. A v1 save loads as "no sensors, default
 ///   signature, no contacts" through the serde defaults below.
-pub const SAVE_FORMAT_VERSION: u32 = 2;
+/// * 3: contacts become tracks with a covariance, classification and domain, and detection events
+///   carry measurement errors. A v2 save loads with zero covariance, `unknown` classification and
+///   no measurement errors (serde defaults).
+pub const SAVE_FORMAT_VERSION: u32 = 3;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,8 +76,8 @@ impl SaveGame {
                 found: v,
                 supported: SAVE_FORMAT_VERSION,
             }),
-            // v1 → v2: the new fields take their serde defaults (no sensors, no contacts).
-            1 | SAVE_FORMAT_VERSION => {
+            // v1 and v2: the newer fields take their serde defaults (see the history above).
+            1 | 2 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

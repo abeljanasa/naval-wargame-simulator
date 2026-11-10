@@ -183,8 +183,8 @@ jobs:
           cargo vendor --locked vendor > .cargo/config.toml
       - name: Build and test engine crates with the network disabled
         run: |
-          cargo build --offline --locked -p sim-core -p sim-geo -p sim-db -p sim-scenario -p nws-batch
-          cargo test --offline --locked -p sim-core -p sim-geo -p sim-db -p sim-scenario
+          cargo build --offline --locked -p sim-core -p sim-geo -p sim-sensors -p sim-db -p sim-scenario -p nws-batch
+          cargo test --offline --locked -p sim-core -p sim-geo -p sim-sensors -p sim-db -p sim-scenario
 
   frontend:
     name: Front end (typecheck, lint, build)

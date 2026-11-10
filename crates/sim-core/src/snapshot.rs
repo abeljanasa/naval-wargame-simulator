@@ -1,14 +1,15 @@
 //! Per-viewer state snapshots streamed to clients (UI, multiplayer seats).
 //!
-//! Phase 1: there are no sensors yet, so a side's picture contains only its own units. Detected
-//! contacts (with uncertainty, classification and age) join the side picture in Phase 2. Ground
-//! truth for all sides is only ever sent to the white cell.
+//! A side's picture holds its own units and its tracks on other sides' units, each with an
+//! estimated position, an error ellipse, a classification and an age. Ground truth for all sides
+//! is only ever sent to the white cell.
 
 use crate::components::Domain;
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_geo::GeoPoint;
+use sim_sensors::{Classification, ErrorEllipse};
 
 /// Whose picture a snapshot shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,7 +57,13 @@ pub struct ContactView {
     pub side: SideId,
     /// Contact number within that side's picture (C1, C2, …).
     pub number: u32,
+    /// Estimated position (not the target's true position).
     pub position: GeoPoint,
+    /// One-sigma position error at the snapshot time, grown since the last update.
+    pub error: ErrorEllipse,
+    pub classification: Classification,
+    /// Present once the classification reaches `domain`.
+    pub domain: Option<Domain>,
     pub first_seen_s: f64,
     pub last_seen_s: f64,
     /// Own unit whose sensor last detected it.

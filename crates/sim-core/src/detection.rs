@@ -1,5 +1,6 @@
-//! **Gate 1 interim radar detection model.** Deliberately minimal; Phase 2 replaces it with the full
-//! sensor models in a `sim-sensors` crate. Model doc: `docs/models/radar-detection-gate1.md`.
+//! Detection and tracking system. It runs the radar model (Gate 1 interim, still in use until
+//! the Phase 2 radar slice) and the track model, both from `sim-sensors` (ADR-0005). Model docs:
+//! `docs/models/radar-detection-gate1.md` and `docs/models/tracks.md`.
 //!
 //! Every [`SENSOR_PERIOD_TICKS`] ticks, for each observer (in `UnitId` order), each radar it carries,
 //! and each unit of another side (in `UnitId` order):
@@ -13,11 +14,13 @@
 //! 4. Draw u ~ U[0,1) from the `Sensors` RNG stream. The target is detected if u < Pd. Every draw is
 //!    logged with its inputs ([`SimEventKind::DetectionAttempt`]).
 //!
-//! Detections create or refresh a contact in the observer side's picture. A contact not refreshed
-//! for [`CONTACT_TIMEOUT_TICKS`] is dropped.
+//! A detection measures the target's position with range and bearing error (two more `Sensors`
+//! draws, logged), and the measurement is fused into the observer side's track on that target
+//! (`docs/models/tracks.md`). A track's error grows between updates by the fastest speed its
+//! classification allows. A track not refreshed for [`CONTACT_TIMEOUT_TICKS`] is dropped.
 //!
 //! Not modelled yet: clutter, jamming, weather, terrain masking, ESM, sonar, visual/EO/IR,
-//! position error, classification, track correlation, data-link sharing.
+//! velocity estimation, association errors (tracks are keyed by the true target), data links.
 
 use crate::components::{Domain, Position, Unit};
 use crate::events::{EventLog, SimEventKind};
@@ -27,6 +30,11 @@ use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use sim_geo::{inverse, radar_horizon_m, GeoPoint};
+pub use sim_sensors::{detection_range_m, pd_per_scan, SensorKind};
+use sim_sensors::{
+    gaussian_pair, measured_point, measurement_error, radar_classification, Classification, Cov2,
+    ErrorEllipse, TrackEstimate,
+};
 use std::collections::BTreeMap;
 
 /// Sensors run on every 5th tick (master prompt §6.2).
@@ -42,47 +50,6 @@ pub const SURFACED_SUBMARINE_HEIGHT_M: f64 = 2.0;
 /// A lower bound on metres per degree of geodetic latitude anywhere on WGS-84. The minimum
 /// meridional radius a(1−e²) = 6 335 439 m gives 110 574 m/°; rounding down keeps it a strict bound.
 const MIN_METRES_PER_DEG_LAT: f64 = 110_000.0;
-
-/// Sensor kinds, matching the platform database `sensors.kind` values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-#[serde(rename_all = "snake_case")]
-pub enum SensorKind {
-    Radar,
-    SonarHull,
-    SonarTowed,
-    SonarDipping,
-    Sonobuoy,
-    Esm,
-    Ir,
-    Eo,
-    Visual,
-    Mad,
-}
-
-impl SensorKind {
-    /// Parses a platform-database sensor kind.
-    #[must_use]
-    pub fn from_db(kind: &str) -> Option<Self> {
-        Some(match kind {
-            "radar" => Self::Radar,
-            "sonar_hull" => Self::SonarHull,
-            "sonar_towed" => Self::SonarTowed,
-            "sonar_dipping" => Self::SonarDipping,
-            "sonobuoy" => Self::Sonobuoy,
-            "esm" => Self::Esm,
-            "ir" => Self::Ir,
-            "eo" => Self::Eo,
-            "visual" => Self::Visual,
-            "mad" => Self::Mad,
-            _ => return None,
-        })
-    }
-
-    pub(crate) fn code(self) -> u8 {
-        self as u8
-    }
-}
 
 /// One fitted sensor, with the values the detection model needs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -146,25 +113,15 @@ pub fn default_rcs_m2(domain: Domain) -> f64 {
     }
 }
 
-/// R₅₀: the range at which single-scan Pd is 0.5, scaled from the radar's reference value by
-/// the fourth root of the RCS ratio and capped at the radar's maximum range.
+/// The fastest a target of this domain is assumed able to move, for track error growth.
+/// Generic upper bounds (original design): 35 kn at sea, 30 m/s on land, Mach 1.8 in the air.
 #[must_use]
-pub fn detection_range_m(ref_range_m: f64, ref_rcs_m2: f64, rcs_m2: f64, max_range_m: f64) -> f64 {
-    // (σ/σ_ref)^¼ as two square roots: sqrt is correctly rounded, so this is bit-exact everywhere.
-    let scale = (rcs_m2.max(0.0) / ref_rcs_m2).sqrt().sqrt();
-    (ref_range_m * scale).min(max_range_m)
-}
-
-/// Single-scan probability of detection at range `r` for a radar whose R₅₀ is `r50`.
-#[must_use]
-pub fn pd_per_scan(range_m: f64, r50_m: f64) -> f64 {
-    if r50_m <= 0.0 {
-        return 0.0;
+pub fn domain_speed_bound_mps(domain: Option<Domain>) -> f64 {
+    match domain {
+        Some(Domain::Surface | Domain::Subsurface) => 18.0,
+        Some(Domain::Land) => 30.0,
+        Some(Domain::Air) | None => 600.0,
     }
-    let x = range_m / r50_m;
-    let x2 = x * x;
-    let x4 = x2 * x2;
-    1.0 / (1.0 + x4 * x4)
 }
 
 /// Height used for the horizon check, or `None` if a radar cannot see this target at all.
@@ -197,10 +154,47 @@ pub struct Contact {
     pub target: UnitId,
     pub first_seen: Tick,
     pub last_seen: Tick,
-    /// Position at the last detection. Phase 1 has no position error.
+    /// Estimated position at the last update.
     pub position: GeoPoint,
+    /// Position covariance at the last update, m² (zero in v2 saves, which had no error model).
+    #[serde(default)]
+    pub cov: Cov2,
+    #[serde(default)]
+    pub classification: Classification,
+    /// The target's domain, once the classification reaches [`Classification::Domain`].
+    #[serde(default)]
+    pub domain: Option<Domain>,
     pub detected_by: UnitId,
     pub sensor_id: String,
+}
+
+impl Contact {
+    /// The estimate at `now`, with the error grown for the time since the last update.
+    #[must_use]
+    pub fn estimate_at(&self, now: Tick) -> TrackEstimate {
+        let dt = now.0.saturating_sub(self.last_seen.0) as f64;
+        TrackEstimate {
+            position: self.position,
+            cov: self.cov,
+        }
+        .predicted(domain_speed_bound_mps(self.domain), dt)
+    }
+
+    /// The one-sigma error ellipse at `now`.
+    #[must_use]
+    pub fn error_at(&self, now: Tick) -> ErrorEllipse {
+        self.estimate_at(now).cov.ellipse()
+    }
+}
+
+/// One detection, as the tracker receives it.
+struct Measurement<'a> {
+    point: GeoPoint,
+    cov: Cov2,
+    classification: Classification,
+    domain: Domain,
+    observer: UnitId,
+    sensor_id: &'a str,
 }
 
 /// Every side's contacts.
@@ -218,22 +212,27 @@ pub struct ContactRecord {
 }
 
 impl ContactTable {
-    /// Creates or refreshes a contact. Returns the new contact number if it was created.
+    /// Creates a track or fuses the measurement into the existing one. Returns the new contact
+    /// number if a track was created.
     fn record(
         &mut self,
         side: SideId,
         target: UnitId,
         tick: Tick,
-        position: GeoPoint,
-        observer: UnitId,
-        sensor_id: &str,
+        m: &Measurement<'_>,
     ) -> Option<u32> {
         let contacts = self.by_side.entry(side).or_default();
         if let Some(c) = contacts.get_mut(&target) {
+            let post = c.estimate_at(tick).fused(m.point, m.cov);
+            c.position = post.position;
+            c.cov = post.cov;
             c.last_seen = tick;
-            c.position = position;
-            c.detected_by = observer;
-            sensor_id.clone_into(&mut c.sensor_id);
+            c.classification = c.classification.max(m.classification);
+            if c.classification >= Classification::Domain {
+                c.domain = Some(m.domain);
+            }
+            c.detected_by = m.observer;
+            m.sensor_id.clone_into(&mut c.sensor_id);
             return None;
         }
         let next = self.next_number.entry(side).or_insert(1);
@@ -246,9 +245,12 @@ impl ContactTable {
                 target,
                 first_seen: tick,
                 last_seen: tick,
-                position,
-                detected_by: observer,
-                sensor_id: sensor_id.to_owned(),
+                position: m.point,
+                cov: m.cov,
+                classification: m.classification,
+                domain: (m.classification >= Classification::Domain).then_some(m.domain),
+                detected_by: m.observer,
+                sensor_id: m.sensor_id.to_owned(),
             },
         );
         Some(number)
@@ -392,7 +394,8 @@ pub(crate) fn detection_system(
                 if (tgt.position.point.lat_deg - lat0).abs() * MIN_METRES_PER_DEG_LAT > bound {
                     continue;
                 }
-                let range = inverse(obs.position.point, tgt.position.point).distance_m;
+                let inv = inverse(obs.position.point, tgt.position.point);
+                let range = inv.distance_m;
                 if range < sensor.min_range_m || range > sensor.max_range_m {
                     continue;
                 }
@@ -404,6 +407,24 @@ pub(crate) fn detection_system(
                 let pd = pd_per_scan(range, r50);
                 let draw = rng.uniform(StreamId::Sensors);
                 let detected = draw < pd;
+                // A detection measures range and bearing with error: two more draws, always taken
+                // in this order and only when detected.
+                let measurement = detected.then(|| {
+                    let err = measurement_error(SensorKind::Radar);
+                    let (n_range, n_bearing) = gaussian_pair(
+                        rng.uniform(StreamId::Sensors),
+                        rng.uniform(StreamId::Sensors),
+                    );
+                    measured_point(
+                        obs.position.point,
+                        range,
+                        inv.azimuth1_deg,
+                        err.range_sigma_m.unwrap_or(0.0),
+                        err.bearing_sigma_deg,
+                        n_range,
+                        n_bearing,
+                    )
+                });
                 log.push(
                     tick,
                     SimEventKind::DetectionAttempt {
@@ -416,17 +437,20 @@ pub(crate) fn detection_system(
                         pd,
                         draw,
                         detected,
+                        range_error_m: measurement.map(|m| m.2),
+                        bearing_error_deg: measurement.map(|m| m.3),
                     },
                 );
-                if detected {
-                    if let Some(number) = contacts.record(
-                        obs.side,
-                        tgt.id,
-                        tick,
-                        tgt.position.point,
-                        obs.id,
-                        &sensor.sensor_id,
-                    ) {
+                if let Some((point, cov, _, _)) = measurement {
+                    let m = Measurement {
+                        point,
+                        cov,
+                        classification: radar_classification(),
+                        domain: tgt.domain,
+                        observer: obs.id,
+                        sensor_id: &sensor.sensor_id,
+                    };
+                    if let Some(number) = contacts.record(obs.side, tgt.id, tick, &m) {
                         log.push(
                             tick,
                             SimEventKind::ContactGained {
@@ -456,43 +480,6 @@ pub(crate) fn detection_system(
 mod tests {
     use super::*;
 
-    fn close(a: f64, b: f64, tol: f64) -> bool {
-        (a - b).abs() <= tol
-    }
-
-    #[test]
-    fn pd_curve_hand_values() {
-        assert!(close(pd_per_scan(100.0, 100.0), 0.5, 1e-15));
-        // x = 0.8: x⁸ = 0.16777216 → 1/1.16777216 = 0.856329…
-        assert!(close(pd_per_scan(80.0, 100.0), 1.0 / 1.167_772_16, 1e-12));
-        // x = 1.2: x⁸ = 4.29981696 → 0.188686…
-        assert!(close(pd_per_scan(120.0, 100.0), 1.0 / 5.299_816_96, 1e-12));
-        assert!(close(pd_per_scan(0.0, 100.0), 1.0, 0.0));
-        assert_eq!(pd_per_scan(10.0, 0.0), 0.0);
-    }
-
-    #[test]
-    fn detection_range_scales_with_fourth_root_of_rcs() {
-        // 16× the reference RCS doubles R₅₀: 120 km → 240 km.
-        assert!(close(
-            detection_range_m(120_000.0, 1.0, 16.0, 1e9),
-            240_000.0,
-            1e-6
-        ));
-        // 1/16 halves it.
-        assert!(close(
-            detection_range_m(120_000.0, 1.0, 1.0 / 16.0, 1e9),
-            60_000.0,
-            1e-6
-        ));
-        // Capped at the instrumented maximum.
-        assert!(close(
-            detection_range_m(120_000.0, 1.0, 10_000.0, 250_000.0),
-            250_000.0,
-            0.0
-        ));
-    }
-
     #[test]
     fn submerged_targets_and_radars_are_excluded() {
         assert_eq!(target_height_m(Domain::Subsurface, -50.0), None);
@@ -507,24 +494,5 @@ mod tests {
             target_height_m(Domain::Surface, 0.0),
             Some(SURFACE_TARGET_HEIGHT_M)
         );
-    }
-
-    #[test]
-    fn sensor_kinds_round_trip_from_database_names() {
-        for k in [
-            "radar",
-            "sonar_hull",
-            "sonar_towed",
-            "sonar_dipping",
-            "sonobuoy",
-            "esm",
-            "ir",
-            "eo",
-            "visual",
-            "mad",
-        ] {
-            assert!(SensorKind::from_db(k).is_some(), "{k}");
-        }
-        assert_eq!(SensorKind::from_db("laser"), None);
     }
 }

@@ -1,5 +1,5 @@
-//! Event log: what happened and why. Detection and engagement events (Phase 2) will record their
-//! model inputs and random draws here, so every outcome can be explained.
+//! Event log: what happened and why. Detection and engagement events record their model inputs and
+//! random draws here, so every outcome can be explained (master prompt §8).
 
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
@@ -46,6 +46,11 @@ pub enum SimEventKind {
         pd: f64,
         draw: f64,
         detected: bool,
+        /// Measurement errors drawn for a detection (none when not detected, or in v2 saves).
+        #[serde(default)]
+        range_error_m: Option<f64>,
+        #[serde(default)]
+        bearing_error_deg: Option<f64>,
     },
     ContactGained {
         side: SideId,

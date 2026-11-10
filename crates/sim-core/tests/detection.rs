@@ -282,3 +282,128 @@ fn detection_runs_are_deterministic_and_seed_dependent() {
     assert_eq!(run(5), run(5));
     assert_ne!(run(5).1, run(6).1);
 }
+
+// ---- Tracks: measurement error, fusion, growth, classification (docs/models/tracks.md) ----
+
+/// Stationary surface target 20 km east of the observer. Horizon 33.6 km; R50 is capped at the
+/// 250 km maximum range, so Pd = 1/(1 + 0.08^8), effectively 1.
+fn surface_track_run(seed: u64, ticks: u64) -> (Simulation, GeoPoint) {
+    let mut sim = Simulation::new(seed);
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Surface,
+        ORIGIN,
+        0.0,
+        0.0,
+        0.0,
+        vec![radar()],
+        5000.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 90.0, 20_000.0).point;
+    sim.submit(spawn(
+        2,
+        2,
+        Domain::Surface,
+        at,
+        0.0,
+        0.0,
+        0.0,
+        vec![],
+        5000.0,
+    ))
+    .unwrap();
+    sim.run_ticks(ticks);
+    (sim, at)
+}
+
+#[test]
+fn first_detection_reports_the_single_measurement_error() {
+    // One scan at tick 0; the snapshot is at tick 1, so 1 s of growth at 18 m/s.
+    let (mut sim, truth) = surface_track_run(11, 1);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    let c = &blue.contacts[0];
+    assert_eq!(c.classification, Classification::Domain);
+    assert_eq!(c.domain, Some(Domain::Surface));
+    // Cross-range σ = 20 km × 0.5° = 174.53 m; along-range σ = 50 m. Growth adds 18² m² to both.
+    let cross = 20_000.0 * 0.5_f64.to_radians();
+    let major = (cross * cross + 18.0 * 18.0).sqrt();
+    let minor = (50.0_f64 * 50.0 + 18.0 * 18.0).sqrt();
+    assert!((c.error.semi_major_m - major).abs() < 0.5, "{:?}", c.error);
+    assert!((c.error.semi_minor_m - minor).abs() < 0.5, "{:?}", c.error);
+    // Major axis across the line of sight (east), so it points north–south.
+    assert!(c.error.orientation_deg < 1.0 || c.error.orientation_deg > 179.0);
+    // The reported position is not ground truth, but within 4 σ of it.
+    let miss = sim_geo::inverse(truth, c.position).distance_m;
+    assert!(miss > 0.0 && miss < 4.0 * major, "miss {miss}");
+}
+
+#[test]
+fn repeated_detections_shrink_the_track_error() {
+    // 31 scans (ticks 0..=150); the snapshot is at tick 151.
+    let (mut sim, truth) = surface_track_run(12, 151);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    let c = &blue.contacts[0];
+    let single = 20_000.0 * 0.5_f64.to_radians();
+    assert!(c.error.semi_major_m < single, "{:?}", c.error);
+    let miss = sim_geo::inverse(truth, c.position).distance_m;
+    assert!(
+        miss < 4.0 * c.error.semi_major_m,
+        "miss {miss} vs {:?}",
+        c.error
+    );
+}
+
+#[test]
+fn measurement_errors_are_logged_only_for_detections() {
+    let mut sim = duel(5, Domain::Air, 10_000.0, R50_REF, 1.0);
+    sim.run_ticks(40 * SENSOR_PERIOD_TICKS);
+    let mut seen = 0;
+    for e in sim.events() {
+        if let SimEventKind::DetectionAttempt {
+            detected,
+            range_error_m,
+            bearing_error_deg,
+            ..
+        } = &e.kind
+        {
+            assert_eq!(range_error_m.is_some(), *detected);
+            assert_eq!(bearing_error_deg.is_some(), *detected);
+            seen += 1;
+        }
+    }
+    assert_eq!(seen, 40);
+}
+
+#[test]
+fn track_error_grows_with_time_since_update() {
+    // Hand value: σ 100 m, surface bound 18 m/s, 100 s without update:
+    // √(100² + 1800²) = 1802.776 m on both axes.
+    let c = Contact {
+        number: 1,
+        target: UnitId(2),
+        first_seen: Tick(0),
+        last_seen: Tick(0),
+        position: ORIGIN,
+        cov: sim_sensors_cov(100.0),
+        classification: Classification::Domain,
+        domain: Some(Domain::Surface),
+        detected_by: UnitId(1),
+        sensor_id: "TEST-RADAR".into(),
+    };
+    let e = c.error_at(Tick(100));
+    assert!((e.semi_major_m - 1802.776).abs() < 1e-3, "{e:?}");
+    assert!((e.semi_minor_m - 1802.776).abs() < 1e-3, "{e:?}");
+    // An unclassified track grows at the 600 m/s bound: 60 km after 100 s.
+    let unknown = Contact {
+        classification: Classification::Unknown,
+        domain: None,
+        ..c
+    };
+    assert!((unknown.error_at(Tick(100)).semi_major_m - 60_000.08).abs() < 0.01);
+}
+
+fn sim_sensors_cov(sigma_m: f64) -> Cov2 {
+    Cov2::isotropic(sigma_m)
+}

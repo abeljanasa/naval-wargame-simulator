@@ -22,9 +22,9 @@ mod time;
 pub use command::{Command, CommandPayload, Issuer, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
 pub use components::{Domain, Kinematics, Position, Route, Unit};
 pub use detection::{
-    default_rcs_m2, detection_range_m, pd_per_scan, sensor_height_m, target_height_m, Contact,
-    ContactRecord, SensorKind, SensorSpec, SensorSuite, Signature, CONTACT_TIMEOUT_TICKS,
-    SENSOR_PERIOD_TICKS,
+    default_rcs_m2, detection_range_m, domain_speed_bound_mps, pd_per_scan, sensor_height_m,
+    target_height_m, Contact, ContactRecord, SensorKind, SensorSpec, SensorSuite, Signature,
+    CONTACT_TIMEOUT_TICKS, SENSOR_PERIOD_TICKS,
 };
 pub use error::SimError;
 pub use events::{SimEvent, SimEventKind};
@@ -33,6 +33,7 @@ pub use ids::{SideId, UnitId};
 pub use rng::{RngStreams, StreamId};
 pub use save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
 pub use sim::Simulation;
+pub use sim_sensors::{Classification, Cov2, ErrorEllipse};
 pub use snapshot::{ContactView, RouteView, Snapshot, UnitView, Viewer};
 pub use time::{SimClock, Tick, TICK_SECONDS};
 
