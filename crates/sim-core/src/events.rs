@@ -52,6 +52,21 @@ pub enum SimEventKind {
         number: u32,
         target: UnitId,
     },
+    /// A route crossing land was planned round it: `legs` legs replanned, `waypoints` in the result.
+    RouteReplanned {
+        unit: UnitId,
+        legs: u32,
+        waypoints: u32,
+    },
+    /// A scenario route could not be planned round land and was dropped.
+    RouteBlocked {
+        unit: UnitId,
+        reason: String,
+    },
+    /// A ship or submarine stopped rather than run onto land.
+    LandAhead {
+        unit: UnitId,
+    },
     ContactLost {
         side: SideId,
         number: u32,

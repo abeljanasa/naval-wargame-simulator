@@ -1,7 +1,7 @@
 //! The `Simulation` facade: the only public way to drive the world.
 
 use crate::command::{Command, CommandPayload, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
-use crate::components::{Kinematics, Position, Route, Unit};
+use crate::components::{Domain, Kinematics, Position, Route, Unit};
 use crate::detection::{default_rcs_m2, detection_system, ContactTable, SensorSuite, Signature};
 use crate::error::SimError;
 use crate::events::{EventLog, SimEvent, SimEventKind};
@@ -14,7 +14,10 @@ use crate::snapshot::{ContactView, RouteView, Snapshot, UnitView, Viewer};
 use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
+use sim_geo::land::LandMask;
+use sim_geo::GeoPoint;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// All accepted commands, keyed by (apply tick, sequence number). This is also the replay log.
 #[derive(Debug, Default, Resource)]
@@ -42,6 +45,28 @@ impl CommandLog {
             .collect();
         v.sort_by_key(|c| c.seq);
         v
+    }
+}
+
+/// The coastline the movement model navigates around. `None` = open ocean everywhere
+/// (unit tests, or scenarios that opt out).
+#[derive(Debug, Default, Clone, Resource)]
+pub(crate) struct LandMaskRes(pub(crate) Option<Arc<LandMask>>);
+
+/// Plans `waypoints` from `from` around land for ships and submarines. Returns the route to store
+/// and, when legs were replanned, how many.
+fn plan_sea_route(
+    world: &World,
+    domain: Domain,
+    from: GeoPoint,
+    waypoints: &[GeoPoint],
+) -> Result<(Vec<GeoPoint>, usize), String> {
+    let mask = world.resource::<LandMaskRes>().0.clone();
+    match (mask, domain) {
+        (Some(mask), Domain::Surface | Domain::Subsurface) if !waypoints.is_empty() => mask
+            .plan_route(from, waypoints)
+            .map_err(|e| format!("route refused: {e}")),
+        _ => Ok((waypoints.to_vec(), 0)),
     }
 }
 
@@ -74,6 +99,7 @@ impl Simulation {
         world.insert_resource(CommandLog::default());
         world.insert_resource(UnitIndex::default());
         world.insert_resource(ContactTable::default());
+        world.insert_resource(LandMaskRes::default());
         Self {
             world,
             schedule: build_schedule(),
@@ -84,6 +110,12 @@ impl Simulation {
     #[must_use]
     pub fn tick(&self) -> Tick {
         self.world.resource::<SimClock>().tick
+    }
+
+    /// Navigate ships and submarines around this coastline from now on. Part of the state hash
+    /// (by id), so it must be set again after loading a save, or the run will not match.
+    pub fn set_land_mask(&mut self, mask: Arc<LandMask>) {
+        self.world.insert_resource(LandMaskRes(Some(mask)));
     }
 
     #[must_use]
@@ -251,6 +283,13 @@ impl Simulation {
         let log = self.world.resource::<CommandLog>();
         h.u64(log.next_seq);
         h.u64(log.entries.len() as u64);
+        h.opt_str(
+            self.world
+                .resource::<LandMaskRes>()
+                .0
+                .as_ref()
+                .map(|m| m.id()),
+        );
         for r in self.unit_records() {
             h.u64(r.unit.id.0);
             h.u16(r.unit.side.0);
@@ -420,11 +459,29 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
         }
         CommandPayload::SetRoute { unit, waypoints } => {
             let entity = authorised_entity(world, cmd, *unit)?;
+            let (domain, from) = match (world.get::<Unit>(entity), world.get::<Position>(entity)) {
+                (Some(u), Some(p)) => (u.domain, p.point),
+                _ => return Err(format!("{unit} has no position")),
+            };
+            let (planned, replanned) = plan_sea_route(world, domain, from, waypoints)?;
+            let count = planned.len();
             let mut route = world
                 .get_mut::<Route>(entity)
                 .ok_or_else(|| format!("{unit} has no route component"))?;
-            route.waypoints.clone_from(waypoints);
+            route.waypoints = planned;
             route.next = 0;
+            if replanned > 0 {
+                let tick = world.resource::<SimClock>().tick;
+                #[allow(clippy::cast_possible_truncation)]
+                world.resource_mut::<EventLog>().push(
+                    tick,
+                    SimEventKind::RouteReplanned {
+                        unit: *unit,
+                        legs: replanned as u32,
+                        waypoints: count as u32,
+                    },
+                );
+            }
             Ok(())
         }
         CommandPayload::SetSpeed { unit, speed_mps } => {
@@ -460,6 +517,28 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
     if world.resource::<UnitIndex>().0.contains_key(&s.id) {
         return Err(format!("duplicate unit id {}", s.id));
     }
+    // A scenario route that crosses land is planned round it; one that cannot be planned is dropped
+    // (the unit still spawns, holding its course) and the reason is logged.
+    let tick = world.resource::<SimClock>().tick;
+    let (route, route_note) = match plan_sea_route(world, s.domain, s.position, &s.route) {
+        Ok((planned, 0)) => (planned, None),
+        #[allow(clippy::cast_possible_truncation)]
+        Ok((planned, legs)) => {
+            let n = planned.len() as u32;
+            (
+                planned,
+                Some(SimEventKind::RouteReplanned {
+                    unit: s.id,
+                    legs: legs as u32,
+                    waypoints: n,
+                }),
+            )
+        }
+        Err(reason) => (
+            Vec::new(),
+            Some(SimEventKind::RouteBlocked { unit: s.id, reason }),
+        ),
+    };
     let entity = world
         .spawn((
             Unit {
@@ -487,15 +566,17 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 min_turn_radius_m: s.min_turn_radius_m.unwrap_or(0.0),
             },
             Route {
-                waypoints: s.route.clone(),
+                waypoints: route,
                 next: 0,
             },
         ))
         .id();
     world.resource_mut::<UnitIndex>().0.insert(s.id, entity);
-    let tick = world.resource::<SimClock>().tick;
     world
         .resource_mut::<EventLog>()
         .push(tick, SimEventKind::UnitSpawned { unit: s.id });
+    if let Some(note) = route_note {
+        world.resource_mut::<EventLog>().push(tick, note);
+    }
     Ok(())
 }

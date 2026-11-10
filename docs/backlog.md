@@ -23,7 +23,8 @@ Items deferred out of the current change, or requested out of phase (master prom
 - [ ] Desktop app: visual check of contacts during a live run. Covered by engine tests so far; there is no automated UI test yet.
 - [x] Turn-rate / turning-circle limits on movement (geodesy-and-movement model doc §Turning).
 - [ ] Turn performance as platform-database fields (generic class values are derived in scenario resolution today).
-- [ ] Land and shallow-water blocking with pathfinding on a navigable-water graph honouring draft limits (needs coastline and bathymetry sampling in `sim-geo`).
+- [x] Land blocking with route planning round the coastline (DL-0008, land-avoidance model doc).
+- [ ] Shallow water and draft limits (needs bundled GEBCO bathymetry).
 - [ ] Snapshot diffs instead of full snapshots on the UI stream (the protocol is versioned for this).
 - [ ] Scenario loading from file in the desktop app (Phase 1 embeds the demo scenario).
 - [ ] Front-end unit tests (Vitest) and a Tauri end-to-end smoke test (WebDriver).

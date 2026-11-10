@@ -8,11 +8,13 @@
 //!    final waypoint it comes to all-stop (ordered and current speed set to 0).
 //! 4. Without a route, it dead-reckons along its heading.
 //!
-//! Not yet modelled (see `docs/backlog.md`): turn-rate limits, land/shallow-water blocking,
-//! sea-state penalties, fuel.
+//! Land: routes are planned round the coastline when ordered (`sim_geo::land`), and a ship or
+//! submarine that would still move onto land stops instead (`LandAhead`).
+//! Not yet modelled (see `docs/backlog.md`): shallow water and draft limits, sea-state penalties, fuel.
 
-use crate::components::{Kinematics, Position, Route, Unit};
+use crate::components::{Domain, Kinematics, Position, Route, Unit};
 use crate::events::{EventLog, SimEventKind};
+use crate::sim::LandMaskRes;
 use crate::time::{SimClock, TICK_SECONDS};
 use bevy_ecs::prelude::*;
 use sim_geo::{direct, inverse};
@@ -22,6 +24,7 @@ const ARRIVAL_EPSILON_M: f64 = 1e-3;
 
 pub(crate) fn movement_system(
     clock: Res<SimClock>,
+    land: Res<LandMaskRes>,
     mut log: ResMut<EventLog>,
     mut units: Query<(Entity, &Unit, &mut Position, &mut Kinematics, &mut Route)>,
 ) {
@@ -33,6 +36,7 @@ pub(crate) fn movement_system(
         let Ok((_, unit, mut pos, mut kin, mut route)) = units.get_mut(entity) else {
             continue;
         };
+        let before = (*pos, kin.heading_deg);
         step_unit(&mut pos, &mut kin, &mut route, |idx, done| {
             #[allow(clippy::cast_possible_truncation)] // routes are far shorter than u32::MAX
             log.push(
@@ -46,6 +50,18 @@ pub(crate) fn movement_system(
                 log.push(tick, SimEventKind::RouteCompleted { unit: unit.id });
             }
         });
+        // Grounding guard: a ship or submarine that would move from water onto land stops at the
+        // last water position instead (routes are planned round land; this catches dead reckoning
+        // and corners cut while turning).
+        if let (Some(mask), Domain::Surface | Domain::Subsurface) = (&land.0, unit.domain) {
+            if mask.is_land(pos.point) && !mask.is_land(before.0.point) {
+                *pos = before.0;
+                kin.heading_deg = before.1;
+                kin.speed_mps = 0.0;
+                kin.ordered_speed_mps = 0.0;
+                log.push(tick, SimEventKind::LandAhead { unit: unit.id });
+            }
+        }
     }
 }
 

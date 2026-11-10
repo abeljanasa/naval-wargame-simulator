@@ -13,6 +13,7 @@ specta = ["dep:specta"]
 [dependencies]
 libm.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 specta = { workspace = true, optional = true }
 
 [dev-dependencies]

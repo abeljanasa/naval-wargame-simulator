@@ -80,6 +80,19 @@ fn gate1_demo_units_move_and_detect() {
         gained.contains(&(2, 1)),
         "merchant never detected the frigate: {gained:?}"
     );
+    // Both ships stay at sea: no grounding stop and no refused route.
+    let land_events: Vec<_> = sim
+        .events()
+        .iter()
+        .filter(|e| {
+            matches!(
+                e.kind,
+                sim_core::SimEventKind::LandAhead { .. }
+                    | sim_core::SimEventKind::RouteBlocked { .. }
+            )
+        })
+        .collect();
+    assert!(land_events.is_empty(), "{land_events:?}");
 }
 
 #[test]
@@ -91,6 +104,7 @@ fn save_midway_and_resume_matches_uninterrupted_run() {
         a.run_until(mid);
         let bytes = a.save().to_bytes().unwrap();
         let mut b = Simulation::from_save(SaveGame::from_bytes(&bytes).unwrap()).unwrap();
+        b.set_land_mask(sim_geo::land::embedded());
         a.run_until(end);
         b.run_until(end);
         assert_eq!(a.state_hash(), b.state_hash(), "{name}");

@@ -3810,6 +3810,7 @@ dependencies = [
  "libm",
  "proptest",
  "serde",
+ "serde_json",
  "specta",
 ]
 

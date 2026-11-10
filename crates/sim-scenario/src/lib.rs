@@ -185,6 +185,8 @@ impl Scenario {
     pub fn build(&self, seed: Option<u64>, db: &PlatformDb) -> Result<Simulation, ScenarioError> {
         let spawns = self.resolve(db)?;
         let mut sim = Simulation::new(seed.unwrap_or(self.seed));
+        // Ships and submarines navigate round the bundled coastline (docs/models/land-avoidance.md).
+        sim.set_land_mask(sim_geo::land::embedded());
         for s in spawns {
             sim.submit(Command {
                 tick: Tick(0),
