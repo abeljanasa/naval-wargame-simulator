@@ -91,12 +91,14 @@ pub trait EventWorld {
     fn units_alive(&self, side: u16) -> u32;
     /// The next uniform draw in [0, 1) from the `Events` stream.
     fn draw(&mut self) -> f64;
+    /// A unit in play, if it is.
+    fn unit(&self, unit: u64) -> Option<UnitFact>;
 }
 
 impl Condition {
-    /// Does the condition hold now?
-    pub fn holds(&self, w: &mut dyn EventWorld) -> bool {
-        match self {
+    /// Does the condition hold now? Only a Lua condition can fail to say.
+    pub fn holds(&self, w: &mut dyn EventWorld) -> Result<bool, String> {
+        Ok(match self {
             Condition::EventFired { event } => w.fired(event) > 0,
             Condition::EventNotFired { event } => w.fired(event) == 0,
             Condition::UnitAlive { unit } => w.unit_alive(*unit),
@@ -107,13 +109,23 @@ impl Condition {
                 from_s.is_none_or(|f| t >= f) && to_s.is_none_or(|e| t <= e)
             }
             Condition::Probability { p } => w.draw() < *p,
-        }
+            Condition::Lua { script } => return crate::lua::condition(script, w),
+        })
     }
 
     /// Index of the first condition that does not hold, or `None` when all hold. Conditions
-    /// after a failing one are not checked (so they take no draws).
-    pub fn first_failing(conditions: &[Condition], w: &mut dyn EventWorld) -> Option<usize> {
-        conditions.iter().position(|c| !c.holds(w))
+    /// after a failing one are not checked (so they take no draws). A condition that cannot be
+    /// evaluated (a Lua error) is returned as `Err((index, reason))`.
+    pub fn first_failing(
+        conditions: &[Condition],
+        w: &mut dyn EventWorld,
+    ) -> Result<Option<usize>, (usize, String)> {
+        for (i, c) in conditions.iter().enumerate() {
+            if !c.holds(w).map_err(|e| (i, e))? {
+                return Ok(Some(i));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -247,6 +259,13 @@ mod tests {
         fn draw(&mut self) -> f64 {
             self.draws.remove(0)
         }
+        fn unit(&self, unit: u64) -> Option<UnitFact> {
+            self.alive.get(&unit).map(|&side| UnitFact {
+                id: unit,
+                side,
+                position: GeoPoint::new(0.0, 0.0),
+            })
+        }
     }
 
     #[test]
@@ -273,12 +292,12 @@ mod tests {
             },
             Condition::Probability { p: 0.5 },
         ];
-        assert_eq!(Condition::first_failing(&all, &mut w), None);
+        assert_eq!(Condition::first_failing(&all, &mut w), Ok(None));
         assert_eq!(w.draws, vec![0.9]);
         // The second draw (0.9) fails a 0.5 probability.
         assert_eq!(
             Condition::first_failing(&[Condition::Probability { p: 0.5 }], &mut w),
-            Some(0)
+            Ok(Some(0))
         );
         // A failing condition stops the checks: the probability is not drawn.
         w.draws = vec![0.0];
@@ -290,7 +309,7 @@ mod tests {
             },
             Condition::Probability { p: 1.0 },
         ];
-        assert_eq!(Condition::first_failing(&c, &mut w), Some(0));
+        assert_eq!(Condition::first_failing(&c, &mut w), Ok(Some(0)));
         assert_eq!(w.draws, vec![0.0]);
     }
 }

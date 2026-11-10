@@ -172,6 +172,17 @@
       "name": "Press desk",
       "trigger": { "type": "time", "at_s": 2400 },
       "actions": [{ "type": "send_inject", "inject": "i02-media" }]
+    },
+    {
+      "id": "e08-umpire-brief",
+      "name": "Exercise control (script)",
+      "trigger": { "type": "time", "at_s": 1500 },
+      "conditions": [
+        { "type": "lua", "script": "local u = sim.unit(1)\nreturn u ~= nil and sim.units_alive(2) >= 1" }
+      ],
+      "actions": [
+        { "type": "lua", "script": "local u = sim.unit(1)\nlocal lines = {}\nfor side, n in pairs({ [1] = sim.units_alive(1), [2] = sim.units_alive(2) }) do\n  lines[#lines + 1] = string.format('S%d: %d units', side, n)\nend\nsim.message('white_cell', string.format('Umpire brief at %d s. Anvil at %.4f S %.4f E. %s. Friction draw %.3f.', sim.time(), -u.lat, u.lon, table.concat(lines, ', '), sim.random()))" }
+      ]
     }
   ],
   "injects": [

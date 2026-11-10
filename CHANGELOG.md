@@ -34,10 +34,24 @@
   - Message to.
   - Inject titles in the Messages panel.
 
+### Added (Phase 3, slice 4: Lua scripting)
+
+- **Lua 5.4 conditions and actions on events** (`docs/models/lua-scripting.md`, DL-0024):
+  - Built on mlua, vendored, so it works air-gapped.
+  - A `sim` API: read time, events, units and counts; draw from the simulation stream; ask for messages, injects, event switches, postures, speeds and reserves.
+- **Sandbox:**
+  - Only `table`, `string`, `math` and `utf8`; no file, OS, module, debug, coroutine, `load` or `pcall` access.
+  - Text only; 1 M instructions and 16 MiB per run; 64 KiB per script.
+  - Escape tests cover all of this.
+- **Determinism replacements:** sorted `pairs`, address-free `tostring` and `format`, `libm` maths, `sim.random()`, no finalizers or weak tables.
+- **Errors:** script errors are logged, and the run continues. Syntax errors stop the scenario loading.
+- **Demonstrator:** gains a scripted umpire brief, which the cross-OS golden replay runs.
+
 ### Changed
 
 - Save format 14 (events, injects, messages).
-- Golden hashes: phase 1 `8bedd2be4a43ad72`, phase 2 `21f3cc8300d560a7`, phase 3 `7fb4c0bd32644c04`.
+- Golden hashes: phase 1 `8bedd2be4a43ad72`, phase 2 `21f3cc8300d560a7`, phase 3 `1928186cbeaf1578`.
+- CI: the air-gapped job builds and tests `sim-events`.
 - Save format 13 (adjudication log).
 
 ### Added (Phase 2, slice 12: Gate 2 pack)

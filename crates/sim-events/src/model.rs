@@ -163,6 +163,8 @@ pub enum Condition {
     /// Holds with probability `p` (one draw from the `Events` stream, taken only when this
     /// condition is reached).
     Probability { p: f64 },
+    /// A Lua script that returns `true` or `false` (`docs/models/lua-scripting.md`).
+    Lua { script: String },
 }
 
 /// Who receives a message.
@@ -260,6 +262,10 @@ pub enum EventAction {
     SendInject {
         inject: String,
     },
+    /// A Lua script whose `sim.*` requests become actions (`docs/models/lua-scripting.md`).
+    Lua {
+        script: String,
+    },
 }
 
 /// A prepared message in the scenario's inject library, sent by an event or by the white cell.
@@ -314,6 +320,9 @@ impl EventAction {
             }
             EventAction::SendInject { inject } if !injects.contains(inject.as_str()) => {
                 Err(format!("unknown inject {inject:?}"))
+            }
+            EventAction::Lua { script } => {
+                crate::lua::check(script).map_err(|e| format!("Lua action: {e}"))
             }
             _ => Ok(()),
         }
@@ -394,6 +403,9 @@ pub fn validate_events(events: &[ScenarioEvent], injects: &[Inject]) -> Result<(
                 }
                 Condition::Probability { p } if !(0.0..=1.0).contains(p) => {
                     return Err(fail("probability must be in 0..=1".into()))
+                }
+                Condition::Lua { script } => {
+                    crate::lua::check(script).map_err(|e| fail(format!("Lua condition: {e}")))?;
                 }
                 Condition::TimeBetween { from_s, to_s }
                     if from_s.is_some_and(|t| !finite_time(t))

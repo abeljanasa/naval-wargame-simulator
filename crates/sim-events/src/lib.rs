@@ -14,6 +14,7 @@
 #![forbid(unsafe_code)]
 
 mod eval;
+pub mod lua;
 mod model;
 
 pub use eval::{EventRuntime, EventWorld, TickFacts, UnitFact};

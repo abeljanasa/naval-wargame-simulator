@@ -35,6 +35,8 @@ anyhow = "1"
 bevy_ecs = "0.20"
 clap = { version = "4", features = ["derive"] }
 libm = "0.2"
+# Lua 5.4 for scenario scripts, built from bundled source (no system Lua; works air-gapped).
+mlua = { version = "0.12", features = ["lua54", "vendored"] }
 proptest = "1"
 rand_chacha = { version = "0.9", features = ["serde"] }
 rmp-serde = "1"

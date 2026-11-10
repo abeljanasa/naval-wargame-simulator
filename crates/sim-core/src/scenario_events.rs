@@ -312,6 +312,27 @@ impl EventWorld for View<'_> {
     fn draw(&mut self) -> f64 {
         self.rng.uniform(StreamId::Events)
     }
+    fn unit(&self, unit: u64) -> Option<UnitFact> {
+        self.units
+            .binary_search_by_key(&unit, |u| u.id)
+            .ok()
+            .map(|i| self.units[i])
+    }
+}
+
+/// Every unit in play, in id order.
+fn units_in_play(world: &mut World) -> Vec<UnitFact> {
+    let mut units: Vec<UnitFact> = world
+        .query::<(&Unit, &Position)>()
+        .iter(world)
+        .map(|(u, p)| UnitFact {
+            id: u.id.0,
+            side: u.side.0,
+            position: p.point,
+        })
+        .collect();
+    units.sort_by_key(|u| u.id);
+    units
 }
 
 /// Checks every event once per tick, after the models have run, and fires those whose trigger
@@ -326,16 +347,7 @@ pub(crate) fn scenario_events_system(world: &mut World) {
     let tick = world.resource::<SimClock>().tick;
     let now_s = tick.seconds();
 
-    let mut units: Vec<UnitFact> = world
-        .query::<(&Unit, &Position)>()
-        .iter(world)
-        .map(|(u, p)| UnitFact {
-            id: u.id.0,
-            side: u.side.0,
-            position: p.point,
-        })
-        .collect();
-    units.sort_by_key(|u| u.id);
+    let units = units_in_play(world);
     for u in &units {
         engine.sides.insert(UnitId(u.id), SideId(u.side));
     }
@@ -390,16 +402,30 @@ pub(crate) fn scenario_events_system(world: &mut World) {
             };
             Condition::first_failing(&engine.events[i].conditions, &mut view)
         };
-        if let Some(c) = failing {
-            #[allow(clippy::cast_possible_truncation)]
-            world.resource_mut::<EventLog>().push(
-                tick,
-                SimEventKind::ScenarioEventHeld {
-                    event: id,
-                    condition: c as u32,
-                },
-            );
-            continue;
+        #[allow(clippy::cast_possible_truncation)]
+        match failing {
+            Ok(None) => {}
+            Ok(Some(c)) => {
+                world.resource_mut::<EventLog>().push(
+                    tick,
+                    SimEventKind::ScenarioEventHeld {
+                        event: id,
+                        condition: c as u32,
+                    },
+                );
+                continue;
+            }
+            Err((c, reason)) => {
+                world.resource_mut::<EventLog>().push(
+                    tick,
+                    SimEventKind::ScenarioScriptFailed {
+                        event: id,
+                        condition: c as u32,
+                        reason,
+                    },
+                );
+                continue;
+            }
         }
         fire(world, &mut engine, i, tick);
     }
@@ -460,6 +486,32 @@ fn act(
         }
         EventAction::SendInject { inject } => {
             return deliver_inject(world, engine, inject, Some(from), tick);
+        }
+        EventAction::Lua { script } => {
+            let units = units_in_play(world);
+            let asked = {
+                let mut rng = world.resource_mut::<RngStreams>();
+                let mut view = View {
+                    now_s: tick.seconds(),
+                    runtime: &engine.runtime,
+                    units: &units,
+                    rng: &mut rng,
+                };
+                sim_events::lua::action(script, &mut view)?
+            };
+            // Every requested action runs; their failures are reported together.
+            let failures: Vec<String> = asked
+                .iter()
+                .filter_map(|a| match a {
+                    EventAction::Lua { .. } => Some("a script cannot run a script".to_owned()),
+                    _ => act(world, engine, a, from, tick).err(),
+                })
+                .collect();
+            return if failures.is_empty() {
+                Ok(())
+            } else {
+                Err(failures.join("; "))
+            };
         }
         EventAction::EnableEvent { event, enabled } => {
             return engine

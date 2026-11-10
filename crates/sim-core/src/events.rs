@@ -176,6 +176,13 @@ pub enum SimEventKind {
         event: String,
         condition: u32,
     },
+    /// Condition `condition` (0-based, a Lua script) of a triggered event could not be
+    /// evaluated; the event is held.
+    ScenarioScriptFailed {
+        event: String,
+        condition: u32,
+        reason: String,
+    },
     /// Action `action` (0-based) of a fired event could not be carried out.
     ScenarioActionFailed {
         event: String,

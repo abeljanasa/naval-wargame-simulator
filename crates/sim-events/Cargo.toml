@@ -16,6 +16,8 @@ sim-c2.workspace = true
 sim-ai.workspace = true
 sim-sensors.workspace = true
 serde.workspace = true
+mlua.workspace = true
+libm.workspace = true
 specta = { workspace = true, optional = true }
 
 [dev-dependencies]

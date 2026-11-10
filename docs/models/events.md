@@ -48,6 +48,7 @@ All conditions must hold.
 | `units_alive { side, cmp, count }` | The side's units in play, compared (`lt`, `le`, `eq`, `ge`, `gt`). |
 | `time_between { from_s?, to_s? }` | Game time is within the window, ends included. |
 | `probability { p }` | One draw from the `Events` random stream is below `p`. It is drawn only when this condition is reached. |
+| `lua { script }` | A sandboxed Lua script returns `true` ([lua-scripting.md](lua-scripting.md)). A script error holds the event and logs `ScenarioScriptFailed`. |
 
 ## Actions
 
@@ -61,6 +62,7 @@ Actions run as `Issuer::Script` commands, with the scenario's authority, and are
 | `spawn_reserve { unit }` | Brings in a scenario unit marked `"reserve": true`, held off the board until then. |
 | `enable_event { event, enabled }` | Turns an event on or off. |
 | `send_inject { inject }` | Sends an inject from the scenario library ([injects.md](injects.md)). |
+| `lua { script }` | Runs a sandboxed Lua script whose `sim.*` requests become actions ([lua-scripting.md](lua-scripting.md)). |
 
 ## Messages
 
@@ -98,6 +100,6 @@ Example from `data/scenarios/phase3-ttx-demo.json`. Hostilities begin when Red e
 
 ## Limitations
 
-- Conditions are AND only. Lua conditions (slice 4) give anything more complex.
+- Conditions are AND only. Anything more complex goes in a Lua condition.
 - Polygon edges are straight in latitude and longitude, not great circles; the difference is negligible for exercise areas of tens of kilometres.
 - `unit_destroyed` knows a unit's side only if the unit was in play at an earlier check. A unit spawned and destroyed in the same tick matches only triggers with no side filter.

@@ -222,6 +222,8 @@ fn gate3_demo_events_drive_the_exercise() {
         "e02-intel",
         "e03-first-contact",
         "e04-escalation",
+        "e07-media",
+        "e08-umpire-brief",
     ] {
         assert_eq!(
             f.iter().filter(|x| *x == e).count(),
@@ -242,7 +244,12 @@ fn gate3_demo_events_drive_the_exercise() {
             .len(),
         3
     );
-    assert_eq!(sim.snapshot(Viewer::WhiteCell).messages.len(), 8);
+    let white = sim.snapshot(Viewer::WhiteCell);
+    assert_eq!(white.messages.len(), 9);
+    assert!(white
+        .messages
+        .iter()
+        .any(|m| m.text.starts_with("Umpire brief at 1500 s. Anvil at 39.")));
     assert_eq!(sim.snapshot(Viewer::WhiteCell).injects.len(), 3);
 
     let mut sim = s.build(None, &db()).unwrap();

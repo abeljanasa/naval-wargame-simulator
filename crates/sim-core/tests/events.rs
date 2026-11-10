@@ -611,3 +611,135 @@ fn the_white_cell_fires_and_switches_events_and_messages_but_players_cannot() {
         .messages
         .is_empty());
 }
+
+// --- Lua scripts (Phase 3 slice 4) ---
+
+#[test]
+fn lua_conditions_and_actions_drive_the_simulation() {
+    // Every 10 s, once blue unit 1 is east of 0.01° E, a script orders it to slow down and
+    // reports its position. It needs a minute or so to get there from rest.
+    let mut e = event(
+        "slow",
+        Trigger::Every {
+            period_s: 10.0,
+            start_s: 0.0,
+        },
+        vec![EventAction::Lua {
+            script: "local u = sim.unit(1)\n\
+                     sim.set_speed(1, 2)\n\
+                     sim.message(1, string.format('Anvil at %.4f E, slowing', u.lon))"
+                .into(),
+        }],
+    );
+    e.conditions = vec![Condition::Lua {
+        script: "local u = sim.unit(1) return u ~= nil and u.lon > 0.01".into(),
+    }];
+    let mut sim = scene(9, vec![e], vec![]);
+    sim.run_until(Tick(300));
+    let f = fired(&sim);
+    assert_eq!(f.len(), 1, "{f:?}");
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    let u = blue.units.iter().find(|u| u.id == UnitId(1)).unwrap();
+    assert!((u.ordered_speed_mps - 2.0).abs() < 1e-12);
+    assert!(
+        blue.messages[0].text.starts_with("Anvil at 0.01")
+            && blue.messages[0].text.ends_with("slowing"),
+        "{}",
+        blue.messages[0].text
+    );
+    // Before the unit got there, the condition held the event every 10 s.
+    let held = sim
+        .events()
+        .iter()
+        .filter(|e| matches!(e.kind, SimEventKind::ScenarioEventHeld { .. }))
+        .count();
+    assert!(held >= 5, "{held}");
+}
+
+#[test]
+fn script_errors_are_logged_and_never_stop_the_run() {
+    let cond_err = {
+        let mut e = event(
+            "bad-cond",
+            Trigger::Time { at_s: 5.0 },
+            vec![say(None, "x")],
+        );
+        e.conditions = vec![Condition::Lua {
+            script: "return sim.unit(1).nope.deeper".into(),
+        }];
+        e
+    };
+    let act_err = event(
+        "bad-act",
+        Trigger::Time { at_s: 6.0 },
+        vec![
+            EventAction::Lua {
+                script: "sim.set_speed(1, -5) sim.spawn_reserve(42)".into(),
+            },
+            say(None, "after the script"),
+        ],
+    );
+    let loop_forever = event(
+        "spin",
+        Trigger::Time { at_s: 7.0 },
+        vec![EventAction::Lua {
+            script: "while true do end".into(),
+        }],
+    );
+    let mut sim = scene(10, vec![cond_err, act_err, loop_forever], vec![]);
+    sim.run_until(Tick(20));
+    let script_failed: Vec<String> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match &e.kind {
+            SimEventKind::ScenarioScriptFailed { event, reason, .. } => {
+                Some(format!("{event}: {reason}"))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(script_failed.len(), 1, "{script_failed:?}");
+    assert!(script_failed[0].starts_with("bad-cond: "));
+    let action_failed: Vec<String> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match &e.kind {
+            SimEventKind::ScenarioActionFailed { event, reason, .. } => {
+                Some(format!("{event}: {reason}"))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(action_failed.len(), 2, "{action_failed:?}");
+    // Both requested actions were tried; both failures are reported together.
+    assert!(action_failed[0].contains("speed must be finite and >= 0"));
+    assert!(action_failed[0].contains("not a reserve"));
+    assert!(action_failed[1].contains("instruction limit"));
+    // The plain message after the failing script still went out, and the run carried on.
+    assert_eq!(sim.snapshot(Viewer::WhiteCell).messages.len(), 1);
+    assert_eq!(sim.tick(), Tick(20));
+}
+
+#[test]
+fn a_script_with_a_syntax_error_is_refused_when_the_events_are_loaded() {
+    let mut sim = Simulation::new(11);
+    let bad = event(
+        "a",
+        Trigger::Time { at_s: 1.0 },
+        vec![EventAction::Lua {
+            script: "sim.message('all', ".into(),
+        }],
+    );
+    let err = sim
+        .submit(cmd(
+            0,
+            Issuer::Scenario,
+            CommandPayload::SetEvents {
+                events: vec![bad],
+                reserves: vec![],
+                injects: vec![],
+            },
+        ))
+        .unwrap_err();
+    assert!(err.to_string().contains("Lua action"), "{err}");
+}
