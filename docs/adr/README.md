@@ -1,0 +1,9 @@
+# Architecture Decision Records
+
+| ADR | Title | Status |
+|---|---|---|
+| [0001](0001-technology-stack.md) | Technology stack | Accepted |
+| [0002](0002-ui-framework.md) | UI framework: Svelte 5 + TypeScript | Accepted |
+| [0003](0003-determinism-strategy.md) | Determinism strategy | Accepted |
+
+A new ADR gets the next number. ADRs are never deleted. To change one, write a new ADR that supersedes it.
