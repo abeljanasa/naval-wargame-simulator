@@ -7,7 +7,7 @@ mod host;
 
 use host::{ClockStatus, Host, SnapshotUpdate, TimeCompression};
 use serde::{Deserialize, Serialize};
-use sim_core::{Adjudication, Doctrine, GeoPoint, Mission, SideId, UnitId, Viewer};
+use sim_core::{Adjudication, Doctrine, Facilitation, GeoPoint, Mission, SideId, UnitId, Viewer};
 use sim_scenario::Scenario;
 use specta_typescript::Typescript;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -334,6 +334,17 @@ fn order_adjudicate(
         .map_err(|e| e.to_string())
 }
 
+/// A white-cell facilitation action: inject, message, fire or switch an event (white-cell seat
+/// only).
+#[tauri::command]
+#[specta::specta]
+fn order_facilitate(host: State<'_, SharedHost>, action: Facilitation) -> Result<(), String> {
+    lock(&host)
+        .order_facilitate(action)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -352,6 +363,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_engage,
             order_mission,
             order_adjudicate,
+            order_facilitate,
         ])
         .events(collect_events![FrameEvent])
 }

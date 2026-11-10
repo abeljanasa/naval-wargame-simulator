@@ -25,6 +25,14 @@
   let engageWeapon = $state("");
   let engageRounds = $state("1");
   let umpireReason = $state("");
+  let messageTo = $state("all");
+  let messageText = $state("");
+
+  function audienceFromKey(k: string): Audience {
+    if (k === "all") return { to: "all" };
+    if (k === "white") return { to: "white_cell" };
+    return { to: "side", side: Number(k.slice(5)) };
+  }
 
   // Keep the engage form pointing at something that exists.
   $effect(() => {
@@ -436,6 +444,7 @@
                 ? ` → ${audienceText(m.to)}`
                 : ""}</span
             >
+            {#if m.title}<strong>{m.title}</strong>{/if}
             <span>{m.text}</span>
           </li>
         {:else}
@@ -513,6 +522,89 @@
             {/each}
           </ul>
         {/if}
+        <h3>Injects</h3>
+        <ul class="units injects" aria-label="Injects">
+          {#each sim.injects as s (s.inject.id)}
+            <li>
+              <div class="row">
+                <strong>{s.inject.title}</strong>
+                <span class="dim"
+                  >→ {audienceText(s.inject)}{s.sent ? ` · sent ×${s.sent}` : ""}</span
+                >
+                <button
+                  type="button"
+                  aria-label={`Send ${s.inject.title}`}
+                  onclick={() => sim.facilitate({ kind: "send_inject", inject: s.inject.id })}
+                  >Send</button
+                >
+              </div>
+              {#if s.inject.note}<span class="dim">{s.inject.note}</span>{/if}
+            </li>
+          {:else}
+            <li class="empty">No injects in this scenario.</li>
+          {/each}
+        </ul>
+        <h3>Events</h3>
+        <ul class="units" aria-label="Scenario events">
+          {#each sim.scenarioEvents as e (e.id)}
+            <li class="row">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={e.enabled}
+                  onchange={(ev) =>
+                    sim.facilitate({
+                      kind: "set_event_enabled",
+                      event: e.id,
+                      enabled: ev.currentTarget.checked,
+                    })}
+                />
+                {e.name || e.id}
+              </label>
+              <span class="dim">{e.fired ? `fired ×${e.fired}` : "not fired"}</span>
+              <button
+                type="button"
+                aria-label={`Fire ${e.id}`}
+                onclick={() => sim.facilitate({ kind: "fire_event", event: e.id })}>Fire</button
+              >
+            </li>
+          {:else}
+            <li class="empty">No events in this scenario.</li>
+          {/each}
+        </ul>
+        <form
+          class="send-message"
+          aria-label="Send message"
+          onsubmit={(e) => {
+            e.preventDefault();
+            void sim
+              .facilitate({
+                kind: "send_message",
+                ...audienceFromKey(messageTo),
+                text: messageText,
+              })
+              .then(() => {
+                if (!sim.error) messageText = "";
+              });
+          }}
+        >
+          <label for="message-to">Message to</label>
+          <select id="message-to" bind:value={messageTo}>
+            <option value="all">All sides</option>
+            {#each sim.session?.sides ?? [] as s (s.id)}
+              <option value={`side-${s.id}`}>{s.name}</option>
+            {/each}
+            <option value="white">White cell</option>
+          </select>
+          <input
+            id="message-text"
+            type="text"
+            aria-label="Message text"
+            bind:value={messageText}
+            placeholder="From exercise control"
+          />
+          <button type="submit">Send</button>
+        </form>
         <p class="dim">Override log:</p>
         <ul class="units adjudications">
           {#each [...sim.adjudications].reverse() as a, i (i)}
@@ -691,6 +783,7 @@
     font-size: 12px;
     margin: 8px 0 4px;
   }
+  .injects li,
   .messages li {
     display: flex;
     flex-direction: column;

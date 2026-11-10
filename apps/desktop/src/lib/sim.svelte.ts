@@ -11,6 +11,9 @@ import {
   type ContactView,
   type Doctrine,
   type Environment,
+  type EventStatus,
+  type Facilitation,
+  type InjectStatus,
   type FrameEvent,
   type GeoPoint,
   type Message,
@@ -51,6 +54,10 @@ class SimSession {
   adjudications = $state<AdjudicationRecord[]>([]);
   /** The seat's message log, oldest first. */
   messages = $state<Message[]>([]);
+  /** White cell: the inject library with send counts. */
+  injects = $state<InjectStatus[]>([]);
+  /** White cell: every scenario event's state. */
+  scenarioEvents = $state<EventStatus[]>([]);
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */
@@ -89,6 +96,8 @@ class SimSession {
     this.minefields = u.minefields;
     this.adjudications = u.adjudications;
     this.messages = u.messages;
+    this.injects = u.injects;
+    this.scenarioEvents = u.scenario_events;
     if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 
@@ -195,6 +204,16 @@ class SimSession {
       return;
     }
     const res = await commands.orderAdjudicate(reason.trim(), action);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** A white-cell facilitation action: inject, message, fire or switch an event. */
+  async facilitate(action: Facilitation) {
+    if (action.kind === "send_message" && !action.text.trim()) {
+      this.error = "Write the message first";
+      return;
+    }
+    const res = await commands.orderFacilitate(action);
     this.error = res.status === "error" ? res.error : null;
   }
 

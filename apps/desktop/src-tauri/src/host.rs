@@ -6,8 +6,9 @@
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, ContactView, Doctrine,
-    DoctrineScope, Environment, GeoPoint, Issuer, Message, Minefield, Mission, SimError,
-    SimEventKind, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponView,
+    DoctrineScope, Environment, EventStatus, Facilitation, GeoPoint, InjectStatus, Issuer, Message,
+    Minefield, Mission, SimError, SimEventKind, Simulation, Snapshot, Tick, UnitId, UnitView,
+    Viewer, WeaponView,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -67,6 +68,10 @@ pub struct SnapshotUpdate {
     pub adjudications: Vec<AdjudicationRecord>,
     /// The seat's message log, latest 100 (sent whole).
     pub messages: Vec<Message>,
+    /// White cell only: the inject library with send counts.
+    pub injects: Vec<InjectStatus>,
+    /// White cell only: every scenario event's state.
+    pub scenario_events: Vec<EventStatus>,
 }
 
 /// Clock status sent with every frame.
@@ -261,6 +266,8 @@ impl Host {
                     minefields: snap.minefields.clone(),
                     adjudications: snap.adjudications.clone(),
                     messages: snap.messages.clone(),
+                    injects: snap.injects.clone(),
+                    scenario_events: snap.scenario_events.clone(),
                 }
             }
             _ => SnapshotUpdate {
@@ -278,6 +285,8 @@ impl Host {
                 minefields: snap.minefields.clone(),
                 adjudications: snap.adjudications.clone(),
                 messages: snap.messages.clone(),
+                injects: snap.injects.clone(),
+                scenario_events: snap.scenario_events.clone(),
             },
         };
         self.last_sent = Some(snap);
@@ -339,6 +348,12 @@ impl Host {
         action: Adjudication,
     ) -> Result<u64, SimError> {
         self.order(CommandPayload::Adjudicate { reason, action })
+    }
+
+    /// A white-cell facilitation action: send an inject or a message, fire an event, or turn
+    /// one on or off. Only the white-cell seat may (the core refuses others).
+    pub fn order_facilitate(&mut self, action: Facilitation) -> Result<u64, SimError> {
+        self.order(CommandPayload::Facilitate { action })
     }
 
     /// Reasons this seat's orders were refused since the last call.

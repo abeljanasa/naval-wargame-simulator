@@ -176,6 +176,18 @@ try {
     "message log shows each message with its sender and, for the white cell, its audience",
   );
 
+  await page.getByRole("button", { name: "Send Distress call" }).click();
+  await messages.getByText("Engine room fire, request assistance").waitFor({ timeout: 5_000 });
+  check(
+    (await calls()).some(
+      (c) =>
+        c.cmd === "order_facilitate" &&
+        c.args.action.kind === "send_inject" &&
+        c.args.action.inject === "i01-distress",
+    ) && (await page.getByText("sent ×1").isVisible()),
+    "white cell sends an inject from the library; it appears in the message log, counted",
+  );
+
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
 } catch (e) {
   failures.push(String(e));

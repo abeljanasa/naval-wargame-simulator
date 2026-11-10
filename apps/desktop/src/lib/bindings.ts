@@ -36,6 +36,11 @@ export const commands = {
 	orderMission: (unit: UnitId, mission: Mission | null) => typedError<null, string>(__TAURI_INVOKE("order_mission", { unit, mission })),
 	/**  A white-cell adjudication override with its reason (white-cell seat only). */
 	orderAdjudicate: (reason: string, action: Adjudication_Deserialize) => typedError<null, string>(__TAURI_INVOKE("order_adjudicate", { reason, action })),
+	/**
+	 *  A white-cell facilitation action: inject, message, fire or switch an event (white-cell seat
+	 *  only).
+	 */
+	orderFacilitate: (action: Facilitation) => typedError<null, string>(__TAURI_INVOKE("order_facilitate", { action })),
 };
 
 /** Events */
@@ -348,6 +353,33 @@ export type ErrorEllipse = {
 	orientation_deg: number | null,
 };
 
+/**  An event as the white cell sees it. */
+export type EventStatus = {
+	id: string,
+	name: string,
+	enabled: boolean,
+	repeatable: boolean,
+	fired: number,
+};
+
+/**  A white-cell facilitation action: running the exercise, as opposed to overriding outcomes. */
+export type Facilitation = 
+/**  Sends an inject from the library now. */
+({ kind: "send_inject"; inject: string }) & { enabled?: never; event?: never } | 
+/**  Sends a free-text message from exercise control. */
+{
+	kind: "send_message",
+} & {
+	text: string,
+} & Audience | 
+/**
+ *  Fires an event now: its actions run regardless of its trigger, conditions and whether it
+ *  is enabled or spent. It counts as fired.
+ */
+({ kind: "fire_event"; event: string }) & { enabled?: never; inject?: never } | 
+/**  Turns an event on or off. */
+({ kind: "set_event_enabled"; event: string; enabled: boolean }) & { inject?: never };
+
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent = FrameEvent_Serialize | FrameEvent_Deserialize;
 
@@ -373,13 +405,83 @@ export type GeoPoint = {
 	lon_deg: number | null,
 };
 
+/**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */
+export type Inject = Inject_Serialize | Inject_Deserialize;
+
+/**  An inject as the white cell sees it. */
+export type InjectStatus = InjectStatus_Serialize | InjectStatus_Deserialize;
+
+/**  An inject as the white cell sees it. */
+export type InjectStatus_Deserialize = {
+	inject: Inject_Deserialize,
+	sent: number,
+};
+
+/**  An inject as the white cell sees it. */
+export type InjectStatus_Serialize = {
+	inject: Inject_Serialize,
+	sent: number,
+};
+
+/**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */
+export type Inject_Deserialize = {
+	/**  Unique id, referred to by `send_inject` actions. */
+	id: string,
+	/**  Short heading shown with the message. */
+	title: string,
+	/**
+	 *  Who the message appears to come from (role-play), e.g. `MV Ember`. Empty: the event's
+	 *  name, or `Exercise control` when the white cell sends it.
+	 */
+	from?: string,
+	text: string,
+	/**  Guidance for the white cell (when to use it, expected response). Never sent to sides. */
+	note?: string,
+} & Audience;
+
+/**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */
+export type Inject_Serialize = {
+	/**  Unique id, referred to by `send_inject` actions. */
+	id: string,
+	/**  Short heading shown with the message. */
+	title: string,
+	/**
+	 *  Who the message appears to come from (role-play), e.g. `MV Ember`. Empty: the event's
+	 *  name, or `Exercise control` when the white cell sends it.
+	 */
+	from: string,
+	text: string,
+	/**  Guidance for the white cell (when to use it, expected response). Never sent to sides. */
+	note: string,
+} & Audience;
+
 /**  A message delivered to a message log. */
-export type Message = {
+export type Message = Message_Serialize | Message_Deserialize;
+
+/**  A message delivered to a message log. */
+export type Message_Deserialize = {
 	tick: Tick,
-	/**  The event's name (or id), or the umpire. */
+	/**  The inject's sender, the event's name (or id), or `Exercise control` for the white cell. */
 	from: string,
 	to: Audience,
 	text: string,
+	/**  The inject's title, when the message is an inject. */
+	title?: string | null,
+	/**  The inject's id, when the message is an inject. */
+	inject?: string | null,
+};
+
+/**  A message delivered to a message log. */
+export type Message_Serialize = {
+	tick: Tick,
+	/**  The inject's sender, the event's name (or id), or `Exercise control` for the white cell. */
+	from: string,
+	to: Audience,
+	text: string,
+	/**  The inject's title, when the message is an inject. */
+	title: string | null,
+	/**  The inject's id, when the message is an inject. */
+	inject: string | null,
 };
 
 /**  A circular minefield. */
@@ -478,7 +580,11 @@ export type SnapshotUpdate_Deserialize = {
 	/**  White cell only: the most recent overrides (sent whole). */
 	adjudications: AdjudicationRecord_Deserialize[],
 	/**  The seat's message log, latest 100 (sent whole). */
-	messages: Message[],
+	messages: Message_Deserialize[],
+	/**  White cell only: the inject library with send counts. */
+	injects: InjectStatus_Deserialize[],
+	/**  White cell only: every scenario event's state. */
+	scenario_events: EventStatus[],
 };
 
 /**
@@ -506,7 +612,11 @@ export type SnapshotUpdate_Serialize = {
 	/**  White cell only: the most recent overrides (sent whole). */
 	adjudications: AdjudicationRecord_Serialize[],
 	/**  The seat's message log, latest 100 (sent whole). */
-	messages: Message[],
+	messages: Message_Serialize[],
+	/**  White cell only: the inject library with send counts. */
+	injects: InjectStatus_Serialize[],
+	/**  White cell only: every scenario event's state. */
+	scenario_events: EventStatus[],
 };
 
 /**  What a unit can still do. */

@@ -24,8 +24,40 @@ const adjudications: {
   action: { kind: "destroy_unit"; unit: number };
 }[] = [];
 let emcon: "active" | "silent" | null = null;
-const messages = [
-  { tick: 0, from: "Exercise control", to: { to: "all" as const }, text: "STARTEX: proceed" },
+type MockMessage = {
+  tick: number;
+  from: string;
+  to: { to: "all" } | { to: "side"; side: number } | { to: "white_cell" };
+  text: string;
+  title: string | null;
+  inject: string | null;
+};
+const messages: MockMessage[] = [
+  {
+    tick: 0,
+    from: "Exercise control",
+    to: { to: "all" },
+    text: "STARTEX: proceed",
+    title: null,
+    inject: null,
+  },
+];
+const injects = [
+  {
+    inject: {
+      id: "i01-distress",
+      title: "Distress call",
+      from: "MV Ember",
+      to: "side" as const,
+      side: 1,
+      text: "Engine room fire, request assistance",
+      note: "Tests whether Blue diverts",
+    },
+    sent: 0,
+  },
+];
+const scenarioEvents = [
+  { id: "e01-startex", name: "Exercise control", enabled: true, repeatable: false, fired: 1 },
 ];
 
 const session = (): SessionInfo => ({
@@ -104,6 +136,22 @@ mockIPC(
       case "order_adjudicate": {
         const a = args as { reason: string; action: { kind: "destroy_unit"; unit: number } };
         adjudications.push({ tick, umpire: "local", reason: a.reason, action: a.action });
+        return null;
+      }
+      case "order_facilitate": {
+        const a = (args as { action: { kind: string; inject?: string } }).action;
+        const s = injects.find((x) => x.inject.id === a.inject);
+        if (a.kind === "send_inject" && s) {
+          s.sent += 1;
+          messages.push({
+            tick,
+            from: s.inject.from,
+            to: { to: s.inject.to, side: s.inject.side },
+            text: s.inject.text,
+            title: s.inject.title,
+            inject: s.inject.id,
+          });
+        }
         return null;
       }
       case "order_engage":
@@ -245,6 +293,8 @@ const frame = (): FrameEvent => {
       minefields: [],
       adjudications,
       messages,
+      injects: viewer.kind === "white_cell" ? injects : [],
+      scenario_events: viewer.kind === "white_cell" ? scenarioEvents : [],
       refusals: sent,
     },
   };
