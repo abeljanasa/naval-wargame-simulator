@@ -4,6 +4,7 @@
 //! estimated position, an error ellipse, a classification and an age. Ground truth for all sides
 //! is only ever sent to the white cell.
 
+use crate::adjudication::AdjudicationRecord;
 use crate::components::Domain;
 use crate::esm::BearingView;
 use crate::ids::{SideId, UnitId};
@@ -149,4 +150,6 @@ pub struct Snapshot {
     pub weapons: Vec<WeaponView>,
     /// Side viewer: its own minefields. White cell: every minefield.
     pub minefields: Vec<Minefield>,
+    /// White cell only: the most recent overrides, newest last.
+    pub adjudications: Vec<AdjudicationRecord>,
 }

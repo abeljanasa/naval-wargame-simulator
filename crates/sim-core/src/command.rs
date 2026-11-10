@@ -1,5 +1,6 @@
 //! Commands: the only way anything outside the core changes simulation state.
 
+use crate::adjudication::Adjudication;
 use crate::components::Domain;
 use crate::detection::SensorSpec;
 use crate::ids::{SideId, UnitId};
@@ -183,6 +184,11 @@ pub enum CommandPayload {
         weapon: String,
         rounds: u32,
     },
+    /// A white-cell override of the simulation, logged with the umpire and the reason.
+    Adjudicate {
+        reason: String,
+        action: Adjudication,
+    },
     /// Creates a minefield. Scenario and white cell only.
     CreateMinefield {
         side: SideId,
@@ -224,6 +230,7 @@ impl CommandPayload {
             | CommandPayload::SetEmitterLibrary { .. }
             | CommandPayload::SetWeaponCatalog { .. }
             | CommandPayload::CreateMinefield { .. }
+            | CommandPayload::Adjudicate { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -321,6 +328,13 @@ impl CommandPayload {
                     Err("minefield needs a mine type".into())
                 } else {
                     Ok(())
+                }
+            }
+            CommandPayload::Adjudicate { reason, action } => {
+                if reason.trim().is_empty() {
+                    Err("an override needs a reason".into())
+                } else {
+                    action.validate()
                 }
             }
             CommandPayload::LayMines {

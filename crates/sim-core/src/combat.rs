@@ -441,7 +441,7 @@ fn apply_critical(world: &mut World, e: Entity, critical: Option<System>) {
     }
 }
 
-fn destroy(world: &mut World, unit: UnitId, e: Entity, tick: Tick) {
+pub(crate) fn destroy(world: &mut World, unit: UnitId, e: Entity, tick: Tick) {
     world.despawn(e);
     world.resource_mut::<UnitIndex>().0.remove(&unit);
     world

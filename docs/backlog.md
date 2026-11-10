@@ -2,7 +2,11 @@
 
 Items deferred out of the current change, or requested out of phase (master prompt §14). Each item names the phase it belongs to.
 
-Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md).
+Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md); Phase 3 in [plan/phase-3.md](plan/phase-3.md).
+
+## Phase 3, deferred from slices
+
+- [ ] Repair restores sensors and speed lost to earlier criticals (keep the originals on the unit).
 
 ## Phase 2, deferred from slices
 

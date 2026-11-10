@@ -167,6 +167,12 @@ pub enum SimEventKind {
         draw: f64,
         hit: bool,
     },
+    /// A white-cell override, with who made it and why.
+    Adjudicated {
+        umpire: String,
+        reason: String,
+        action: crate::adjudication::Adjudication,
+    },
     /// One transit-risk draw for a ship moving through another side's minefield.
     MineEncounter {
         unit: UnitId,

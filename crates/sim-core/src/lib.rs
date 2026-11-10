@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod adjudication;
 mod ai;
 mod c2;
 mod combat;
@@ -27,6 +28,9 @@ mod snapshot;
 mod sonar;
 mod time;
 
+pub use adjudication::{
+    Adjudication, AdjudicationLog, AdjudicationRecord, ADJUDICATION_VIEW_LIMIT,
+};
 pub use ai::MissionState;
 pub use c2::C2State;
 pub use combat::{

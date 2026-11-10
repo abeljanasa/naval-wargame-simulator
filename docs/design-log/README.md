@@ -33,4 +33,5 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
 | [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
 | [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0021](DL-0021-adjudication.md) | White-cell adjudication overrides | Project spec §10 + original design |
 | [DL-0020](DL-0020-mines.md) | Basic mines: fields, laying, transit risk | Project spec §8 + textbook mine-warfare threat formula + platform database |

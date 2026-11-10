@@ -1,5 +1,6 @@
 //! The `Simulation` facade: the only public way to drive the world.
 
+use crate::adjudication::{adjudicate, AdjudicationLog, ADJUDICATION_VIEW_LIMIT};
 use crate::ai::{ai_system, MissionState};
 use crate::c2::C2State;
 use crate::combat::{
@@ -7,7 +8,7 @@ use crate::combat::{
     WeaponCatalog, WeaponsInFlight,
 };
 use crate::command::DoctrineScope;
-use crate::command::{Command, CommandPayload, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
+use crate::command::{Command, CommandPayload, Issuer, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
 use crate::components::{Domain, Kinematics, Position, Route, Unit};
 use crate::detection::{
     default_rcs_m2, detection_system, ContactTable, EnvState, Jammer, SensorSuite, Signature,
@@ -121,6 +122,7 @@ impl Simulation {
         world.insert_resource(WeaponsInFlight::default());
         world.insert_resource(PointDefence::default());
         world.insert_resource(Minefields::default());
+        world.insert_resource(AdjudicationLog::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
         Self {
@@ -356,6 +358,13 @@ impl Simulation {
                 })
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
+            adjudications: match viewer {
+                Viewer::WhiteCell => {
+                    let log = &self.world.resource::<AdjudicationLog>().0;
+                    log[log.len().saturating_sub(ADJUDICATION_VIEW_LIMIT)..].to_vec()
+                }
+                Viewer::Side { .. } => Vec::new(),
+            },
             minefields: self.world.resource::<Minefields>().visible(match viewer {
                 Viewer::WhiteCell => None,
                 Viewer::Side { side } => Some(side),
@@ -495,6 +504,13 @@ impl Simulation {
             h.u8(u8::from(w.seeker_tried) | (u8::from(w.homing) << 1));
             h.opt_f64(w.decoy_effect);
         }
+        let adj = self.world.resource::<AdjudicationLog>();
+        h.u64(adj.0.len() as u64);
+        for a in &adj.0 {
+            h.u64(a.tick.0);
+            h.str(&a.umpire);
+            h.str(&a.reason);
+        }
         let mf = self.world.resource::<Minefields>();
         h.u64(u64::from(mf.next_id));
         for f in &mf.fields {
@@ -630,6 +646,7 @@ impl Simulation {
             weapons_in_flight: self.world.resource::<WeaponsInFlight>().clone(),
             point_defence: self.world.resource::<PointDefence>().clone(),
             minefields: self.world.resource::<Minefields>().clone(),
+            adjudications: self.world.resource::<AdjudicationLog>().clone(),
         }
     }
 
@@ -663,6 +680,7 @@ impl Simulation {
         sim.world.insert_resource(save.weapons_in_flight);
         sim.world.insert_resource(save.point_defence);
         sim.world.insert_resource(save.minefields);
+        sim.world.insert_resource(save.adjudications);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -869,6 +887,10 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
             let entity = authorised_entity(world, cmd, *shooter)?;
             engage(world, cmd, *shooter, *contact, weapon, *rounds, entity)
         }
+        CommandPayload::Adjudicate { reason, action } => match &cmd.issuer {
+            Issuer::WhiteCell { umpire } => adjudicate(world, umpire, reason, action),
+            _ => Err("only the white cell may adjudicate".into()),
+        },
         CommandPayload::CreateMinefield {
             side,
             centre,

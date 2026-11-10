@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 1: white-cell adjudication)
+
+- **Phase 3 plan** (`docs/plan/phase-3.md`): white cell and injects first, at the client's choice.
+- **`Adjudicate` command** (white cell only, reason required; `docs/models/adjudication.md`, DL-0021):
+  - Force a weapon in flight to hit or miss, set or repair damage, destroy or remove a unit, move a unit, set stores.
+  - Every override is logged with umpire and reason before it takes effect, saved, and replays exactly.
+- **Desktop white-cell console:** reason box; Repair, Destroy and Remove for the selected unit; Hit and Miss for weapons in flight; the override log.
+
+### Changed
+
+- Save format 13. Golden hashes: phase 1 `897a23ff0e619af2`, phase 2 `1b01a1518913d807`.
+
 ### Added (Phase 2, slice 12: Gate 2 pack)
 
 - **Combat demo scenario** `data/scenarios/phase2-surface-action.json`: Blue destroyer and frigate against two Red missile corvettes in Bass Strait, weapons free, with a Red minefield and a neutral merchant. It is included in the golden replays and the cross-OS determinism matrix.

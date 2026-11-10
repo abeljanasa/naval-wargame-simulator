@@ -910,3 +910,174 @@ fn a_ship_lays_its_own_field_and_is_not_at_risk_in_it() {
         .minefields
         .is_empty());
 }
+
+// ---- White-cell adjudication (Phase 3 slice 1; docs/models/adjudication.md) ----
+
+fn adjudicate(tick: u64, issuer: Issuer, reason: &str, action: Adjudication) -> Command {
+    cmd(
+        tick,
+        issuer,
+        None,
+        CommandPayload::Adjudicate {
+            reason: reason.into(),
+            action,
+        },
+    )
+}
+
+#[test]
+fn only_the_white_cell_adjudicates_and_always_with_a_reason() {
+    let mut sim = scene(71, 30_000.0, None);
+    assert!(sim
+        .submit(adjudicate(
+            1,
+            umpire(),
+            "  ",
+            Adjudication::DestroyUnit { unit: UnitId(2) }
+        ))
+        .is_err());
+    sim.submit(adjudicate(
+        1,
+        Issuer::Player { seat: 1 },
+        "I want it gone",
+        Adjudication::DestroyUnit { unit: UnitId(2) },
+    ))
+    .unwrap();
+    sim.submit(adjudicate(
+        1,
+        Issuer::Scenario,
+        "scripted",
+        Adjudication::DestroyUnit { unit: UnitId(2) },
+    ))
+    .unwrap();
+    sim.step();
+    assert_eq!(rejected(&sim).len(), 2, "{:?}", rejected(&sim));
+    assert_eq!(sim.snapshot(Viewer::WhiteCell).units.len(), 2);
+}
+
+#[test]
+fn the_umpire_forces_a_missile_to_hit_or_miss() {
+    let frigate = DamageProfile {
+        damage_points: 450.0,
+        mission_kill_fraction: 0.45,
+        fire_susceptibility: 0.0,
+        flooding_susceptibility: 0.0,
+    };
+    for hit in [true, false] {
+        let mut sim = scene(72, 30_000.0, Some(frigate));
+        sim.submit(engage_as(1, umpire(), None, "T-ASM", 1))
+            .unwrap();
+        sim.run_ticks(10);
+        let id = sim.weapons_in_flight()[0].id;
+        sim.submit(adjudicate(
+            11,
+            umpire(),
+            "missile malfunction ruled",
+            Adjudication::ForceWeaponOutcome { weapon_id: id, hit },
+        ))
+        .unwrap();
+        sim.step();
+        assert!(sim.weapons_in_flight().is_empty());
+        let rolls = sim
+            .events()
+            .iter()
+            .filter(|e| matches!(e.kind, SimEventKind::HitRoll { .. }))
+            .count();
+        assert_eq!(rolls, 0, "no Ph roll on a forced outcome");
+        let red = sim.snapshot(Viewer::Side { side: SideId(2) });
+        if hit {
+            // Full 220 kg warhead: 220 DP, mission-killed.
+            assert_eq!(red.units[0].status, Status::MissionKilled);
+        } else {
+            assert_eq!(red.units[0].damage_fraction, 0.0);
+            assert!(sim.events().iter().any(|e| matches!(
+                &e.kind,
+                SimEventKind::WeaponMissed { reason, .. } if reason == "adjudicated miss"
+            )));
+        }
+    }
+}
+
+#[test]
+fn damage_repair_destroy_remove_move_and_stores_are_logged_overrides() {
+    let mut sim = scene(73, 30_000.0, None);
+    let mid = direct(ORIGIN, 0.0, 10_000.0).point;
+    let actions = [
+        Adjudication::SetDamage {
+            unit: UnitId(1),
+            damage_dp: 200.0,
+            clear_effects: false,
+        },
+        Adjudication::SetDamage {
+            unit: UnitId(1),
+            damage_dp: 0.0,
+            clear_effects: true,
+        },
+        Adjudication::MoveUnit {
+            unit: UnitId(1),
+            position: mid,
+            altitude_m: None,
+        },
+        Adjudication::SetStores {
+            unit: UnitId(1),
+            weapon: "T-ASM".into(),
+            count: 6,
+        },
+        Adjudication::RemoveUnit { unit: UnitId(2) },
+    ];
+    for (i, a) in actions.iter().enumerate() {
+        sim.submit(adjudicate(
+            1 + i as u64,
+            umpire(),
+            &format!("ruling {i}"),
+            a.clone(),
+        ))
+        .unwrap();
+    }
+    sim.run_ticks(10);
+    assert!(rejected(&sim).is_empty(), "{:?}", rejected(&sim));
+    let white = sim.snapshot(Viewer::WhiteCell);
+    assert_eq!(white.units.len(), 1, "red removed");
+    let blue = &white.units[0];
+    assert_eq!(blue.damage_fraction, 0.0);
+    assert!(sim_geo::inverse(blue.position, mid).distance_m < 1.0);
+    assert!(blue
+        .stores
+        .iter()
+        .any(|s| s.weapon == "T-ASM" && s.count == 6));
+    // Removed is not destroyed.
+    assert!(!sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::UnitDestroyed { .. })));
+    // Five overrides, each with umpire and reason; only the white cell sees them.
+    assert_eq!(white.adjudications.len(), 5);
+    assert!(white
+        .adjudications
+        .iter()
+        .all(|a| a.umpire == "u" && a.reason.starts_with("ruling")));
+    assert!(sim
+        .snapshot(Viewer::Side { side: SideId(1) })
+        .adjudications
+        .is_empty());
+    // And they replay: save, resume, same hash.
+    let bytes = sim.save().to_bytes().unwrap();
+    let mut b = Simulation::from_save(SaveGame::from_bytes(&bytes).unwrap()).unwrap();
+    assert_eq!(sim.state_hash(), b.state_hash());
+    assert_eq!(b.snapshot(Viewer::WhiteCell).adjudications.len(), 5);
+
+    // Destroy is logged as a destruction.
+    let mut sim = scene(74, 30_000.0, None);
+    sim.submit(adjudicate(
+        1,
+        umpire(),
+        "sunk by inject",
+        Adjudication::DestroyUnit { unit: UnitId(2) },
+    ))
+    .unwrap();
+    sim.step();
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::UnitDestroyed { unit: UnitId(2) })));
+}
