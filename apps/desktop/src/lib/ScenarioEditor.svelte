@@ -1,0 +1,844 @@
+<script lang="ts">
+  // Scenario editor drawer (docs/models/scenario-editor.md). Forms for the overview, sides and
+  // postures, units and missions, minefields and reference points; JSON for events, injects,
+  // seats and groups. The engine checks the draft; errors block Save and Play.
+  import type { Mission, Posture } from "./bindings";
+  import { editor } from "./editor.svelte";
+  import { MPS_PER_KNOT, n } from "./format";
+  import {
+    addSide,
+    addUnit,
+    duplicateUnit,
+    EVENT_TEMPLATES,
+    parseJsonArray,
+    postureOf,
+    removeSide,
+    removeUnit,
+    setPosture,
+    uniqueEventId,
+    type DraftUnit,
+  } from "./scenario-edit";
+
+  type Tab = "overview" | "sides" | "units" | "minefields" | "points" | "events";
+  const TABS: { key: Tab; label: string }[] = [
+    { key: "overview", label: "Overview" },
+    { key: "sides", label: "Sides" },
+    { key: "units", label: "Units" },
+    { key: "minefields", label: "Mines" },
+    { key: "points", label: "Points" },
+    { key: "events", label: "Events" },
+  ];
+  const POSTURES: Posture[] = ["friendly", "neutral", "unfriendly", "hostile"];
+  const JSON_FIELDS = ["events", "injects", "seats", "groups"] as const;
+  type JsonField = (typeof JSON_FIELDS)[number];
+
+  let tab = $state<Tab>("overview");
+  let newSide = $state("");
+  let jsonText = $state<Record<JsonField, string>>({
+    events: "",
+    injects: "",
+    seats: "",
+    groups: "",
+  });
+  let jsonError = $state<Record<JsonField, string | null>>({
+    events: null,
+    injects: null,
+    seats: null,
+    groups: null,
+  });
+
+  const d = $derived(editor.draft);
+  const unit = $derived(d.units.find((u) => u.id === editor.selectedUnit) ?? null);
+  const mines = $derived(editor.weapons.filter((w) => w.kind === "mine"));
+
+  // Refill the JSON boxes whenever a different draft is opened.
+  let shownDraft: object | null = null;
+  $effect(() => {
+    if (shownDraft === editor.draft) return;
+    shownDraft = editor.draft;
+    for (const f of JSON_FIELDS) {
+      const v = editor.draft[f];
+      jsonText[f] = Array.isArray(v) && v.length ? JSON.stringify(v, null, 2) : "";
+      jsonError[f] = null;
+    }
+  });
+
+  function changed() {
+    editor.changed();
+  }
+
+  function applyJson(f: JsonField) {
+    const r = parseJsonArray(jsonText[f]);
+    if ("error" in r) {
+      jsonError[f] = r.error;
+      return;
+    }
+    jsonError[f] = null;
+    // An empty list is written as absent, as the engine writes it.
+    editor.draft[f] = r.value.length ? r.value : undefined;
+    changed();
+  }
+
+  function addTemplate(i: number) {
+    const t = EVENT_TEMPLATES[i];
+    if (!t) return;
+    const parsed = parseJsonArray(jsonText.events);
+    const events = "value" in parsed ? parsed.value : [];
+    const event = { ...t.event, id: uniqueEventId(events, t.event.id) };
+    jsonText.events = JSON.stringify([...events, event], null, 2);
+    applyJson("events");
+  }
+
+  function sideName(id: number): string {
+    return d.sides.find((s) => s.id === id)?.name ?? `S${id}`;
+  }
+
+  function knotsOf(u: DraftUnit): string {
+    return u.speed_mps == null ? "" : (n(u.speed_mps) / MPS_PER_KNOT).toFixed(1);
+  }
+
+  function setMission(u: DraftUnit, kind: string) {
+    const here = u.position;
+    const m: Mission | undefined =
+      kind === "patrol"
+        ? { kind: "patrol", centre: here, radius_m: 30_000 }
+        : kind === "ferry"
+          ? { kind: "ferry", destination: here }
+          : kind === "escort"
+            ? {
+                kind: "escort",
+                escorted: d.units.find((x) => x.id !== u.id && x.side === u.side)?.id ?? 0,
+                bearing_deg: 0,
+                range_m: 5_000,
+              }
+            : kind === "strike"
+              ? { kind: "strike", contact: 1 }
+              : undefined;
+    if (m) u.mission = m;
+    else delete u.mission;
+    changed();
+  }
+
+  function addUnitHere() {
+    const side = unit?.side ?? d.sides[0]?.id ?? 1;
+    const platform = unit?.platform ?? editor.platforms[0]?.id;
+    editor.pick("Click the map to place the new unit", (p) => {
+      editor.selectedUnit = addUnit(editor.draft, side, p, platform);
+    });
+  }
+
+  function num(v: string, fallback = 0): number {
+    const x = Number(v);
+    return Number.isFinite(x) ? x : fallback;
+  }
+
+  /** `datetime-local` text (UTC) for Unix seconds, and back. */
+  function isoOf(s: number | undefined): string {
+    return new Date((s ?? 0) * 1000).toISOString().slice(0, 16);
+  }
+  function unixOf(text: string): number {
+    const t = Date.parse(`${text}:00Z`);
+    return Number.isFinite(t) ? Math.round(t / 1000) : 0;
+  }
+</script>
+
+<div class="editor" role="dialog" aria-label="Scenario editor">
+  <header>
+    <strong>Scenario editor</strong>
+    <span class="spacer"></span>
+    <button onclick={() => editor.check()} disabled={editor.busy}>Check</button>
+    <button onclick={() => editor.save()} disabled={editor.busy}>Save file</button>
+    <button class="primary" onclick={() => editor.play()} disabled={editor.busy}>Play</button>
+    <button onclick={() => editor.close()} aria-label="Close the editor">Close</button>
+  </header>
+
+  {#if editor.picking}
+    <p class="picking" role="status">
+      {editor.picking.prompt}
+      {#if editor.picking.many}
+        <button onclick={() => editor.finishPick()}>Done</button>
+      {:else}
+        <button onclick={() => editor.finishPick()}>Cancel</button>
+      {/if}
+    </p>
+  {/if}
+
+  <div class="tabs" role="tablist">
+    {#each TABS as t (t.key)}
+      <button
+        role="tab"
+        aria-selected={tab === t.key}
+        class:active={tab === t.key}
+        onclick={() => (tab = t.key)}>{t.label}</button
+      >
+    {/each}
+  </div>
+
+  <div class="body">
+    {#if tab === "overview"}
+      <label>Name <input bind:value={editor.draft.name} oninput={changed} /></label>
+      <label>
+        Description
+        <textarea rows="3" bind:value={editor.draft.description} oninput={changed}></textarea>
+      </label>
+      <div class="grid2">
+        <label>
+          Seed
+          <input
+            type="number"
+            value={d.seed}
+            onchange={(e) => {
+              editor.draft.seed = Math.max(0, Math.round(num(e.currentTarget.value, 1)));
+              changed();
+            }}
+          />
+        </label>
+        <label>
+          Duration (hours)
+          <input
+            type="number"
+            step="0.25"
+            min="0"
+            value={d.duration_s / 3600}
+            onchange={(e) => {
+              editor.draft.duration_s = Math.round(num(e.currentTarget.value) * 3600);
+              changed();
+            }}
+          />
+        </label>
+        <label>
+          Start (UTC)
+          <input
+            type="datetime-local"
+            value={isoOf(d.environment?.start_unix_s)}
+            onchange={(e) => {
+              editor.draft.environment = {
+                ...editor.draft.environment,
+                start_unix_s: unixOf(e.currentTarget.value),
+              };
+              changed();
+            }}
+          />
+        </label>
+        <label>
+          Sea state (0–9)
+          <input
+            type="number"
+            min="0"
+            max="9"
+            value={d.environment?.sea_state ?? 0}
+            onchange={(e) => {
+              editor.draft.environment = {
+                ...editor.draft.environment,
+                sea_state: Math.round(num(e.currentTarget.value)),
+              };
+              changed();
+            }}
+          />
+        </label>
+        <label>
+          Weather loss (dB)
+          <input
+            type="number"
+            min="0"
+            step="0.5"
+            value={d.environment?.weather_loss_db ?? 0}
+            onchange={(e) => {
+              editor.draft.environment = {
+                ...editor.draft.environment,
+                weather_loss_db: num(e.currentTarget.value),
+              };
+              changed();
+            }}
+          />
+        </label>
+        <label>
+          Visibility (km)
+          <input
+            type="number"
+            min="0"
+            value={d.environment?.visibility_km ?? 40}
+            onchange={(e) => {
+              editor.draft.environment = {
+                ...editor.draft.environment,
+                visibility_km: num(e.currentTarget.value, 40),
+              };
+              changed();
+            }}
+          />
+        </label>
+      </div>
+    {:else if tab === "sides"}
+      {#each editor.draft.sides as s (s.id)}
+        <fieldset>
+          <legend>Side {s.id}</legend>
+          <label>Name <input bind:value={s.name} oninput={changed} /></label>
+          {#each d.sides.filter((o) => o.id !== s.id) as o (o.id)}
+            <label class="inline">
+              Regards {o.name} as
+              <select
+                value={postureOf(d, s.id, o.id)}
+                onchange={(e) => {
+                  setPosture(editor.draft, s.id, o.id, e.currentTarget.value as Posture);
+                  changed();
+                }}
+              >
+                {#each POSTURES as p (p)}<option value={p}>{p}</option>{/each}
+              </select>
+            </label>
+          {/each}
+          <button
+            class="danger"
+            onclick={() => {
+              const units = d.units.filter((u) => u.side === s.id).length;
+              if (units === 0 || confirm(`Remove ${s.name} and its ${units} units?`)) {
+                removeSide(editor.draft, s.id);
+                changed();
+              }
+            }}>Remove side</button
+          >
+        </fieldset>
+      {/each}
+      <div class="row">
+        <input placeholder="New side name" aria-label="New side name" bind:value={newSide} />
+        <button
+          onclick={() => {
+            addSide(editor.draft, newSide);
+            newSide = "";
+            changed();
+          }}>Add side</button
+        >
+      </div>
+    {:else if tab === "units"}
+      <div class="row">
+        <button onclick={addUnitHere}>Add unit on the map</button>
+        <span class="dim">{d.units.length} units · click one on the map to select it</span>
+      </div>
+      <ul class="list" aria-label="Scenario units">
+        {#each d.units as u (u.id)}
+          <li>
+            <button
+              class:selected={u.id === editor.selectedUnit}
+              onclick={() => (editor.selectedUnit = u.id)}
+            >
+              <span>{u.name}</span>
+              <span class="dim">{sideName(u.side)} · {u.platform ?? u.domain ?? "?"}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+      {#if unit}
+        {@const u = unit}
+        <fieldset>
+          <legend>Unit {u.id}</legend>
+          <label>Name <input bind:value={u.name} oninput={changed} /></label>
+          <div class="grid2">
+            <label>
+              Side
+              <select bind:value={u.side} onchange={changed}>
+                {#each d.sides as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+              </select>
+            </label>
+            <label>
+              Platform
+              <select
+                value={u.platform ?? ""}
+                onchange={(e) => {
+                  const v = e.currentTarget.value;
+                  if (v) u.platform = v;
+                  else delete u.platform;
+                  changed();
+                }}
+              >
+                <option value="">(none: give domain and speeds as JSON)</option>
+                {#each editor.platforms as p (p.id)}
+                  <option value={p.id}>{p.id} · {p.name}</option>
+                {/each}
+              </select>
+            </label>
+            <label>
+              Latitude
+              <input
+                type="number"
+                step="0.01"
+                value={n(u.position.lat_deg)}
+                onchange={(e) => {
+                  u.position = { ...u.position, lat_deg: num(e.currentTarget.value) };
+                  changed();
+                }}
+              />
+            </label>
+            <label>
+              Longitude
+              <input
+                type="number"
+                step="0.01"
+                value={n(u.position.lon_deg)}
+                onchange={(e) => {
+                  u.position = { ...u.position, lon_deg: num(e.currentTarget.value) };
+                  changed();
+                }}
+              />
+            </label>
+            <label>
+              Heading (°)
+              <input
+                type="number"
+                min="0"
+                max="359"
+                value={u.heading_deg ?? 0}
+                onchange={(e) => {
+                  u.heading_deg = num(e.currentTarget.value);
+                  changed();
+                }}
+              />
+            </label>
+            <label>
+              Speed (kn, blank: cruise)
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={knotsOf(u)}
+                onchange={(e) => {
+                  const v = e.currentTarget.value.trim();
+                  if (v === "") delete u.speed_mps;
+                  else u.speed_mps = num(v) * MPS_PER_KNOT;
+                  changed();
+                }}
+              />
+            </label>
+          </div>
+          <div class="row">
+            <button
+              onclick={() =>
+                editor.pick(`Click the map to move ${u.name}`, (p) => (u.position = p))}
+            >
+              Move on the map
+            </button>
+            <button
+              onclick={() => {
+                u.route = [];
+                editor.pick(
+                  `Click waypoints for ${u.name}, then Done`,
+                  (p) => (u.route = [...(u.route ?? []), p]),
+                  true,
+                );
+              }}>Draw route</button
+            >
+            <span class="dim">{(u.route ?? []).length} waypoints</span>
+            {#if (u.route ?? []).length}
+              <button
+                onclick={() => {
+                  u.route = [];
+                  changed();
+                }}>Clear route</button
+              >
+            {/if}
+          </div>
+          <label>
+            Mission
+            <select
+              value={u.mission?.kind ?? ""}
+              onchange={(e) => setMission(u, e.currentTarget.value)}
+            >
+              <option value="">none</option>
+              <option value="patrol">patrol</option>
+              <option value="ferry">ferry</option>
+              <option value="escort">escort</option>
+              <option value="strike">strike</option>
+            </select>
+          </label>
+          {#if u.mission?.kind === "patrol"}
+            {@const m = u.mission}
+            <div class="row">
+              <label class="inline">
+                Radius (km)
+                <input
+                  type="number"
+                  min="1"
+                  value={n(m.radius_m) / 1000}
+                  onchange={(e) => {
+                    m.radius_m = num(e.currentTarget.value, 30) * 1000;
+                    changed();
+                  }}
+                />
+              </label>
+              <button
+                onclick={() =>
+                  editor.pick("Click the centre of the patrol area", (p) => (m.centre = p))}
+              >
+                Centre on the map
+              </button>
+            </div>
+          {:else if u.mission?.kind === "ferry"}
+            {@const m = u.mission}
+            <button
+              onclick={() => editor.pick("Click the destination", (p) => (m.destination = p))}
+            >
+              Destination on the map
+            </button>
+          {:else if u.mission?.kind === "escort"}
+            {@const m = u.mission}
+            <div class="grid2">
+              <label>
+                Escort
+                <select bind:value={m.escorted} onchange={changed}>
+                  {#each d.units.filter((x) => x.id !== u.id) as x (x.id)}
+                    <option value={x.id}>{x.name}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>
+                Bearing (° from its heading)
+                <input type="number" bind:value={m.bearing_deg} onchange={changed} />
+              </label>
+              <label>
+                Range (km)
+                <input
+                  type="number"
+                  min="0"
+                  value={n(m.range_m) / 1000}
+                  onchange={(e) => {
+                    m.range_m = num(e.currentTarget.value, 5) * 1000;
+                    changed();
+                  }}
+                />
+              </label>
+            </div>
+          {:else if u.mission?.kind === "strike"}
+            {@const m = u.mission}
+            <label class="inline">
+              Contact number
+              <input type="number" min="1" bind:value={m.contact} onchange={changed} />
+            </label>
+          {/if}
+          <label class="inline">
+            <input
+              type="checkbox"
+              checked={u.reserve ?? false}
+              onchange={(e) => {
+                if (e.currentTarget.checked) u.reserve = true;
+                else delete u.reserve;
+                changed();
+              }}
+            />
+            Reserve (off the board until an event brings it in)
+          </label>
+          <div class="row">
+            <button
+              onclick={() => {
+                editor.selectedUnit = duplicateUnit(editor.draft, u.id);
+                changed();
+              }}>Duplicate</button
+            >
+            <button
+              class="danger"
+              onclick={() => {
+                removeUnit(editor.draft, u.id);
+                editor.selectedUnit = editor.draft.units[0]?.id ?? null;
+                changed();
+              }}>Delete</button
+            >
+          </div>
+        </fieldset>
+      {/if}
+    {:else if tab === "minefields"}
+      {#each editor.draft.minefields ?? [] as m, i (i)}
+        <fieldset>
+          <legend>Minefield {i + 1}</legend>
+          <div class="grid2">
+            <label>
+              Side
+              <select bind:value={m.side} onchange={changed}>
+                {#each d.sides as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+              </select>
+            </label>
+            <label>
+              Mine type
+              <select bind:value={m.weapon} onchange={changed}>
+                {#each mines as w (w.id)}<option value={w.id}>{w.id} · {w.name}</option>{/each}
+              </select>
+            </label>
+            <label>
+              Mines
+              <input type="number" min="1" bind:value={m.mines} onchange={changed} />
+            </label>
+            <label>
+              Radius (km)
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={n(m.radius_m) / 1000}
+                onchange={(e) => {
+                  m.radius_m = num(e.currentTarget.value, 1) * 1000;
+                  changed();
+                }}
+              />
+            </label>
+          </div>
+          <div class="row">
+            <button
+              onclick={() =>
+                editor.pick("Click the centre of the minefield", (p) => (m.centre = p))}
+            >
+              Centre on the map
+            </button>
+            <button
+              class="danger"
+              onclick={() => {
+                editor.draft.minefields = (editor.draft.minefields ?? []).filter((_, j) => j !== i);
+                changed();
+              }}>Remove</button
+            >
+          </div>
+        </fieldset>
+      {/each}
+      <button
+        onclick={() =>
+          editor.pick("Click the centre of the new minefield", (p) => {
+            editor.draft.minefields = [
+              ...(editor.draft.minefields ?? []),
+              {
+                side: d.sides[0]?.id ?? 1,
+                centre: p,
+                radius_m: 2_000,
+                mines: 20,
+                weapon: mines[0]?.id ?? "",
+              },
+            ];
+          })}>Add minefield on the map</button
+      >
+    {:else if tab === "points"}
+      <p class="dim">Named marks for briefing and planning. They do not change the simulation.</p>
+      {#each editor.draft.reference_points ?? [] as r, i (i)}
+        <fieldset>
+          <div class="grid2">
+            <label>Name <input bind:value={r.name} oninput={changed} /></label>
+            <label>
+              Shown to
+              <select
+                value={r.side ?? ""}
+                onchange={(e) => {
+                  const v = e.currentTarget.value;
+                  if (v === "") delete r.side;
+                  else r.side = Number(v);
+                  changed();
+                }}
+              >
+                <option value="">every side</option>
+                {#each d.sides as s (s.id)}<option value={s.id}>{s.name} only</option>{/each}
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <button
+              onclick={() => editor.pick(`Click the map for ${r.name}`, (p) => (r.position = p))}
+            >
+              Move on the map
+            </button>
+            <button
+              class="danger"
+              onclick={() => {
+                editor.draft.reference_points = (editor.draft.reference_points ?? []).filter(
+                  (_, j) => j !== i,
+                );
+                changed();
+              }}>Remove</button
+            >
+          </div>
+        </fieldset>
+      {/each}
+      <button
+        onclick={() =>
+          editor.pick("Click the map for the new reference point", (p) => {
+            const k = (editor.draft.reference_points ?? []).length + 1;
+            editor.draft.reference_points = [
+              ...(editor.draft.reference_points ?? []),
+              { name: `Point ${k}`, position: p },
+            ];
+          })}>Add point on the map</button
+      >
+    {:else}
+      <p class="dim">
+        Events, injects, seats and groups are edited as JSON (docs/models/events.md). Changes apply
+        when you leave a box.
+      </p>
+      <label class="inline">
+        Add an event
+        <select
+          aria-label="Add an event from a template"
+          onchange={(e) => {
+            addTemplate(Number(e.currentTarget.value));
+            e.currentTarget.value = "";
+          }}
+        >
+          <option value="">choose a template…</option>
+          {#each EVENT_TEMPLATES as t, i (t.label)}<option value={i}>{t.label}</option>{/each}
+        </select>
+      </label>
+      {#each JSON_FIELDS as f (f)}
+        <label>
+          {f}
+          <textarea
+            class="json"
+            rows={f === "events" ? 14 : 6}
+            spellcheck="false"
+            bind:value={jsonText[f]}
+            onblur={() => applyJson(f)}></textarea>
+        </label>
+        {#if jsonError[f]}<p class="error">{f}: {jsonError[f]}</p>{/if}
+      {/each}
+    {/if}
+  </div>
+
+  <footer aria-label="Check results">
+    {#if editor.error}<p class="error" role="alert">{editor.error}</p>{/if}
+    <p class:dim={editor.checked}>
+      {#if !editor.checked}
+        Changed since the last check.
+      {:else if editor.issues.length === 0}
+        No problems found.
+      {:else}
+        {editor.errors.length} error{editor.errors.length === 1 ? "" : "s"}, {editor.warnings
+          .length}
+        warning{editor.warnings.length === 1 ? "" : "s"}.
+      {/if}
+    </p>
+    <ul class="issues">
+      {#each editor.issues as i, k (k)}
+        <li class={i.severity}>{i.severity === "error" ? "Error" : "Warning"}: {i.message}</li>
+      {/each}
+    </ul>
+  </footer>
+</div>
+
+<style>
+  .editor {
+    position: fixed;
+    top: 48px;
+    right: 0;
+    bottom: 0;
+    width: min(480px, 60vw);
+    z-index: 25;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-1);
+    border-left: 1px solid var(--border);
+  }
+  header,
+  footer {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  footer {
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    max-height: 30%;
+    overflow: auto;
+  }
+  .spacer {
+    flex: 1;
+  }
+  .primary {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+  }
+  .danger {
+    color: var(--danger);
+  }
+  .picking {
+    margin: 0;
+    padding: 6px 12px;
+    background: var(--surface-3);
+    border-bottom: 1px solid var(--warn);
+    color: var(--warn);
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 12px;
+  }
+  .tabs .active {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+  }
+  .body {
+    flex: 1;
+    overflow: auto;
+    padding: 0 12px 12px;
+  }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 6px 0;
+    color: var(--text-dim);
+  }
+  label.inline {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 10px;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0;
+  }
+  fieldset {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 8px 0;
+  }
+  .list {
+    list-style: none;
+    margin: 6px 0;
+    padding: 0;
+    max-height: 180px;
+    overflow: auto;
+  }
+  .list button {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    text-align: left;
+  }
+  .list button.selected {
+    border-color: var(--accent);
+    background: var(--surface-3);
+  }
+  textarea.json {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .dim {
+    color: var(--text-dim);
+  }
+  .error,
+  li.error {
+    color: var(--danger);
+  }
+  li.warning {
+    color: var(--warn);
+  }
+  .issues {
+    margin: 4px 0 0;
+    padding-left: 18px;
+  }
+</style>

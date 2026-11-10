@@ -119,6 +119,7 @@ const session = (): SessionInfo => ({
   seats: [...seats],
   locked: false,
   controls_time: true,
+  reference_points: [{ name: "RV Alpha", position: { lat_deg: -39.2, lon_deg: 145.8 } }],
 });
 
 const platforms = [
@@ -236,6 +237,47 @@ mockIPC(
       }
       case "open_seat_window":
         return null;
+      case "db_weapons":
+        return [
+          { id: "WPN-MINE-MOORED", name: "Generic moored mine", kind: "mine" },
+          { id: "WPN-SAM-MR", name: "Generic medium-range SAM", kind: "sam" },
+        ];
+      case "editor_current":
+        return {
+          format: "nws-scenario",
+          format_version: 4,
+          name: "E2E — mock scenario",
+          seed: 7,
+          duration_s: 7200,
+          sides: [
+            { id: 1, name: "Blue" },
+            { id: 2, name: "Neutral shipping" },
+          ],
+          units: [
+            {
+              id: 1,
+              name: "Frigate Alpha",
+              side: 1,
+              platform: "GEN-FFG",
+              position: { lat_deg: -39.3, lon_deg: 146.0 },
+              route: [],
+            },
+          ],
+        };
+      case "editor_check": {
+        // The mock reports one warning per side without units, as the engine would.
+        const draft = JSON.parse((args as { json: string }).json) as {
+          sides: { id: number; name: string }[];
+          units: { side: number }[];
+        };
+        const issues = draft.sides
+          .filter((x) => !draft.units.some((u) => u.side === x.id))
+          .map((x) => ({
+            severity: "warning",
+            message: `side ${x.id} (${x.name}) starts with no units`,
+          }));
+        return { issues, scenario: draft };
+      }
       case "review_exercise":
         liveTick = tick;
         replay = { end_s: tick, verified: true };

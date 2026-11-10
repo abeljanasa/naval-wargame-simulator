@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use sim_core::{
     Adjudication, Doctrine, Facilitation, GeoPoint, Mission, Seat, SideId, UnitId, Viewer,
 };
-use sim_scenario::Scenario;
+use sim_scenario::{ReferencePoint, Scenario, ScenarioIssue, Severity};
 use specta_typescript::Typescript;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
@@ -61,6 +61,8 @@ pub struct SessionInfo {
     pub locked: bool,
     /// This window may run the clock and manage seats.
     pub controls_time: bool,
+    /// The scenario's reference points this window's seat may see.
+    pub reference_points: Vec<ReferencePoint>,
 }
 
 #[tauri::command]
@@ -258,7 +260,96 @@ fn session_info(h: &Host, label: &str) -> Result<SessionInfo, String> {
         seats: h.seats(),
         locked: h.locked(label),
         controls_time: h.controls_time(label),
+        reference_points: h
+            .scenario
+            .reference_points
+            .iter()
+            .filter(|r| match (h.viewer(label), r.side) {
+                (Viewer::WhiteCell, _) | (_, None) => true,
+                (Viewer::Side { side }, Some(s)) => s == side,
+            })
+            .cloned()
+            .collect(),
     })
+}
+
+/// A weapon type in the platform database (for the scenario editor's pickers).
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbWeaponRow {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+}
+
+/// Every weapon type, sorted by id.
+#[tauri::command]
+#[specta::specta]
+fn db_weapons(host: State<'_, SharedHost>) -> Result<Vec<DbWeaponRow>, String> {
+    Ok(lock(&host)
+        .platforms()
+        .weapons()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|(id, name, kind)| DbWeaponRow { id, name, kind })
+        .collect())
+}
+
+/// The scenario editor's check of a draft.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct EditorCheck {
+    /// Errors first, then warnings. Errors block saving and playing.
+    pub issues: Vec<ScenarioIssue>,
+    /// The draft as the engine reads it (absent when it is not a scenario at all).
+    pub scenario: Option<Scenario>,
+}
+
+/// Checks a draft scenario for the editor: every error and warning at once
+/// (`docs/models/scenario-editor.md`).
+#[tauri::command]
+#[specta::specta]
+fn editor_check(host: State<'_, SharedHost>, json: String) -> Result<EditorCheck, String> {
+    check_draft(host.inner(), &json)
+}
+
+fn check_draft(host: &SharedHost, json: &str) -> Result<EditorCheck, String> {
+    if json.len() > MAX_SCENARIO_BYTES {
+        return Err(format!(
+            "scenario is {} bytes; the limit is {MAX_SCENARIO_BYTES}",
+            json.len()
+        ));
+    }
+    let error = |message: String| EditorCheck {
+        issues: vec![ScenarioIssue {
+            severity: Severity::Error,
+            message,
+        }],
+        scenario: None,
+    };
+    let scenario: Scenario = match serde_json::from_str(json) {
+        Ok(s) => s,
+        Err(e) => return Ok(error(format!("not a valid scenario: {e}"))),
+    };
+    if scenario.format != sim_scenario::SCENARIO_FORMAT
+        || scenario.format_version > sim_scenario::SCENARIO_FORMAT_VERSION
+    {
+        return Ok(error(format!(
+            "format must be {:?} version {} or older",
+            sim_scenario::SCENARIO_FORMAT,
+            sim_scenario::SCENARIO_FORMAT_VERSION
+        )));
+    }
+    let issues = scenario.check(lock(host).platforms());
+    Ok(EditorCheck {
+        issues,
+        scenario: Some(scenario),
+    })
+}
+
+/// The scenario now loaded, for the editor to start from.
+#[tauri::command]
+#[specta::specta]
+fn editor_current(host: State<'_, SharedHost>) -> Scenario {
+    lock(&host).scenario.clone()
 }
 
 /// Runs or pauses the clock (white-cell windows only).
@@ -575,6 +666,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_mission,
             order_adjudicate,
             order_facilitate,
+            db_weapons,
+            editor_check,
+            editor_current,
             review_exercise,
             close_review,
             seek_replay,
@@ -708,5 +802,52 @@ mod tests {
     fn export_bindings() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/lib/bindings.ts");
         super::export_bindings(&path).unwrap();
+    }
+
+    /// The scenario editor's event templates (`src/lib/event-templates.json`) are valid events
+    /// for a two-side scenario, so "Add event" never starts from a broken one.
+    #[test]
+    fn event_templates_are_valid() {
+        let templates: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("../../src/lib/event-templates.json")).unwrap();
+        assert!(!templates.is_empty());
+        let events: Vec<serde_json::Value> = templates.iter().map(|t| t["event"].clone()).collect();
+        let scenario = serde_json::json!({
+            "format": "nws-scenario", "format_version": 4, "name": "t", "seed": 1,
+            "duration_s": 3600,
+            "sides": [{"id": 1, "name": "Blue"}, {"id": 2, "name": "Red"}],
+            "units": [],
+            "events": events,
+        });
+        let s = sim_scenario::Scenario::from_json(&scenario.to_string())
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(s.events.len(), templates.len());
+        let db = sim_db::embedded::open_platform_db().unwrap();
+        assert!(s.build(None, &db).is_ok());
+    }
+
+    #[test]
+    fn editor_check_reports_parse_errors_and_every_issue() {
+        let db = sim_db::embedded::open_platform_db().unwrap();
+        let scenario = sim_scenario::Scenario::from_json(super::DEFAULT_SCENARIO).unwrap();
+        let host = std::sync::Arc::new(std::sync::Mutex::new(
+            super::Host::new(scenario, db).unwrap(),
+        ));
+        let check = |json: &str| super::check_draft(&host, json).unwrap();
+        let bad = check("{ not json");
+        assert_eq!(bad.issues.len(), 1);
+        assert!(bad.scenario.is_none());
+        let wrong = check(r#"{"format": "other", "format_version": 1}"#);
+        assert!(
+            wrong.issues[0].message.contains("not a valid scenario")
+                || wrong.issues[0].message.contains("format")
+        );
+        let current = serde_json::to_string(&host.lock().unwrap().scenario).unwrap();
+        let ok = check(&current);
+        assert!(ok.scenario.is_some());
+        assert!(ok
+            .issues
+            .iter()
+            .all(|i| i.severity == sim_scenario::Severity::Warning));
     }
 }

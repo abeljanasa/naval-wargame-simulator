@@ -118,7 +118,7 @@ try {
     "Patrol here sends order_mission(patrol)",
   );
 
-  await page.getByLabel("Scenario").setInputFiles({
+  await page.getByLabel("Scenario", { exact: true }).setInputFiles({
     name: "loaded.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify({ format: "nws-scenario", name: "Loaded from file" })),
@@ -238,6 +238,47 @@ try {
   check(
     (await page.getByText("REPLAY", { exact: true }).count()) === 0,
     "back to the live exercise",
+  );
+
+  // Scenario editor: a new scenario, a unit placed on the map, checked by the engine, played.
+  await page.getByRole("button", { name: "New scenario" }).click();
+  const ed = page.getByRole("dialog", { name: "Scenario editor" });
+  await ed.getByText("2 warnings.").waitFor({ timeout: 5_000 });
+  check(
+    await ed.getByText("Warning: side 2 (Red) starts with no units").isVisible(),
+    "the editor checks a new scenario with the engine and lists its warnings",
+  );
+  await ed.getByRole("tab", { name: "Units" }).click();
+  await ed.getByRole("button", { name: "Add unit on the map" }).click();
+  await ed.getByText("Click the map to place the new unit").waitFor();
+  {
+    const box = await page.locator("main.map").boundingBox();
+    if (box) await page.mouse.click(box.x + box.width / 3, box.y + box.height / 2);
+  }
+  await ed.getByRole("list", { name: "Scenario units" }).getByRole("button").first().waitFor();
+  check(
+    (await ed.getByRole("list", { name: "Scenario units" }).getByRole("button").count()) === 1,
+    "clicking the map places the new unit in the draft",
+  );
+  await ed.getByRole("tab", { name: "Events" }).click();
+  await ed.getByLabel("Add an event from a template").selectOption({ index: 1 });
+  await ed.getByRole("button", { name: "Play" }).click();
+  await page.waitForTimeout(400);
+  {
+    const loads = (await calls()).filter((c) => c.cmd === "load_scenario");
+    const last = loads.length ? JSON.parse(loads[loads.length - 1].args.json) : null;
+    check(
+      last !== null &&
+        last.units.length === 1 &&
+        last.units[0].side === 1 &&
+        last.events.length === 1 &&
+        last.format_version === 4,
+      "Play sends the checked draft (its unit and event) to load_scenario",
+    );
+  }
+  check(
+    (await page.getByRole("dialog", { name: "Scenario editor" }).count()) === 0,
+    "the editor closes once its scenario is playing",
   );
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);

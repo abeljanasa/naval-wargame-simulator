@@ -5,6 +5,8 @@
   import {
     createMap,
     buildLayers,
+    editorLayers,
+    referenceLayers,
     contactAge,
     contactKind,
     setMapTheme,
@@ -15,6 +17,8 @@
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import type { Audience, Emcon, Mission, Seat, Wcs } from "./lib/bindings";
   import AarPanel from "./lib/AarPanel.svelte";
+  import ScenarioEditor from "./lib/ScenarioEditor.svelte";
+  import { editor } from "./lib/editor.svelte";
   import DbBrowser from "./lib/DbBrowser.svelte";
 
   let mapEl: HTMLElement;
@@ -110,7 +114,9 @@
     overlay = created.overlay;
     setMapTheme(map, theme);
     map.on("click", (e) => {
-      if (sim.draft) sim.addWaypoint({ lat_deg: e.lngLat.lat, lon_deg: e.lngLat.lng });
+      const p = { lat_deg: e.lngLat.lat, lon_deg: e.lngLat.lng };
+      if (editor.open && editor.deliver(p)) return;
+      if (sim.draft) sim.addWaypoint(p);
     });
     sim.start().catch((e: unknown) => {
       startError = `Cannot connect to the simulation engine: ${String(e)}`;
@@ -121,19 +127,37 @@
   // Redraw the dynamic layers whenever the frame, the selection or the draft changes.
   $effect(() => {
     if (!overlay) return;
+    if (editor.open) {
+      // The editor draws the draft instead of the live picture.
+      const d = editor.draft;
+      overlay.setProps({
+        layers: editorLayers({
+          units: d.units,
+          minefields: d.minefields ?? [],
+          points: d.reference_points ?? [],
+          sides: d.sides.map((x) => x.id),
+          selected: editor.selectedUnit,
+          onPickUnit: (id) => (editor.selectedUnit = id),
+        }),
+      });
+      return;
+    }
     overlay.setProps({
-      layers: buildLayers({
-        units: sim.units,
-        contacts: sim.contacts,
-        bearings: sim.bearings,
-        weapons: sim.weapons,
-        minefields: sim.minefields,
-        gameTimeS: n(clock?.game_time_s ?? 0),
-        viewer: sim.session?.viewer ?? { kind: "white_cell" },
-        selected: sim.selected,
-        draft: sim.draft,
-        onPickUnit: (id) => sim.select(id),
-      }),
+      layers: [
+        ...buildLayers({
+          units: sim.units,
+          contacts: sim.contacts,
+          bearings: sim.bearings,
+          weapons: sim.weapons,
+          minefields: sim.minefields,
+          gameTimeS: n(clock?.game_time_s ?? 0),
+          viewer: sim.session?.viewer ?? { kind: "white_cell" },
+          selected: sim.selected,
+          draft: sim.draft,
+          onPickUnit: (id) => sim.select(id),
+        }),
+        ...referenceLayers(sim.session?.reference_points ?? []),
+      ],
     });
   });
 
@@ -253,6 +277,24 @@
           e.currentTarget.value = "";
         }}
       />
+      {#if sim.controlsTime}
+        <div class="editor-buttons" role="group" aria-label="Scenario editor">
+          <button onclick={() => editor.start("current")}>Edit this scenario</button>
+          <button onclick={() => editor.start("blank")}>New scenario</button>
+        </div>
+        <label for="edit-file" class="dim">Edit a scenario file</label>
+        <input
+          id="edit-file"
+          type="file"
+          accept=".json,application/json"
+          onchange={(e) => {
+            const file = e.currentTarget.files?.[0];
+            if (file) void editor.start(file);
+            e.currentTarget.value = "";
+          }}
+        />
+        {#if editor.error && !editor.open}<p class="error">{editor.error}</p>{/if}
+      {/if}
     </section>
 
     <section>
@@ -699,7 +741,14 @@
     <footer class="help">Space run/pause · 1–7 compression · . step · Esc deselect</footer>
   </aside>
 
-  <main class="map" bind:this={mapEl} class:planning={sim.draft !== null}></main>
+  <main
+    class="map"
+    bind:this={mapEl}
+    class:planning={sim.draft !== null || editor.picking !== null}
+  ></main>
+  {#if editor.open}
+    <ScenarioEditor />
+  {/if}
 </div>
 
 <style>
@@ -731,6 +780,11 @@
     align-items: baseline;
     gap: 10px;
     font-variant-numeric: tabular-nums;
+  }
+  .editor-buttons {
+    display: flex;
+    gap: 6px;
+    margin: 6px 0;
   }
   .replay-badge {
     padding: 1px 6px;

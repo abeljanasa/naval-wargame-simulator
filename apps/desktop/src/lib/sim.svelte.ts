@@ -109,10 +109,15 @@ class SimSession {
 
   /** Loads a scenario file the user picked; the engine validates it and resets the session. */
   async loadScenario(file: File) {
-    const res = await commands.loadScenario(await file.text());
+    await this.loadScenarioText(file.name, await file.text());
+  }
+
+  /** Loads scenario JSON (from a file or the scenario editor). True if it loaded. */
+  async loadScenarioText(name: string, json: string): Promise<boolean> {
+    const res = await commands.loadScenario(json);
     if (res.status === "error") {
-      this.error = `Could not load ${file.name}: ${res.error}`;
-      return;
+      this.error = `Could not load ${name}: ${res.error}`;
+      return false;
     }
     this.session = res.data;
     this.clock = null;
@@ -121,6 +126,7 @@ class SimSession {
     this.selected = null;
     this.draft = null;
     this.error = null;
+    return true;
   }
 
   /** Can this window run the clock? (The main window and white-cell seats can.) */

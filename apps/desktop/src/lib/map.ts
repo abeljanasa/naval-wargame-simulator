@@ -422,3 +422,140 @@ export function contactAge(nowS: number, c: ContactView): string {
   const age = Math.max(0, Math.round(nowS - n(c.last_seen_s)));
   return age < 120 ? `${age} s` : `${Math.round(age / 60)} min`;
 }
+
+/** A named mark on the map: a scenario reference point. */
+export interface MapPoint {
+  name: string;
+  position: GeoPoint;
+}
+
+const POINT_COLOUR: RGBA = [120, 220, 160, 255];
+
+/** Reference points: a small ring and the name. */
+export function referenceLayers(points: MapPoint[], id = "reference-points"): Layer[] {
+  return [
+    new ScatterplotLayer<MapPoint>({
+      id,
+      data: points,
+      getPosition: (p) => pt(p.position),
+      getRadius: 5,
+      radiusUnits: "pixels",
+      stroked: true,
+      filled: false,
+      getLineColor: POINT_COLOUR,
+      getLineWidth: 2,
+      lineWidthUnits: "pixels",
+    }),
+    new TextLayer<MapPoint>({
+      id: `${id}-labels`,
+      data: points,
+      getPosition: (p) => pt(p.position),
+      getText: (p) => p.name,
+      getSize: 12,
+      getColor: POINT_COLOUR,
+      getPixelOffset: [0, -14],
+      fontFamily: "system-ui, sans-serif",
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
+  ];
+}
+
+/** What the scenario editor draws: the draft's units, routes, patrol areas and minefields. */
+export interface EditorScene {
+  units: {
+    id: number;
+    name: string;
+    side: number;
+    position: GeoPoint;
+    route?: GeoPoint[];
+    mission?: { kind: string; centre?: GeoPoint; radius_m?: number | null; destination?: GeoPoint };
+    reserve?: boolean;
+  }[];
+  minefields: { centre: GeoPoint; radius_m: number; mines: number }[];
+  points: MapPoint[];
+  /** Side ids in order: the first side is drawn blue, the second red, others in turn. */
+  sides: number[];
+  selected: number | null;
+  onPickUnit: (id: number) => void;
+}
+
+const SIDE_COLOURS: [number, number, number][] = [
+  [90, 170, 255],
+  [255, 110, 100],
+  [250, 210, 90],
+  [180, 140, 255],
+  [120, 220, 160],
+];
+
+/** The scenario editor's layers (drawn instead of the live picture while it is open). */
+export function editorLayers(e: EditorScene): Layer[] {
+  const colour = (side: number, alpha = 255): RGBA =>
+    rgba(
+      SIDE_COLOURS[Math.max(0, e.sides.indexOf(side)) % SIDE_COLOURS.length] ?? [200, 200, 200],
+      alpha,
+    );
+  const routes = e.units
+    .filter((u) => (u.route ?? []).length > 0)
+    .map((u) => ({ side: u.side, path: [pt(u.position), ...(u.route ?? []).map(pt)] }));
+  const areas = e.units.flatMap((u) =>
+    u.mission?.kind === "patrol" && u.mission.centre
+      ? [{ side: u.side, path: circleRing(u.mission.centre, n(u.mission.radius_m ?? 0)) }]
+      : u.mission?.kind === "ferry" && u.mission.destination
+        ? [{ side: u.side, path: [pt(u.position), pt(u.mission.destination)] }]
+        : [],
+  );
+  return [
+    new PathLayer<{ side: number; path: LonLat[] }>({
+      id: "editor-routes",
+      data: [...routes, ...areas],
+      getPath: (r) => r.path,
+      getColor: (r) => colour(r.side, 170),
+      getWidth: 2,
+      widthUnits: "pixels",
+    }),
+    new PathLayer<EditorScene["minefields"][number]>({
+      id: "editor-minefields",
+      data: e.minefields,
+      getPath: (f) => circleRing(f.centre, n(f.radius_m)),
+      getColor: [230, 120, 220, 200],
+      getWidth: 2,
+      widthUnits: "pixels",
+    }),
+    new ScatterplotLayer<EditorScene["units"][number]>({
+      id: "editor-units",
+      data: e.units,
+      getPosition: (u) => pt(u.position),
+      getRadius: (u) => (u.id === e.selected ? 9 : 6),
+      radiusUnits: "pixels",
+      stroked: true,
+      getFillColor: (u) => colour(u.side, u.reserve ? 60 : 220),
+      getLineColor: (u) => (u.id === e.selected ? [255, 255, 255, 255] : [11, 27, 43, 255]),
+      getLineWidth: 2,
+      lineWidthUnits: "pixels",
+      pickable: true,
+      onClick: (info: PickingInfo<EditorScene["units"][number]>) => {
+        if (info.object) e.onPickUnit(info.object.id);
+        return true;
+      },
+      updateTriggers: { getRadius: [e.selected], getLineColor: [e.selected] },
+    }),
+    new TextLayer<EditorScene["units"][number]>({
+      id: "editor-unit-labels",
+      data: e.units,
+      getPosition: (u) => pt(u.position),
+      getText: (u) => (u.reserve ? `${u.name} (reserve)` : u.name),
+      getSize: 12,
+      getColor: (u) => colour(u.side),
+      getPixelOffset: [0, 16],
+      fontFamily: "system-ui, sans-serif",
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
+    ...referenceLayers(e.points, "editor-points"),
+  ];
+}

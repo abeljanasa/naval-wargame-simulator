@@ -16,7 +16,7 @@ tauri-build = { workspace = true, features = [] }
 [dependencies]
 sim-aar = { workspace = true, features = ["specta"] }
 sim-core = { workspace = true, features = ["specta"] }
-sim-scenario.workspace = true
+sim-scenario = { workspace = true, features = ["specta"] }
 sim-db.workspace = true
 serde.workspace = true
 serde_json.workspace = true

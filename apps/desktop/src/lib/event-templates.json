@@ -1,0 +1,78 @@
+[
+  {
+    "label": "Message to everyone at a time",
+    "event": {
+      "id": "new-message",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "time",
+        "at_s": 600
+      },
+      "actions": [
+        {
+          "type": "message",
+          "to": "all",
+          "text": "Message text"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Tell the white cell when Blue gains contact on Red",
+    "event": {
+      "id": "new-first-contact",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "contact_gained",
+        "side": 1,
+        "target_side": 2
+      },
+      "actions": [
+        {
+          "type": "message",
+          "to": "white_cell",
+          "text": "Blue has first contact on Red."
+        }
+      ]
+    }
+  },
+  {
+    "label": "Red turns hostile when a Blue unit is lost",
+    "event": {
+      "id": "new-escalation",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "unit_destroyed",
+        "side": 1
+      },
+      "actions": [
+        {
+          "type": "set_posture",
+          "side": 2,
+          "toward": 1,
+          "posture": "hostile"
+        }
+      ]
+    }
+  },
+  {
+    "label": "Situation report every 30 minutes",
+    "event": {
+      "id": "new-sitrep",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "every",
+        "period_s": 1800,
+        "start_s": 1800
+      },
+      "repeatable": true,
+      "actions": [
+        {
+          "type": "message",
+          "to": "all",
+          "text": "Send your situation report."
+        }
+      ]
+    }
+  }
+]
