@@ -10,7 +10,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { IconLayer, LineLayer, PathLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import type { GeoPoint, UnitView, Viewer } from "./bindings";
+import type { ContactView, GeoPoint, UnitView, Viewer } from "./bindings";
 import { n, project } from "./format";
 import { AFFILIATION_COLOUR, symbolUrl, type Affiliation } from "./symbols";
 
@@ -85,6 +85,9 @@ export function createMap(container: HTMLElement, center: LonLat) {
 
 export interface SceneInput {
   units: UnitView[];
+  /** The viewing side's contacts (empty for the white cell, which sees ground truth). */
+  contacts: ContactView[];
+  gameTimeS: number;
   viewer: Viewer;
   selected: number | null;
   draft: GeoPoint[] | null;
@@ -202,5 +205,36 @@ export function buildLayers(s: SceneInput): Layer[] {
       fontSettings: { sdf: true },
       characterSet: "auto",
     }),
+    // Contacts: what the viewing side believes is out there. Unknown frame until Phase 2
+    // classification; no ground-truth identity is available to draw.
+    new IconLayer<ContactView>({
+      id: "contacts",
+      data: s.contacts,
+      getPosition: (c) => pt(c.position),
+      getIcon: () => ({ id: "contact", url: symbolUrl("unknown", false), width: 64, height: 64 }),
+      getSize: 24,
+      sizeUnits: "pixels",
+    }),
+    new TextLayer<ContactView>({
+      id: "contact-labels",
+      data: s.contacts,
+      getPosition: (c) => pt(c.position),
+      getText: (c) => `C${c.number} · ${contactAge(s.gameTimeS, c)}`,
+      getSize: 12,
+      getColor: [255, 240, 150, 255],
+      getPixelOffset: [0, 20],
+      fontFamily: "system-ui, sans-serif",
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: "auto",
+      updateTriggers: { getText: [s.gameTimeS] },
+    }),
   ];
+}
+
+/** Time since the contact was last detected, e.g. "12 s" or "4 min". */
+export function contactAge(nowS: number, c: ContactView): string {
+  const age = Math.max(0, Math.round(nowS - n(c.last_seen_s)));
+  return age < 120 ? `${age} s` : `${Math.round(age / 60)} min`;
 }

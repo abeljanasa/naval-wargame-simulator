@@ -31,6 +31,10 @@ class SimSession {
   error = $state<string | null>(null);
 
   units = $derived(this.frame?.snapshot.units ?? []);
+  /** Contacts of the viewing side. The white cell sees ground truth, so its view shows none. */
+  contacts = $derived(
+    this.session?.viewer.kind === "side" ? (this.frame?.snapshot.contacts ?? []) : [],
+  );
   selectedUnit = $derived(this.units.find((u) => u.id === this.selected) ?? null);
 
   async start() {

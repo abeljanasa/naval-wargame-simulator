@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import type { Map as MapLibreMap } from "maplibre-gl";
   import type { MapboxOverlay } from "@deck.gl/mapbox";
-  import { createMap, buildLayers } from "./lib/map";
+  import { createMap, buildLayers, contactAge } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import type { Viewer } from "./lib/bindings";
@@ -15,6 +15,10 @@
 
   const clock = $derived(sim.frame?.clock ?? null);
   const viewerKey = $derived(viewerToKey(sim.session?.viewer ?? { kind: "white_cell" }));
+
+  function unitName(id: number): string {
+    return sim.units.find((u) => u.id === id)?.name ?? `unit ${id}`;
+  }
 
   function viewerToKey(v: Viewer): string {
     return v.kind === "white_cell" ? "white" : `side-${v.side}`;
@@ -43,6 +47,8 @@
     overlay.setProps({
       layers: buildLayers({
         units: sim.units,
+        contacts: sim.contacts,
+        gameTimeS: n(clock?.game_time_s ?? 0),
         viewer: sim.session?.viewer ?? { kind: "white_cell" },
         selected: sim.selected,
         draft: sim.draft,
@@ -155,11 +161,34 @@
       </ul>
     </section>
 
+    {#if sim.session?.viewer.kind === "side"}
+      <section>
+        <h2>Contacts</h2>
+        <ul class="units">
+          {#each sim.contacts as c (c.number)}
+            <li class="contact">
+              <span class="name">C{c.number} · unknown</span>
+              <span class="meta">
+                {latLon(c.position.lat_deg, c.position.lon_deg)} · seen {contactAge(
+                  n(clock?.game_time_s ?? 0),
+                  c,
+                )} ago by {unitName(c.detected_by)}
+              </span>
+            </li>
+          {:else}
+            <li class="empty">No contacts held.</li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
     {#if sim.selectedUnit}
       {@const u = sim.selectedUnit}
       <section>
         <h2>{u.name}</h2>
         <dl>
+          <dt>Class</dt>
+          <dd>{u.platform ?? "—"}</dd>
           <dt>Position</dt>
           <dd>{latLon(u.position.lat_deg, u.position.lon_deg)}</dd>
           <dt>Heading</dt>
@@ -316,6 +345,19 @@
   }
   .empty {
     color: var(--text-dim);
+  }
+  .contact {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 8px;
+    border: 1px dashed var(--warn);
+    border-radius: 4px;
+  }
+  .contact .meta {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
   }
   dl {
     display: grid;
