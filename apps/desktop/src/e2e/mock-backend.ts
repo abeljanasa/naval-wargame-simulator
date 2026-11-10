@@ -16,6 +16,7 @@ window.__ipcCalls = [];
 let viewer: Viewer = { kind: "side", side: 1 };
 let paused = true;
 let tick = 0;
+let emcon: "active" | "silent" | null = null;
 
 const session = (): SessionInfo => ({
   scenario_name: "E2E — mock scenario",
@@ -90,6 +91,9 @@ mockIPC(
             message: "mock warning",
           },
         ];
+      case "order_doctrine":
+        emcon = (args as { doctrine: { emcon: "active" | "silent" | null } }).doctrine.emcon;
+        return null;
       case "set_viewer":
         viewer = (args as { viewer: Viewer }).viewer;
         return null;
@@ -115,6 +119,13 @@ const frame = (): FrameEvent => {
       max_speed_mps: 14.4,
       platform: "GEN-FFG",
       route: { waypoints: [{ lat_deg: -39.4, lon_deg: 145.5 }], next: 0 },
+      group: null,
+      doctrine: {
+        wcs: "hold" as const,
+        emcon: emcon ?? ("active" as const),
+        engage_unfriendly: false,
+      },
+      doctrine_set: { wcs: null, emcon, engage_unfriendly: null },
     },
     {
       id: 2,
@@ -129,6 +140,9 @@ const frame = (): FrameEvent => {
       max_speed_mps: 7.7,
       platform: "GEN-MV-BULK",
       route: null,
+      group: null,
+      doctrine: { wcs: "tight" as const, emcon: "active" as const, engage_unfriendly: false },
+      doctrine_set: { wcs: null, emcon: null, engage_unfriendly: null },
     },
   ].filter((u) => viewer.kind === "white_cell" || u.side === viewer.side);
   const contacts =
@@ -141,6 +155,7 @@ const frame = (): FrameEvent => {
             error: { semi_major_m: 500, semi_minor_m: 60, orientation_deg: 0 },
             classification: "domain" as const,
             domain: "surface" as const,
+            affiliation: null,
             first_seen_s: 0,
             last_seen_s: tick,
             detected_by: viewer.side === 1 ? 1 : 2,

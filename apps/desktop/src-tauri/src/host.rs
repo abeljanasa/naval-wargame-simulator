@@ -5,8 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Command, CommandPayload, ContactView, GeoPoint, Issuer, SimError, Simulation, Snapshot, Tick,
-    UnitId, UnitView, Viewer,
+    Command, CommandPayload, ContactView, Doctrine, DoctrineScope, GeoPoint, Issuer, SimError,
+    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -273,6 +273,14 @@ impl Host {
     pub fn order_speed(&mut self, unit: UnitId, speed_mps: f64) -> Result<u64, SimError> {
         self.order(CommandPayload::SetSpeed { unit, speed_mps })
     }
+
+    /// Replaces the doctrine set on `unit` (unset fields inherit from its group and side).
+    pub fn order_doctrine(&mut self, unit: UnitId, doctrine: Doctrine) -> Result<u64, SimError> {
+        self.order(CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Unit { unit },
+            doctrine,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -285,6 +293,27 @@ mod tests {
         ))
         .unwrap();
         Host::new(s, sim_db::embedded::open_platform_db().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn a_player_sets_doctrine_on_its_own_unit() {
+        let mut h = host();
+        h.set_viewer(Viewer::Side {
+            side: sim_core::SideId(1),
+        });
+        h.step(1);
+        let silent = Doctrine {
+            emcon: Some(sim_core::Emcon::Silent),
+            ..Doctrine::default()
+        };
+        h.order_doctrine(UnitId(1), silent).unwrap();
+        h.step(1);
+        let snap = h.sim.snapshot(Viewer::Side {
+            side: sim_core::SideId(1),
+        });
+        assert_eq!(snap.units[0].doctrine.emcon, sim_core::Emcon::Silent);
+        // The demo's Blue side doctrine (WCS hold) is inherited.
+        assert_eq!(snap.units[0].doctrine.wcs, sim_core::Wcs::Hold);
     }
 
     #[test]

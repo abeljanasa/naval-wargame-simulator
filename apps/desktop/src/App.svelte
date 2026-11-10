@@ -13,7 +13,7 @@
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
-  import type { Viewer } from "./lib/bindings";
+  import type { Emcon, Viewer, Wcs } from "./lib/bindings";
   import DbBrowser from "./lib/DbBrowser.svelte";
 
   let mapEl: HTMLElement;
@@ -264,6 +264,37 @@
             {:else}
               none
             {/if}
+          </dd>
+          <dt><label for="wcs">Weapons</label></dt>
+          <dd>
+            <select
+              id="wcs"
+              value={u.doctrine_set.wcs ?? "inherit"}
+              onchange={(e) => {
+                const v = e.currentTarget.value;
+                void sim.orderDoctrine({ wcs: v === "inherit" ? null : (v as Wcs) });
+              }}
+            >
+              <option value="inherit">Inherit ({u.doctrine.wcs})</option>
+              <option value="hold">Hold</option>
+              <option value="tight">Tight</option>
+              <option value="free">Free</option>
+            </select>
+          </dd>
+          <dt><label for="emcon">Emissions</label></dt>
+          <dd>
+            <select
+              id="emcon"
+              value={u.doctrine_set.emcon ?? "inherit"}
+              onchange={(e) => {
+                const v = e.currentTarget.value;
+                void sim.orderDoctrine({ emcon: v === "inherit" ? null : (v as Emcon) });
+              }}
+            >
+              <option value="inherit">Inherit ({u.doctrine.emcon})</option>
+              <option value="active">Active</option>
+              <option value="silent">Silent (radar off)</option>
+            </select>
           </dd>
         </dl>
 

@@ -6,6 +6,7 @@ import { bearing, distance, gameTime, knots, latLon, MPS_PER_KNOT, project } fro
 import { frameSvg, symbolUrl } from "./symbols";
 import {
   buildLayers,
+  contactAffiliation,
   contactAge,
   contactKind,
   CONTAINMENT_95,
@@ -29,6 +30,9 @@ const unit = (id: number, overrides: Partial<UnitView> = {}): UnitView => ({
   max_speed_mps: 15,
   platform: "GEN-FFG",
   route: null,
+  group: null,
+  doctrine: { wcs: "tight", emcon: "active", engage_unfriendly: false },
+  doctrine_set: { wcs: null, emcon: null, engage_unfriendly: null },
   ...overrides,
 });
 
@@ -115,6 +119,9 @@ describe("map layers", () => {
     expect(ring[4]).toEqual(ring[0]);
     expect(contactKind(c)).toBe("surface");
     expect(contactKind({ domain: null } as ContactView)).toBe("unknown");
+    expect(contactAffiliation(c)).toBe("unknown");
+    expect(contactAffiliation({ ...c, affiliation: "unfriendly" })).toBe("hostile");
+    expect(contactAffiliation({ ...c, affiliation: "neutral" })).toBe("neutral");
   });
 
   it("formats contact age from the last detection", () => {

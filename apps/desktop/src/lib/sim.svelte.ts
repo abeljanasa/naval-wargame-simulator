@@ -6,6 +6,7 @@ import {
   events,
   type ClockStatus,
   type ContactView,
+  type Doctrine,
   type FrameEvent,
   type GeoPoint,
   type SessionInfo,
@@ -130,6 +131,14 @@ class SimSession {
       return;
     }
     const res = await commands.orderSpeed(this.selected, kn * MPS_PER_KNOT);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Changes doctrine set on the selected unit; fields given as null go back to inheriting. */
+  async orderDoctrine(change: Partial<Doctrine>) {
+    const u = this.selectedUnit;
+    if (!u) return;
+    const res = await commands.orderDoctrine(u.id, { ...u.doctrine_set, ...change });
     this.error = res.status === "error" ? res.error : null;
   }
 }

@@ -160,6 +160,22 @@ export function ellipseRing(c: ContactView, points = 48): LonLat[] {
   return ring;
 }
 
+/** Symbol affiliation of a contact: unknown until the side identifies it to class level, then
+ * the side's posture toward the contact's side (unfriendly is drawn as hostile). */
+export function contactAffiliation(c: ContactView): Affiliation {
+  switch (c.affiliation) {
+    case "friendly":
+      return "friend";
+    case "neutral":
+      return "neutral";
+    case "unfriendly":
+    case "hostile":
+      return "hostile";
+    default:
+      return "unknown";
+  }
+}
+
 /** What the side knows about a contact, e.g. "unknown" or "surface". */
 export function contactKind(c: ContactView): string {
   return c.domain ?? "unknown";
@@ -295,9 +311,10 @@ export function buildLayers(s: SceneInput): Layer[] {
       getPosition: (c) => pt(c.position),
       getIcon: (c) => {
         const domain = c.domain ?? "surface";
+        const aff = contactAffiliation(c);
         return {
-          id: `contact-${domain}`,
-          url: symbolUrl("unknown", false, domain),
+          id: `contact-${aff}-${domain}`,
+          url: symbolUrl(aff, false, domain),
           width: 64,
           height: 64,
         };

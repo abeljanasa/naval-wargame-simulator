@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 2: command and control)
+
+- **`sim-c2` crate:** postures, doctrine inheritance (unit, then group, then side), the WCS weapons-release rule with the ROE `engage_unfriendly` setting, and EMCON (model doc `docs/models/c2-doctrine.md`, DL-0011).
+- **Engine:**
+  - `SetPosture` (scenario and white cell only) and `SetDoctrine` (side, group or unit) commands.
+  - EMCON silent switches a unit's radar off.
+  - Snapshots carry each unit's doctrine, the viewer's postures, and contact affiliation once a track is identified.
+- **Scenario format:** optional `postures`, side `doctrine`, `groups`, and unit `group` and `doctrine`.
+- **Desktop:** weapons (WCS) and emissions (EMCON) selectors on the selected unit, showing what is inherited. Contacts are coloured by affiliation once identified.
+
+### Changed
+
+- Save format 4 (older saves still load).
+- The demo scenario sets both sides neutral and Blue weapons hold. Golden hash is now `d46bae3f7ea350a8`.
+
 ### Added (Phase 2, slice 1: tracks)
 
 - **Phase 2 plan** (`docs/plan/phase-2.md`) and **ADR-0005**: model crates hold pure functions, and `sim-core` runs them.

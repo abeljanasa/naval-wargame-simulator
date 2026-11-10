@@ -76,6 +76,20 @@ try {
     "map clicks + Enter send order_route with 2 waypoints",
   );
 
+  await page.getByLabel("Emissions").selectOption("silent");
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some(
+      (c) => c.cmd === "order_doctrine" && c.args.unit === 1 && c.args.doctrine.emcon === "silent",
+    ),
+    "emissions selector sends order_doctrine(emcon silent)",
+  );
+  check(
+    (await page.getByLabel("Weapons").inputValue()) === "inherit" &&
+      (await page.getByRole("option", { name: "Inherit (hold)" }).count()) === 1,
+    "weapons selector shows the inherited WCS",
+  );
+
   await page.getByLabel("Scenario").setInputFiles({
     name: "loaded.json",
     mimeType: "application/json",

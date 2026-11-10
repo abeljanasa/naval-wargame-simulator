@@ -28,6 +28,8 @@ export const commands = {
 	stepTicks: (ticks: number) => __TAURI_INVOKE<void>("step_ticks", { ticks }),
 	orderRoute: (unit: UnitId, waypoints: GeoPoint[]) => typedError<null, string>(__TAURI_INVOKE("order_route", { unit, waypoints })),
 	orderSpeed: (unit: UnitId, speedMps: number | null) => typedError<null, string>(__TAURI_INVOKE("order_speed", { unit, speedMps })),
+	/**  Sets doctrine (WCS, EMCON, ROE) on one unit; unset fields inherit from its group and side. */
+	orderDoctrine: (unit: UnitId, doctrine: Doctrine_Deserialize) => typedError<null, string>(__TAURI_INVOKE("order_doctrine", { unit, doctrine })),
 };
 
 /** Events */
@@ -82,6 +84,8 @@ export type ContactView_Deserialize = {
 	classification: Classification,
 	/**  Present once the classification reaches `domain`. */
 	domain?: Domain | null,
+	/**  The holding side's posture toward the track's side, once identified to class level. */
+	affiliation?: Posture | null,
 	first_seen_s: number | null,
 	last_seen_s: number | null,
 	/**  Own unit whose sensor last detected it. */
@@ -105,6 +109,8 @@ export type ContactView_Serialize = {
 	classification: Classification,
 	/**  Present once the classification reaches `domain`. */
 	domain: Domain | null,
+	/**  The holding side's posture toward the track's side, once identified to class level. */
+	affiliation: Posture | null,
 	first_seen_s: number | null,
 	last_seen_s: number | null,
 	/**  Own unit whose sensor last detected it. */
@@ -168,8 +174,37 @@ export type DbSensorRow = {
 	max_range_m: number | null,
 };
 
+/**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
+export type Doctrine = Doctrine_Serialize | Doctrine_Deserialize;
+
+/**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
+export type Doctrine_Deserialize = {
+	wcs?: Wcs | null,
+	emcon?: Emcon | null,
+	/**  ROE: may unfriendly (not only hostile) tracks be engaged? */
+	engage_unfriendly?: boolean | null,
+};
+
+/**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
+export type Doctrine_Serialize = {
+	wcs: Wcs | null,
+	emcon: Emcon | null,
+	/**  ROE: may unfriendly (not only hostile) tracks be engaged? */
+	engage_unfriendly: boolean | null,
+};
+
 /**  Broad physical domain of a unit. */
 export type Domain = "surface" | "subsurface" | "air" | "land";
+
+/**
+ *  Emission control for active sensors. Phase 2 slice 2 has two states; graded states (for
+ *  example navigation radar only) can be added without changing the inheritance rules.
+ */
+export type Emcon = 
+/**  Active sensors (radar, active sonar) may transmit. */
+"active" | 
+/**  No active emissions. Passive sensors still work. */
+"silent";
 
 /**  A one-sigma position error ellipse, as shown to players. */
 export type ErrorEllipse = {
@@ -202,6 +237,18 @@ export type FrameEvent_Serialize = {
 export type GeoPoint = {
 	lat_deg: number | null,
 	lon_deg: number | null,
+};
+
+/**  How one side regards another. */
+export type Posture = "friendly" | 
+/**  The default between sides that have not set a posture. */
+"neutral" | "unfriendly" | "hostile";
+
+/**  Doctrine with every field decided. */
+export type ResolvedDoctrine = {
+	wcs: Wcs,
+	emcon: Emcon,
+	engage_unfriendly: boolean,
 };
 
 export type RouteView = {
@@ -289,6 +336,11 @@ export type UnitView_Deserialize = {
 	platform?: string | null,
 	/**  Present for units the viewer controls. */
 	route?: RouteView | null,
+	group?: string | null,
+	/**  Doctrine in force (unit, then group, then side, then default). */
+	doctrine: ResolvedDoctrine,
+	/**  Doctrine set on the unit itself (unset fields are inherited). */
+	doctrine_set: Doctrine_Deserialize,
 };
 
 export type UnitView_Serialize = {
@@ -306,6 +358,11 @@ export type UnitView_Serialize = {
 	platform: string | null,
 	/**  Present for units the viewer controls. */
 	route: RouteView | null,
+	group: string | null,
+	/**  Doctrine in force (unit, then group, then side, then default). */
+	doctrine: ResolvedDoctrine,
+	/**  Doctrine set on the unit itself (unset fields are inherited). */
+	doctrine_set: Doctrine_Serialize,
 };
 
 /**  Whose picture a snapshot shows. */
@@ -314,6 +371,15 @@ export type Viewer =
 { kind: "white_cell" } | 
 /**  The perceived picture of one side. */
 { kind: "side"; side: SideId };
+
+/**  Weapons control status. */
+export type Wcs = 
+/**  Do not fire (self-defence arrives with point defence, Phase 2 slice 9). */
+"hold" | 
+/**  Fire only at tracks identified as hostile. */
+"tight" | 
+/**  Fire at any track not identified as friendly or neutral. */
+"free";
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

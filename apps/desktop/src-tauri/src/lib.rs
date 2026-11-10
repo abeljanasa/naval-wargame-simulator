@@ -7,7 +7,7 @@ mod host;
 
 use host::{ClockStatus, Host, SnapshotUpdate, TimeCompression};
 use serde::{Deserialize, Serialize};
-use sim_core::{GeoPoint, SideId, UnitId, Viewer};
+use sim_core::{Doctrine, GeoPoint, SideId, UnitId, Viewer};
 use sim_scenario::Scenario;
 use specta_typescript::Typescript;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -276,6 +276,20 @@ fn order_speed(host: State<'_, SharedHost>, unit: UnitId, speed_mps: f64) -> Res
         .map_err(|e| e.to_string())
 }
 
+/// Sets doctrine (WCS, EMCON, ROE) on one unit; unset fields inherit from its group and side.
+#[tauri::command]
+#[specta::specta]
+fn order_doctrine(
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    doctrine: Doctrine,
+) -> Result<(), String> {
+    lock(&host)
+        .order_doctrine(unit, doctrine)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -290,6 +304,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             step_ticks,
             order_route,
             order_speed,
+            order_doctrine,
         ])
         .events(collect_events![FrameEvent])
 }
