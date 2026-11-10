@@ -110,6 +110,52 @@ jobs:
           done
           echo "All OSes produced identical hashes."
 
+  # Dependency licences (no GPL/AGPL/LGPL), sources and security advisories (deny.toml).
+  dependencies:
+    name: Dependency audit (cargo deny)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  # Performance budgets (master prompt §12). The budgets are defined for the reference laptop; the
+  # CI gate checks the 1,000-unit budget, which has ~3x headroom on a developer machine, and records
+  # the 10,000-unit figure for trend review. See docs/build/performance.md.
+  performance:
+    name: Performance budget
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked -p nws-batch
+      - name: 1,000 units at >= 60x real time (gate)
+        run: ./target/release/nws-batch bench --units 1000 --ticks 600 --min-ratio 60 | tee bench-1k.json
+      - name: 10,000 units (recorded; reference-laptop budget is >= 1x)
+        run: ./target/release/nws-batch bench --units 10000 --ticks 60 | tee bench-10k.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks
+          path: bench-*.json
+
+  # Air-gapped build path: every dependency vendored, then built with no network.
+  offline-build:
+    name: Air-gapped build (vendored, offline)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - name: Vendor all crates
+        run: |
+          mkdir -p .cargo
+          cargo vendor --locked vendor > .cargo/config.toml
+      - name: Build and test engine crates with the network disabled
+        run: |
+          cargo build --offline --locked -p sim-core -p sim-geo -p sim-db -p sim-scenario -p nws-batch
+          cargo test --offline --locked -p sim-core -p sim-geo -p sim-db -p sim-scenario
+
   frontend:
     name: Front end (typecheck, lint, build)
     runs-on: ubuntu-24.04

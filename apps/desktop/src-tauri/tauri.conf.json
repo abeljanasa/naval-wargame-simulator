@@ -28,7 +28,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "category": "Simulation",
     "shortDescription": "Naval operational and tactical wargaming simulator",
     "icon": [
       "icons/32x32.png",
