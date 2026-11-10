@@ -27,10 +27,10 @@ use serde::{Deserialize, Serialize};
 use sim_c2::{may_engage, track_affiliation};
 use sim_geo::{direct, inverse, GeoPoint};
 use sim_weapons::{
-    critical_system, fire_starts, flooding_starts, hit_damage_dp, ph, ph_sea_modifier,
-    ph_size_modifier, ph_speed_modifier, DamageProfile, Guidance, Status, System, WeaponKind,
-    WeaponSpec, CRITICAL_CHANCE, DC_FIRE_PER_MINUTE, DC_FLOOD_PER_MINUTE, FIRE_DP_PER_MINUTE,
-    FLOOD_DP_PER_MINUTE, SEEKER_ACQUISITION_PD,
+    countermeasure_modifier, critical_system, fire_starts, flooding_starts, hit_damage_dp, ph,
+    ph_sea_modifier, ph_size_modifier, ph_speed_modifier, DamageProfile, Guidance, Status, System,
+    WeaponKind, WeaponSpec, CRITICAL_CHANCE, DC_FIRE_PER_MINUTE, DC_FLOOD_PER_MINUTE,
+    FIRE_DP_PER_MINUTE, FLOOD_DP_PER_MINUTE, SEEKER_ACQUISITION_PD,
 };
 use std::collections::BTreeMap;
 
@@ -115,6 +115,9 @@ pub struct WeaponInFlight {
     pub seeker_tried: bool,
     pub homing: bool,
     pub launched: Tick,
+    /// Seduction effect of a decoy the target fired at this weapon (lowers Ph at impact).
+    #[serde(default)]
+    pub decoy_effect: Option<f64>,
 }
 
 /// Weapons in flight, in launch (id) order.
@@ -267,6 +270,7 @@ pub(crate) fn engage(
                 seeker_tried: false,
                 homing: false,
                 launched: tick,
+                decoy_effect: None,
             });
             world.resource_mut::<EventLog>().push(
                 tick,
@@ -280,7 +284,7 @@ pub(crate) fn engage(
             );
         } else {
             // Guns, CIWS, bombs, depth charges, ASW rockets: resolved at once.
-            apply_hit_roll(world, &spec, None, track.target, tick);
+            apply_hit_roll(world, &spec, None, None, track.target, tick);
         }
     }
     Ok(())
@@ -291,6 +295,7 @@ fn apply_hit_roll(
     world: &mut World,
     spec: &WeaponSpec,
     weapon_id: Option<u64>,
+    decoy_effect: Option<f64>,
     target: UnitId,
     tick: Tick,
 ) {
@@ -308,7 +313,15 @@ fn apply_hit_roll(
     let size = ph_size_modifier(air, length);
     let manoeuvre = ph_speed_modifier(air, speed);
     let sea = ph_sea_modifier(spec.kind, sea_state);
-    let p = ph(spec.base_ph, size, manoeuvre, sea);
+    // Soft kill: a decoy fired at this weapon, and the target's own jammer if it is radiating.
+    let jamming = world
+        .get::<crate::detection::Jammer>(e)
+        .is_some_and(|j| j.0.is_some())
+        && world.get::<Unit>(e).is_some_and(|u| {
+            world.resource::<C2State>().doctrine_for(u).emcon == sim_c2::Emcon::Active
+        });
+    let countermeasures = countermeasure_modifier(spec.guidance, decoy_effect, jamming);
+    let p = ph(spec.base_ph, size, manoeuvre, sea) * countermeasures;
     let draw = world
         .resource_mut::<RngStreams>()
         .uniform(StreamId::Weapons);
@@ -323,6 +336,7 @@ fn apply_hit_roll(
             size_modifier: size,
             speed_modifier: manoeuvre,
             sea_modifier: sea,
+            countermeasure_modifier: countermeasures,
             ph: p,
             draw,
             hit,
@@ -512,7 +526,7 @@ pub(crate) fn weapons_system(world: &mut World) {
             };
             match miss {
                 None => {
-                    apply_hit_roll(world, &spec, Some(w.id), w.target, tick);
+                    apply_hit_roll(world, &spec, Some(w.id), w.decoy_effect, w.target, tick);
                     continue;
                 }
                 Some("") => {}

@@ -31,3 +31,4 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0015](DL-0015-optical-mad.md) | Visual, EO/IR and MAD | Project spec §8 + solar geometry + original design |
 | [DL-0016](DL-0016-weapons.md) | Weapons as entities and engagements | Project spec §8 + platform database + original design |
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
+| [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |

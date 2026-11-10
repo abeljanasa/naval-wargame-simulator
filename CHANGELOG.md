@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 9: point defence and soft kill)
+
+- **Point defence** (`docs/models/weapons-damage.md`, DL-0018):
+  - Ships with a radiating radar detect incoming missiles and engage them after a reaction time.
+  - SAMs defend the area; guns and CIWS defend their own ship. Fire channels are limited, so saturation emerges.
+  - Interceptors resolve at the intercept time with a logged Ph draw. Point defence works under any WCS.
+- **Soft kill:**
+  - Targets fire matched decoys (chaff or IR against missiles, countermeasures against torpedoes); the database decoy effect lowers Ph.
+  - A radiating jammer on the target lowers an active radar seeker's Ph by × 0.8. Hit rolls log the countermeasure modifier.
+
+### Changed
+
+- Save format 10 (older saves still load).
+
 ### Added (Phase 2, slices 7 and 8: weapons, Ph and damage)
 
 - **`sim-weapons` crate and combat engine** (`docs/models/weapons-damage.md`, DL-0016, DL-0017):

@@ -1,10 +1,10 @@
 # Model: Weapons, engagements, Ph and damage
 
-> Phase 2 slices 7 and 8. Original design using the platform database's weapon and damage-profile figures; **not SME-validated**.
+> Phase 2 slices 7, 8 and 9. Original design using the platform database's weapon and damage-profile figures; **not SME-validated**.
 
 - **Code:** `crates/sim-weapons` (model), `crates/sim-core/src/combat.rs` (engagements, flight, damage)
 - **Tests:** unit tests in `sim-weapons` (hand values); engine and duel tests in `crates/sim-core/tests/combat.rs`
-- **Design log:** [DL-0016](../design-log/DL-0016-weapons.md) (weapons), [DL-0017](../design-log/DL-0017-ph-damage.md) (Ph and damage)
+- **Design log:** [DL-0016](../design-log/DL-0016-weapons.md) (weapons), [DL-0017](../design-log/DL-0017-ph-damage.md) (Ph and damage), [DL-0018](../design-log/DL-0018-point-defence.md) (point defence and soft kill)
 
 ## Data
 
@@ -54,7 +54,33 @@ Ph = base Ph × size × manoeuvre × environment, clamped to [0, 0.99]:
 | Manoeuvre | air: over 300 m/s × 0.8, over 200 m/s × 0.9; surface: over 15 m/s × 0.9 |
 | Environment | anti-ship missile in sea state 6+ × 0.9; gun or CIWS in sea state 5+ × 0.85 |
 
-Countermeasures join in slice 9 (soft kill). One `Weapons` draw; logged as `HitRoll` with every modifier.
+Countermeasures (slice 9) multiply in: × (1 − decoy effect) when the target fired a matched decoy at this weapon, and × 0.8 against an active radar seeker when the target's own jammer is radiating. One `Weapons` draw; logged as `HitRoll` with every modifier.
+
+## Point defence and soft kill (slice 9)
+
+Every tick, before weapons move:
+
+1. **Interceptors in the air** that are due resolve with Ph = interceptor base Ph × the threat's manoeuvre modifier (air rules). A kill removes the threat (`InterceptRoll`, `WeaponMissed: shot down`).
+2. **Defenders** are operational units with a radiating radar (EMCON active), in unit-id order. Each detects an incoming enemy missile once it is inside both the radar horizon (to the missile's altitude) and the radar's R₅₀ against a **0.1 m²** missile. Detection here takes no draw.
+3. **Firing:**
+   - After the **reaction time** (SAM 8 s, gun 5 s, CIWS 3 s), with the threat inside the weapon's range, the defender fires one round per free **fire channel** (SAM 2, gun 1, CIWS 1), one engagement per threat at a time.
+   - **SAMs defend the area**: any incoming enemy missile. **Guns and CIWS defend only their own ship.**
+   - A shot resolves after the head-on intercept time, range / (threat speed + interceptor speed), with the channel busy until then.
+   - If the threat survives, the next tick can shoot again (shoot-look-shoot).
+   - **Saturation** emerges when threats arrive faster than channels free up.
+   - Point defence is self-defence: it works under any weapons control status.
+4. **Soft kill:** when an incoming weapon closes inside 10 km (3 km for a torpedo), its target fires one matched decoy at it, if it carries one:
+   - chaff or IR decoys against radar and IR seekers;
+   - torpedo countermeasures against acoustic homing.
+
+   The decoy's database `base_ph` (0.3 for the generic decoys) is its seduction effect (`DecoyLaunched`).
+
+| Case | Working | Result |
+|---|---|---|
+| Ship SAM (0.75) against a 270 m/s ASM | × 0.9 manoeuvre | intercept Ph **0.675** |
+| SAM (900 m/s) at an ASM 20 km out | 20 000 / (270 + 900) | intercept after **18 s** |
+| Radar R₅₀ 120 km at 1 m² against a 0.1 m² missile | 120 × 0.1^¼ | **67.5 km** (then the horizon limits a sea-skimmer to ≈ 34 km) |
+| Chaff plus jamming against an active radar ASM (0.8) | 0.8 × 0.7 × 0.8 | Ph **0.448** |
 
 ## Damage (slice 8)
 
@@ -103,10 +129,14 @@ Logged: `WeaponLaunched`, `SeekerAcquisition`, `HitRoll`, `WeaponMissed` (with t
 | `fires_burn_until_damage_control_puts_them_out` | engine: 2 DP a minute until put out; damage total matches |
 | `guns_resolve_at_once_and_the_white_cell_may_override_wcs` | engine: five rolls at once; white-cell override |
 | `save_and_resume_with_missiles_in_flight_is_exact` | determinism with weapons in flight |
+| `point_defence_rules_hand_values`, `soft_kill_hand_values` | intercept time, reaction, channels; decoy matching; × 0.7 and × 0.56 |
+| `sams_engage_incoming_missiles_with_the_hand_calculated_ph` | engine: engaged after the reaction time; intercept Ph 0.675 |
+| `two_sam_channels_limit_a_four_missile_raid` | engine: never more than two SAMs in the air from one ship |
+| `decoys_and_jamming_lower_ph_at_impact` | engine: decoy effect 0.3; countermeasures 0.56; Ph 0.448 |
 
 ## Limitations
 
-- Weapons in flight cannot yet be detected or engaged: point defence and soft kill are slice 9.
+- Incoming missiles are detected deterministically at a fixed 0.1 m² and engaged only by point defence; sides do not see enemy missiles in their picture. Torpedoes are countered only by decoys.
 - No salvo deconfliction, re-attack or retargeting; a seeker that misses does not search again.
 - Weapons fly great-circle legs at constant speed; no flight profiles, pop-ups or terminal manoeuvres.
 - Aircraft carry their first database loadout; loadout choice comes with air operations (Phase 4).

@@ -160,9 +160,36 @@ pub enum SimEventKind {
         size_modifier: f64,
         speed_modifier: f64,
         sea_modifier: f64,
+        /// Soft kill (decoy, target jamming); 1 when none. Absent before save format 10.
+        #[serde(default = "one")]
+        countermeasure_modifier: f64,
         ph: f64,
         draw: f64,
         hit: bool,
+    },
+    /// A defender fired an interceptor (SAM, gun or CIWS) at an incoming weapon.
+    PointDefenceShot {
+        defender: UnitId,
+        interceptor: String,
+        threat: u64,
+        range_m: f64,
+        resolve_at: crate::time::Tick,
+    },
+    /// The Ph draw of an interceptor reaching its threat.
+    InterceptRoll {
+        defender: UnitId,
+        interceptor: String,
+        threat: u64,
+        ph: f64,
+        draw: f64,
+        killed: bool,
+    },
+    /// A ship under attack fired a decoy at an incoming weapon.
+    DecoyLaunched {
+        unit: UnitId,
+        decoy: String,
+        threat: u64,
+        effect: f64,
     },
     WeaponMissed {
         weapon_id: u64,
@@ -229,4 +256,8 @@ impl EventLog {
     pub fn push(&mut self, tick: Tick, kind: SimEventKind) {
         self.events.push(SimEvent { tick, kind });
     }
+}
+
+fn one() -> f64 {
+    1.0
 }

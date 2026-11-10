@@ -17,6 +17,7 @@ use crate::events::{EventLog, SimEvent, SimEventKind};
 use crate::hash::StateHash;
 use crate::ids::{SideId, UnitId};
 use crate::movement::movement_system;
+use crate::point_defence::{point_defence_system, PointDefence};
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
 use crate::snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
@@ -116,6 +117,7 @@ impl Simulation {
         world.insert_resource(BearingTable::default());
         world.insert_resource(WeaponCatalog::default());
         world.insert_resource(WeaponsInFlight::default());
+        world.insert_resource(PointDefence::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
         Self {
@@ -479,6 +481,26 @@ impl Simulation {
             h.f64(w.aim.lon_deg);
             h.f64(w.range_left_m);
             h.u8(u8::from(w.seeker_tried) | (u8::from(w.homing) << 1));
+            h.opt_f64(w.decoy_effect);
+        }
+        let pd = self.world.resource::<PointDefence>();
+        for ((d, w), busy) in &pd.channels {
+            h.u64(d.0);
+            h.str(w);
+            for b in busy {
+                h.u64(b.0);
+            }
+        }
+        for ((d, t), seen) in &pd.first_seen {
+            h.u64(d.0);
+            h.u64(*t);
+            h.u64(seen.0);
+        }
+        for s in &pd.shots {
+            h.u64(s.defender.0);
+            h.str(&s.interceptor);
+            h.u64(s.threat);
+            h.u64(s.resolve_at.0);
         }
         let lib = self.world.resource::<EmitterLibrary>();
         h.u64(lib.0.len() as u64);
@@ -578,6 +600,7 @@ impl Simulation {
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
             weapons_in_flight: self.world.resource::<WeaponsInFlight>().clone(),
+            point_defence: self.world.resource::<PointDefence>().clone(),
         }
     }
 
@@ -609,6 +632,7 @@ impl Simulation {
         sim.world.insert_resource(save.emitter_library);
         sim.world.insert_resource(save.weapon_catalog);
         sim.world.insert_resource(save.weapons_in_flight);
+        sim.world.insert_resource(save.point_defence);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -662,6 +686,7 @@ fn build_schedule() -> Schedule {
         (
             apply_commands_system,
             movement_system,
+            point_defence_system,
             weapons_system,
             damage_control_system,
             detection_system,

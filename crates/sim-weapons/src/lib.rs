@@ -230,11 +230,151 @@ pub fn ph_sea_modifier(kind: WeaponKind, sea_state: u8) -> f64 {
     }
 }
 
-/// Ph = base × size × manoeuvre × environment, clamped to [0, 0.99]. Countermeasures join in
-/// slice 9 (soft kill).
+/// Ph = base × size × manoeuvre × environment, clamped to [0, 0.99]. Multiply by
+/// [`countermeasure_modifier`] for soft kill.
 #[must_use]
 pub fn ph(base: f64, size: f64, speed: f64, sea: f64) -> f64 {
     (base * size * speed * sea).clamp(0.0, 0.99)
+}
+
+// ---- Point defence and soft kill (slice 9) ----
+
+/// Radar cross-section of an incoming missile, m², for point-defence detection.
+pub const MISSILE_RCS_M2: f64 = 0.1;
+/// A radiating jammer on the target cuts an active radar seeker's Ph by this factor.
+pub const ECM_SEEKER_FACTOR: f64 = 0.8;
+/// A target fires a decoy at an incoming missile inside this range, metres.
+pub const DECOY_RANGE_MISSILE_M: f64 = 10_000.0;
+/// A target fires a torpedo countermeasure inside this range, metres.
+pub const DECOY_RANGE_TORPEDO_M: f64 = 3_000.0;
+
+/// Whether a weapon can shoot down incoming missiles (an air-capable SAM, gun or CIWS).
+#[must_use]
+pub fn point_defence_capable(spec: &WeaponSpec) -> bool {
+    matches!(
+        spec.kind,
+        WeaponKind::Sam | WeaponKind::Gun | WeaponKind::Ciws
+    ) && spec.target_domains.iter().any(|d| d == "air")
+}
+
+/// Seconds from detecting a threat to the first shot (original design).
+#[must_use]
+pub fn reaction_time_s(kind: WeaponKind) -> u64 {
+    match kind {
+        WeaponKind::Sam => 8,
+        WeaponKind::Gun => 5,
+        _ => 3,
+    }
+}
+
+/// Threats a unit can engage at once with this weapon kind (illuminators or directors).
+#[must_use]
+pub fn fire_channels(kind: WeaponKind) -> usize {
+    match kind {
+        WeaponKind::Sam => 2,
+        _ => 1,
+    }
+}
+
+/// Seconds to intercept a threat closing head-on: range / (threat speed + interceptor speed),
+/// rounded up to whole ticks, at least 1.
+#[must_use]
+pub fn intercept_ticks(range_m: f64, threat_mps: f64, interceptor_mps: f64) -> u64 {
+    let closing = (threat_mps + interceptor_mps).max(1.0);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let t = (range_m.max(0.0) / closing).ceil() as u64;
+    t.max(1)
+}
+
+/// Whether a decoy defends against a weapon: chaff and IR decoys (air) against radar and IR
+/// seekers; torpedo countermeasures (subsurface) against acoustic homing.
+#[must_use]
+pub fn decoy_matches(decoy: &WeaponSpec, guidance: Guidance) -> bool {
+    let air = decoy.target_domains.iter().any(|d| d == "air");
+    let sub = decoy.target_domains.iter().any(|d| d == "subsurface");
+    match guidance {
+        Guidance::ActiveRadar | Guidance::Passive | Guidance::SemiActive => air,
+        Guidance::Acoustic => sub,
+        _ => false,
+    }
+}
+
+/// The countermeasures Ph modifier: × (1 − decoy effect) for a matched decoy, and
+/// × [`ECM_SEEKER_FACTOR`] against an active radar seeker when the target is jamming.
+#[must_use]
+pub fn countermeasure_modifier(
+    guidance: Guidance,
+    decoy_effect: Option<f64>,
+    jamming: bool,
+) -> f64 {
+    let decoy = 1.0 - decoy_effect.unwrap_or(0.0).clamp(0.0, 1.0);
+    let ecm = if jamming && guidance == Guidance::ActiveRadar {
+        ECM_SEEKER_FACTOR
+    } else {
+        1.0
+    };
+    decoy * ecm
+}
+
+#[cfg(test)]
+mod pd_tests {
+    use super::*;
+
+    fn weapon(kind: WeaponKind, domains: &[&str]) -> WeaponSpec {
+        WeaponSpec {
+            id: "X".into(),
+            name: "x".into(),
+            kind,
+            guidance: Guidance::Unguided,
+            min_range_m: 0.0,
+            max_range_m: 1.0,
+            speed_mps: 0.0,
+            warhead_kg: 0.0,
+            base_ph: 0.3,
+            target_domains: domains.iter().map(|d| (*d).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn point_defence_rules_hand_values() {
+        assert!(point_defence_capable(&weapon(WeaponKind::Sam, &["air"])));
+        assert!(point_defence_capable(&weapon(
+            WeaponKind::Ciws,
+            &["air", "surface"]
+        )));
+        assert!(!point_defence_capable(&weapon(
+            WeaponKind::Asm,
+            &["surface"]
+        )));
+        assert!(!point_defence_capable(&weapon(
+            WeaponKind::Gun,
+            &["surface"]
+        )));
+        // SAM (900 m/s) against a subsonic ASM (270 m/s) at 20 km: 20 000 / 1170 = 17.1 → 18 s.
+        assert_eq!(intercept_ticks(20_000.0, 270.0, 900.0), 18);
+        assert_eq!(intercept_ticks(0.0, 270.0, 900.0), 1);
+        assert_eq!(reaction_time_s(WeaponKind::Sam), 8);
+        assert_eq!(fire_channels(WeaponKind::Sam), 2);
+        assert_eq!(fire_channels(WeaponKind::Ciws), 1);
+    }
+
+    #[test]
+    fn soft_kill_hand_values() {
+        let chaff = weapon(WeaponKind::Decoy, &["air"]);
+        let torp_decoy = weapon(WeaponKind::Decoy, &["subsurface"]);
+        assert!(decoy_matches(&chaff, Guidance::ActiveRadar));
+        assert!(!decoy_matches(&chaff, Guidance::Acoustic));
+        assert!(decoy_matches(&torp_decoy, Guidance::Acoustic));
+        // Chaff (0.3) alone: × 0.7. Chaff and jamming against a radar seeker: × 0.56.
+        assert!(
+            (countermeasure_modifier(Guidance::ActiveRadar, Some(0.3), false) - 0.7).abs() < 1e-12
+        );
+        assert!(
+            (countermeasure_modifier(Guidance::ActiveRadar, Some(0.3), true) - 0.56).abs() < 1e-12
+        );
+        // Jamming does nothing to an IR seeker.
+        assert!((countermeasure_modifier(Guidance::Passive, None, true) - 1.0).abs() < 1e-12);
+    }
 }
 
 #[cfg(test)]

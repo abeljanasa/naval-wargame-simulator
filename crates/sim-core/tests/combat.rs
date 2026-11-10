@@ -442,3 +442,137 @@ fn save_and_resume_with_missiles_in_flight_is_exact() {
     assert_eq!(a.state_hash(), b.state_hash());
     assert_eq!(a.events(), b.events());
 }
+
+// ---- Point defence and soft kill (slice 9) ----
+
+fn chaff() -> WeaponSpec {
+    WeaponSpec {
+        id: "T-CHAFF".into(),
+        name: "test chaff".into(),
+        kind: WeaponKind::Decoy,
+        guidance: Guidance::Unguided,
+        min_range_m: 0.0,
+        max_range_m: 2_000.0,
+        speed_mps: 0.0,
+        warhead_kg: 0.0,
+        base_ph: 0.3,
+        target_domains: vec!["air".into()],
+    }
+}
+
+/// Blue (radar, `blue_stores`) at the origin defends against red (radar, 4 ASM) 30 km east,
+/// which the white cell orders to fire `salvo` missiles at blue's track.
+fn raid(seed: u64, blue_stores: &[(&str, u32)], jammer: bool, salvo: u32) -> Simulation {
+    let mut sim = Simulation::new(seed);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![asm(), sam(), chaff()],
+        },
+    ))
+    .unwrap();
+    let mut blue = unit(1, 1, ORIGIN, vec![radar()], blue_stores, None);
+    if jammer {
+        if let CommandPayload::SpawnUnit(u) = &mut blue.payload {
+            u.jammer = Some(JammerSpec { jn_db_at_1km: 40.0 });
+        }
+    }
+    sim.submit(blue).unwrap();
+    let at = direct(ORIGIN, 90.0, 30_000.0).point;
+    sim.submit(unit(2, 2, at, vec![radar()], &[("T-ASM", 4)], None))
+        .unwrap();
+    sim.run_ticks(1);
+    sim.submit(cmd(
+        1,
+        umpire(),
+        None,
+        CommandPayload::Engage {
+            shooter: UnitId(2),
+            contact: 1,
+            weapon: "T-ASM".into(),
+            rounds: salvo,
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(200);
+    sim
+}
+
+#[test]
+fn sams_engage_incoming_missiles_with_the_hand_calculated_ph() {
+    let sim = raid(21, &[("T-SAM", 8)], false, 1);
+    let shot = sim
+        .events()
+        .iter()
+        .find_map(|e| match &e.kind {
+            SimEventKind::PointDefenceShot { range_m, .. } => Some((e.tick, *range_m)),
+            _ => None,
+        })
+        .unwrap();
+    // The missile is seen at the radar's R₅₀ against 0.1 m² (120 km × 0.1^¼ = 67.5 km, so at
+    // once inside the horizon) and engaged after the 8 s SAM reaction time.
+    assert!(shot.0 .0 >= 9, "{shot:?}");
+    let roll = sim
+        .events()
+        .iter()
+        .find_map(|e| match e.kind {
+            SimEventKind::InterceptRoll { ph, .. } => Some(ph),
+            _ => None,
+        })
+        .unwrap();
+    // SAM 0.75 × manoeuvre 0.9 (a 270 m/s threat is over 200 m/s) = 0.675.
+    assert!((roll - 0.675).abs() < 1e-12, "{roll}");
+}
+
+#[test]
+fn two_sam_channels_limit_a_four_missile_raid() {
+    let sim = raid(22, &[("T-SAM", 20)], false, 4);
+    let shots: Vec<(u64, u64)> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::PointDefenceShot { resolve_at, .. } => Some((e.tick.0, resolve_at.0)),
+            _ => None,
+        })
+        .collect();
+    assert!(shots.len() >= 2);
+    // At no moment are more than two SAMs in the air from one ship.
+    for &(t, _) in &shots {
+        let in_air = shots.iter().filter(|&&(s, r)| s <= t && t < r).count();
+        assert!(in_air <= 2, "{in_air} at {t}: {shots:?}");
+    }
+}
+
+#[test]
+fn decoys_and_jamming_lower_ph_at_impact() {
+    // No SAMs: the missile always arrives. Chaff (0.3) and a radiating jammer against an active
+    // radar seeker: countermeasures × 0.7 × 0.8 = 0.56; Ph = 0.8 × 0.56 = 0.448.
+    let sim = (0..40)
+        .map(|s| raid(400 + s, &[("T-CHAFF", 2)], true, 1))
+        .find(|sim| {
+            sim.events()
+                .iter()
+                .any(|e| matches!(e.kind, SimEventKind::HitRoll { .. }))
+        })
+        .unwrap();
+    assert!(sim.events().iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::DecoyLaunched { effect, .. } if (effect - 0.3).abs() < 1e-12
+    )));
+    let (cm, p) = sim
+        .events()
+        .iter()
+        .find_map(|e| match e.kind {
+            SimEventKind::HitRoll {
+                countermeasure_modifier,
+                ph,
+                ..
+            } => Some((countermeasure_modifier, ph)),
+            _ => None,
+        })
+        .unwrap();
+    assert!((cm - 0.56).abs() < 1e-12, "{cm}");
+    assert!((p - 0.448).abs() < 1e-12, "{p}");
+}
