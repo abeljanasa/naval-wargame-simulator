@@ -137,6 +137,8 @@ const frame = (): FrameEvent => {
       criticals: [],
       fires: 0,
       flooding: false,
+      mission: null,
+      mission_complete: false,
       stores: [
         { weapon: "WPN-ASM-SUB", count: 8 },
         { weapon: "WPN-SAM-MR", count: 32 },
@@ -163,6 +165,8 @@ const frame = (): FrameEvent => {
       criticals: [],
       fires: 0,
       flooding: false,
+      mission: null,
+      mission_complete: false,
       stores: [],
     },
   ].filter((u) => viewer.kind === "white_cell" || u.side === viewer.side);

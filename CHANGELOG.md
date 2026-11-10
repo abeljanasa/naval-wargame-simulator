@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 10: basic missions)
+
+- **`sim-ai` crate and AI system** (`docs/models/missions.md`, DL-0019):
+  - Patrol (random points over a circle, logged draws), ferry, escort station-keeping and strike missions, run every 10 s.
+  - Tasked units engage automatically: nearest contact first, with the first weapon that passes every `Engage` check, release rule included.
+- `AssignMission` command; optional `mission` on scenario units.
+- **Desktop:** the unit panel shows the mission and offers "Patrol here" and "Clear".
+
+### Changed
+
+- Save format 11 (older saves still load). Golden hash is now `b296e935e3375df2`.
+
 ### Added (Phase 2, slice 9: point defence and soft kill)
 
 - **Point defence** (`docs/models/weapons-damage.md`, DL-0018):

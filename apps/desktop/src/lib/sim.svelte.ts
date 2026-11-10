@@ -11,6 +11,7 @@ import {
   type Environment,
   type FrameEvent,
   type GeoPoint,
+  type Mission,
   type SessionInfo,
   type TimeCompression,
   type UnitView,
@@ -18,6 +19,9 @@ import {
   type Viewer,
 } from "./bindings";
 import { MPS_PER_KNOT } from "./format";
+
+/** Radius of a patrol ordered from the unit panel, metres. */
+export const PATROL_RADIUS_M = 30_000;
 
 export const COMPRESSIONS: { key: TimeCompression; label: string }[] = [
   { key: "x1", label: "1×" },
@@ -156,6 +160,18 @@ class SimSession {
       return;
     }
     const res = await commands.orderEngage(this.selected, contact, weapon, rounds);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Patrols the selected unit around its current position (30 km radius), or clears its
+   * mission with `null`. */
+  async orderPatrolHere(clear = false) {
+    const u = this.selectedUnit;
+    if (!u) return;
+    const mission: Mission | null = clear
+      ? null
+      : { kind: "patrol", centre: u.position, radius_m: PATROL_RADIUS_M };
+    const res = await commands.orderMission(u.id, mission);
     this.error = res.status === "error" ? res.error : null;
   }
 

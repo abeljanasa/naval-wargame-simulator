@@ -13,7 +13,7 @@
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
-  import type { Emcon, Viewer, Wcs } from "./lib/bindings";
+  import type { Emcon, Mission, Viewer, Wcs } from "./lib/bindings";
   import DbBrowser from "./lib/DbBrowser.svelte";
 
   let mapEl: HTMLElement;
@@ -38,6 +38,19 @@
 
   const clock = $derived(sim.clock);
   const viewerKey = $derived(viewerToKey(sim.session?.viewer ?? { kind: "white_cell" }));
+
+  function missionText(m: Mission): string {
+    switch (m.kind) {
+      case "patrol":
+        return `patrol ${(n(m.radius_m) / 1000).toFixed(0)} km around ${latLon(m.centre.lat_deg, m.centre.lon_deg)}`;
+      case "ferry":
+        return `ferry to ${latLon(m.destination.lat_deg, m.destination.lon_deg)}`;
+      case "escort":
+        return `escort ${unitName(m.escorted)}`;
+      case "strike":
+        return `strike C${m.contact}`;
+    }
+  }
 
   function unitName(id: number): string {
     return sim.units.find((u) => u.id === id)?.name ?? `unit ${id}`;
@@ -327,6 +340,16 @@
               : ""}{u.flooding ? " · flooding" : ""}{u.criticals.length
               ? ` · lost: ${u.criticals.join(", ").replaceAll("_", " ")}`
               : ""}
+          </dd>
+          <dt>Mission</dt>
+          <dd>
+            {u.mission ? missionText(u.mission) : "none"}{u.mission_complete ? " (complete)" : ""}
+            <div class="row">
+              <button type="button" onclick={() => sim.orderPatrolHere()}>Patrol here</button>
+              {#if u.mission}
+                <button type="button" onclick={() => sim.orderPatrolHere(true)}>Clear</button>
+              {/if}
+            </div>
           </dd>
           <dt>Stores</dt>
           <dd>

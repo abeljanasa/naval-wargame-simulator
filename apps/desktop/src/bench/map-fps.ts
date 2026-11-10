@@ -63,6 +63,8 @@ let units: UnitView[] = Array.from({ length: N }, (_, i) => ({
   criticals: [],
   fires: 0,
   flooding: false,
+  mission: null,
+  mission_complete: false,
   stores: [],
 }));
 

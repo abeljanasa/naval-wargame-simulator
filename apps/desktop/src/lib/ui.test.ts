@@ -38,6 +38,8 @@ const unit = (id: number, overrides: Partial<UnitView> = {}): UnitView => ({
   criticals: [],
   fires: 0,
   flooding: false,
+  mission: null,
+  mission_complete: false,
   stores: [],
   ...overrides,
 });

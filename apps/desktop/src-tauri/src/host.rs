@@ -6,8 +6,8 @@
 use serde::{Deserialize, Serialize};
 use sim_core::{
     BearingView, Command, CommandPayload, ContactView, Doctrine, DoctrineScope, Environment,
-    GeoPoint, Issuer, SimError, SimEventKind, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer,
-    WeaponView,
+    GeoPoint, Issuer, Mission, SimError, SimEventKind, Simulation, Snapshot, Tick, UnitId,
+    UnitView, Viewer, WeaponView,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -309,6 +309,15 @@ impl Host {
             weapon,
             rounds,
         })
+    }
+
+    /// Gives `unit` a mission, or clears it with `None`.
+    pub fn order_mission(
+        &mut self,
+        unit: UnitId,
+        mission: Option<Mission>,
+    ) -> Result<u64, SimError> {
+        self.order(CommandPayload::AssignMission { unit, mission })
     }
 
     /// Reasons this seat's orders were refused since the last call.

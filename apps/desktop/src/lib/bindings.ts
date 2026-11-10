@@ -32,6 +32,8 @@ export const commands = {
 	orderDoctrine: (unit: UnitId, doctrine: Doctrine_Deserialize) => typedError<null, string>(__TAURI_INVOKE("order_doctrine", { unit, doctrine })),
 	/**  Fires `rounds` of `weapon` from `shooter` at the seat's contact `contact`. */
 	orderEngage: (shooter: UnitId, contact: number, weapon: string, rounds: number) => typedError<null, string>(__TAURI_INVOKE("order_engage", { shooter, contact, weapon, rounds })),
+	/**  Gives a unit a mission (patrol, ferry, escort, strike), or clears it with `null`. */
+	orderMission: (unit: UnitId, mission: Mission | null) => typedError<null, string>(__TAURI_INVOKE("order_mission", { unit, mission })),
 };
 
 /** Events */
@@ -296,6 +298,17 @@ export type GeoPoint = {
 	lon_deg: number | null,
 };
 
+/**  What a unit has been told to do. */
+export type Mission = 
+/**  Steam between random points in a circular area. */
+{ kind: "patrol"; centre: GeoPoint; radius_m: number | null } | 
+/**  Go to a point, then the mission is complete. */
+{ kind: "ferry"; destination: GeoPoint } | 
+/**  Keep station on another unit: `bearing_deg` relative to its heading, at `range_m`. */
+{ kind: "escort"; escorted: number; bearing_deg: number | null; range_m: number | null } | 
+/**  Close and attack one of the side's contacts. */
+{ kind: "strike"; contact: number };
+
 /**  How one side regards another. */
 export type Posture = "friendly" | 
 /**  The default between sides that have not set a posture. */
@@ -451,6 +464,8 @@ export type UnitView_Deserialize = {
 	flooding: boolean,
 	/**  Rounds carried, by weapon id (sorted). */
 	stores: StoreView[],
+	mission?: Mission | null,
+	mission_complete: boolean,
 };
 
 export type UnitView_Serialize = {
@@ -481,6 +496,8 @@ export type UnitView_Serialize = {
 	flooding: boolean,
 	/**  Rounds carried, by weapon id (sorted). */
 	stores: StoreView[],
+	mission: Mission | null,
+	mission_complete: boolean,
 };
 
 /**  Whose picture a snapshot shows. */

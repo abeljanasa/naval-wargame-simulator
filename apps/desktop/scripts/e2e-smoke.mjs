@@ -109,6 +109,15 @@ try {
   await page.getByText(/exceeds the 500 m WPN-SAM-MR needs/).waitFor({ timeout: 5_000 });
   check(true, "an engine refusal of the order is shown to the player");
 
+  await page.getByRole("button", { name: "Patrol here" }).click();
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some(
+      (c) => c.cmd === "order_mission" && c.args.unit === 1 && c.args.mission?.kind === "patrol",
+    ),
+    "Patrol here sends order_mission(patrol)",
+  );
+
   await page.getByLabel("Scenario").setInputFiles({
     name: "loaded.json",
     mimeType: "application/json",
