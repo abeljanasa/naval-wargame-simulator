@@ -5,7 +5,7 @@
 
 mod host;
 
-use host::{ClockStatus, Host, SnapshotUpdate, TimeCompression, MAIN_WINDOW};
+use host::{AarView, ClockStatus, Host, SnapshotUpdate, TimeCompression, MAIN_WINDOW};
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Adjudication, Doctrine, Facilitation, GeoPoint, Mission, Seat, SideId, UnitId, Viewer,
@@ -363,6 +363,80 @@ async fn open_seat_window(
     })
 }
 
+/// Largest exercise record accepted from the UI.
+const MAX_RECORD_BYTES: usize = 64 * 1024 * 1024;
+
+/// Reviews the live exercise so far as a replay (control station and white-cell seats).
+#[tauri::command]
+#[specta::specta]
+fn review_exercise(window: WebviewWindow, host: State<'_, SharedHost>) -> Result<(), String> {
+    lock(&host).review(window.label())
+}
+
+/// Leaves the replay and shows the live exercise again.
+#[tauri::command]
+#[specta::specta]
+fn close_review(window: WebviewWindow, host: State<'_, SharedHost>) -> Result<(), String> {
+    lock(&host).close_review(window.label())
+}
+
+/// Moves the replay scrubber to `tick`.
+#[tauri::command]
+#[specta::specta]
+fn seek_replay(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    tick: sim_core::Tick,
+) -> Result<(), String> {
+    lock(&host).seek(window.label(), tick)
+}
+
+/// The exercise record (replay under review, or the live run so far) for the UI to save.
+#[tauri::command]
+#[specta::specta]
+fn save_record(window: WebviewWindow, host: State<'_, SharedHost>) -> Result<Vec<u8>, String> {
+    lock(&host).record_bytes(window.label())
+}
+
+/// Opens an exercise record the user picked (the webview reads the file): its scenario replaces
+/// the session and the record is replayed for review.
+#[tauri::command]
+#[specta::specta]
+fn open_record(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    bytes: Vec<u8>,
+) -> Result<SessionInfo, String> {
+    if bytes.len() > MAX_RECORD_BYTES {
+        return Err(format!(
+            "record is {} bytes; the limit is {MAX_RECORD_BYTES}",
+            bytes.len()
+        ));
+    }
+    let mut h = lock(&host);
+    let closing = h.open_record(window.label(), &bytes)?;
+    close_windows(&window, &closing);
+    session_info(&h, window.label())
+}
+
+/// The after-action review tables.
+#[tauri::command]
+#[specta::specta]
+fn get_aar(window: WebviewWindow, host: State<'_, SharedHost>) -> Result<AarView, String> {
+    lock(&host).aar(window.label())
+}
+
+/// One AAR table as CSV text, for the UI to save.
+#[tauri::command]
+#[specta::specta]
+fn aar_csv(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    table: sim_aar::AarTable,
+) -> Result<String, String> {
+    lock(&host).aar_csv(window.label(), table)
+}
+
 /// Advances a paused simulation by `ticks` (single-step for the umpire; white-cell windows only).
 #[tauri::command]
 #[specta::specta]
@@ -501,6 +575,13 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_mission,
             order_adjudicate,
             order_facilitate,
+            review_exercise,
+            close_review,
+            seek_replay,
+            save_record,
+            open_record,
+            get_aar,
+            aar_csv,
         ])
         .events(collect_events![FrameEvent])
 }

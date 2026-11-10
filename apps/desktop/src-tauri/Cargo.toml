@@ -14,6 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { workspace = true, features = [] }
 
 [dependencies]
+sim-aar = { workspace = true, features = ["specta"] }
 sim-core = { workspace = true, features = ["specta"] }
 sim-scenario.workspace = true
 sim-db.workspace = true

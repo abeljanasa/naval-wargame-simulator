@@ -12,6 +12,7 @@
 //! - Every window has its own picture, diff state and refusals.
 
 use serde::{Deserialize, Serialize};
+use sim_aar::{AarReport, AarTable, ExerciseRecord, Replay};
 use sim_core::{
     Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, ContactView, Doctrine,
     DoctrineScope, Environment, EventStatus, Facilitation, GeoPoint, InjectStatus, Issuer, Message,
@@ -96,6 +97,26 @@ pub struct ClockStatus {
     /// Game seconds per wall second actually achieved over the last frame.
     pub achieved_ratio: f64,
     pub scenario_duration_s: f64,
+    /// Set while the session is reviewing a replay instead of running live.
+    pub replay: Option<ReplayClock>,
+}
+
+/// The replay being reviewed.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ReplayClock {
+    /// Where the record ends (the scrubber's range is 0 to this).
+    pub end_s: f64,
+    /// The rebuilt run reached the recorded final state exactly.
+    pub verified: bool,
+}
+
+/// The after-action review for one window: the whole report, with the timeline cut to what the
+/// window's seat may see.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct AarView {
+    pub report: AarReport,
+    /// Built from a replay (else from the live run so far).
+    pub replaying: bool,
 }
 
 /// Longest wall-clock gap credited in one frame. This stops a stall (debugger, sleep) from
@@ -142,7 +163,11 @@ pub struct Host {
     stations: BTreeMap<String, Station>,
     /// Numbers seat windows uniquely.
     windows_opened: u32,
+    /// Set while reviewing: windows show the replay, and orders are refused.
+    replay: Option<Replay>,
 }
+
+const IN_REVIEW: &str = "reviewing a replay: return to the live exercise first";
 
 fn viewer_of(seat: &Seat) -> Viewer {
     match seat.role {
@@ -194,6 +219,7 @@ impl Host {
             seats,
             stations: BTreeMap::from([(MAIN_WINDOW.to_owned(), Station::new(first, false, 0))]),
             windows_opened: 0,
+            replay: None,
         })
     }
 
@@ -206,6 +232,7 @@ impl Host {
         self.scenario = scenario;
         self.sim = sim;
         self.seats = seats;
+        self.replay = None;
         let closing: Vec<String> = self
             .stations
             .keys()
@@ -293,8 +320,150 @@ impl Host {
     /// Advances by `ticks` (single-step for the umpire).
     pub fn step(&mut self, label: &str, ticks: u64) -> Result<(), String> {
         self.require_control(label)?;
-        self.sim.run_ticks(ticks);
+        self.run(ticks);
         Ok(())
+    }
+
+    fn shown_tick(&self) -> Tick {
+        self.replay
+            .as_ref()
+            .map_or_else(|| self.sim.tick(), Replay::tick)
+    }
+
+    fn shown_events_len(&self) -> usize {
+        self.replay
+            .as_ref()
+            .map_or_else(|| self.sim.events().len(), Replay::events_len)
+    }
+
+    /// Every window gets a full picture next frame (after switching between live and replay, or
+    /// a seek).
+    fn reset_stations(&mut self) {
+        let seen = self.shown_events_len();
+        for st in self.stations.values_mut() {
+            st.last_sent = None;
+            st.pending.clear();
+            st.events_seen = seen;
+        }
+    }
+
+    fn side_names(&self) -> Vec<(SideId, String)> {
+        self.scenario
+            .sides
+            .iter()
+            .map(|s| (s.id, s.name.clone()))
+            .collect()
+    }
+
+    /// Is the session reviewing a replay?
+    #[cfg(test)]
+    #[must_use]
+    pub fn reviewing(&self) -> bool {
+        self.replay.is_some()
+    }
+
+    /// Reviews the live exercise so far as a replay. The live run is paused and kept; the
+    /// windows show the replay until [`Host::close_review`].
+    pub fn review(&mut self, label: &str) -> Result<(), String> {
+        self.require_control(label)?;
+        if self.replay.is_some() {
+            return Err("already reviewing a replay".into());
+        }
+        let record = self.capture();
+        let replay = Replay::open(record, &self.side_names()).map_err(|e| e.to_string())?;
+        self.enter_review(replay)
+    }
+
+    fn capture(&mut self) -> ExerciseRecord {
+        let json = serde_json::to_string_pretty(&self.scenario).unwrap_or_default();
+        ExerciseRecord::capture(&mut self.sim, self.scenario.name.clone(), json)
+    }
+
+    fn enter_review(&mut self, mut replay: Replay) -> Result<(), String> {
+        // The scrubber starts at the beginning, paused.
+        replay.seek(Tick(0)).map_err(|e| e.to_string())?;
+        self.replay = Some(replay);
+        self.paused = true;
+        self.carry = 0.0;
+        self.reset_stations();
+        Ok(())
+    }
+
+    /// Opens a saved exercise record: its scenario replaces the session (as [`Host::load`]),
+    /// then the record is replayed for review. Returns the seat windows to close.
+    pub fn open_record(&mut self, label: &str, bytes: &[u8]) -> Result<Vec<String>, String> {
+        self.require_control(label)?;
+        let record = ExerciseRecord::from_bytes(bytes).map_err(|e| e.to_string())?;
+        let scenario = Scenario::from_json(&record.scenario_json)
+            .map_err(|e| format!("the record's scenario: {e}"))?;
+        let sides: Vec<(SideId, String)> = scenario
+            .sides
+            .iter()
+            .map(|s| (s.id, s.name.clone()))
+            .collect();
+        let replay = Replay::open(record, &sides).map_err(|e| e.to_string())?;
+        let closing = self.load(scenario).map_err(|e| e.to_string())?;
+        self.enter_review(replay)?;
+        Ok(closing)
+    }
+
+    /// Leaves the review and shows the live exercise again (still paused).
+    pub fn close_review(&mut self, label: &str) -> Result<(), String> {
+        self.require_control(label)?;
+        if self.replay.take().is_some() {
+            self.paused = true;
+            self.carry = 0.0;
+            self.reset_stations();
+        }
+        Ok(())
+    }
+
+    /// Moves the replay scrubber.
+    pub fn seek(&mut self, label: &str, tick: Tick) -> Result<(), String> {
+        self.require_control(label)?;
+        let r = self
+            .replay
+            .as_mut()
+            .ok_or_else(|| "not reviewing a replay".to_owned())?;
+        r.seek(tick).map_err(|e| e.to_string())?;
+        self.reset_stations();
+        Ok(())
+    }
+
+    /// The exercise record to save: the replay under review, or the live run so far.
+    pub fn record_bytes(&mut self, label: &str) -> Result<Vec<u8>, String> {
+        self.require_control(label)?;
+        let record = match &self.replay {
+            Some(r) => r.record().clone(),
+            None => self.capture(),
+        };
+        record.to_bytes().map_err(|e| e.to_string())
+    }
+
+    /// The after-action review: of the replay under review, else of the live run so far. For
+    /// the control station and white-cell seats; the timeline is cut to the window's seat.
+    pub fn aar(&mut self, label: &str) -> Result<AarView, String> {
+        self.require_control(label)?;
+        let role = self.seat_of(label)?.role;
+        let (mut report, replaying) = match &self.replay {
+            Some(r) => (r.report().clone(), true),
+            None => (
+                AarReport::build(
+                    &self.sim.command_log(),
+                    self.sim.events(),
+                    &self.side_names(),
+                    self.sim.tick(),
+                ),
+                false,
+            ),
+        };
+        report.timeline = report.timeline_for(&role);
+        Ok(AarView { report, replaying })
+    }
+
+    /// One AAR table as CSV text (the timeline cut to the window's seat).
+    pub fn aar_csv(&mut self, label: &str, table: AarTable) -> Result<String, String> {
+        Ok(self.aar(label)?.report.csv(table))
     }
 
     /// Moves an unlocked window (the control station) to another seat.
@@ -302,7 +471,7 @@ impl Host {
         if !self.seats.contains_key(&seat) {
             return Err(format!("no seat {seat}"));
         }
-        let events_seen = self.sim.events().len();
+        let events_seen = self.shown_events_len();
         let st = self
             .stations
             .get_mut(label)
@@ -326,7 +495,7 @@ impl Host {
         if !self.seats.contains_key(&seat) {
             return Err(format!("no seat {seat}"));
         }
-        let events_seen = self.sim.events().len();
+        let events_seen = self.shown_events_len();
         self.stations
             .insert(label.to_owned(), Station::new(seat, true, events_seen));
         Ok(())
@@ -351,6 +520,9 @@ impl Host {
 
     /// Sends the seat table to the simulation as a white-cell command (logged and replayed).
     fn publish_seats(&mut self, umpire: String) -> Result<(), String> {
+        if self.replay.is_some() {
+            return Err(IN_REVIEW.into());
+        }
         self.sim
             .submit(Command {
                 tick: self.sim.tick(),
@@ -454,19 +626,25 @@ impl Host {
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             // `whole` is non-negative and bounded by 60 × 0.25 s
             let n = whole as u64;
-            self.sim.run_ticks(n);
-            n
+            self.run(n)
         } else {
             // Wall-clock pacing lives outside the deterministic core (ADR-0003 §1).
             #[allow(clippy::disallowed_methods)]
             let start = Instant::now();
             let mut n = 0;
             while start.elapsed() < max_budget {
-                self.sim.run_ticks(32);
-                n += 32;
+                let ran = self.run(32);
+                n += ran;
+                if ran < 32 {
+                    break;
+                }
             }
             n
         };
+        // A replay stops at its end.
+        if self.replay.as_ref().is_some_and(Replay::at_end) {
+            self.paused = true;
+        }
         let secs = wall_elapsed.as_secs_f64();
         #[allow(clippy::cast_precision_loss)]
         if secs > 0.0 {
@@ -475,8 +653,19 @@ impl Host {
         ran
     }
 
+    /// Runs `n` ticks of what is shown (a replay stops at its end). Returns the ticks run.
+    fn run(&mut self, n: u64) -> u64 {
+        match &mut self.replay {
+            Some(r) => r.advance(n),
+            None => {
+                self.sim.run_ticks(n);
+                n
+            }
+        }
+    }
+
     pub fn clock(&self) -> ClockStatus {
-        let tick = self.sim.tick();
+        let tick = self.shown_tick();
         #[allow(clippy::cast_precision_loss)]
         let duration = self.scenario.duration_s as f64;
         ClockStatus {
@@ -486,6 +675,10 @@ impl Host {
             compression: self.compression,
             achieved_ratio: self.achieved_ratio,
             scenario_duration_s: duration,
+            replay: self.replay.as_ref().map(|r| ReplayClock {
+                end_s: r.end_tick().seconds(),
+                verified: r.verified(),
+            }),
         }
     }
 
@@ -495,8 +688,12 @@ impl Host {
     #[cfg(test)]
     pub fn update(&mut self, label: &str) -> Option<SnapshotUpdate> {
         let viewer = self.viewer(label);
+        let sim = match &mut self.replay {
+            Some(r) => r.sim_mut(),
+            None => &mut self.sim,
+        };
         let st = self.stations.get_mut(label)?;
-        Some(update_station(&mut self.sim, viewer, st))
+        Some(update_station(sim, viewer, st))
     }
 
     /// The next update for every window, by label.
@@ -509,8 +706,12 @@ impl Host {
         viewers
             .into_iter()
             .filter_map(|(label, viewer)| {
+                let sim = match &mut self.replay {
+                    Some(r) => r.sim_mut(),
+                    None => &mut self.sim,
+                };
                 let st = self.stations.get_mut(&label)?;
-                let u = update_station(&mut self.sim, viewer, st);
+                let u = update_station(sim, viewer, st);
                 Some((label, u))
             })
             .collect()
@@ -519,6 +720,9 @@ impl Host {
     /// Issues an order from a window's seat: a white-cell seat as the umpire (its name), a side
     /// seat as that seat's player. The core checks the seat and the side.
     pub fn order(&mut self, label: &str, payload: CommandPayload) -> Result<u64, String> {
+        if self.replay.is_some() {
+            return Err(IN_REVIEW.into());
+        }
         let seat = self.seat_of(label)?.clone();
         let (issuer, side) = match seat.role {
             SeatRole::WhiteCell => (Issuer::WhiteCell { umpire: seat.name }, None),
@@ -699,6 +903,7 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sim_aar::AarTable;
 
     const M: &str = MAIN_WINDOW;
 
@@ -969,5 +1174,90 @@ mod tests {
         assert!(h.remove_seat(M, seat_named(&h, "White cell")).is_err());
         h.step(M, 1).unwrap();
         assert_eq!(h.sim.snapshot(Viewer::WhiteCell).seats.len(), 3);
+    }
+
+    #[test]
+    fn review_replays_the_live_run_and_refuses_orders_until_it_closes() {
+        let mut h = host();
+        let blue = seat_named(&h, "Blue");
+        h.bind(M, "seat-b", blue).unwrap();
+        assert!(h.review("seat-b").is_err(), "a side seat cannot review");
+        h.step(M, 120).unwrap();
+        h.order_speed(M, UnitId(1), 3.0).unwrap();
+        h.step(M, 180).unwrap();
+        let live_tick = h.clock().tick;
+
+        h.review(M).unwrap();
+        assert!(h.reviewing());
+        let c = h.clock();
+        let r = c.replay.clone().unwrap();
+        assert!(r.verified);
+        assert_eq!(r.end_s, live_tick.seconds());
+        assert_eq!(c.tick, Tick(0), "the scrubber starts at the beginning");
+        assert!(c.paused);
+        // Every window gets a full picture of the replay.
+        assert!(h.update(M).unwrap().full);
+        assert!(h.update("seat-b").unwrap().full);
+        assert!(h.order_speed(M, UnitId(1), 1.0).is_err());
+        assert!(h.add_seat(M, "Late", None).is_err());
+        assert!(h.seek("seat-b", Tick(5)).is_err());
+
+        h.seek(M, Tick(200)).unwrap();
+        assert_eq!(h.clock().tick, Tick(200));
+        assert!(h.update(M).unwrap().full);
+        h.step(M, 10).unwrap();
+        assert_eq!(h.clock().tick, Tick(210));
+        // Running stops (and pauses) at the end of the record.
+        h.set_compression(M, TimeCompression::Max).unwrap();
+        h.set_paused(M, false).unwrap();
+        h.advance(Duration::from_millis(33), Duration::from_millis(500));
+        assert_eq!(h.clock().tick, live_tick);
+        assert!(h.clock().paused);
+
+        let aar = h.aar(M).unwrap();
+        assert!(aar.replaying);
+        assert!(aar
+            .report
+            .timeline
+            .iter()
+            .any(|e| e.kind == sim_aar::TimelineKind::Order));
+
+        h.close_review(M).unwrap();
+        assert!(!h.reviewing());
+        assert_eq!(h.clock().tick, live_tick, "the live run is kept");
+        assert!(h.clock().replay.is_none());
+        assert!(h.update(M).unwrap().full);
+        h.order_speed(M, UnitId(1), 1.0).unwrap();
+    }
+
+    #[test]
+    fn a_saved_record_opens_for_review_and_the_aar_follows_the_seat() {
+        let mut h = host();
+        h.step(M, 60).unwrap();
+        h.order_speed(M, UnitId(1), 4.0).unwrap();
+        h.step(M, 60).unwrap();
+        let bytes = h.record_bytes(M).unwrap();
+        let aar = h.aar(M).unwrap();
+        assert!(!aar.replaying);
+        // The main window sits at a side seat: its timeline holds only that side's lines.
+        let side = match h.seat_of(M).unwrap().role {
+            SeatRole::Side { side } => side,
+            SeatRole::WhiteCell => panic!("main starts at a side seat"),
+        };
+        assert!(aar.report.timeline.iter().all(|e| e.side == Some(side)));
+        assert!(h
+            .aar_csv(M, AarTable::Timeline)
+            .unwrap()
+            .starts_with("time,tick,kind,side,text"));
+
+        let mut other = host();
+        assert!(other.open_record(M, b"garbage").is_err());
+        other.open_record(M, &bytes).unwrap();
+        assert!(other.reviewing());
+        let r = other.clock().replay.unwrap();
+        assert!(r.verified);
+        assert_eq!(r.end_s, 120.0);
+        // A saved review saves the same record again.
+        assert_eq!(other.record_bytes(M).unwrap(), bytes);
     }
 }

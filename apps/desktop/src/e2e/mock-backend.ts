@@ -24,6 +24,45 @@ const seatViewer = (s: Seat): Viewer =>
   s.role === "white_cell" ? { kind: "white_cell" } : { kind: "side", side: s.side };
 let paused = true;
 let tick = 0;
+/** Set while "reviewing" a replay; the live tick is kept in `liveTick`. */
+let replay: { end_s: number; verified: boolean } | null = null;
+let liveTick = 0;
+const aarReport = () => ({
+  end_tick: tick,
+  sides: [
+    {
+      side: 1,
+      name: "Blue",
+      units_start: 1,
+      reinforcements: 0,
+      destroyed: 0,
+      removed: 0,
+      remaining: 1,
+      weapons_fired: 2,
+      hits: 1,
+      kills: 0,
+    },
+  ],
+  losses: [
+    {
+      tick: 40,
+      unit: 2,
+      name: "Bulk carrier Bravo",
+      side: 2,
+      side_name: "Neutral shipping",
+      platform: "GEN-MV-BULK",
+      removed: false,
+      cause: "white cell: Ruled sunk by umpire",
+      by_side: null,
+    },
+  ],
+  weapons: [],
+  detections: [],
+  timeline: [
+    { tick: 12, kind: "order" as const, side: 1, text: "Blue: routed Frigate Alpha (2 waypoints)" },
+    { tick: 40, kind: "loss" as const, side: 2, text: "Bulk carrier Bravo destroyed" },
+  ],
+});
 let refusals: string[] = [];
 const adjudications: {
   tick: number;
@@ -197,6 +236,25 @@ mockIPC(
       }
       case "open_seat_window":
         return null;
+      case "review_exercise":
+        liveTick = tick;
+        replay = { end_s: tick, verified: true };
+        tick = 0;
+        paused = true;
+        return null;
+      case "seek_replay":
+        tick = Math.min((args as { tick: number }).tick, replay?.end_s ?? 0);
+        return null;
+      case "close_review":
+        replay = null;
+        tick = liveTick;
+        return null;
+      case "save_record":
+        return [1, 2, 3];
+      case "get_aar":
+        return { report: aarReport(), replaying: replay !== null };
+      case "aar_csv":
+        return "time,tick,kind,side,text\n";
       default:
         return null;
     }
@@ -306,6 +364,7 @@ const frame = (): FrameEvent => {
       compression: "x1",
       achieved_ratio: paused ? 0 : 1,
       scenario_duration_s: 86400,
+      replay,
     },
     // The mock always sends full updates; diffs are covered by the backend's own tests.
     update: {
@@ -336,6 +395,6 @@ const frame = (): FrameEvent => {
 
 await import("../main");
 setInterval(() => {
-  if (!paused) tick += 1;
+  if (!paused && (!replay || tick < replay.end_s)) tick += 1;
   void emit("frame-event", frame());
 }, 100);

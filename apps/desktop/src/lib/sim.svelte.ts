@@ -2,6 +2,8 @@
 // (selection, draft route). Every change to the simulation goes through `commands`.
 
 import {
+  type AarTable,
+  type AarView,
   type Adjudication,
   type AdjudicationRecord,
   commands,
@@ -25,6 +27,7 @@ import {
   type WeaponView,
 } from "./bindings";
 import { MPS_PER_KNOT } from "./format";
+import { download, fileStem } from "./files";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 /** Radius of a patrol ordered from the unit panel, metres. */
@@ -259,6 +262,78 @@ class SimSession {
     }
     const res = await commands.orderFacilitate(action);
     this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Is the session reviewing a replay (from the latest frame)? */
+  get replaying(): boolean {
+    return this.clock?.replay != null;
+  }
+
+  /** Replays the live exercise from the start; the live run is paused and kept. */
+  async review() {
+    this.cancelPlan();
+    const res = await commands.reviewExercise();
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Leaves the replay and returns to the live exercise. */
+  async closeReview() {
+    const res = await commands.closeReview();
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Moves the replay scrubber to `tick`. */
+  async seek(tick: number) {
+    const res = await commands.seekReplay(Math.max(0, Math.round(tick)));
+    if (res.status === "error") this.error = res.error;
+  }
+
+  /** Saves the exercise record (the replay under review, or the live run so far). */
+  async saveRecord() {
+    const res = await commands.saveRecord();
+    if (res.status === "error") {
+      this.error = res.error;
+      return;
+    }
+    const name = fileStem(this.session?.scenario_name ?? "exercise");
+    download(`${name}.nwsrec`, new Uint8Array(res.data), "application/octet-stream");
+  }
+
+  /** Opens a saved exercise record for review: its scenario replaces the session. */
+  async openRecord(file: File) {
+    const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+    const res = await commands.openRecord(bytes);
+    if (res.status === "error") {
+      this.error = `Could not open ${file.name}: ${res.error}`;
+      return;
+    }
+    this.session = res.data;
+    this.units = [];
+    this.allContacts = [];
+    this.selected = null;
+    this.draft = null;
+    this.error = null;
+  }
+
+  /** The after-action review tables (of the replay, or of the live run so far). */
+  async aar(): Promise<AarView | null> {
+    const res = await commands.getAar();
+    if (res.status === "error") {
+      this.error = res.error;
+      return null;
+    }
+    return res.data;
+  }
+
+  /** Saves one AAR table as a CSV file. */
+  async saveCsv(table: AarTable) {
+    const res = await commands.aarCsv(table);
+    if (res.status === "error") {
+      this.error = res.error;
+      return;
+    }
+    const name = fileStem(this.session?.scenario_name ?? "exercise");
+    download(`${name}-${table}.csv`, res.data, "text/csv");
   }
 
   /** Changes doctrine set on the selected unit; fields given as null go back to inheriting. */

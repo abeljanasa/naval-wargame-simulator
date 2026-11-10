@@ -53,6 +53,23 @@ export const commands = {
 	 *  only).
 	 */
 	orderFacilitate: (action: Facilitation) => typedError<null, string>(__TAURI_INVOKE("order_facilitate", { action })),
+	/**  Reviews the live exercise so far as a replay (control station and white-cell seats). */
+	reviewExercise: () => typedError<null, string>(__TAURI_INVOKE("review_exercise")),
+	/**  Leaves the replay and shows the live exercise again. */
+	closeReview: () => typedError<null, string>(__TAURI_INVOKE("close_review")),
+	/**  Moves the replay scrubber to `tick`. */
+	seekReplay: (tick: Tick) => typedError<null, string>(__TAURI_INVOKE("seek_replay", { tick })),
+	/**  The exercise record (replay under review, or the live run so far) for the UI to save. */
+	saveRecord: () => typedError<number[], string>(__TAURI_INVOKE("save_record")),
+	/**
+	 *  Opens an exercise record the user picked (the webview reads the file): its scenario replaces
+	 *  the session and the record is replayed for review.
+	 */
+	openRecord: (bytes: number[]) => typedError<SessionInfo, string>(__TAURI_INVOKE("open_record", { bytes })),
+	/**  The after-action review tables. */
+	getAar: () => typedError<AarView_Serialize, string>(__TAURI_INVOKE("get_aar")),
+	/**  One AAR table as CSV text, for the UI to save. */
+	aarCsv: (table: AarTable) => typedError<string, string>(__TAURI_INVOKE("aar_csv", { table })),
 };
 
 /** Events */
@@ -61,6 +78,60 @@ export const events = {
 };
 
 /* Types */
+/**  The after-action review of one run. */
+export type AarReport = AarReport_Serialize | AarReport_Deserialize;
+
+/**  The after-action review of one run. */
+export type AarReport_Deserialize = {
+	/**  The tick the logs run to. */
+	end_tick: Tick,
+	sides: SideSummary[],
+	losses: LossRow_Deserialize[],
+	weapons: WeaponRow[],
+	detections: DetectionRow_Deserialize[],
+	timeline: TimelineEntry_Deserialize[],
+};
+
+/**  The after-action review of one run. */
+export type AarReport_Serialize = {
+	/**  The tick the logs run to. */
+	end_tick: Tick,
+	sides: SideSummary[],
+	losses: LossRow_Serialize[],
+	weapons: WeaponRow[],
+	detections: DetectionRow_Serialize[],
+	timeline: TimelineEntry_Serialize[],
+};
+
+/**  The tables of an [`AarReport`]. */
+export type AarTable = "sides" | "losses" | "weapons" | "detections" | "timeline";
+
+/**
+ *  The after-action review for one window: the whole report, with the timeline cut to what the
+ *  window's seat may see.
+ */
+export type AarView = AarView_Serialize | AarView_Deserialize;
+
+/**
+ *  The after-action review for one window: the whole report, with the timeline cut to what the
+ *  window's seat may see.
+ */
+export type AarView_Deserialize = {
+	report: AarReport_Deserialize,
+	/**  Built from a replay (else from the live run so far). */
+	replaying: boolean,
+};
+
+/**
+ *  The after-action review for one window: the whole report, with the timeline cut to what the
+ *  window's seat may see.
+ */
+export type AarView_Serialize = {
+	report: AarReport_Serialize,
+	/**  Built from a replay (else from the live run so far). */
+	replaying: boolean,
+};
+
 /**  One override. */
 export type Adjudication = Adjudication_Serialize | Adjudication_Deserialize;
 
@@ -168,7 +239,10 @@ export type Classification =
 "identified";
 
 /**  Clock status sent with every frame. */
-export type ClockStatus = {
+export type ClockStatus = ClockStatus_Serialize | ClockStatus_Deserialize;
+
+/**  Clock status sent with every frame. */
+export type ClockStatus_Deserialize = {
 	tick: Tick,
 	game_time_s: number | null,
 	paused: boolean,
@@ -176,6 +250,21 @@ export type ClockStatus = {
 	/**  Game seconds per wall second actually achieved over the last frame. */
 	achieved_ratio: number | null,
 	scenario_duration_s: number | null,
+	/**  Set while the session is reviewing a replay instead of running live. */
+	replay?: ReplayClock | null,
+};
+
+/**  Clock status sent with every frame. */
+export type ClockStatus_Serialize = {
+	tick: Tick,
+	game_time_s: number | null,
+	paused: boolean,
+	compression: TimeCompression,
+	/**  Game seconds per wall second actually achieved over the last frame. */
+	achieved_ratio: number | null,
+	scenario_duration_s: number | null,
+	/**  Set while the session is reviewing a replay instead of running live. */
+	replay: ReplayClock | null,
 };
 
 /**
@@ -298,6 +387,39 @@ export type DbSensorRow = {
 	max_range_m: number | null,
 };
 
+/**  One contact held by one side. */
+export type DetectionRow = DetectionRow_Serialize | DetectionRow_Deserialize;
+
+/**  One contact held by one side. */
+export type DetectionRow_Deserialize = {
+	side: SideId,
+	side_name: string,
+	contact: number,
+	target: UnitId,
+	target_name: string,
+	target_side?: SideId | null,
+	gained: Tick,
+	/**  `None`: still held at the end. */
+	lost?: Tick | null,
+	/**  Seconds held (to the end of the record if never lost). */
+	held_s: number | null,
+};
+
+/**  One contact held by one side. */
+export type DetectionRow_Serialize = {
+	side: SideId,
+	side_name: string,
+	contact: number,
+	target: UnitId,
+	target_name: string,
+	target_side: SideId | null,
+	gained: Tick,
+	/**  `None`: still held at the end. */
+	lost: Tick | null,
+	/**  Seconds held (to the end of the record if never lost). */
+	held_s: number | null,
+};
+
 /**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
 export type Doctrine = Doctrine_Serialize | Doctrine_Deserialize;
 
@@ -397,13 +519,13 @@ export type FrameEvent = FrameEvent_Serialize | FrameEvent_Deserialize;
 
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent_Deserialize = {
-	clock: ClockStatus,
+	clock: ClockStatus_Deserialize,
 	update: SnapshotUpdate_Deserialize,
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent_Serialize = {
-	clock: ClockStatus,
+	clock: ClockStatus_Serialize,
 	update: SnapshotUpdate_Serialize,
 };
 
@@ -467,6 +589,41 @@ export type Inject_Serialize = {
 	note: string,
 } & Audience;
 
+/**  One unit lost. */
+export type LossRow = LossRow_Serialize | LossRow_Deserialize;
+
+/**  One unit lost. */
+export type LossRow_Deserialize = {
+	tick: Tick,
+	unit: UnitId,
+	name: string,
+	side: SideId,
+	side_name: string,
+	platform?: string | null,
+	/**  Removed by the white cell rather than destroyed. */
+	removed: boolean,
+	/**  What did it: the weapon and who fired it, or the white cell's reason. */
+	cause: string,
+	/**  The side credited with the kill, if any. */
+	by_side?: SideId | null,
+};
+
+/**  One unit lost. */
+export type LossRow_Serialize = {
+	tick: Tick,
+	unit: UnitId,
+	name: string,
+	side: SideId,
+	side_name: string,
+	platform: string | null,
+	/**  Removed by the white cell rather than destroyed. */
+	removed: boolean,
+	/**  What did it: the weapon and who fired it, or the white cell's reason. */
+	cause: string,
+	/**  The side credited with the kill, if any. */
+	by_side: SideId | null,
+};
+
 /**  A message delivered to a message log. */
 export type Message = Message_Serialize | Message_Deserialize;
 
@@ -523,6 +680,14 @@ export type Mission =
 export type Posture = "friendly" | 
 /**  The default between sides that have not set a posture. */
 "neutral" | "unfriendly" | "hostile";
+
+/**  The replay being reviewed. */
+export type ReplayClock = {
+	/**  Where the record ends (the scrubber's range is 0 to this). */
+	end_s: number | null,
+	/**  The rebuilt run reached the recorded final state exactly. */
+	verified: boolean,
+};
 
 /**  Doctrine with every field decided. */
 export type ResolvedDoctrine = ResolvedDoctrine_Serialize | ResolvedDoctrine_Deserialize;
@@ -581,6 +746,25 @@ export type SideId = number;
 export type SideInfo = {
 	id: SideId,
 	name: string,
+};
+
+/**  One side's totals. */
+export type SideSummary = {
+	side: SideId,
+	name: string,
+	/**  Units on the board at tick 0. */
+	units_start: number,
+	/**  Units that came in later (reserves, white-cell spawns). */
+	reinforcements: number,
+	destroyed: number,
+	/**  Taken out of the exercise by the white cell (not counted as destroyed). */
+	removed: number,
+	remaining: number,
+	/**  Strike weapons fired (missiles, torpedoes, guns, mines struck). */
+	weapons_fired: number,
+	hits: number,
+	/**  Enemy units destroyed with this side's weapons. */
+	kills: number,
 };
 
 /**
@@ -679,6 +863,30 @@ export type Tick = number;
 export type TimeCompression = "x1" | "x2" | "x5" | "x15" | "x30" | "x60" | 
 /**  As fast as the machine allows. */
 "max";
+
+/**  One line of the exercise timeline. */
+export type TimelineEntry = TimelineEntry_Serialize | TimelineEntry_Deserialize;
+
+/**  One line of the exercise timeline. */
+export type TimelineEntry_Deserialize = {
+	tick: Tick,
+	kind: TimelineKind,
+	/**  The side it concerns (`None`: exercise control). */
+	side?: SideId | null,
+	text: string,
+};
+
+/**  One line of the exercise timeline. */
+export type TimelineEntry_Serialize = {
+	tick: Tick,
+	kind: TimelineKind,
+	/**  The side it concerns (`None`: exercise control). */
+	side: SideId | null,
+	text: string,
+};
+
+/**  What a timeline entry is about. */
+export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | "override" | "facilitation" | "event" | "script_error";
 
 /**
  *  Stable unit identifier assigned by the scenario. It never depends on ECS entity
@@ -790,6 +998,24 @@ export type Wcs_Serialize =
 "tight" | 
 /**  Fire at any track not identified as friendly or neutral. */
 "free";
+
+/**  Weapons expended against effective, for one weapon type of one side. */
+export type WeaponRow = {
+	side: SideId,
+	side_name: string,
+	weapon: string,
+	/**  Fired in defence (an interceptor at an incoming weapon) rather than at a unit. */
+	defensive: boolean,
+	fired: number,
+	/**  Hit rolls won (for interceptors: threats killed). */
+	hits: number,
+	/**  Hit rolls lost, or no hit for another reason (lost track, seeker, fuel, adjudicated). */
+	missed: number,
+	/**  Shot down by the target side's point defence. */
+	intercepted: number,
+	/**  Units destroyed with this as the last weapon to hit them. */
+	kills: number,
+};
 
 /**  A missile or torpedo in flight, as shown to its own side (and the white cell). */
 export type WeaponView = {

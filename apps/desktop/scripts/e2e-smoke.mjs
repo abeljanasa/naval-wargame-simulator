@@ -203,6 +203,43 @@ try {
     );
   }
 
+  // Exercise review: replay from the start, scrub, read the AAR tables, return to live.
+  await page.getByRole("button", { name: "Replay", exact: true }).click();
+  await page.getByText("REPLAY", { exact: true }).waitFor({ timeout: 5_000 });
+  check(
+    await page.getByText("Replay: matches the recorded run").isVisible(),
+    "replay starts and shows that it matches the recorded run",
+  );
+  await page.getByLabel("Replay position").fill("3");
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some((c) => c.cmd === "seek_replay" && c.args.tick === 3),
+    "the scrubber seeks the replay",
+  );
+  await page.getByRole("button", { name: "AAR tables" }).click();
+  const aar = page.getByRole("dialog", { name: "After-action review" });
+  await aar.getByRole("tab", { name: "Losses" }).click();
+  await aar.getByText("white cell: Ruled sunk by umpire").waitFor({ timeout: 5_000 });
+  await aar.getByRole("tab", { name: "Timeline" }).click();
+  await aar.getByText("Bulk carrier Bravo destroyed").click();
+  await aar.getByRole("button", { name: "Save CSV" }).click();
+  await page.waitForTimeout(300);
+  {
+    const c = await calls();
+    check(
+      c.some((x) => x.cmd === "seek_replay" && x.args.tick === 40) &&
+        c.some((x) => x.cmd === "aar_csv" && x.args.table === "timeline"),
+      "AAR tables show losses and the timeline; a timeline entry jumps the replay; CSV export",
+    );
+  }
+  await aar.getByRole("button", { name: "Close the review" }).click();
+  await page.getByRole("button", { name: "Back to live" }).click();
+  await page.waitForTimeout(400);
+  check(
+    (await page.getByText("REPLAY", { exact: true }).count()) === 0,
+    "back to the live exercise",
+  );
+
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
 } catch (e) {
   failures.push(String(e));

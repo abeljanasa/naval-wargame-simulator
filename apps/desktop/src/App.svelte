@@ -14,6 +14,7 @@
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import type { Audience, Emcon, Mission, Seat, Wcs } from "./lib/bindings";
+  import AarPanel from "./lib/AarPanel.svelte";
   import DbBrowser from "./lib/DbBrowser.svelte";
 
   let mapEl: HTMLElement;
@@ -176,6 +177,9 @@
     </div>
 
     <div class="clock">
+      {#if clock?.replay}
+        <span class="replay-badge" title="Reviewing a replay: orders are off">REPLAY</span>
+      {/if}
       <span class="time">{gameTime(clock?.game_time_s ?? 0)}</span>
       <span class="ratio" title="Achieved game seconds per wall second">
         {clock && !clock.paused ? `${Math.round(n(clock.achieved_ratio))}×` : "paused"}
@@ -479,6 +483,10 @@
       <DbBrowser />
     </details>
 
+    {#if sim.controlsTime}
+      <AarPanel />
+    {/if}
+
     {#if sim.session?.viewer.kind === "white_cell"}
       <section class="umpire" aria-label="White-cell console">
         <h2>White-cell console</h2>
@@ -723,6 +731,14 @@
     align-items: baseline;
     gap: 10px;
     font-variant-numeric: tabular-nums;
+  }
+  .replay-badge {
+    padding: 1px 6px;
+    border: 1px solid var(--warn);
+    border-radius: 3px;
+    color: var(--warn);
+    font-weight: 700;
+    letter-spacing: 0.05em;
   }
   .clock .time {
     font-family: var(--mono);
