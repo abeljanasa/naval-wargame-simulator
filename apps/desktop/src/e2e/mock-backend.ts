@@ -17,6 +17,12 @@ let viewer: Viewer = { kind: "side", side: 1 };
 let paused = true;
 let tick = 0;
 let refusals: string[] = [];
+const adjudications: {
+  tick: number;
+  umpire: string;
+  reason: string;
+  action: { kind: "destroy_unit"; unit: number };
+}[] = [];
 let emcon: "active" | "silent" | null = null;
 
 const session = (): SessionInfo => ({
@@ -92,6 +98,11 @@ mockIPC(
             message: "mock warning",
           },
         ];
+      case "order_adjudicate": {
+        const a = args as { reason: string; action: { kind: "destroy_unit"; unit: number } };
+        adjudications.push({ tick, umpire: "local", reason: a.reason, action: a.action });
+        return null;
+      }
       case "order_engage":
         refusals = ["C1 track error 900 m exceeds the 500 m WPN-SAM-MR needs"];
         return null;
@@ -229,6 +240,7 @@ const frame = (): FrameEvent => {
       bearings,
       weapons: [],
       minefields: [],
+      adjudications,
       refusals: sent,
     },
   };

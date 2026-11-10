@@ -7,7 +7,7 @@ mod host;
 
 use host::{ClockStatus, Host, SnapshotUpdate, TimeCompression};
 use serde::{Deserialize, Serialize};
-use sim_core::{Doctrine, GeoPoint, Mission, SideId, UnitId, Viewer};
+use sim_core::{Adjudication, Doctrine, GeoPoint, Mission, SideId, UnitId, Viewer};
 use sim_scenario::Scenario;
 use specta_typescript::Typescript;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -320,6 +320,20 @@ fn order_mission(
         .map_err(|e| e.to_string())
 }
 
+/// A white-cell adjudication override with its reason (white-cell seat only).
+#[tauri::command]
+#[specta::specta]
+fn order_adjudicate(
+    host: State<'_, SharedHost>,
+    reason: String,
+    action: Adjudication,
+) -> Result<(), String> {
+    lock(&host)
+        .order_adjudicate(reason, action)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -337,6 +351,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_doctrine,
             order_engage,
             order_mission,
+            order_adjudicate,
         ])
         .events(collect_events![FrameEvent])
 }

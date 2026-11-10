@@ -24,6 +24,7 @@
   let engageContact = $state("");
   let engageWeapon = $state("");
   let engageRounds = $state("1");
+  let umpireReason = $state("");
 
   // Keep the engage form pointing at something that exists.
   $effect(() => {
@@ -424,6 +425,86 @@
       <DbBrowser />
     </details>
 
+    {#if sim.session?.viewer.kind === "white_cell"}
+      <section class="umpire" aria-label="White-cell console">
+        <h2>White-cell console</h2>
+        <label for="umpire-reason">Reason (logged)</label>
+        <input
+          id="umpire-reason"
+          type="text"
+          bind:value={umpireReason}
+          placeholder="Why this override"
+        />
+        {#if sim.selectedUnit}
+          {@const u = sim.selectedUnit}
+          <p class="dim">Override {u.name}:</p>
+          <div class="row">
+            <button
+              type="button"
+              onclick={() =>
+                sim.adjudicate(umpireReason, {
+                  kind: "set_damage",
+                  unit: u.id,
+                  damage_dp: 0,
+                  clear_effects: true,
+                })}>Repair</button
+            >
+            <button
+              type="button"
+              onclick={() => sim.adjudicate(umpireReason, { kind: "destroy_unit", unit: u.id })}
+              >Destroy</button
+            >
+            <button
+              type="button"
+              onclick={() => sim.adjudicate(umpireReason, { kind: "remove_unit", unit: u.id })}
+              >Remove</button
+            >
+          </div>
+        {/if}
+        {#if sim.weapons.length > 0}
+          <p class="dim">Weapons in flight:</p>
+          <ul class="units">
+            {#each sim.weapons as w (w.id)}
+              <li class="row">
+                <span>#{w.id} {w.weapon}{w.homing ? " (homing)" : ""}</span>
+                <button
+                  type="button"
+                  onclick={() =>
+                    sim.adjudicate(umpireReason, {
+                      kind: "force_weapon_outcome",
+                      weapon_id: w.id,
+                      hit: true,
+                    })}>Hit</button
+                >
+                <button
+                  type="button"
+                  onclick={() =>
+                    sim.adjudicate(umpireReason, {
+                      kind: "force_weapon_outcome",
+                      weapon_id: w.id,
+                      hit: false,
+                    })}>Miss</button
+                >
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        <p class="dim">Override log:</p>
+        <ul class="units adjudications">
+          {#each [...sim.adjudications].reverse() as a, i (i)}
+            <li>
+              <span class="meta"
+                >{gameTime(n(a.tick))} · {a.umpire} · {a.action.kind.replaceAll("_", " ")}</span
+              >
+              <span>{a.reason}</span>
+            </li>
+          {:else}
+            <li class="empty">No overrides yet.</li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
     {#if sim.error}
       <p class="error" role="alert">{sim.error}</p>
     {/if}
@@ -571,6 +652,25 @@
   }
   .engage button {
     grid-column: 2;
+  }
+  .umpire {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .umpire input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+  }
+  .dim {
+    color: var(--text-dim);
+    font-size: 12px;
+    margin: 8px 0 4px;
+  }
+  .adjudications li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
   .hurt {
     color: var(--danger);

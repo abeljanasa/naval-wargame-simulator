@@ -34,6 +34,8 @@ export const commands = {
 	orderEngage: (shooter: UnitId, contact: number, weapon: string, rounds: number) => typedError<null, string>(__TAURI_INVOKE("order_engage", { shooter, contact, weapon, rounds })),
 	/**  Gives a unit a mission (patrol, ferry, escort, strike), or clears it with `null`. */
 	orderMission: (unit: UnitId, mission: Mission | null) => typedError<null, string>(__TAURI_INVOKE("order_mission", { unit, mission })),
+	/**  A white-cell adjudication override with its reason (white-cell seat only). */
+	orderAdjudicate: (reason: string, action: Adjudication_Deserialize) => typedError<null, string>(__TAURI_INVOKE("order_adjudicate", { reason, action })),
 };
 
 /** Events */
@@ -42,6 +44,70 @@ export const events = {
 };
 
 /* Types */
+/**  One override. */
+export type Adjudication = Adjudication_Serialize | Adjudication_Deserialize;
+
+/**  An override as recorded. */
+export type AdjudicationRecord = AdjudicationRecord_Serialize | AdjudicationRecord_Deserialize;
+
+/**  An override as recorded. */
+export type AdjudicationRecord_Deserialize = {
+	tick: Tick,
+	umpire: string,
+	reason: string,
+	action: Adjudication_Deserialize,
+};
+
+/**  An override as recorded. */
+export type AdjudicationRecord_Serialize = {
+	tick: Tick,
+	umpire: string,
+	reason: string,
+	action: Adjudication_Serialize,
+};
+
+/**  One override. */
+export type Adjudication_Deserialize = 
+/**
+ *  Resolve a weapon in flight now: a hit does its full damage with no Ph roll; a miss
+ *  removes it.
+ */
+{ kind: "force_weapon_outcome"; weapon_id: number; hit: boolean } | 
+/**
+ *  Set a unit's damage, in damage points. `clear_effects` also puts out fires, stops
+ *  flooding and clears critical-hit flags (a repair).
+ */
+{ kind: "set_damage"; unit: UnitId; damage_dp: number | null; clear_effects: boolean } | 
+/**  Sink or shoot down a unit (logged as destroyed). */
+{ kind: "destroy_unit"; unit: UnitId } | 
+/**  Take a unit out of the exercise without it counting as destroyed. */
+{ kind: "remove_unit"; unit: UnitId } | 
+/**  Place a unit somewhere else; its route is cleared. */
+{ kind: "move_unit"; unit: UnitId; position: GeoPoint; altitude_m?: number | null } | 
+/**  Set the rounds of one weapon a unit carries (0 removes it). */
+{ kind: "set_stores"; unit: UnitId; weapon: string; count: number };
+
+/**  One override. */
+export type Adjudication_Serialize = 
+/**
+ *  Resolve a weapon in flight now: a hit does its full damage with no Ph roll; a miss
+ *  removes it.
+ */
+{ kind: "force_weapon_outcome"; weapon_id: number; hit: boolean } | 
+/**
+ *  Set a unit's damage, in damage points. `clear_effects` also puts out fires, stops
+ *  flooding and clears critical-hit flags (a repair).
+ */
+{ kind: "set_damage"; unit: UnitId; damage_dp: number | null; clear_effects: boolean } | 
+/**  Sink or shoot down a unit (logged as destroyed). */
+{ kind: "destroy_unit"; unit: UnitId } | 
+/**  Take a unit out of the exercise without it counting as destroyed. */
+{ kind: "remove_unit"; unit: UnitId } | 
+/**  Place a unit somewhere else; its route is cleared. */
+{ kind: "move_unit"; unit: UnitId; position: GeoPoint; altitude_m: number | null } | 
+/**  Set the rounds of one weapon a unit carries (0 removes it). */
+{ kind: "set_stores"; unit: UnitId; weapon: string; count: number };
+
 /**  A measured bearing from an observer. */
 export type BearingLine = {
 	from: GeoPoint,
@@ -391,6 +457,8 @@ export type SnapshotUpdate_Deserialize = {
 	refusals: string[],
 	/**  The viewer's minefields (own side; every field for the white cell). */
 	minefields: Minefield[],
+	/**  White cell only: the most recent overrides (sent whole). */
+	adjudications: AdjudicationRecord_Deserialize[],
 };
 
 /**
@@ -415,6 +483,8 @@ export type SnapshotUpdate_Serialize = {
 	refusals: string[],
 	/**  The viewer's minefields (own side; every field for the white cell). */
 	minefields: Minefield[],
+	/**  White cell only: the most recent overrides (sent whole). */
+	adjudications: AdjudicationRecord_Serialize[],
 };
 
 /**  What a unit can still do. */

@@ -5,9 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    BearingView, Command, CommandPayload, ContactView, Doctrine, DoctrineScope, Environment,
-    GeoPoint, Issuer, Minefield, Mission, SimError, SimEventKind, Simulation, Snapshot, Tick,
-    UnitId, UnitView, Viewer, WeaponView,
+    Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, ContactView, Doctrine,
+    DoctrineScope, Environment, GeoPoint, Issuer, Minefield, Mission, SimError, SimEventKind,
+    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponView,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -63,6 +63,8 @@ pub struct SnapshotUpdate {
     pub refusals: Vec<String>,
     /// The viewer's minefields (own side; every field for the white cell).
     pub minefields: Vec<Minefield>,
+    /// White cell only: the most recent overrides (sent whole).
+    pub adjudications: Vec<AdjudicationRecord>,
 }
 
 /// Clock status sent with every frame.
@@ -255,6 +257,7 @@ impl Host {
                     weapons: snap.weapons.clone(),
                     refusals: refusals.clone(),
                     minefields: snap.minefields.clone(),
+                    adjudications: snap.adjudications.clone(),
                 }
             }
             _ => SnapshotUpdate {
@@ -270,6 +273,7 @@ impl Host {
                 weapons: snap.weapons.clone(),
                 refusals,
                 minefields: snap.minefields.clone(),
+                adjudications: snap.adjudications.clone(),
             },
         };
         self.last_sent = Some(snap);
@@ -322,6 +326,15 @@ impl Host {
         mission: Option<Mission>,
     ) -> Result<u64, SimError> {
         self.order(CommandPayload::AssignMission { unit, mission })
+    }
+
+    /// A white-cell override. Only the white-cell seat may adjudicate (the core refuses others).
+    pub fn order_adjudicate(
+        &mut self,
+        reason: String,
+        action: Adjudication,
+    ) -> Result<u64, SimError> {
+        self.order(CommandPayload::Adjudicate { reason, action })
     }
 
     /// Reasons this seat's orders were refused since the last call.

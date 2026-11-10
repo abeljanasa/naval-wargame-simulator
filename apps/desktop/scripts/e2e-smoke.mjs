@@ -153,6 +153,22 @@ try {
     "platform record shows provenance and its validation warning",
   );
 
+  // White-cell console: an override with its reason appears in the override log.
+  await page.getByRole("button", { name: /Bulk carrier Bravo/ }).click();
+  await page.getByLabel("Reason (logged)").fill("Ruled sunk by umpire");
+  await page.getByRole("button", { name: "Destroy" }).click();
+  await page.getByText("Ruled sunk by umpire").waitFor({ timeout: 5_000 });
+  check(
+    (await calls()).some(
+      (c) =>
+        c.cmd === "order_adjudicate" &&
+        c.args.reason === "Ruled sunk by umpire" &&
+        c.args.action.kind === "destroy_unit" &&
+        c.args.action.unit === 2,
+    ),
+    "white-cell override sends order_adjudicate with its reason and shows in the log",
+  );
+
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
 } catch (e) {
   failures.push(String(e));

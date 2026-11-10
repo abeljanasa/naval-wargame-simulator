@@ -2,6 +2,8 @@
 // (selection, draft route). Every change to the simulation goes through `commands`.
 
 import {
+  type Adjudication,
+  type AdjudicationRecord,
   commands,
   events,
   type BearingView,
@@ -44,6 +46,8 @@ class SimSession {
   weapons = $state<WeaponView[]>([]);
   /** The seat's minefields. */
   minefields = $state<Minefield[]>([]);
+  /** White cell: the most recent overrides. */
+  adjudications = $state<AdjudicationRecord[]>([]);
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */
@@ -80,6 +84,7 @@ class SimSession {
     this.bearings = u.bearings;
     this.weapons = u.weapons;
     this.minefields = u.minefields;
+    this.adjudications = u.adjudications;
     if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 
@@ -176,6 +181,16 @@ class SimSession {
       ? null
       : { kind: "patrol", centre: u.position, radius_m: PATROL_RADIUS_M };
     const res = await commands.orderMission(u.id, mission);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** A white-cell override with its reason. The engine refuses one with no reason. */
+  async adjudicate(reason: string, action: Adjudication) {
+    if (!reason.trim()) {
+      this.error = "Give a reason for the override";
+      return;
+    }
+    const res = await commands.orderAdjudicate(reason.trim(), action);
     this.error = res.status === "error" ? res.error : null;
   }
 
