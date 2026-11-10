@@ -28,8 +28,9 @@ Items deferred out of the current change, or requested out of phase (master prom
 - [ ] Snapshot diffs instead of full snapshots on the UI stream (the protocol is versioned for this).
 - [ ] Scenario loading from file in the desktop app (Phase 1 embeds the demo scenario).
 - [ ] Front-end unit tests (Vitest) and a Tauri end-to-end smoke test (WebDriver).
-- [ ] APP-6-style symbol icons by domain and type, beyond affiliation frames.
-- [ ] Light-theme toggle in the UI (the CSS tokens already exist).
+- [x] APP-6-style frames by domain (sea surface full, air upper half, subsurface lower half, land) and affiliation.
+- [ ] Function icons inside the frames (frigate, submarine, fighter…); needs a symbology behaviour spec.
+- [x] Light-theme toggle (header button; map base layers recoloured; remembered per viewer).
 
 ## Phase 2 (replacing Gate 1 interim detection)
 

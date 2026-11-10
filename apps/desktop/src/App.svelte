@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import type { Map as MapLibreMap } from "maplibre-gl";
   import type { MapboxOverlay } from "@deck.gl/mapbox";
-  import { createMap, buildLayers, contactAge } from "./lib/map";
+  import { createMap, buildLayers, contactAge, setMapTheme, type MapTheme } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import type { Viewer } from "./lib/bindings";
@@ -28,10 +28,36 @@
     return k === "white" ? { kind: "white_cell" } : { kind: "side", side: Number(k.slice(5)) };
   }
 
+  // Dark by default (spec §10); the viewer's choice is remembered on this machine only.
+  let theme = $state<MapTheme>(readTheme());
+
+  function readTheme(): MapTheme {
+    try {
+      return localStorage.getItem("nws-theme") === "light" ? "light" : "dark";
+    } catch {
+      return "dark";
+    }
+  }
+
+  function toggleTheme() {
+    theme = theme === "dark" ? "light" : "dark";
+    try {
+      localStorage.setItem("nws-theme", theme);
+    } catch {
+      // Storage unavailable: the choice lasts for this session only.
+    }
+  }
+
+  $effect(() => {
+    document.documentElement.dataset.theme = theme;
+    if (map) setMapTheme(map, theme);
+  });
+
   onMount(() => {
     const created = createMap(mapEl, [146.0, -39.3]);
     map = created.map;
     overlay = created.overlay;
+    setMapTheme(map, theme);
     map.on("click", (e) => {
       if (sim.draft) sim.addWaypoint({ lat_deg: e.lngLat.lat, lon_deg: e.lngLat.lng });
     });
@@ -123,6 +149,14 @@
         </button>
       {/each}
     </div>
+    <button
+      class="theme"
+      onclick={toggleTheme}
+      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+      title="Switch light / dark theme"
+    >
+      {theme === "dark" ? "Light" : "Dark"}
+    </button>
   </header>
 
   <aside class="panel">

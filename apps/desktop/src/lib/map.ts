@@ -97,6 +97,26 @@ export function createMap(container: HTMLElement, center: LonLat) {
   return { map, overlay };
 }
 
+export type MapTheme = "dark" | "light";
+
+const BASE_COLOURS: Record<MapTheme, { sea: string; grid: string; land: string; coast: string }> = {
+  dark: { sea: "#0d2030", grid: "#1d3a50", land: "#283139", coast: "#7890a0" },
+  light: { sea: "#cfe3ee", grid: "#b3cddb", land: "#f2efe6", coast: "#6d8394" },
+};
+
+/** Recolours the base layers for a theme (once the style has loaded). */
+export function setMapTheme(map: maplibregl.Map, theme: MapTheme) {
+  const apply = () => {
+    const c = BASE_COLOURS[theme];
+    map.setPaintProperty("sea", "background-color", c.sea);
+    map.setPaintProperty("grid", "line-color", c.grid);
+    map.setPaintProperty("land", "fill-color", c.land);
+    map.setPaintProperty("coast", "line-color", c.coast);
+  };
+  if (map.isStyleLoaded()) apply();
+  else map.once("load", apply);
+}
+
 export interface SceneInput {
   units: UnitView[];
   /** The viewing side's contacts (empty for the white cell, which sees ground truth). */
@@ -197,7 +217,12 @@ export function buildLayers(s: SceneInput): Layer[] {
       getIcon: (u) => {
         const aff = affiliation(u, s.viewer);
         const sel = u.id === s.selected;
-        return { id: `${aff}-${sel}`, url: symbolUrl(aff, sel), width: 64, height: 64 };
+        return {
+          id: `${aff}-${u.domain}-${sel}`,
+          url: symbolUrl(aff, sel, u.domain),
+          width: 64,
+          height: 64,
+        };
       },
       getSize: 28,
       sizeUnits: "pixels",
