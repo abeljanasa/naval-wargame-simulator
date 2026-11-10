@@ -32,11 +32,13 @@ use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use sim_c2::Emcon;
 use sim_geo::{inverse, radar_horizon_m, GeoPoint};
-pub use sim_sensors::{detection_range_m, pd_per_scan, SensorKind};
 use sim_sensors::{
-    gaussian_pair, measured_point, measurement_error, radar_classification, Classification, Cov2,
-    ErrorEllipse, TrackEstimate,
+    clutter_loss_db, detection_range_with_loss_m, gaussian_pair, in_main_beam, jamming_to_noise,
+    measured_point, measurement_error, pd_jammed, radar_classification, Classification,
+    ClutterBackground, Cov2, Environment, ErrorEllipse, JammerSpec, TrackEstimate,
+    CLUTTER_CEILING_M, DEFAULT_BEAMWIDTH_DEG, DEFAULT_CLUTTER_DB_PER_SEA_STATE,
 };
+pub use sim_sensors::{detection_range_m, pd_per_scan, SensorKind};
 use std::collections::BTreeMap;
 
 /// Sensors run on every 5th tick (master prompt §6.2).
@@ -68,6 +70,12 @@ pub struct SensorSpec {
     pub ref_rcs_m2: Option<f64>,
     /// Highest target altitude the sensor covers.
     pub max_target_altitude_m: f64,
+    /// Radar: signal-to-clutter loss per sea-state step, dB (default 1.5).
+    #[serde(default)]
+    pub clutter_db_per_sea_state: Option<f64>,
+    /// Radar: two-way half-power beamwidth, degrees (default 2).
+    #[serde(default)]
+    pub beamwidth_deg: Option<f64>,
 }
 
 impl SensorSpec {
@@ -84,6 +92,18 @@ impl SensorSpec {
             return Err(format!("sensor {} has invalid ranges", self.sensor_id));
         }
         let positive = |v: Option<f64>| v.is_none_or(|x| x.is_finite() && x > 0.0);
+        let clutter_ok = self
+            .clutter_db_per_sea_state
+            .is_none_or(|x| x.is_finite() && x >= 0.0);
+        let beam_ok = self
+            .beamwidth_deg
+            .is_none_or(|x| x.is_finite() && x > 0.0 && x <= 360.0);
+        if !clutter_ok || !beam_ok {
+            return Err(format!(
+                "sensor {} has an invalid clutter figure or beamwidth",
+                self.sensor_id
+            ));
+        }
         if !positive(self.ref_range_m) || !positive(self.ref_rcs_m2) {
             return Err(format!(
                 "sensor {} has an invalid radar reference",
@@ -93,6 +113,14 @@ impl SensorSpec {
         Ok(())
     }
 }
+
+/// A unit's noise jammer, if it carries one. It radiates whenever the unit's EMCON is active.
+#[derive(Debug, Clone, Copy, Default, Component, Serialize, Deserialize)]
+pub struct Jammer(pub Option<JammerSpec>);
+
+/// Scenario-wide sea state and weather loss (set by the scenario or the white cell).
+#[derive(Debug, Clone, Copy, Default, Resource, Serialize, Deserialize)]
+pub struct EnvState(pub Environment);
 
 /// The sensors a unit carries.
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -123,6 +151,18 @@ pub fn domain_speed_bound_mps(domain: Option<Domain>) -> f64 {
         Some(Domain::Surface | Domain::Subsurface) => 18.0,
         Some(Domain::Land) => 30.0,
         Some(Domain::Air) | None => 600.0,
+    }
+}
+
+/// What a radar sees a target against: low targets compete with sea or land clutter.
+/// Low air targets are treated as over the sea (no land mask lookup yet).
+#[must_use]
+pub fn clutter_background(domain: Domain, altitude_m: f64) -> ClutterBackground {
+    match domain {
+        Domain::Land => ClutterBackground::Land,
+        Domain::Surface | Domain::Subsurface => ClutterBackground::Sea,
+        Domain::Air if altitude_m <= CLUTTER_CEILING_M => ClutterBackground::Sea,
+        Domain::Air => ClutterBackground::None,
     }
 }
 
@@ -315,8 +355,9 @@ struct Observed<'a> {
     position: Position,
     sensors: &'a SensorSuite,
     rcs_m2: f64,
-    /// EMCON allows active emissions (radar).
+    /// EMCON allows active emissions (radar, jammer).
     emits: bool,
+    jammer: Option<JammerSpec>,
 }
 
 pub(crate) fn detection_system(
@@ -325,15 +366,17 @@ pub(crate) fn detection_system(
     mut contacts: ResMut<ContactTable>,
     mut log: ResMut<EventLog>,
     c2: Res<C2State>,
-    units: Query<(&Unit, &Position, &SensorSuite, &Signature)>,
+    env: Res<EnvState>,
+    units: Query<(&Unit, &Position, &SensorSuite, &Signature, &Jammer)>,
 ) {
+    let env = env.0;
     let tick = clock.tick;
     if !tick.is_multiple_of(SENSOR_PERIOD_TICKS) {
         return;
     }
     let mut all: Vec<Observed<'_>> = units
         .iter()
-        .map(|(u, p, s, sig)| Observed {
+        .map(|(u, p, s, sig, j)| Observed {
             id: u.id,
             side: u.side,
             domain: u.domain,
@@ -341,6 +384,7 @@ pub(crate) fn detection_system(
             sensors: s,
             rcs_m2: sig.rcs_m2,
             emits: c2.doctrine_for(u).emcon == Emcon::Active,
+            jammer: j.0,
         })
         .collect();
     all.sort_by_key(|o| o.id);
@@ -359,6 +403,13 @@ pub(crate) fn detection_system(
         .filter_map(|t| target_height_m(t.domain, t.position.altitude_m))
         .fold(0.0_f64, f64::max);
     let mut candidates: Vec<usize> = Vec::new();
+    // Radiating jammers, in UnitId order: (index into `all`, spec).
+    let jammers: Vec<(usize, JammerSpec)> = all
+        .iter()
+        .enumerate()
+        .filter(|(_, o)| o.emits)
+        .filter_map(|(i, o)| o.jammer.map(|j| (i, j)))
+        .collect();
 
     for obs in &all {
         // EMCON silent: radar does not transmit, so it detects nothing and draws nothing.
@@ -374,6 +425,28 @@ pub(crate) fn detection_system(
             else {
                 continue;
             };
+            // Jammers of other sides within line of sight of this radar: (unit index, distance,
+            // bearing from the radar, spec). Jamming only raises the noise floor, so the broad
+            // phase below is unaffected.
+            let in_view: Vec<(usize, f64, f64, JammerSpec)> = jammers
+                .iter()
+                .filter(|(i, _)| all[*i].side != obs.side)
+                .filter_map(|&(i, spec)| {
+                    let j = &all[i];
+                    let h_j = target_height_m(j.domain, j.position.altitude_m)?;
+                    let inv = inverse(obs.position.point, j.position.point);
+                    (inv.distance_m <= radar_horizon_m(h_s, h_j)).then_some((
+                        i,
+                        inv.distance_m,
+                        inv.azimuth1_deg,
+                        spec,
+                    ))
+                })
+                .collect();
+            let beamwidth = sensor.beamwidth_deg.unwrap_or(DEFAULT_BEAMWIDTH_DEG);
+            let clutter_per_step = sensor
+                .clutter_db_per_sea_state
+                .unwrap_or(DEFAULT_CLUTTER_DB_PER_SEA_STATE);
             // No target this scan can be seen beyond `reach`, so none can be detected outside
             // a latitude band of ±reach / (minimum metres per degree of latitude).
             let reach = sensor.max_range_m.min(radar_horizon_m(h_s, tallest));
@@ -413,8 +486,29 @@ pub(crate) fn detection_system(
                 if range > horizon {
                     continue;
                 }
-                let r50 = detection_range_m(ref_range, ref_rcs, tgt.rcs_m2, sensor.max_range_m);
-                let pd = pd_per_scan(range, r50);
+                let clutter_db = clutter_loss_db(
+                    clutter_background(tgt.domain, tgt.position.altitude_m),
+                    env.sea_state,
+                    clutter_per_step,
+                );
+                let weather_db = env.weather_loss_db;
+                let r50 = detection_range_with_loss_m(
+                    ref_range,
+                    ref_rcs,
+                    tgt.rcs_m2,
+                    sensor.max_range_m,
+                    clutter_db + weather_db,
+                );
+                // Summed in UnitId order (fixed f64 reduction order, ADR-0003). A jammer on the
+                // target itself is always in the main beam (self-screening).
+                let jn: f64 = in_view
+                    .iter()
+                    .map(|&(j, dist, bearing, spec)| {
+                        let main = j == i || in_main_beam(inv.azimuth1_deg, bearing, beamwidth);
+                        jamming_to_noise(spec, dist, main)
+                    })
+                    .sum();
+                let pd = pd_jammed(range, r50, jn);
                 let draw = rng.uniform(StreamId::Sensors);
                 let detected = draw < pd;
                 // A detection measures range and bearing with error: two more draws, always taken
@@ -447,6 +541,9 @@ pub(crate) fn detection_system(
                         pd,
                         draw,
                         detected,
+                        clutter_db,
+                        weather_db,
+                        jn,
                         range_error_m: measurement.map(|m| m.2),
                         bearing_error_deg: measurement.map(|m| m.3),
                     },

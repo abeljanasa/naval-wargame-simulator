@@ -4,6 +4,13 @@ Items deferred out of the current change, or requested out of phase (master prom
 
 Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md).
 
+## Phase 2, deferred from slices
+
+- [ ] Radar terrain masking (needs bundled elevation data, with GEBCO/SRTM in Phase 4).
+- [ ] Low air targets over land should see land clutter (needs a land-mask lookup in detection).
+- [ ] ECM equipment (jammers) in the platform database, with soft kill in slice 9; until then jammers are given per unit in scenarios.
+- [ ] Track velocity estimation and association errors (tracks model limitations).
+
 ## Phase 1, still to do (Gate 1: "units move and detect")
 
 - [x] `sim-db`: SQLite schema, forward-only migrations, `cargo run -p sim-db -- validate`, and 50 generic platform types with citations, confidence and classification fields (DL-0005).

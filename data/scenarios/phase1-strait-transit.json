@@ -5,6 +5,7 @@
   "description": "Gate 1 demonstrator: units move and detect. A generic frigate transits a strait westbound on a four-leg route while a generic bulk carrier transits eastbound; the ships close at about 30 kn and each side's radar picks up the other once inside the radar horizon (about 34 km). All platforms are generic database classes with no real-world values.",
   "seed": 20261110,
   "duration_s": 86400,
+  "environment": { "sea_state": 3 },
   "sides": [
     {
       "id": 1,

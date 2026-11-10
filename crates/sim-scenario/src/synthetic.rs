@@ -40,6 +40,7 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
                 route: vec![],
                 group: None,
                 doctrine: Doctrine::default(),
+                jammer: None,
             }
         })
         .collect();
@@ -65,6 +66,7 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
             },
         ],
         groups: vec![],
+        environment: Default::default(),
         units,
     }
 }

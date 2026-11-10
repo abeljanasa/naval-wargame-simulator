@@ -1,5 +1,7 @@
 # Model: Gate 1 interim radar detection and contacts
 
+> **Phase 2 extends this model** with clutter, weather and jamming: see [radar.md](radar.md). The geometry gates, R₅₀ and Pd curve below are unchanged.
+
 > **Interim model.** It exists so Gate 1 ("units move and detect") can be demonstrated with platform-database sensors. Phase 2 replaces it with the full sensor suite (radar clutter and jamming, ESM, sonar, IR/EO, visual, MAD) in a `sim-sensors` crate. Treat its outputs as illustrative, not analytical.
 
 - **Code:** `crates/sim-sensors/src/radar.rs` (R₅₀, Pd) and `crates/sim-core/src/detection.rs` (geometry gates, draws, scheduling)

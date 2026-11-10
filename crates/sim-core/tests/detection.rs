@@ -18,6 +18,8 @@ fn radar() -> SensorSpec {
         ref_range_m: Some(R50_REF),
         ref_rcs_m2: Some(1.0),
         max_target_altitude_m: 25_000.0,
+        clutter_db_per_sea_state: None,
+        beamwidth_deg: None,
     }
 }
 
@@ -56,6 +58,7 @@ fn spawn(
             min_turn_radius_m: None,
             group: None,
             doctrine: Doctrine::default(),
+            jammer: None,
         }),
     }
 }
@@ -655,4 +658,196 @@ fn save_and_resume_keeps_c2_state() {
     b.run_ticks(100);
     assert_eq!(a.state_hash(), b.state_hash());
     assert_eq!(a.events(), b.events());
+}
+
+// ---- Phase 2 radar: clutter, weather, jamming (docs/models/radar.md) ----
+
+/// (r50, pd, clutter_db, weather_db, jn) of every logged attempt.
+fn radar_terms(sim: &Simulation) -> Vec<(f64, f64, f64, f64, f64)> {
+    sim.events()
+        .iter()
+        .filter_map(|e| match &e.kind {
+            SimEventKind::DetectionAttempt {
+                r50_m,
+                pd,
+                clutter_db,
+                weather_db,
+                jn,
+                ..
+            } => Some((*r50_m, *pd, *clutter_db, *weather_db, *jn)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn set_environment(sim: &mut Simulation, sea_state: u8, weather_loss_db: f64) {
+    sim.submit(order(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetEnvironment {
+            environment: Environment {
+                sea_state,
+                weather_loss_db,
+            },
+        },
+    ))
+    .unwrap();
+}
+
+fn with_jammer(mut c: Command, jn_db_at_1km: f64) -> Command {
+    if let CommandPayload::SpawnUnit(u) = &mut c.payload {
+        u.jammer = Some(JammerSpec { jn_db_at_1km });
+    }
+    c
+}
+
+#[test]
+fn sea_clutter_shortens_r50_for_low_targets_only() {
+    // Sea state 4 at the default 1.5 dB per step = 6 dB: R₅₀ = 120 km × 10^(−6/40) = 84 953.5 m.
+    let mut low = duel(1, Domain::Air, 100.0, 50_000.0, 1.0);
+    set_environment(&mut low, 4, 0.0);
+    low.run_ticks(SENSOR_PERIOD_TICKS);
+    let (r50, pd, clutter, weather, jn) = radar_terms(&low)[0];
+    assert!((clutter - 6.0).abs() < 1e-12 && weather == 0.0 && jn == 0.0);
+    assert!((r50 - 84_953.494).abs() < 0.01, "{r50}");
+    let x: f64 = 50_000.0 / r50;
+    // 1e-9: the geodesic range is 50 km to within ~0.1 mm (direct/inverse round trip).
+    assert!((pd - 1.0 / (1.0 + x.powi(8))).abs() < 1e-9, "pd {pd}");
+
+    // Above the 150 m clutter ceiling the same sea costs nothing; weather loss still applies.
+    let mut high = duel(1, Domain::Air, 10_000.0, 50_000.0, 1.0);
+    set_environment(&mut high, 4, 4.0);
+    high.run_ticks(SENSOR_PERIOD_TICKS);
+    let (r50, _, clutter, weather, _) = radar_terms(&high)[0];
+    assert!(clutter == 0.0 && (weather - 4.0).abs() < 1e-12);
+    assert!(
+        (r50 - 120_000.0 * libm::pow(10.0, -0.1)).abs() < 0.01,
+        "{r50}"
+    );
+}
+
+#[test]
+fn self_screening_jammer_raises_noise_until_emcon_silences_it() {
+    // 60 dB jammer on the target at 60 km (0.5 R₅₀): J/N = 10⁶ / 60² = 277.78,
+    // x = 0.5 × 278.78^¼ = 2.0431, Pd = 1 / (1 + x⁸) = 0.003 28.
+    let mut sim = Simulation::new(2);
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Surface,
+        ORIGIN,
+        0.0,
+        0.0,
+        0.0,
+        vec![radar()],
+        5000.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 90.0, 60_000.0).point;
+    sim.submit(with_jammer(
+        spawn(2, 2, Domain::Air, at, 10_000.0, 0.0, 0.0, vec![], 1.0),
+        60.0,
+    ))
+    .unwrap();
+    sim.run_ticks(SENSOR_PERIOD_TICKS);
+    let (_, pd, _, _, jn) = radar_terms(&sim)[0];
+    assert!((jn - 1.0e6 / 3600.0).abs() < 1e-6, "{jn}");
+    let x = 0.5 * (1.0 + jn).sqrt().sqrt();
+    assert!(
+        (pd - 1.0 / (1.0 + x.powi(8))).abs() < 1e-12 && pd < 0.004,
+        "{pd}"
+    );
+
+    sim.submit(order(
+        5,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Unit { unit: UnitId(2) },
+            doctrine: doctrine_emcon(Emcon::Silent),
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(SENSOR_PERIOD_TICKS);
+    assert_eq!(
+        radar_terms(&sim)[1].4,
+        0.0,
+        "a silent jammer does not radiate"
+    );
+}
+
+#[test]
+fn stand_off_jammer_in_the_sidelobe_and_own_side_jammers() {
+    // Radar at the origin looks east at the target; a red jammer 10 km due north is 90° off the
+    // beam: sidelobe J/N = 10^((60 − 30)/10) / 10² = 10. A blue jammer does not jam blue.
+    let mut sim = duel(3, Domain::Air, 10_000.0, 50_000.0, 1.0);
+    let north = direct(ORIGIN, 0.0, 10_000.0).point;
+    sim.submit(with_jammer(
+        spawn(3, 2, Domain::Air, north, 5_000.0, 0.0, 0.0, vec![], 1.0),
+        60.0,
+    ))
+    .unwrap();
+    let south = direct(ORIGIN, 180.0, 10_000.0).point;
+    sim.submit(with_jammer(
+        spawn(4, 1, Domain::Air, south, 5_000.0, 0.0, 0.0, vec![], 1.0),
+        60.0,
+    ))
+    .unwrap();
+    sim.run_ticks(SENSOR_PERIOD_TICKS);
+    // Attempts this scan: unit 1 on targets 2 and 3, then unit 4 has no radar.
+    let terms = radar_terms(&sim);
+    let on_target = terms[0];
+    assert!((on_target.4 - 10.0).abs() < 1e-9, "{on_target:?}");
+    // Against the jammer itself the jammer is self-screening: main beam, 10⁶ / 10² = 10⁴.
+    assert!((terms[1].4 - 10_000.0).abs() < 1e-6, "{:?}", terms[1]);
+}
+
+#[test]
+fn environment_is_set_by_the_white_cell_and_shown_to_every_side() {
+    let (mut sim, _) = surface_track_run(5, 0);
+    sim.submit(order(
+        0,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        CommandPayload::SetEnvironment {
+            environment: Environment {
+                sea_state: 6,
+                weather_loss_db: 0.0,
+            },
+        },
+    ))
+    .unwrap();
+    sim.submit(order(
+        0,
+        Issuer::WhiteCell { umpire: "u".into() },
+        None,
+        CommandPayload::SetEnvironment {
+            environment: Environment {
+                sea_state: 3,
+                weather_loss_db: 1.0,
+            },
+        },
+    ))
+    .unwrap();
+    sim.step();
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::CommandRejected { .. })));
+    let red = sim.snapshot(Viewer::Side { side: SideId(2) });
+    assert_eq!(red.environment.sea_state, 3);
+    assert!(sim
+        .submit(order(
+            1,
+            Issuer::Scenario,
+            None,
+            CommandPayload::SetEnvironment {
+                environment: Environment {
+                    sea_state: 12,
+                    weather_loss_db: 0.0,
+                },
+            },
+        ))
+        .is_err());
 }

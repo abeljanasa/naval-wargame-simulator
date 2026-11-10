@@ -4,7 +4,9 @@ use crate::c2::C2State;
 use crate::command::DoctrineScope;
 use crate::command::{Command, CommandPayload, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
 use crate::components::{Domain, Kinematics, Position, Route, Unit};
-use crate::detection::{default_rcs_m2, detection_system, ContactTable, SensorSuite, Signature};
+use crate::detection::{
+    default_rcs_m2, detection_system, ContactTable, EnvState, Jammer, SensorSuite, Signature,
+};
 use crate::error::SimError;
 use crate::events::{EventLog, SimEvent, SimEventKind};
 use crate::hash::StateHash;
@@ -103,6 +105,7 @@ impl Simulation {
         world.insert_resource(UnitIndex::default());
         world.insert_resource(ContactTable::default());
         world.insert_resource(C2State::default());
+        world.insert_resource(EnvState::default());
         world.insert_resource(LandMaskRes::default());
         Self {
             world,
@@ -198,16 +201,18 @@ impl Simulation {
             &Route,
             &SensorSuite,
             &Signature,
+            &Jammer,
         )>();
         let mut v: Vec<UnitRecord> = q
             .iter(&self.world)
-            .map(|(u, p, k, r, s, sig)| UnitRecord {
+            .map(|(u, p, k, r, s, sig, j)| UnitRecord {
                 unit: u.clone(),
                 position: *p,
                 kinematics: *k,
                 route: r.clone(),
                 sensors: s.clone(),
                 signature: Some(*sig),
+                jammer: j.0,
             })
             .collect();
         v.sort_by_key(|r| r.unit.id);
@@ -297,6 +302,7 @@ impl Simulation {
                     posture,
                 })
                 .collect(),
+            environment: self.world.resource::<EnvState>().0,
         }
     }
 
@@ -355,8 +361,14 @@ impl Simulation {
                 h.opt_f64(s.ref_range_m);
                 h.opt_f64(s.ref_rcs_m2);
                 h.f64(s.max_target_altitude_m);
+                h.opt_f64(s.clutter_db_per_sea_state);
+                h.opt_f64(s.beamwidth_deg);
             }
+            h.opt_f64(r.jammer.map(|j| j.jn_db_at_1km));
         }
+        let env = self.world.resource::<EnvState>().0;
+        h.u8(env.sea_state);
+        h.f64(env.weather_loss_db);
         let c2 = self.world.resource::<C2State>();
         for (&(side, toward), posture) in &c2.postures {
             h.u16(side.0);
@@ -415,6 +427,7 @@ impl Simulation {
             contacts: self.world.resource::<ContactTable>().records(),
             next_contact_numbers: self.world.resource::<ContactTable>().next_numbers(),
             c2: self.world.resource::<C2State>().clone(),
+            environment: self.world.resource::<EnvState>().0,
         }
     }
 
@@ -441,6 +454,7 @@ impl Simulation {
         }
         sim.world.insert_resource(log);
         sim.world.insert_resource(save.c2);
+        sim.world.insert_resource(EnvState(save.environment));
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -461,6 +475,7 @@ impl Simulation {
                     r.route,
                     r.sensors,
                     signature,
+                    Jammer(r.jammer),
                 ))
                 .id();
             if index.insert(id, e).is_some() {
@@ -568,6 +583,13 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
                 .insert((*side, *toward), *posture);
             Ok(())
         }
+        CommandPayload::SetEnvironment { environment } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set the environment".into());
+            }
+            world.insert_resource(EnvState(*environment));
+            Ok(())
+        }
         CommandPayload::SetDoctrine { scope, doctrine } => match scope {
             DoctrineScope::Side { side } => {
                 authorised_side(cmd, *side)?;
@@ -671,6 +693,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             Signature {
                 rcs_m2: s.rcs_m2.unwrap_or_else(|| default_rcs_m2(s.domain)),
             },
+            Jammer(s.jammer),
             Kinematics {
                 heading_deg: sim_geo::normalize_azimuth_deg(s.heading_deg),
                 speed_mps: s.speed_mps.clamp(0.0, s.max_speed_mps),

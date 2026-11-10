@@ -10,6 +10,7 @@ use crate::ids::SideId;
 use crate::rng::RngStreams;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
+use sim_sensors::{Environment, JammerSpec};
 
 pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// Increment on any change to [`SaveGame`] and add a migration in [`SaveGame::from_bytes`].
@@ -23,7 +24,10 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   no measurement errors (serde defaults).
 /// * 4: adds postures and side/group doctrine (`c2`), and unit group and doctrine. Older saves
 ///   load with no postures set (all neutral) and no doctrine (defaults).
-pub const SAVE_FORMAT_VERSION: u32 = 4;
+/// * 5: adds the environment (sea state, weather), unit jammers, radar clutter and beamwidth
+///   figures, and clutter/weather/jamming on detection events. Older saves load with a calm sea,
+///   no weather, no jammers and the radar defaults.
+pub const SAVE_FORMAT_VERSION: u32 = 5;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +41,8 @@ pub struct UnitRecord {
     /// `None` only in v1 saves; filled with the domain default on load.
     #[serde(default)]
     pub signature: Option<Signature>,
+    #[serde(default)]
+    pub jammer: Option<JammerSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +64,8 @@ pub struct SaveGame {
     pub next_contact_numbers: Vec<(SideId, u32)>,
     #[serde(default)]
     pub c2: C2State,
+    #[serde(default)]
+    pub environment: Environment,
 }
 
 impl SaveGame {
@@ -82,7 +90,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=3 | SAVE_FORMAT_VERSION => {
+            1..=4 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

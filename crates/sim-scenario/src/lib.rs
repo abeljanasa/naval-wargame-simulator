@@ -15,8 +15,8 @@ pub mod synthetic;
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Command, CommandPayload, Doctrine, DoctrineScope, Domain, GeoPoint, Issuer, Posture,
-    SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn,
+    Command, CommandPayload, Doctrine, DoctrineScope, Domain, Environment, GeoPoint, Issuer,
+    JammerSpec, Posture, SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn,
 };
 use sim_db::PlatformDb;
 use std::collections::BTreeSet;
@@ -108,6 +108,10 @@ pub struct ScenarioUnit {
     /// Doctrine set on this unit; unset fields inherit from its group and side.
     #[serde(default, skip_serializing_if = "is_default")]
     pub doctrine: Doctrine,
+    /// A noise jammer (radiates while the unit's EMCON is active). Until the database carries
+    /// ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jammer: Option<JammerSpec>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +128,9 @@ pub struct Scenario {
     pub sides: Vec<SideDef>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<GroupDef>,
+    /// Sea state and weather loss for the whole scenario (default: calm, clear).
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub environment: Environment,
     pub units: Vec<ScenarioUnit>,
 }
 
@@ -232,6 +239,9 @@ impl Scenario {
                 )));
             }
         }
+        self.environment
+            .validate()
+            .map_err(|e| ScenarioError::Invalid(format!("environment: {e}")))?;
         if self.duration_s == 0 {
             return Err(ScenarioError::Invalid("duration_s must be > 0".into()));
         }
@@ -255,8 +265,13 @@ impl Scenario {
         let mut sim = Simulation::new(seed.unwrap_or(self.seed));
         // Ships and submarines navigate round the bundled coastline (docs/models/land-avoidance.md).
         sim.set_land_mask(sim_geo::land::embedded());
-        // Postures and doctrine first, so they are in force when the units spawn.
+        // Environment, postures and doctrine first, so they are in force when the units spawn.
         let mut c2 = Vec::new();
+        if self.environment != Environment::default() {
+            c2.push(CommandPayload::SetEnvironment {
+                environment: self.environment,
+            });
+        }
         for s in &self.sides {
             for p in &s.postures {
                 c2.push(CommandPayload::SetPosture {
@@ -337,6 +352,8 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
                         ref_range_m: s.ref_detect_range_m,
                         ref_rcs_m2: s.ref_target_rcs_m2,
                         max_target_altitude_m: s.max_target_altitude_m,
+                        clutter_db_per_sea_state: s.clutter_db_per_sea_state,
+                        beamwidth_deg: s.beamwidth_deg,
                     })
                 })
                 .collect::<Result<Vec<_>, ScenarioError>>()?;
@@ -382,6 +399,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         min_turn_radius_m: turn.1,
         group: u.group.clone(),
         doctrine: u.doctrine,
+        jammer: u.jammer,
     })
 }
 
@@ -542,5 +560,33 @@ mod tests {
                 "{to}"
             );
         }
+    }
+
+    #[test]
+    fn environment_and_jammers_load_and_are_validated() {
+        let with = INLINE
+            .replacen(
+                r#""duration_s": 10,"#,
+                r#""duration_s": 10, "environment": {"sea_state": 4, "weather_loss_db": 2.0},"#,
+                1,
+            )
+            .replacen(
+                r#""accel_mps2": 0.1}"#,
+                r#""accel_mps2": 0.1, "jammer": {"jn_db_at_1km": 50.0}}"#,
+                1,
+            );
+        let s = Scenario::from_json(&with).unwrap();
+        assert_eq!(s.environment.sea_state, 4);
+        let spawn = &s.resolve(&db()).unwrap()[0];
+        assert_eq!(spawn.jammer.map(|j| j.jn_db_at_1km), Some(50.0));
+        let mut sim = s.build(None, &db()).unwrap();
+        sim.step();
+        let env = sim.snapshot(sim_core::Viewer::WhiteCell).environment;
+        assert_eq!((env.sea_state, env.weather_loss_db), (4, 2.0));
+        let rough = with.replacen(r#""sea_state": 4"#, r#""sea_state": 11"#, 1);
+        assert!(matches!(
+            Scenario::from_json(&rough),
+            Err(ScenarioError::Invalid(_))
+        ));
     }
 }

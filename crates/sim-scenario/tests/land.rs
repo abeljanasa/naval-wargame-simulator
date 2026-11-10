@@ -32,6 +32,7 @@ fn ship(at: GeoPoint, heading: f64, speed: f64) -> Command {
             min_turn_radius_m: Some(300.0),
             group: None,
             doctrine: Doctrine::default(),
+            jammer: None,
         }),
     }
 }

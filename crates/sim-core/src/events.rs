@@ -46,6 +46,15 @@ pub enum SimEventKind {
         pd: f64,
         draw: f64,
         detected: bool,
+        /// Clutter loss applied, dB (0 in saves before format 5).
+        #[serde(default)]
+        clutter_db: f64,
+        /// Weather loss applied, dB.
+        #[serde(default)]
+        weather_db: f64,
+        /// Total linear jamming-to-noise ratio at the radar.
+        #[serde(default)]
+        jn: f64,
         /// Measurement errors drawn for a detection (none when not detected, or in v2 saves).
         #[serde(default)]
         range_error_m: Option<f64>,

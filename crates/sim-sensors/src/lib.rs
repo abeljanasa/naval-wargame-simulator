@@ -15,5 +15,10 @@ mod track;
 pub use classify::{radar_classification, Classification};
 pub use kind::SensorKind;
 pub use measurement::{gaussian_pair, measurement_error, MeasurementError};
-pub use radar::{detection_range_m, pd_per_scan};
+pub use radar::{
+    burn_through_range_m, clutter_loss_db, detection_range_m, detection_range_with_loss_m,
+    in_main_beam, jamming_to_noise, pd_jammed, pd_per_scan, ClutterBackground, Environment,
+    JammerSpec, CLUTTER_CEILING_M, DEFAULT_BEAMWIDTH_DEG, DEFAULT_CLUTTER_DB_PER_SEA_STATE,
+    LAND_CLUTTER_SEA_STATE, SIDELOBE_DB,
+};
 pub use track::{measured_point, Cov2, ErrorEllipse, TrackEstimate};

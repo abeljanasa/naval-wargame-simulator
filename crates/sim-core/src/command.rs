@@ -7,6 +7,7 @@ use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_c2::{Doctrine, Posture};
 use sim_geo::GeoPoint;
+use sim_sensors::{Environment, JammerSpec};
 
 /// Version of the command and snapshot wire protocol. Bump it on any breaking change to
 /// [`Command`], [`CommandPayload`] or [`crate::Snapshot`], and add a migration.
@@ -88,6 +89,8 @@ pub struct UnitSpawn {
     pub group: Option<String>,
     #[serde(default)]
     pub doctrine: Doctrine,
+    #[serde(default)]
+    pub jammer: Option<JammerSpec>,
 }
 
 /// Where a doctrine setting applies.
@@ -131,6 +134,10 @@ pub enum CommandPayload {
         scope: DoctrineScope,
         doctrine: Doctrine,
     },
+    /// Sea state and weather loss for every radar. Scenario and white cell only.
+    SetEnvironment {
+        environment: Environment,
+    },
 }
 
 impl CommandPayload {
@@ -146,6 +153,7 @@ impl CommandPayload {
             } => Some(*unit),
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
+            | CommandPayload::SetEnvironment { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -183,6 +191,9 @@ impl CommandPayload {
                 for sensor in &s.sensors {
                     sensor.validate()?;
                 }
+                if s.jammer.is_some_and(|j| !j.jn_db_at_1km.is_finite()) {
+                    return Err("jammer jn_db_at_1km must be finite".into());
+                }
                 if !(s.speed_mps.is_finite()
                     && s.heading_deg.is_finite()
                     && s.altitude_m.is_finite())
@@ -211,6 +222,7 @@ impl CommandPayload {
                 ..
             } if group.trim().is_empty() => Err("group name is empty".into()),
             CommandPayload::SetDoctrine { .. } => Ok(()),
+            CommandPayload::SetEnvironment { environment } => environment.validate(),
         }
     }
 }

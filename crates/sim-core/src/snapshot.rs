@@ -10,7 +10,7 @@ use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_c2::{Doctrine, Posture, ResolvedDoctrine};
 use sim_geo::GeoPoint;
-use sim_sensors::{Classification, ErrorEllipse};
+use sim_sensors::{Classification, Environment, ErrorEllipse};
 
 /// Whose picture a snapshot shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,4 +101,6 @@ pub struct Snapshot {
     pub contacts: Vec<ContactView>,
     /// Side viewer: that side's postures toward the others. White cell: every posture set.
     pub postures: Vec<PostureView>,
+    /// Sea state and weather, known to every side.
+    pub environment: Environment,
 }

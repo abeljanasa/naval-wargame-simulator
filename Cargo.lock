@@ -3790,6 +3790,7 @@ name = "sim-core"
 version = "0.1.0"
 dependencies = [
  "bevy_ecs",
+ "libm",
  "proptest",
  "rand_chacha",
  "rmp-serde",
