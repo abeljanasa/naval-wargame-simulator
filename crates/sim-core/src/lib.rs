@@ -60,13 +60,16 @@ pub use optical::default_length_m;
 pub use point_defence::{PointDefence, Shot};
 pub use rng::{RngStreams, StreamId};
 pub use save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
-pub use scenario_events::{EventEngine, Message, MessageLog, MESSAGE_VIEW_LIMIT};
+pub use scenario_events::{
+    EventEngine, EventStatus, Facilitation, InjectStatus, Message, MessageLog, EXERCISE_CONTROL,
+    MESSAGE_VIEW_LIMIT,
+};
 pub use sim::Simulation;
 pub use sim_ai::{Mission, AI_PERIOD_TICKS};
 pub use sim_c2::{Doctrine, Emcon, Posture, ResolvedDoctrine, Wcs};
 pub use sim_events::{
     validate_events, Area, Audience, Cmp, Condition, DoctrineTarget, EventAction, EventRuntime,
-    ScenarioEvent, Trigger,
+    Inject, ScenarioEvent, Trigger,
 };
 pub use sim_sensors::{
     BearingLine, Carrier, Classification, Cov2, Environment, ErrorEllipse, JammerSpec,

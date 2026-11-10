@@ -182,6 +182,11 @@ pub enum SimEventKind {
         action: u32,
         reason: String,
     },
+    /// A white-cell facilitation action (inject, message, event fired or switched).
+    Facilitated {
+        umpire: String,
+        action: crate::scenario_events::Facilitation,
+    },
     /// A white-cell override, with who made it and why.
     Adjudicated {
         umpire: String,

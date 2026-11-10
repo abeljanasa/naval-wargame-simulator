@@ -60,6 +60,7 @@ Actions run as `Issuer::Script` commands, with the scenario's authority, and are
 | `set_speed`, `set_route`, `assign_mission` | Orders for a unit. |
 | `spawn_reserve { unit }` | Brings in a scenario unit marked `"reserve": true`, held off the board until then. |
 | `enable_event { event, enabled }` | Turns an event on or off. |
+| `send_inject { inject }` | Sends an inject from the scenario library ([injects.md](injects.md)). |
 
 ## Messages
 

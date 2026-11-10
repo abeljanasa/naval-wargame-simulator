@@ -18,6 +18,6 @@ mod model;
 
 pub use eval::{EventRuntime, EventWorld, TickFacts, UnitFact};
 pub use model::{
-    validate_events, Area, Audience, Cmp, Condition, DoctrineTarget, EventAction, ScenarioEvent,
-    Trigger,
+    validate_events, Area, Audience, Cmp, Condition, DoctrineTarget, EventAction, Inject,
+    ScenarioEvent, Trigger,
 };

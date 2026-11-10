@@ -22,10 +22,22 @@
 - **Desktop Messages panel.**
 - **New demonstrator:** `data/scenarios/phase3-ttx-demo.json`, an escalation exercise.
 
+### Added (Phase 3, slice 3: injects)
+
+- **Inject library in scenarios** (`docs/models/injects.md`, DL-0023): role-play sender, audience, text, and a white-cell note.
+- **Scheduled injects:** the `send_inject` event action.
+- **White-cell `Facilitate` command:** send an inject or a free-text message, fire an event, turn an event on or off. Logged with the umpire.
+- **White-cell picture:** the inject library with send counts, and every event's state.
+- **Desktop white-cell console:**
+  - Injects (Send).
+  - Events (enable, Fire).
+  - Message to.
+  - Inject titles in the Messages panel.
+
 ### Changed
 
-- Save format 14 (events, messages).
-- Golden hashes: phase 1 `dd64421cfad317f2`, phase 2 `3930306360d8e447`, phase 3 `fbd8dfd736e8745d`.
+- Save format 14 (events, injects, messages).
+- Golden hashes: phase 1 `8bedd2be4a43ad72`, phase 2 `21f3cc8300d560a7`, phase 3 `7fb4c0bd32644c04`.
 - Save format 13 (adjudication log).
 
 ### Added (Phase 2, slice 12: Gate 2 pack)

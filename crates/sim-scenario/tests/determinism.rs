@@ -235,14 +235,15 @@ fn gate3_demo_events_drive_the_exercise() {
         .iter()
         .any(|e| matches!(e.kind, K::UnitDestroyed { .. })));
     let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
-    assert_eq!(blue.messages.len(), 4);
+    assert_eq!(blue.messages.len(), 5);
     assert_eq!(
         sim.snapshot(Viewer::Side { side: SideId(2) })
             .messages
             .len(),
-        2
+        3
     );
-    assert_eq!(sim.snapshot(Viewer::WhiteCell).messages.len(), 7);
+    assert_eq!(sim.snapshot(Viewer::WhiteCell).messages.len(), 8);
+    assert_eq!(sim.snapshot(Viewer::WhiteCell).injects.len(), 3);
 
     let mut sim = s.build(None, &db()).unwrap();
     sim.submit(Command {

@@ -49,8 +49,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 11: adds unit missions. Older saves load with no missions.
 /// * 12: adds minefields. Older saves load with none.
 /// * 13: adds the white-cell adjudication log. Older saves load with an empty log.
-/// * 14: adds scenario events (definitions, state, reserves) and the message log. Older saves
-///   load with neither.
+/// * 14: adds scenario events (definitions, state, reserves, injects) and the message log.
+///   Older saves load with neither.
 pub const SAVE_FORMAT_VERSION: u32 = 14;
 
 /// Every component of one unit.

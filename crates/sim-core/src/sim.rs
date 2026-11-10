@@ -23,7 +23,7 @@ use crate::movement::movement_system;
 use crate::point_defence::{point_defence_system, PointDefence};
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
-use crate::scenario_events::{scenario_events_system, EventEngine, MessageLog};
+use crate::scenario_events::{facilitate, scenario_events_system, EventEngine, MessageLog};
 use crate::snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
 use crate::snapshot::{StoreView, WeaponView};
 use crate::time::{SimClock, Tick};
@@ -368,6 +368,14 @@ impl Simulation {
                 }
                 Viewer::Side { .. } => Vec::new(),
             },
+            injects: match viewer {
+                Viewer::WhiteCell => self.world.resource::<EventEngine>().inject_status(),
+                Viewer::Side { .. } => Vec::new(),
+            },
+            scenario_events: match viewer {
+                Viewer::WhiteCell => self.world.resource::<EventEngine>().event_status(),
+                Viewer::Side { .. } => Vec::new(),
+            },
             messages: self.world.resource::<MessageLog>().visible(match viewer {
                 Viewer::WhiteCell => None,
                 Viewer::Side { side } => Some(side),
@@ -531,6 +539,11 @@ impl Simulation {
         }
         for id in ev.reserves.keys() {
             h.u64(id.0);
+        }
+        h.u64(ev.injects.len() as u64);
+        for (id, n) in &ev.sent {
+            h.str(id);
+            h.u64(u64::from(*n));
         }
         for (u, side) in &ev.sides {
             h.u64(u.0);
@@ -928,7 +941,15 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             Issuer::WhiteCell { umpire } => adjudicate(world, umpire, reason, action),
             _ => Err("only the white cell may adjudicate".into()),
         },
-        CommandPayload::SetEvents { events, reserves } => {
+        CommandPayload::Facilitate { action } => match &cmd.issuer {
+            Issuer::WhiteCell { umpire } => facilitate(world, umpire, action),
+            _ => Err("only the white cell may send injects or run events".into()),
+        },
+        CommandPayload::SetEvents {
+            events,
+            reserves,
+            injects,
+        } => {
             if !cmd.issuer.is_privileged() {
                 return Err("only the scenario or white cell may set events".into());
             }
@@ -936,9 +957,11 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             if let Some(r) = reserves.iter().find(|r| index.contains_key(&r.id)) {
                 return Err(format!("reserve {} is already in play", r.id));
             }
-            world
-                .resource_mut::<EventEngine>()
-                .load(events.clone(), reserves.clone());
+            world.resource_mut::<EventEngine>().load(
+                events.clone(),
+                reserves.clone(),
+                injects.clone(),
+            );
             Ok(())
         }
         CommandPayload::CreateMinefield {

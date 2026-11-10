@@ -166,6 +166,39 @@
       "actions": [
         { "type": "message", "to": "white_cell", "text": "SITREP due from both sides." }
       ]
+    },
+    {
+      "id": "e07-media",
+      "name": "Press desk",
+      "trigger": { "type": "time", "at_s": 2400 },
+      "actions": [{ "type": "send_inject", "inject": "i02-media" }]
+    }
+  ],
+  "injects": [
+    {
+      "id": "i01-distress",
+      "title": "Distress call",
+      "from": "MV Ember",
+      "to": "side",
+      "side": 1,
+      "text": "MV Ember, 20 nm north-west of you: engine room fire, two injured, request assistance.",
+      "note": "Send early to see whether Blue detaches a unit from the patrol."
+    },
+    {
+      "id": "i02-media",
+      "title": "Media report",
+      "to": "all",
+      "text": "Regional news is broadcasting footage of warships manoeuvring in Bass Strait.",
+      "note": "Sent automatically at 40 min by e07-media; resend to raise the pressure."
+    },
+    {
+      "id": "i03-red-orders",
+      "title": "Fleet orders",
+      "from": "Red fleet headquarters",
+      "to": "side",
+      "side": 2,
+      "text": "Continue the transit through the patrol box. Do not fire first.",
+      "note": "Send if Red hesitates to enter the box."
     }
   ]
 }

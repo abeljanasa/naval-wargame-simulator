@@ -83,7 +83,11 @@ fn scene(seed: u64, events: Vec<ScenarioEvent>, reserves: Vec<UnitSpawn>) -> Sim
     sim.submit(cmd(
         0,
         Issuer::Scenario,
-        CommandPayload::SetEvents { events, reserves },
+        CommandPayload::SetEvents {
+            events,
+            reserves,
+            injects: vec![],
+        },
     ))
     .unwrap();
     sim
@@ -310,6 +314,7 @@ fn a_contact_trigger_fires_when_a_side_gains_a_track() {
                 vec![say(Some(1), "New surface contact")],
             )],
             reserves: vec![],
+            injects: vec![],
         },
     ))
     .unwrap();
@@ -334,6 +339,7 @@ fn only_privileged_issuers_set_events_and_bad_events_are_refused() {
         payload: CommandPayload::SetEvents {
             events: vec![e.clone()],
             reserves: vec![],
+            injects: vec![],
         },
     })
     .unwrap();
@@ -350,6 +356,7 @@ fn only_privileged_issuers_set_events_and_bad_events_are_refused() {
             CommandPayload::SetEvents {
                 events: vec![e.clone(), e],
                 reserves: vec![],
+                injects: vec![],
             },
         ))
         .unwrap_err();
@@ -392,4 +399,215 @@ fn probability_draws_are_seeded_and_survive_save_and_resume() {
         d.snapshot(Viewer::WhiteCell).messages,
         a.snapshot(Viewer::WhiteCell).messages
     );
+}
+
+// --- Injects and white-cell facilitation (Phase 3 slice 3) ---
+
+fn library() -> Vec<Inject> {
+    vec![
+        Inject {
+            id: "i-distress".into(),
+            title: "Distress call".into(),
+            from: "MV Ember".into(),
+            to: Audience::Side { side: 1 },
+            text: "Engine room fire, request assistance".into(),
+            note: "Tests whether Blue diverts from the patrol".into(),
+        },
+        Inject {
+            id: "i-media".into(),
+            title: "Media report".into(),
+            from: String::new(),
+            to: Audience::All,
+            text: "Footage of the encounter is circulating online".into(),
+            note: String::new(),
+        },
+    ]
+}
+
+/// The scene plus an inject library, with an event that sends the media report at 60 s and a
+/// disabled event the white cell can fire.
+fn facilitated(seed: u64) -> Simulation {
+    let mut sim = scene(seed, vec![], vec![]);
+    let mut spare = event(
+        "spare",
+        Trigger::Time { at_s: 1.0 },
+        vec![say(Some(2), "Red: return to port")],
+    );
+    spare.enabled = false;
+    let mut media = event(
+        "media",
+        Trigger::Time { at_s: 60.0 },
+        vec![EventAction::SendInject {
+            inject: "i-media".into(),
+        }],
+    );
+    media.name = "Press desk".into();
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        CommandPayload::SetEvents {
+            events: vec![media, spare],
+            reserves: vec![],
+            injects: library(),
+        },
+    ))
+    .unwrap();
+    sim
+}
+
+fn facilitate(tick: u64, issuer: Issuer, action: Facilitation) -> Command {
+    cmd(tick, issuer, CommandPayload::Facilitate { action })
+}
+
+#[test]
+fn injects_go_out_by_event_and_by_the_white_cell_and_are_counted() {
+    let mut sim = facilitated(7);
+    sim.submit(facilitate(
+        30,
+        umpire(),
+        Facilitation::SendInject {
+            inject: "i-distress".into(),
+        },
+    ))
+    .unwrap();
+    sim.run_until(Tick(100));
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    let got: Vec<(u64, &str, Option<&str>, &str)> = blue
+        .messages
+        .iter()
+        .map(|m| {
+            (
+                m.tick.0,
+                m.from.as_str(),
+                m.title.as_deref(),
+                m.text.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        got,
+        vec![
+            (
+                30,
+                "MV Ember",
+                Some("Distress call"),
+                "Engine room fire, request assistance"
+            ),
+            (
+                60,
+                "Press desk",
+                Some("Media report"),
+                "Footage of the encounter is circulating online"
+            ),
+        ]
+    );
+    // Red gets only the media report; sides never see the library or the white-cell notes.
+    let red = sim.snapshot(Viewer::Side { side: SideId(2) });
+    assert_eq!(red.messages.len(), 1);
+    assert!(red.injects.is_empty() && red.scenario_events.is_empty());
+    let white = sim.snapshot(Viewer::WhiteCell);
+    let sent: Vec<(String, u32)> = white
+        .injects
+        .iter()
+        .map(|s| (s.inject.id.clone(), s.sent))
+        .collect();
+    assert_eq!(
+        sent,
+        vec![("i-distress".to_owned(), 1), ("i-media".to_owned(), 1)]
+    );
+    assert_eq!(
+        white.injects[0].inject.note,
+        "Tests whether Blue diverts from the patrol"
+    );
+    // The umpire who sent it is in the event log.
+    assert!(sim.events().iter().any(|e| matches!(
+        &e.kind,
+        SimEventKind::Facilitated { umpire, .. } if umpire == "U1"
+    )));
+}
+
+#[test]
+fn the_white_cell_fires_and_switches_events_and_messages_but_players_cannot() {
+    let mut sim = facilitated(8);
+    let player = Issuer::Player { seat: 1 };
+    sim.submit(facilitate(
+        5,
+        player,
+        Facilitation::FireEvent {
+            event: "spare".into(),
+        },
+    ))
+    .unwrap();
+    // A disabled event fires on the white cell's order, and counts as fired.
+    sim.submit(facilitate(
+        10,
+        umpire(),
+        Facilitation::FireEvent {
+            event: "spare".into(),
+        },
+    ))
+    .unwrap();
+    // Switching the timed media event off stops it.
+    sim.submit(facilitate(
+        20,
+        umpire(),
+        Facilitation::SetEventEnabled {
+            event: "media".into(),
+            enabled: false,
+        },
+    ))
+    .unwrap();
+    sim.submit(facilitate(
+        25,
+        umpire(),
+        Facilitation::SendMessage {
+            to: Audience::WhiteCell,
+            text: "Note for the umpires".into(),
+        },
+    ))
+    .unwrap();
+    sim.submit(facilitate(
+        26,
+        umpire(),
+        Facilitation::SendInject {
+            inject: "nope".into(),
+        },
+    ))
+    .unwrap();
+    sim.run_until(Tick(100));
+    let rejected: Vec<String> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match &e.kind {
+            SimEventKind::CommandRejected { reason, .. } => Some(reason.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(rejected.len(), 2, "{rejected:?}");
+    assert!(rejected[0].contains("only the white cell"));
+    assert!(rejected[1].contains("unknown inject"));
+    assert_eq!(fired(&sim), vec![(10, "spare".to_owned())]);
+    let red = sim.snapshot(Viewer::Side { side: SideId(2) });
+    assert_eq!(red.messages.len(), 1);
+    assert_eq!(red.messages[0].text, "Red: return to port");
+    let white = sim.snapshot(Viewer::WhiteCell);
+    let status: Vec<(&str, bool, u32)> = white
+        .scenario_events
+        .iter()
+        .map(|e| (e.id.as_str(), e.enabled, e.fired))
+        .collect();
+    assert_eq!(status, vec![("media", false, 0), ("spare", false, 1)]);
+    let note = white.messages.last().unwrap();
+    assert_eq!(
+        (note.from.as_str(), note.to, note.text.as_str()),
+        (
+            EXERCISE_CONTROL,
+            Audience::WhiteCell,
+            "Note for the umpires"
+        )
+    );
+    assert!(sim
+        .snapshot(Viewer::Side { side: SideId(1) })
+        .messages
+        .is_empty());
 }

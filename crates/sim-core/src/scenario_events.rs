@@ -12,8 +12,8 @@ use crate::time::{SimClock, Tick, TICK_SECONDS};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use sim_events::{
-    Audience, Condition, DoctrineTarget, EventAction, EventRuntime, EventWorld, ScenarioEvent,
-    TickFacts, UnitFact,
+    Audience, Condition, DoctrineTarget, EventAction, EventRuntime, EventWorld, Inject,
+    ScenarioEvent, TickFacts, UnitFact,
 };
 use std::collections::BTreeMap;
 
@@ -30,11 +30,24 @@ pub struct EventEngine {
     pub reserves: BTreeMap<UnitId, UnitSpawn>,
     /// The last known side of every unit seen in play, so a destroyed unit's side is known.
     pub sides: BTreeMap<UnitId, SideId>,
+    /// The inject library, by id.
+    #[serde(default)]
+    pub injects: BTreeMap<String, Inject>,
+    /// Times each inject has been sent.
+    #[serde(default)]
+    pub sent: BTreeMap<String, u32>,
 }
 
 impl EventEngine {
     /// Replaces the events and reserves; every event starts unfired.
-    pub(crate) fn load(&mut self, mut events: Vec<ScenarioEvent>, reserves: Vec<UnitSpawn>) {
+    pub(crate) fn load(
+        &mut self,
+        mut events: Vec<ScenarioEvent>,
+        reserves: Vec<UnitSpawn>,
+        injects: Vec<Inject>,
+    ) {
+        self.injects = injects.into_iter().map(|i| (i.id.clone(), i)).collect();
+        self.sent.clear();
         events.sort_by(|a, b| a.id.cmp(&b.id));
         self.runtime = events
             .iter()
@@ -58,10 +71,200 @@ impl EventEngine {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Message {
     pub tick: Tick,
-    /// The event's name (or id), or the umpire.
+    /// The inject's sender, the event's name (or id), or `Exercise control` for the white cell.
     pub from: String,
     pub to: Audience,
     pub text: String,
+    /// The inject's title, when the message is an inject.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// The inject's id, when the message is an inject.
+    #[serde(default)]
+    pub inject: Option<String>,
+}
+
+/// Sender shown for messages the white cell sends.
+pub const EXERCISE_CONTROL: &str = "Exercise control";
+
+/// A white-cell facilitation action: running the exercise, as opposed to overriding outcomes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Facilitation {
+    /// Sends an inject from the library now.
+    SendInject { inject: String },
+    /// Sends a free-text message from exercise control.
+    SendMessage {
+        #[serde(flatten)]
+        to: Audience,
+        text: String,
+    },
+    /// Fires an event now: its actions run regardless of its trigger, conditions and whether it
+    /// is enabled or spent. It counts as fired.
+    FireEvent { event: String },
+    /// Turns an event on or off.
+    SetEventEnabled { event: String, enabled: bool },
+}
+
+impl Facilitation {
+    pub(crate) fn validate(&self) -> Result<(), String> {
+        match self {
+            Facilitation::SendMessage { text, .. } if text.trim().is_empty() => {
+                Err("message text is empty".into())
+            }
+            Facilitation::SendInject { inject: id }
+            | Facilitation::FireEvent { event: id }
+            | Facilitation::SetEventEnabled { event: id, .. }
+                if id.trim().is_empty() =>
+            {
+                Err("no id given".into())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+/// An inject as the white cell sees it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct InjectStatus {
+    pub inject: Inject,
+    pub sent: u32,
+}
+
+/// An event as the white cell sees it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct EventStatus {
+    pub id: String,
+    pub name: String,
+    pub enabled: bool,
+    pub repeatable: bool,
+    pub fired: u32,
+}
+
+impl EventEngine {
+    /// The inject library with send counts, in id order.
+    #[must_use]
+    pub fn inject_status(&self) -> Vec<InjectStatus> {
+        self.injects
+            .values()
+            .map(|i| InjectStatus {
+                inject: i.clone(),
+                sent: self.sent.get(&i.id).copied().unwrap_or(0),
+            })
+            .collect()
+    }
+
+    /// Every event's state, in id order.
+    #[must_use]
+    pub fn event_status(&self) -> Vec<EventStatus> {
+        self.events
+            .iter()
+            .map(|e| {
+                let rt = self.runtime.get(&e.id);
+                EventStatus {
+                    id: e.id.clone(),
+                    name: e.name.clone(),
+                    enabled: rt.is_some_and(|r| r.enabled),
+                    repeatable: e.repeatable,
+                    fired: rt.map_or(0, |r| r.fired),
+                }
+            })
+            .collect()
+    }
+}
+
+/// Sends inject `id` (`event_from` is the sending event's name, if an event sends it).
+fn deliver_inject(
+    world: &mut World,
+    engine: &mut EventEngine,
+    id: &str,
+    event_from: Option<&str>,
+    tick: Tick,
+) -> Result<(), String> {
+    let inject = engine
+        .injects
+        .get(id)
+        .ok_or_else(|| format!("unknown inject {id:?}"))?;
+    let from = if !inject.from.is_empty() {
+        inject.from.clone()
+    } else {
+        event_from.unwrap_or(EXERCISE_CONTROL).to_owned()
+    };
+    world.resource_mut::<MessageLog>().0.push(Message {
+        tick,
+        from,
+        to: inject.to,
+        text: inject.text.clone(),
+        title: Some(inject.title.clone()),
+        inject: Some(inject.id.clone()),
+    });
+    *engine.sent.entry(id.to_owned()).or_default() += 1;
+    Ok(())
+}
+
+/// Carries out a white-cell facilitation action from `umpire`. The `Facilitated` event is logged
+/// first, so the log explains what follows.
+pub(crate) fn facilitate(
+    world: &mut World,
+    umpire: &str,
+    action: &Facilitation,
+) -> Result<(), String> {
+    let tick = world.resource::<SimClock>().tick;
+    let mut engine = world.remove_resource::<EventEngine>().unwrap_or_default();
+    let known = match action {
+        Facilitation::SendInject { inject } => engine
+            .injects
+            .contains_key(inject)
+            .then_some(())
+            .ok_or_else(|| format!("unknown inject {inject:?}")),
+        Facilitation::FireEvent { event } | Facilitation::SetEventEnabled { event, .. } => engine
+            .runtime
+            .contains_key(event)
+            .then_some(())
+            .ok_or_else(|| format!("unknown event {event:?}")),
+        Facilitation::SendMessage { .. } => Ok(()),
+    };
+    let result = known.and_then(|()| {
+        world.resource_mut::<EventLog>().push(
+            tick,
+            SimEventKind::Facilitated {
+                umpire: umpire.to_owned(),
+                action: action.clone(),
+            },
+        );
+        match action {
+            Facilitation::SendInject { inject } => {
+                deliver_inject(world, &mut engine, inject, None, tick)
+            }
+            Facilitation::SendMessage { to, text } => {
+                world.resource_mut::<MessageLog>().0.push(Message {
+                    tick,
+                    from: EXERCISE_CONTROL.to_owned(),
+                    to: *to,
+                    text: text.clone(),
+                    title: None,
+                    inject: None,
+                });
+                Ok(())
+            }
+            Facilitation::FireEvent { event } => {
+                if let Some(i) = engine.events.iter().position(|e| &e.id == event) {
+                    fire(world, &mut engine, i, tick);
+                }
+                Ok(())
+            }
+            Facilitation::SetEventEnabled { event, enabled } => {
+                if let Some(rt) = engine.runtime.get_mut(event) {
+                    rt.enabled = *enabled;
+                }
+                Ok(())
+            }
+        }
+    });
+    world.insert_resource(engine);
+    result
 }
 
 /// Every message sent, in order.
@@ -250,8 +453,13 @@ fn act(
                 from: from.to_owned(),
                 to: *to,
                 text: text.clone(),
+                title: None,
+                inject: None,
             });
             return Ok(());
+        }
+        EventAction::SendInject { inject } => {
+            return deliver_inject(world, engine, inject, Some(from), tick);
         }
         EventAction::EnableEvent { event, enabled } => {
             return engine

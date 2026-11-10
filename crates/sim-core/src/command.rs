@@ -4,11 +4,12 @@ use crate::adjudication::Adjudication;
 use crate::components::Domain;
 use crate::detection::SensorSpec;
 use crate::ids::{SideId, UnitId};
+use crate::scenario_events::Facilitation;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_ai::Mission;
 use sim_c2::{Doctrine, Posture};
-use sim_events::ScenarioEvent;
+use sim_events::{Inject, ScenarioEvent};
 use sim_geo::GeoPoint;
 use sim_sensors::{Carrier, Environment, JammerSpec};
 use sim_weapons::{DamageProfile, WeaponSpec};
@@ -200,6 +201,14 @@ pub enum CommandPayload {
         events: Vec<ScenarioEvent>,
         #[serde(default)]
         reserves: Vec<UnitSpawn>,
+        /// The inject library.
+        #[serde(default)]
+        injects: Vec<Inject>,
+    },
+    /// A white-cell facilitation action: send an inject or a message, fire an event, or turn one
+    /// on or off. White cell only.
+    Facilitate {
+        action: Facilitation,
     },
     /// Creates a minefield. Scenario and white cell only.
     CreateMinefield {
@@ -244,6 +253,7 @@ impl CommandPayload {
             | CommandPayload::CreateMinefield { .. }
             | CommandPayload::Adjudicate { .. }
             | CommandPayload::SetEvents { .. }
+            | CommandPayload::Facilitate { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -343,8 +353,13 @@ impl CommandPayload {
                     Ok(())
                 }
             }
-            CommandPayload::SetEvents { events, reserves } => {
-                sim_events::validate_events(events)?;
+            CommandPayload::Facilitate { action } => action.validate(),
+            CommandPayload::SetEvents {
+                events,
+                reserves,
+                injects,
+            } => {
+                sim_events::validate_events(events, injects)?;
                 for r in reserves {
                     CommandPayload::SpawnUnit(r.clone())
                         .validate()

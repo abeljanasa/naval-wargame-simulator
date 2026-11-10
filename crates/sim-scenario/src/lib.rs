@@ -18,7 +18,7 @@ pub mod synthetic;
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
-    Environment, GeoPoint, Guidance, Issuer, JammerSpec, Mission, Posture, ScenarioEvent,
+    Environment, GeoPoint, Guidance, Inject, Issuer, JammerSpec, Mission, Posture, ScenarioEvent,
     SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn, WeaponKind, WeaponSpec,
 };
 use sim_db::PlatformDb;
@@ -159,6 +159,9 @@ pub struct Scenario {
     /// Scenario events, checked every tick (`docs/models/events.md`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<ScenarioEvent>,
+    /// The inject library: prepared messages sent by events or by the white cell.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub injects: Vec<Inject>,
 }
 
 fn domain_from_db(s: &str) -> Option<Domain> {
@@ -291,7 +294,17 @@ impl Scenario {
     /// `spawn_reserve` must name a reserve unit.
     fn validate_events(&self, sides: &BTreeSet<SideId>) -> Result<(), ScenarioError> {
         use sim_core::{Audience, Condition, DoctrineTarget, EventAction, Trigger};
-        sim_core::validate_events(&self.events).map_err(ScenarioError::Invalid)?;
+        sim_core::validate_events(&self.events, &self.injects).map_err(ScenarioError::Invalid)?;
+        for i in &self.injects {
+            if let Audience::Side { side } = i.to {
+                if !sides.contains(&SideId(side)) {
+                    return Err(ScenarioError::Invalid(format!(
+                        "inject {:?} is addressed to undeclared side S{side}",
+                        i.id
+                    )));
+                }
+            }
+        }
         let reserves: BTreeSet<u64> = self
             .units
             .iter()
@@ -458,7 +471,7 @@ impl Scenario {
             })?;
         }
         // Last, so area triggers see the units already placed.
-        if !self.events.is_empty() || !reserves.is_empty() {
+        if !self.events.is_empty() || !reserves.is_empty() || !self.injects.is_empty() {
             sim.submit(Command {
                 tick: Tick(0),
                 issuer: Issuer::Scenario,
@@ -466,6 +479,7 @@ impl Scenario {
                 payload: CommandPayload::SetEvents {
                     events: self.events.clone(),
                     reserves,
+                    injects: self.injects.clone(),
                 },
             })?;
         }
@@ -905,6 +919,10 @@ mod tests {
             (r#""unit": 2}"#, r#""unit": 1}"#),
             (r#""unit": 2}"#, r#""unit": 7}"#),
             (r#""at_s": 50"#, r#""at_s": -1"#),
+            (
+                r#""events": ["#,
+                r#""injects": [{"id": "i", "title": "t", "to": "side", "side": 5, "text": "x"}], "events": ["#,
+            ),
         ] {
             let bad = WITH_EVENTS.replacen(from, to, 1);
             assert!(

@@ -72,5 +72,6 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
         environment: Default::default(),
         units,
         events: vec![],
+        injects: vec![],
     }
 }

@@ -256,10 +256,34 @@ pub enum EventAction {
         event: String,
         enabled: bool,
     },
+    /// Delivers an inject from the scenario's library.
+    SendInject {
+        inject: String,
+    },
+}
+
+/// A prepared message in the scenario's inject library, sent by an event or by the white cell.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct Inject {
+    /// Unique id, referred to by `send_inject` actions.
+    pub id: String,
+    /// Short heading shown with the message.
+    pub title: String,
+    /// Who the message appears to come from (role-play), e.g. `MV Ember`. Empty: the event's
+    /// name, or `Exercise control` when the white cell sends it.
+    #[serde(default)]
+    pub from: String,
+    #[serde(flatten)]
+    pub to: Audience,
+    pub text: String,
+    /// Guidance for the white cell (when to use it, expected response). Never sent to sides.
+    #[serde(default)]
+    pub note: String,
 }
 
 impl EventAction {
-    fn validate(&self, ids: &BTreeSet<&str>) -> Result<(), String> {
+    fn validate(&self, ids: &BTreeSet<&str>, injects: &BTreeSet<&str>) -> Result<(), String> {
         match self {
             EventAction::Message { text, .. } if text.trim().is_empty() => {
                 Err("message text is empty".into())
@@ -287,6 +311,9 @@ impl EventAction {
             } => m.validate(),
             EventAction::EnableEvent { event, .. } if !ids.contains(event.as_str()) => {
                 Err(format!("unknown event {event:?}"))
+            }
+            EventAction::SendInject { inject } if !injects.contains(inject.as_str()) => {
+                Err(format!("unknown inject {inject:?}"))
             }
             _ => Ok(()),
         }
@@ -322,9 +349,19 @@ fn finite_time(t: f64) -> bool {
     t.is_finite() && t >= 0.0
 }
 
-/// Checks a set of events on their own: unique ids, valid areas and values, and references to
-/// events that exist. References to units and sides are checked when they are used.
-pub fn validate_events(events: &[ScenarioEvent]) -> Result<(), String> {
+/// Checks a set of events and injects on their own: unique ids, valid areas and values, and
+/// references to events and injects that exist. References to units and sides are checked when
+/// they are used.
+pub fn validate_events(events: &[ScenarioEvent], injects: &[Inject]) -> Result<(), String> {
+    let mut inject_ids = BTreeSet::new();
+    for i in injects {
+        if i.id.trim().is_empty() || i.text.trim().is_empty() {
+            return Err(format!("inject {:?} needs an id and text", i.id));
+        }
+        if !inject_ids.insert(i.id.as_str()) {
+            return Err(format!("duplicate inject id {:?}", i.id));
+        }
+    }
     let mut ids = BTreeSet::new();
     for e in events {
         if e.id.trim().is_empty() {
@@ -371,7 +408,7 @@ pub fn validate_events(events: &[ScenarioEvent]) -> Result<(), String> {
             return Err(fail("no actions".into()));
         }
         for a in &e.actions {
-            a.validate(&ids).map_err(fail)?;
+            a.validate(&ids, &inject_ids).map_err(fail)?;
         }
     }
     Ok(())
@@ -444,22 +481,24 @@ mod tests {
     #[test]
     fn validation_catches_bad_events() {
         let ok = event("a", Trigger::Time { at_s: 60.0 });
-        assert!(validate_events(std::slice::from_ref(&ok)).is_ok());
-        assert!(validate_events(&[ok.clone(), ok.clone()])
+        assert!(validate_events(std::slice::from_ref(&ok), &[]).is_ok());
+        assert!(validate_events(&[ok.clone(), ok.clone()], &[])
             .unwrap_err()
             .contains("duplicate"));
         let mut bad = ok.clone();
         bad.conditions
             .push(Condition::EventFired { event: "x".into() });
-        assert!(validate_events(&[bad])
+        assert!(validate_events(&[bad], &[])
             .unwrap_err()
             .contains("unknown event"));
         let mut bad = ok.clone();
         bad.conditions.push(Condition::Probability { p: 1.5 });
-        assert!(validate_events(&[bad]).is_err());
+        assert!(validate_events(&[bad], &[]).is_err());
         let mut bad = ok.clone();
         bad.actions.clear();
-        assert!(validate_events(&[bad]).unwrap_err().contains("no actions"));
+        assert!(validate_events(&[bad], &[])
+            .unwrap_err()
+            .contains("no actions"));
         let bad = event(
             "a",
             Trigger::Every {
@@ -467,7 +506,7 @@ mod tests {
                 start_s: 0.0,
             },
         );
-        assert!(validate_events(&[bad]).is_err());
+        assert!(validate_events(&[bad], &[]).is_err());
         let bad = event(
             "a",
             Trigger::AreaEntered {
@@ -478,7 +517,35 @@ mod tests {
                 unit: None,
             },
         );
-        assert!(validate_events(&[bad]).unwrap_err().contains("polygon"));
+        assert!(validate_events(&[bad], &[])
+            .unwrap_err()
+            .contains("polygon"));
+    }
+
+    #[test]
+    fn injects_are_checked_and_referenced() {
+        let inject = Inject {
+            id: "i1".into(),
+            title: "Distress call".into(),
+            from: String::new(),
+            to: Audience::Side { side: 1 },
+            text: "MV Ember reports engine failure".into(),
+            note: String::new(),
+        };
+        let mut e = event("a", Trigger::Time { at_s: 1.0 });
+        e.actions = vec![EventAction::SendInject {
+            inject: "i1".into(),
+        }];
+        assert!(validate_events(std::slice::from_ref(&e), std::slice::from_ref(&inject)).is_ok());
+        assert!(validate_events(std::slice::from_ref(&e), &[])
+            .unwrap_err()
+            .contains("unknown inject"));
+        assert!(validate_events(&[], &[inject.clone(), inject.clone()])
+            .unwrap_err()
+            .contains("duplicate inject"));
+        let json = r#"{"id":"i1","title":"Distress call","to":"side","side":1,
+                       "text":"MV Ember reports engine failure"}"#;
+        assert_eq!(serde_json::from_str::<Inject>(json).unwrap(), inject);
     }
 
     #[test]
