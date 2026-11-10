@@ -56,7 +56,31 @@ pub struct SessionInfo {
 #[tauri::command]
 #[specta::specta]
 fn get_session(host: State<'_, SharedHost>) -> SessionInfo {
-    let h = lock(&host);
+    session_info(&lock(&host))
+}
+
+/// Largest scenario file accepted from the UI (a scenario is text; 5 MB is far above any real one).
+const MAX_SCENARIO_BYTES: usize = 5 * 1024 * 1024;
+
+/// Loads a scenario from the JSON text of a file the user picked in the UI. The webview reads
+/// the file, so the app needs no filesystem permission. The text gets the same checks as any
+/// scenario: format and version, structure, platform resolution and command validation.
+#[tauri::command]
+#[specta::specta]
+fn load_scenario(host: State<'_, SharedHost>, json: String) -> Result<SessionInfo, String> {
+    if json.len() > MAX_SCENARIO_BYTES {
+        return Err(format!(
+            "scenario file is {} bytes; the limit is {MAX_SCENARIO_BYTES}",
+            json.len()
+        ));
+    }
+    let scenario = Scenario::from_json(&json).map_err(|e| e.to_string())?;
+    let mut h = lock(&host);
+    h.load(scenario).map_err(|e| e.to_string())?;
+    Ok(session_info(&h))
+}
+
+fn session_info(h: &Host) -> SessionInfo {
     SessionInfo {
         scenario_name: h.scenario.name.clone(),
         description: h.scenario.description.clone(),
@@ -124,6 +148,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             get_session,
+            load_scenario,
             set_paused,
             set_time_compression,
             set_viewer,
@@ -204,7 +229,7 @@ pub fn run() {
             std::process::exit(1);
         }
     };
-    let host = match Host::new(scenario, &platforms) {
+    let host = match Host::new(scenario, platforms) {
         Ok(h) => Arc::new(Mutex::new(h)),
         Err(e) => {
             eprintln!("cannot start simulation: {e}");

@@ -3,6 +3,7 @@
 // for pause/run, time compression, seat changes and route planning.
 // Run: npm run e2e   (headless; set E2E_HEADED=1 to watch)
 
+import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
 import process from "node:process";
 import { createServer } from "vite";
@@ -66,6 +67,19 @@ try {
   check(
     route && route.args.unit === 1 && route.args.waypoints.length === 2,
     "map clicks + Enter send order_route with 2 waypoints",
+  );
+
+  await page.getByLabel("Scenario").setInputFiles({
+    name: "loaded.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ format: "nws-scenario", name: "Loaded from file" })),
+  });
+  await page.getByText("Loaded from file").waitFor({ timeout: 5_000 });
+  check(
+    (await calls()).some(
+      (c) => c.cmd === "load_scenario" && c.args.json.includes("Loaded from file"),
+    ),
+    "picking a scenario file sends load_scenario and shows the new scenario",
   );
 
   await page.getByLabel("Seat").selectOption("white");

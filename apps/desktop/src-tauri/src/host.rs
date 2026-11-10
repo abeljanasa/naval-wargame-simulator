@@ -58,6 +58,7 @@ const MAX_FRAME_CREDIT: Duration = Duration::from_millis(250);
 
 pub struct Host {
     pub scenario: Scenario,
+    platforms: sim_db::PlatformDb,
     sim: Simulation,
     paused: bool,
     compression: TimeCompression,
@@ -70,12 +71,13 @@ pub struct Host {
 impl Host {
     pub fn new(
         scenario: Scenario,
-        platforms: &sim_db::PlatformDb,
+        platforms: sim_db::PlatformDb,
     ) -> Result<Self, sim_scenario::ScenarioError> {
-        let sim = scenario.build(None, platforms)?;
+        let sim = scenario.build(None, &platforms)?;
         let first_side = scenario.sides.first().map(|s| s.id);
         Ok(Self {
             scenario,
+            platforms,
             sim,
             paused: true,
             compression: TimeCompression::X1,
@@ -83,6 +85,24 @@ impl Host {
             carry: 0.0,
             achieved_ratio: 0.0,
         })
+    }
+
+    /// Replaces the running scenario. The new one is fully built first, so a scenario that fails
+    /// to load leaves the current session untouched. The new session starts paused, at 1×,
+    /// in the first side's seat.
+    pub fn load(&mut self, scenario: Scenario) -> Result<(), sim_scenario::ScenarioError> {
+        let sim = scenario.build(None, &self.platforms)?;
+        self.viewer = scenario
+            .sides
+            .first()
+            .map_or(Viewer::WhiteCell, |s| Viewer::Side { side: s.id });
+        self.scenario = scenario;
+        self.sim = sim;
+        self.paused = true;
+        self.compression = TimeCompression::X1;
+        self.carry = 0.0;
+        self.achieved_ratio = 0.0;
+        Ok(())
     }
 
     pub fn set_paused(&mut self, paused: bool) {
@@ -200,7 +220,7 @@ mod tests {
             "../../../../data/scenarios/phase1-strait-transit.json"
         ))
         .unwrap();
-        Host::new(s, &sim_db::embedded::open_platform_db().unwrap()).unwrap()
+        Host::new(s, sim_db::embedded::open_platform_db().unwrap()).unwrap()
     }
 
     #[test]
@@ -252,5 +272,32 @@ mod tests {
         let snap = h.snapshot();
         let merchant = snap.units.iter().find(|u| u.id == UnitId(2)).unwrap();
         assert!((merchant.ordered_speed_mps - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn loading_a_scenario_replaces_the_session_and_a_bad_one_changes_nothing() {
+        let mut h = host();
+        h.set_paused(false);
+        h.step(100);
+        let inline = r#"{"format":"nws-scenario","format_version":2,"name":"Loaded","seed":3,"duration_s":60,
+            "sides":[{"id":7,"name":"Red"}],
+            "units":[{"id":1,"name":"A","side":7,"platform":"GEN-OPV","position":{"lat_deg":-39.3,"lon_deg":146.0}}]}"#;
+        h.load(Scenario::from_json(inline).unwrap()).unwrap();
+        assert_eq!(h.scenario.name, "Loaded");
+        assert_eq!(h.clock().tick, Tick(0));
+        assert!(h.clock().paused);
+        assert_eq!(
+            h.viewer(),
+            Viewer::Side {
+                side: sim_core::SideId(7)
+            }
+        );
+
+        let bad = inline.replace("GEN-OPV", "GEN-NOPE");
+        assert!(h.load(Scenario::from_json(&bad).unwrap()).is_err());
+        assert_eq!(
+            h.scenario.name, "Loaded",
+            "failed load must not change the session"
+        );
     }
 }

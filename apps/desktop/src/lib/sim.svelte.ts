@@ -44,6 +44,20 @@ class SimSession {
     });
   }
 
+  /** Loads a scenario file the user picked; the engine validates it and resets the session. */
+  async loadScenario(file: File) {
+    const res = await commands.loadScenario(await file.text());
+    if (res.status === "error") {
+      this.error = `Could not load ${file.name}: ${res.error}`;
+      return;
+    }
+    this.session = res.data;
+    this.frame = null;
+    this.selected = null;
+    this.draft = null;
+    this.error = null;
+  }
+
   async togglePause() {
     await commands.setPaused(!(this.frame?.clock.paused ?? true));
   }

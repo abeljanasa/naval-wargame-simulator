@@ -37,6 +37,10 @@ mockIPC(
       case "set_paused":
         paused = (args as { paused: boolean }).paused;
         return null;
+      case "load_scenario": {
+        const parsed = JSON.parse((args as { json: string }).json) as { name: string };
+        return { ...session(), scenario_name: parsed.name };
+      }
       case "set_viewer":
         viewer = (args as { viewer: Viewer }).viewer;
         return null;

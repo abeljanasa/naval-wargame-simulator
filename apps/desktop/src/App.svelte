@@ -165,6 +165,20 @@
     {/if}
 
     <section>
+      <h2><label for="scenario-file">Scenario</label></h2>
+      <input
+        id="scenario-file"
+        type="file"
+        accept=".json,application/json"
+        onchange={(e) => {
+          const file = e.currentTarget.files?.[0];
+          if (file) void sim.loadScenario(file);
+          e.currentTarget.value = "";
+        }}
+      />
+    </section>
+
+    <section>
       <h2><label for="seat">Seat</label></h2>
       <select
         id="seat"

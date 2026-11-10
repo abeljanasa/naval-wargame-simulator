@@ -9,6 +9,12 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 /** Commands */
 export const commands = {
 	getSession: () => __TAURI_INVOKE<SessionInfo>("get_session"),
+	/**
+	 *  Loads a scenario from the JSON text of a file the user picked in the UI. The webview reads
+	 *  the file, so the app needs no filesystem permission. The text gets the same checks as any
+	 *  scenario: format and version, structure, platform resolution and command validation.
+	 */
+	loadScenario: (json: string) => typedError<SessionInfo, string>(__TAURI_INVOKE("load_scenario", { json })),
 	setPaused: (paused: boolean) => __TAURI_INVOKE<void>("set_paused", { paused }),
 	setTimeCompression: (compression: TimeCompression) => __TAURI_INVOKE<void>("set_time_compression", { compression }),
 	setViewer: (viewer: Viewer) => __TAURI_INVOKE<void>("set_viewer", { viewer }),
