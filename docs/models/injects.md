@@ -67,4 +67,4 @@ The **Messages** panel shows injects with their title in bold.
 
 - An inject cannot carry attachments or map overlays yet.
 - Players cannot reply in the simulation. Replies go through the exercise's own channels.
-- The umpire ID is `local` in the desktop until seats arrive (slice 5).
+- The umpire ID is the white-cell seat's name ([multi-seat.md](multi-seat.md)).

@@ -15,6 +15,7 @@ use crate::mines::Minefields;
 use crate::point_defence::PointDefence;
 use crate::rng::RngStreams;
 use crate::scenario_events::{EventEngine, MessageLog};
+use crate::seats::Seats;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_sensors::{Environment, JammerSpec};
@@ -51,7 +52,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 13: adds the white-cell adjudication log. Older saves load with an empty log.
 /// * 14: adds scenario events (definitions, state, reserves, injects) and the message log.
 ///   Older saves load with neither.
-pub const SAVE_FORMAT_VERSION: u32 = 14;
+/// * 15: adds the seat table. Older saves load with none (no seat checks).
+pub const SAVE_FORMAT_VERSION: u32 = 15;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,6 +117,8 @@ pub struct SaveGame {
     pub events_engine: EventEngine,
     #[serde(default)]
     pub messages: MessageLog,
+    #[serde(default)]
+    pub seats: Seats,
 }
 
 impl SaveGame {
@@ -139,7 +143,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=13 | SAVE_FORMAT_VERSION => {
+            1..=14 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

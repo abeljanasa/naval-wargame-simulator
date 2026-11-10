@@ -20,7 +20,7 @@ Each slice: behaviour spec, design-log entry, tests, docs, CHANGELOG, green CI (
 | 2 ✅ | **Event engine** (`sim-events`) | Scenario events: triggers (time, area entry, unit destroyed, contact gained) → conditions → actions (message, posture, doctrine, environment, spawn, mission). Evaluated deterministically each tick, every firing logged | — |
 | 3 ✅ | **Injects** | Inject library in the scenario; scheduled (by event) and manual (white cell) injects; message log per side in the desktop | 2 |
 | 4 ✅ | **Lua scripting** | `mlua` (Lua 5.4) conditions and actions, sandboxed (no io/os/package/debug/load), instruction and memory limits, sandbox-escape tests | 2 |
-| 5 | **Multi-seat play** | Seats per side; white-cell control of time for all seats; seat management | — |
+| 5 ✅ | **Multi-seat play** | Seats per side; white-cell control of time for all seats; seat management | — |
 | 6 | **Replay and AAR** | Replay scrubber from the command log, event timeline, loss tables, weapons expended vs effective, detection timeline, CSV export | — |
 | 7 | **Scenario editor** | Units, sides, postures, missions, minefields, reference points, events; validation on save | 2 |
 | 8 | **Planning layer (§7.1)** | Command posts, refuelling points, sheltering ports, anchorages, choke points with sense and engage zones (per-zone ROE/WCS), surface action groups | 2, 7 |

@@ -24,6 +24,7 @@ mod point_defence;
 mod rng;
 mod save;
 mod scenario_events;
+mod seats;
 mod sim;
 mod snapshot;
 mod sonar;
@@ -64,6 +65,7 @@ pub use scenario_events::{
     EventEngine, EventStatus, Facilitation, InjectStatus, Message, MessageLog, EXERCISE_CONTROL,
     MESSAGE_VIEW_LIMIT,
 };
+pub use seats::{validate_seats, Seat, SeatRole, Seats};
 pub use sim::Simulation;
 pub use sim_ai::{Mission, AI_PERIOD_TICKS};
 pub use sim_c2::{Doctrine, Emcon, Posture, ResolvedDoctrine, Wcs};

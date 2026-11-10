@@ -41,5 +41,5 @@ In the white-cell seat, the panel shows a **White-cell console**:
 ## Limitations
 
 - A repair clears critical flags, but sensors lost and speed halved by earlier criticals stay lost. The original values are not kept yet (backlog).
-- The umpire ID in the desktop is `local` until seats and logins arrive with multi-seat play (slice 5).
+- The umpire ID is the white-cell seat's name ([multi-seat.md](multi-seat.md)); logins come with networked play.
 - Moving a unit does not re-plan its mission; the AI picks up from the new position at its next tick.

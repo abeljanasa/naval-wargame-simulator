@@ -10,6 +10,7 @@ use crate::esm::BearingView;
 use crate::ids::{SideId, UnitId};
 use crate::mines::Minefield;
 use crate::scenario_events::{EventStatus, InjectStatus, Message};
+use crate::seats::Seat;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_ai::Mission;
@@ -156,6 +157,8 @@ pub struct Snapshot {
     /// The viewer's message log (the latest 100, oldest first). The white cell sees every
     /// message.
     pub messages: Vec<Message>,
+    /// The seat table: every seat for the white cell, the side's own seats for a side.
+    pub seats: Vec<Seat>,
     /// White cell only: the inject library with send counts.
     pub injects: Vec<InjectStatus>,
     /// White cell only: every scenario event's state.

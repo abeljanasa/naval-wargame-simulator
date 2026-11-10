@@ -24,6 +24,7 @@ use crate::point_defence::{point_defence_system, PointDefence};
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
 use crate::scenario_events::{facilitate, scenario_events_system, EventEngine, MessageLog};
+use crate::seats::Seats;
 use crate::snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
 use crate::snapshot::{StoreView, WeaponView};
 use crate::time::{SimClock, Tick};
@@ -126,6 +127,7 @@ impl Simulation {
         world.insert_resource(AdjudicationLog::default());
         world.insert_resource(EventEngine::default());
         world.insert_resource(MessageLog::default());
+        world.insert_resource(Seats::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
         Self {
@@ -368,6 +370,10 @@ impl Simulation {
                 }
                 Viewer::Side { .. } => Vec::new(),
             },
+            seats: self.world.resource::<Seats>().visible(match viewer {
+                Viewer::WhiteCell => None,
+                Viewer::Side { side } => Some(side),
+            }),
             injects: match viewer {
                 Viewer::WhiteCell => self.world.resource::<EventEngine>().inject_status(),
                 Viewer::Side { .. } => Vec::new(),
@@ -549,6 +555,16 @@ impl Simulation {
             h.u64(u.0);
             h.u16(side.0);
         }
+        let seats = self.world.resource::<Seats>();
+        h.u64(seats.0.len() as u64);
+        for s in seats.0.values() {
+            h.u64(u64::from(s.id));
+            h.str(&s.name);
+            match s.role {
+                crate::seats::SeatRole::WhiteCell => h.u16(u16::MAX),
+                crate::seats::SeatRole::Side { side } => h.u16(side.0),
+            }
+        }
         let msgs = self.world.resource::<MessageLog>();
         h.u64(msgs.0.len() as u64);
         for m in &msgs.0 {
@@ -694,6 +710,7 @@ impl Simulation {
             adjudications: self.world.resource::<AdjudicationLog>().clone(),
             events_engine: self.world.resource::<EventEngine>().clone(),
             messages: self.world.resource::<MessageLog>().clone(),
+            seats: self.world.resource::<Seats>().clone(),
         }
     }
 
@@ -730,6 +747,7 @@ impl Simulation {
         sim.world.insert_resource(save.adjudications);
         sim.world.insert_resource(save.events_engine);
         sim.world.insert_resource(save.messages);
+        sim.world.insert_resource(save.seats);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -838,7 +856,8 @@ fn apply_commands_system(world: &mut World) {
     let tick = world.resource::<SimClock>().tick;
     let due = world.resource::<CommandLog>().due(tick);
     for (seq, cmd) in due {
-        let kind = match apply_command(world, &cmd) {
+        let checked = world.resource::<Seats>().check(&cmd);
+        let kind = match checked.and_then(|()| apply_command(world, &cmd)) {
             Ok(()) => SimEventKind::CommandApplied { seq },
             Err(reason) => SimEventKind::CommandRejected { seq, reason },
         };
@@ -941,6 +960,13 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             Issuer::WhiteCell { umpire } => adjudicate(world, umpire, reason, action),
             _ => Err("only the white cell may adjudicate".into()),
         },
+        CommandPayload::SetSeats { seats } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set seats".into());
+            }
+            world.insert_resource(Seats(seats.iter().map(|s| (s.id, s.clone())).collect()));
+            Ok(())
+        }
         CommandPayload::Facilitate { action } => match &cmd.issuer {
             Issuer::WhiteCell { umpire } => facilitate(world, umpire, action),
             _ => Err("only the white cell may send injects or run events".into()),

@@ -19,7 +19,8 @@ use serde::{Deserialize, Serialize};
 use sim_core::{
     Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
     Environment, GeoPoint, Guidance, Inject, Issuer, JammerSpec, Mission, Posture, ScenarioEvent,
-    SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn, WeaponKind, WeaponSpec,
+    Seat, SeatRole, SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn,
+    WeaponKind, WeaponSpec,
 };
 use sim_db::PlatformDb;
 use std::collections::{BTreeMap, BTreeSet};
@@ -162,6 +163,10 @@ pub struct Scenario {
     /// The inject library: prepared messages sent by events or by the white cell.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub injects: Vec<Inject>,
+    /// Player positions. Empty: one white-cell seat and one seat per side
+    /// (`Scenario::seats_or_default`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seats: Vec<Seat>,
 }
 
 fn domain_from_db(s: &str) -> Option<Domain> {
@@ -284,6 +289,19 @@ impl Scenario {
             .validate()
             .map_err(|e| ScenarioError::Invalid(format!("environment: {e}")))?;
         self.validate_events(&sides)?;
+        if !self.seats.is_empty() {
+            sim_core::validate_seats(&self.seats).map_err(ScenarioError::Invalid)?;
+            for s in &self.seats {
+                if let SeatRole::Side { side } = s.role {
+                    if !sides.contains(&side) {
+                        return Err(ScenarioError::Invalid(format!(
+                            "seat {:?} plays undeclared side {side}",
+                            s.name
+                        )));
+                    }
+                }
+            }
+        }
         if self.duration_s == 0 {
             return Err(ScenarioError::Invalid("duration_s must be > 0".into()));
         }
@@ -378,6 +396,26 @@ impl Scenario {
         Ok(())
     }
 
+    /// The scenario's seats, or the default: seat 0 `White cell`, then seat n for the n-th side,
+    /// named after it.
+    #[must_use]
+    pub fn seats_or_default(&self) -> Vec<Seat> {
+        if !self.seats.is_empty() {
+            return self.seats.clone();
+        }
+        std::iter::once(Seat {
+            id: 0,
+            name: "White cell".into(),
+            role: SeatRole::WhiteCell,
+        })
+        .chain(self.sides.iter().zip(1u32..).map(|(s, id)| Seat {
+            id,
+            name: s.name.clone(),
+            role: SeatRole::Side { side: s.id },
+        }))
+        .collect()
+    }
+
     /// Run length in ticks. `TICK_SECONDS` is 1.0, so seconds and ticks are the same number (ADR-0003).
     #[must_use]
     pub fn duration_ticks(&self) -> Tick {
@@ -447,6 +485,11 @@ impl Scenario {
                 radius_m: m.radius_m,
                 mines: m.mines,
                 weapon: m.weapon.clone(),
+            });
+        }
+        if !self.seats.is_empty() {
+            c2.push(CommandPayload::SetSeats {
+                seats: self.seats.clone(),
             });
         }
         for payload in c2 {
@@ -910,6 +953,44 @@ mod tests {
         let again = Scenario::from_json(&serde_json::to_string(&s).unwrap()).unwrap();
         assert!(again.units[1].reserve);
         assert_eq!(again.events, s.events);
+    }
+
+    #[test]
+    fn default_seats_are_the_white_cell_and_one_per_side_and_declared_seats_are_checked() {
+        let s = Scenario::from_json(WITH_EVENTS).unwrap();
+        let seats = s.seats_or_default();
+        let got: Vec<(u32, &str, SeatRole)> = seats
+            .iter()
+            .map(|x| (x.id, x.name.as_str(), x.role))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                (0, "White cell", SeatRole::WhiteCell),
+                (1, "Blue", SeatRole::Side { side: SideId(1) }),
+                (2, "Red", SeatRole::Side { side: SideId(2) }),
+            ]
+        );
+        let declared = WITH_EVENTS.replacen(
+            r#""events": ["#,
+            r#""seats": [{"id": 5, "name": "Umpire", "role": "white_cell"},
+                         {"id": 6, "name": "Blue CO", "role": "side", "side": 1}], "events": ["#,
+            1,
+        );
+        let s = Scenario::from_json(&declared).unwrap();
+        assert_eq!(s.seats_or_default().len(), 2);
+        let mut sim = s.build(None, &db()).unwrap();
+        sim.step();
+        assert_eq!(sim.snapshot(sim_core::Viewer::WhiteCell).seats.len(), 2);
+        for bad in [
+            declared.replacen(r#""side": 1}], "events""#, r#""side": 4}], "events""#, 1),
+            declared.replacen(r#""role": "white_cell""#, r#""role": "side", "side": 2"#, 1),
+        ] {
+            assert!(
+                matches!(Scenario::from_json(&bad), Err(ScenarioError::Invalid(_))),
+                "{bad}"
+            );
+        }
     }
 
     #[test]

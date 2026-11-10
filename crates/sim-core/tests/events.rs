@@ -743,3 +743,136 @@ fn a_script_with_a_syntax_error_is_refused_when_the_events_are_loaded() {
         .unwrap_err();
     assert!(err.to_string().contains("Lua action"), "{err}");
 }
+
+// --- Seats (Phase 3 slice 5) ---
+
+fn seat(id: u32, name: &str, side: Option<u16>) -> Seat {
+    Seat {
+        id,
+        name: name.into(),
+        role: side.map_or(SeatRole::WhiteCell, |s| SeatRole::Side { side: SideId(s) }),
+    }
+}
+
+fn seated(seed: u64) -> Simulation {
+    let mut sim = scene(seed, vec![], vec![]);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        CommandPayload::SetSeats {
+            seats: vec![
+                seat(0, "Umpire A", None),
+                seat(1, "Blue CO", Some(1)),
+                seat(2, "Red CO", Some(2)),
+            ],
+        },
+    ))
+    .unwrap();
+    sim
+}
+
+fn speed_order(tick: u64, issuer: Issuer, side: Option<u16>, unit: u64) -> Command {
+    Command {
+        tick: Tick(tick),
+        issuer,
+        side: side.map(SideId),
+        payload: CommandPayload::SetSpeed {
+            unit: UnitId(unit),
+            speed_mps: 3.0,
+        },
+    }
+}
+
+#[test]
+fn seats_decide_who_may_command_which_side() {
+    let mut sim = seated(12);
+    let player = |seat| Issuer::Player { seat };
+    let orders = [
+        speed_order(1, player(1), Some(1), 1), // Blue seat, Blue unit: applied
+        speed_order(1, player(1), Some(2), 2), // Blue seat claiming Red: refused
+        speed_order(1, player(9), Some(1), 1), // no such seat: refused
+        speed_order(1, player(0), Some(1), 1), // white-cell seat as a player: refused
+        speed_order(1, umpire(), None, 2),     // "U1" is not a white-cell seat: refused
+        speed_order(
+            1,
+            Issuer::WhiteCell {
+                umpire: "Umpire A".into(),
+            },
+            None,
+            2,
+        ), // applied
+    ];
+    let seqs: Vec<u64> = orders.into_iter().map(|o| sim.submit(o).unwrap()).collect();
+    sim.run_until(Tick(3));
+    let outcome = |seq: u64| -> Result<(), String> {
+        sim.events()
+            .iter()
+            .find_map(|e| match &e.kind {
+                SimEventKind::CommandApplied { seq: s } if *s == seq => Some(Ok(())),
+                SimEventKind::CommandRejected { seq: s, reason } if *s == seq => {
+                    Some(Err(reason.clone()))
+                }
+                _ => None,
+            })
+            .unwrap()
+    };
+    assert_eq!(outcome(seqs[0]), Ok(()));
+    assert!(outcome(seqs[1]).unwrap_err().contains("plays side 1"));
+    assert!(outcome(seqs[2]).unwrap_err().contains("no seat 9"));
+    assert!(outcome(seqs[3]).unwrap_err().contains("white-cell seat"));
+    assert!(outcome(seqs[4])
+        .unwrap_err()
+        .contains("not a white-cell seat"));
+    assert_eq!(outcome(seqs[5]), Ok(()));
+}
+
+#[test]
+fn seat_tables_are_validated_visible_by_side_and_saved() {
+    let mut sim = Simulation::new(13);
+    let err = sim
+        .submit(cmd(
+            0,
+            Issuer::Scenario,
+            CommandPayload::SetSeats {
+                seats: vec![seat(1, "Blue", Some(1))],
+            },
+        ))
+        .unwrap_err();
+    assert!(err.to_string().contains("white-cell seat"));
+    let err = sim
+        .submit(cmd(
+            0,
+            Issuer::Scenario,
+            CommandPayload::SetSeats {
+                seats: vec![seat(0, "A", None), seat(1, "A", Some(1))],
+            },
+        ))
+        .unwrap_err();
+    assert!(err.to_string().contains("duplicate seat name"));
+
+    let mut sim = seated(13);
+    sim.run_until(Tick(2));
+    let names = |v: Viewer, sim: &mut Simulation| -> Vec<String> {
+        sim.snapshot(v).seats.into_iter().map(|s| s.name).collect()
+    };
+    assert_eq!(
+        names(Viewer::WhiteCell, &mut sim),
+        vec!["Umpire A", "Blue CO", "Red CO"]
+    );
+    assert_eq!(
+        names(Viewer::Side { side: SideId(2) }, &mut sim),
+        vec!["Red CO"]
+    );
+    // A resumed run keeps the table and still enforces it.
+    let bytes = sim.save().to_bytes().unwrap();
+    let mut resumed = Simulation::from_save(SaveGame::from_bytes(&bytes).unwrap()).unwrap();
+    assert_eq!(resumed.state_hash(), sim.state_hash());
+    let seq = resumed
+        .submit(speed_order(2, Issuer::Player { seat: 2 }, Some(1), 1))
+        .unwrap();
+    resumed.run_until(Tick(3));
+    assert!(resumed.events().iter().any(|e| matches!(
+        &e.kind,
+        SimEventKind::CommandRejected { seq: s, .. } if *s == seq
+    )));
+}

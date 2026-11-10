@@ -47,10 +47,23 @@
 - **Errors:** script errors are logged, and the run continues. Syntax errors stop the scenario loading.
 - **Demonstrator:** gains a scripted umpire brief, which the cross-OS golden replay runs.
 
+### Added (Phase 3, slice 5: multi-seat play)
+
+- **Seat table** (`docs/models/multi-seat.md`, DL-0025):
+  - White-cell and side seats, declared in the scenario or defaulted (one white-cell seat plus one per side).
+  - Set by the logged `SetSeats` command.
+  - The core refuses player commands from the wrong seat or side, and umpire commands not from a white-cell seat.
+- **Desktop seat windows:**
+  - The main window is the control station and may sit at any seat.
+  - The white cell opens windows locked to a seat, each with its own picture.
+  - Only the main window and white-cell seats run the clock.
+- **Seat management** in the white-cell console: add, remove, open a window.
+
 ### Changed
 
-- Save format 14 (events, injects, messages).
-- Golden hashes: phase 1 `8bedd2be4a43ad72`, phase 2 `21f3cc8300d560a7`, phase 3 `1928186cbeaf1578`.
+- Save format 15 (events, injects, messages, seats).
+- Golden hashes: phase 1 `dd942f76e85bd4f2`, phase 2 `cb360f9a36c8bc87`, phase 3 `db033be444af12f8`.
+- Desktop: `set_viewer` is replaced by `set_seat`. Time-control commands now return errors to seats that may not use them.
 - CI: the air-gapped job builds and tests `sim-events`.
 - Save format 13 (adjudication log).
 

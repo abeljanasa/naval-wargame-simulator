@@ -5,6 +5,7 @@ use crate::components::Domain;
 use crate::detection::SensorSpec;
 use crate::ids::{SideId, UnitId};
 use crate::scenario_events::Facilitation;
+use crate::seats::Seat;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_ai::Mission;
@@ -210,6 +211,10 @@ pub enum CommandPayload {
     Facilitate {
         action: Facilitation,
     },
+    /// Replaces the seat table (`docs/models/multi-seat.md`). Scenario and white cell only.
+    SetSeats {
+        seats: Vec<Seat>,
+    },
     /// Creates a minefield. Scenario and white cell only.
     CreateMinefield {
         side: SideId,
@@ -254,6 +259,7 @@ impl CommandPayload {
             | CommandPayload::Adjudicate { .. }
             | CommandPayload::SetEvents { .. }
             | CommandPayload::Facilitate { .. }
+            | CommandPayload::SetSeats { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -354,6 +360,7 @@ impl CommandPayload {
                 }
             }
             CommandPayload::Facilitate { action } => action.validate(),
+            CommandPayload::SetSeats { seats } => crate::seats::validate_seats(seats),
             CommandPayload::SetEvents {
                 events,
                 reserves,
