@@ -13,7 +13,7 @@ pub mod land;
 mod vincenty;
 
 pub use angle::{normalize_azimuth_deg, normalize_lon_deg};
-pub use ellipsoid::{WGS84_A, WGS84_B, WGS84_F};
+pub use ellipsoid::{chord_m, ecef_surface, WGS84_A, WGS84_B, WGS84_F};
 pub use horizon::{radar_horizon_m, within_radar_horizon, RADAR_HORIZON_COEFF_M};
 pub use vincenty::{direct, inverse, Direct, Inverse, InverseMethod};
 
