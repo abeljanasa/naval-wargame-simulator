@@ -1,0 +1,184 @@
+{
+  "defaults": {
+    "source_citation": "Generic class value representative of open-literature ranges; not derived from any specific aircraft (docs/db/data-dictionary.md#generic-values)",
+    "confidence": "D",
+    "classification": "UNCLASSIFIED",
+    "is_generic": true,
+    "created_by": "nws-core-team",
+    "updated_at": "2026-11-10"
+  },
+  "platforms": [
+    {
+      "id": "GEN-MPA-TP", "name": "Generic turboprop maritime patrol aircraft", "category": "mpa", "domain": "air",
+      "service": "GEN-NAVY", "propulsion": "PROP-TURBOPROP", "damage_profile": "DMG-AIRCRAFT-LARGE",
+      "length_m": 36, "displacement_t": 60, "max_speed_kn": 400, "cruise_speed_kn": 330, "accel_mps2": 1.5, "endurance_nm": 4500, "max_altitude_m": 9000, "hardpoints": 8,
+      "signatures": [ { "kind": "rcs", "value": 40, "unit": "m2" }, { "kind": "ir", "value": 3, "unit": "kw_sr" } ],
+      "sensors": [
+        { "sensor": "SEN-RDR-MAR-AIR", "height_m": 0 }, { "sensor": "SEN-ESM-AIR", "height_m": 0 }, { "sensor": "SEN-EO-AIR", "height_m": 0 },
+        { "sensor": "SEN-MAD", "height_m": 0 }, { "sensor": "SEN-SONOBUOY", "height_m": 0 }, { "sensor": "SEN-VISUAL", "height_m": 0 }
+      ],
+      "loadouts": [
+        { "id": "GEN-MPA-TP/ASW", "name": "Anti-submarine patrol", "role": "asw", "items": { "WPN-TORP-LW": 6 } },
+        { "id": "GEN-MPA-TP/ASUW", "name": "Anti-surface patrol", "role": "asuw", "items": { "WPN-ASM-AIR": 2, "WPN-TORP-LW": 4 } }
+      ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-MPA-JET", "name": "Generic jet maritime patrol aircraft", "category": "mpa", "domain": "air",
+      "service": "GEN-NAVY", "propulsion": "PROP-TURBOFAN", "damage_profile": "DMG-AIRCRAFT-LARGE",
+      "length_m": 40, "displacement_t": 85, "max_speed_kn": 490, "cruise_speed_kn": 450, "accel_mps2": 2, "endurance_nm": 4000, "max_altitude_m": 12500, "hardpoints": 11,
+      "signatures": [ { "kind": "rcs", "value": 50, "unit": "m2" }, { "kind": "ir", "value": 6, "unit": "kw_sr" } ],
+      "sensors": [
+        { "sensor": "SEN-RDR-MAR-AIR", "height_m": 0 }, { "sensor": "SEN-ESM-AIR", "height_m": 0 }, { "sensor": "SEN-EO-AIR", "height_m": 0 },
+        { "sensor": "SEN-SONOBUOY", "height_m": 0 }, { "sensor": "SEN-VISUAL", "height_m": 0 }
+      ],
+      "loadouts": [
+        { "id": "GEN-MPA-JET/ASW", "name": "Anti-submarine patrol", "role": "asw", "items": { "WPN-TORP-LW": 8 } },
+        { "id": "GEN-MPA-JET/ASUW", "name": "Anti-surface patrol", "role": "asuw", "items": { "WPN-ASM-AIR": 4, "WPN-TORP-LW": 4 } }
+      ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-AEW", "name": "Generic airborne early-warning aircraft", "category": "aew", "domain": "air",
+      "service": "GEN-AIR", "propulsion": "PROP-TURBOPROP", "damage_profile": "DMG-AIRCRAFT-LARGE",
+      "length_m": 18, "displacement_t": 26, "max_speed_kn": 350, "cruise_speed_kn": 300, "accel_mps2": 1, "endurance_nm": 1500, "max_altitude_m": 10000,
+      "signatures": [ { "kind": "rcs", "value": 100, "unit": "m2" }, { "kind": "ir", "value": 2, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-RDR-AEW", "height_m": 0 }, { "sensor": "SEN-ESM-AIR", "height_m": 0 } ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-TANKER", "name": "Generic air-to-air refuelling tanker", "category": "tanker", "domain": "air",
+      "service": "GEN-AIR", "propulsion": "PROP-TURBOFAN", "damage_profile": "DMG-AIRCRAFT-LARGE",
+      "length_m": 50, "displacement_t": 230, "max_speed_kn": 500, "cruise_speed_kn": 460, "accel_mps2": 1.2, "endurance_nm": 6000, "max_altitude_m": 12000,
+      "signatures": [ { "kind": "rcs", "value": 100, "unit": "m2" }, { "kind": "ir", "value": 8, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-VISUAL", "height_m": 0 } ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-FTR-MR", "name": "Generic multirole fighter", "category": "fighter", "domain": "air",
+      "service": "GEN-AIR", "propulsion": "PROP-TURBOFAN", "damage_profile": "DMG-AIRCRAFT-SMALL",
+      "length_m": 16, "displacement_t": 25, "max_speed_kn": 1150, "cruise_speed_kn": 480, "accel_mps2": 8, "endurance_nm": 1500, "max_altitude_m": 15000, "hardpoints": 9,
+      "signatures": [ { "kind": "rcs", "value": 3, "unit": "m2" }, { "kind": "ir", "value": 5, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-RDR-FTR", "height_m": 0 }, { "sensor": "SEN-VISUAL", "height_m": 0 } ],
+      "loadouts": [
+        { "id": "GEN-FTR-MR/CAP", "name": "Combat air patrol", "role": "air_superiority", "items": { "WPN-AAM-BVR": 4, "WPN-AAM-SR": 2 } },
+        { "id": "GEN-FTR-MR/ASUW", "name": "Maritime strike", "role": "asuw", "items": { "WPN-ASM-AIR": 2, "WPN-AAM-BVR": 2, "WPN-AAM-SR": 2 } },
+        { "id": "GEN-FTR-MR/STRIKE", "name": "Precision strike", "role": "strike", "items": { "WPN-BOMB-GUIDED": 4, "WPN-AAM-BVR": 2, "WPN-AAM-SR": 2 } }
+      ],
+      "comms": ["COM-UHF", "COM-VHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-FTR-AS", "name": "Generic air-superiority fighter", "category": "fighter", "domain": "air",
+      "service": "GEN-AIR", "propulsion": "PROP-TURBOFAN", "damage_profile": "DMG-AIRCRAFT-SMALL",
+      "length_m": 20, "displacement_t": 30, "max_speed_kn": 1300, "cruise_speed_kn": 500, "accel_mps2": 10, "endurance_nm": 1600, "max_altitude_m": 18000, "hardpoints": 10,
+      "signatures": [ { "kind": "rcs", "value": 5, "unit": "m2" }, { "kind": "ir", "value": 8, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-RDR-FTR", "height_m": 0 }, { "sensor": "SEN-IRST", "height_m": 0 }, { "sensor": "SEN-VISUAL", "height_m": 0 } ],
+      "loadouts": [
+        { "id": "GEN-FTR-AS/CAP", "name": "Combat air patrol", "role": "air_superiority", "items": { "WPN-AAM-BVR": 6, "WPN-AAM-SR": 2 } }
+      ],
+      "comms": ["COM-UHF", "COM-VHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-FTR-CV", "name": "Generic carrier-capable strike fighter", "category": "fighter", "domain": "air",
+      "service": "GEN-NAVY", "propulsion": "PROP-TURBOFAN", "damage_profile": "DMG-AIRCRAFT-SMALL",
+      "length_m": 18, "displacement_t": 30, "max_speed_kn": 1000, "cruise_speed_kn": 470, "accel_mps2": 7, "endurance_nm": 1200, "max_altitude_m": 15000, "hardpoints": 11,
+      "signatures": [ { "kind": "rcs", "value": 3, "unit": "m2" }, { "kind": "ir", "value": 6, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-RDR-FTR", "height_m": 0 }, { "sensor": "SEN-EO-AIR", "height_m": 0 }, { "sensor": "SEN-VISUAL", "height_m": 0 } ],
+      "loadouts": [
+        { "id": "GEN-FTR-CV/CAP", "name": "Fleet air defence", "role": "air_superiority", "items": { "WPN-AAM-BVR": 6, "WPN-AAM-SR": 2 } },
+        { "id": "GEN-FTR-CV/ASUW", "name": "Maritime strike", "role": "asuw", "items": { "WPN-ASM-AIR": 4, "WPN-AAM-BVR": 2, "WPN-AAM-SR": 2 } },
+        { "id": "GEN-FTR-CV/STRIKE", "name": "Precision strike", "role": "strike", "items": { "WPN-BOMB-GUIDED": 6, "WPN-AAM-BVR": 2, "WPN-AAM-SR": 2 } }
+      ],
+      "comms": ["COM-UHF", "COM-VHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-FTR-LIGHT", "name": "Generic light combat aircraft", "category": "fighter", "domain": "air",
+      "service": "GEN-AIR", "propulsion": "PROP-TURBOFAN", "damage_profile": "DMG-AIRCRAFT-SMALL",
+      "length_m": 13, "displacement_t": 13, "max_speed_kn": 1000, "cruise_speed_kn": 450, "accel_mps2": 6, "endurance_nm": 1000, "max_altitude_m": 15000, "hardpoints": 7,
+      "signatures": [ { "kind": "rcs", "value": 2, "unit": "m2" }, { "kind": "ir", "value": 3, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-RDR-FTR", "height_m": 0 }, { "sensor": "SEN-VISUAL", "height_m": 0 } ],
+      "loadouts": [
+        { "id": "GEN-FTR-LIGHT/CAP", "name": "Air defence", "role": "air_superiority", "items": { "WPN-AAM-BVR": 2, "WPN-AAM-SR": 2 } },
+        { "id": "GEN-FTR-LIGHT/STRIKE", "name": "Strike", "role": "strike", "items": { "WPN-BOMB-GUIDED": 2, "WPN-AAM-SR": 2 } }
+      ],
+      "comms": ["COM-UHF", "COM-VHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-BMR", "name": "Generic maritime strike bomber", "category": "fighter", "domain": "air",
+      "service": "GEN-AIR", "propulsion": "PROP-TURBOFAN", "damage_profile": "DMG-AIRCRAFT-LARGE",
+      "length_m": 40, "displacement_t": 120, "max_speed_kn": 1000, "cruise_speed_kn": 480, "accel_mps2": 3, "endurance_nm": 3000, "max_altitude_m": 13000, "hardpoints": 4,
+      "signatures": [ { "kind": "rcs", "value": 25, "unit": "m2" }, { "kind": "ir", "value": 15, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-RDR-MAR-AIR", "height_m": 0 }, { "sensor": "SEN-ESM-AIR", "height_m": 0 } ],
+      "loadouts": [
+        { "id": "GEN-BMR/ASUW", "name": "Anti-ship strike", "role": "asuw", "items": { "WPN-ASM-AIR": 4 } },
+        { "id": "GEN-BMR/LAND", "name": "Land-attack strike", "role": "strike", "items": { "WPN-LACM": 4 } }
+      ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-HELO-ASW", "name": "Generic medium naval ASW helicopter", "category": "helicopter", "domain": "air",
+      "service": "GEN-NAVY", "propulsion": "PROP-TURBOSHAFT", "damage_profile": "DMG-HELICOPTER",
+      "length_m": 19, "displacement_t": 10, "max_speed_kn": 150, "cruise_speed_kn": 120, "accel_mps2": 2, "endurance_nm": 450, "max_altitude_m": 4500, "hardpoints": 3,
+      "signatures": [ { "kind": "rcs", "value": 10, "unit": "m2" }, { "kind": "ir", "value": 1.5, "unit": "kw_sr" }, { "kind": "acoustic", "value": 150, "unit": "db_re_1upa" } ],
+      "sensors": [
+        { "sensor": "SEN-SON-DIP", "height_m": 0 }, { "sensor": "SEN-SONOBUOY", "height_m": 0 }, { "sensor": "SEN-RDR-MAR-AIR", "height_m": 0 },
+        { "sensor": "SEN-ESM-AIR", "height_m": 0 }, { "sensor": "SEN-EO-AIR", "height_m": 0 }
+      ],
+      "loadouts": [
+        { "id": "GEN-HELO-ASW/ASW", "name": "Anti-submarine", "role": "asw", "items": { "WPN-TORP-LW": 2 } },
+        { "id": "GEN-HELO-ASW/ASUW", "name": "Anti-surface", "role": "asuw", "items": { "WPN-ASM-LIGHT": 2 } }
+      ],
+      "comms": ["COM-UHF", "COM-VHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-HELO-UTIL", "name": "Generic naval utility helicopter", "category": "helicopter", "domain": "air",
+      "service": "GEN-NAVY", "propulsion": "PROP-TURBOSHAFT", "damage_profile": "DMG-HELICOPTER",
+      "length_m": 18, "displacement_t": 9, "max_speed_kn": 150, "cruise_speed_kn": 125, "accel_mps2": 2, "endurance_nm": 350, "max_altitude_m": 5000, "hardpoints": 2,
+      "signatures": [ { "kind": "rcs", "value": 10, "unit": "m2" }, { "kind": "ir", "value": 1.5, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-EO-AIR", "height_m": 0 }, { "sensor": "SEN-VISUAL", "height_m": 0 } ],
+      "loadouts": [ { "id": "GEN-HELO-UTIL/ARMED", "name": "Armed escort", "role": "asuw", "items": { "WPN-ASM-LIGHT": 2 } } ],
+      "comms": ["COM-UHF", "COM-VHF"]
+    },
+    {
+      "id": "GEN-HELO-HEAVY", "name": "Generic heavy ASW / mine countermeasures helicopter", "category": "helicopter", "domain": "air",
+      "service": "GEN-NAVY", "propulsion": "PROP-TURBOSHAFT", "damage_profile": "DMG-HELICOPTER",
+      "length_m": 22, "displacement_t": 15, "max_speed_kn": 165, "cruise_speed_kn": 135, "accel_mps2": 1.8, "endurance_nm": 550, "max_altitude_m": 4500, "hardpoints": 4,
+      "signatures": [ { "kind": "rcs", "value": 15, "unit": "m2" }, { "kind": "ir", "value": 2, "unit": "kw_sr" }, { "kind": "acoustic", "value": 155, "unit": "db_re_1upa" } ],
+      "sensors": [
+        { "sensor": "SEN-SON-DIP", "height_m": 0 }, { "sensor": "SEN-SONOBUOY", "height_m": 0 },
+        { "sensor": "SEN-RDR-MAR-AIR", "height_m": 0 }, { "sensor": "SEN-ESM-AIR", "height_m": 0 }
+      ],
+      "loadouts": [ { "id": "GEN-HELO-HEAVY/ASW", "name": "Anti-submarine", "role": "asw", "items": { "WPN-TORP-LW": 4 } } ],
+      "comms": ["COM-UHF", "COM-VHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-HELO-LIGHT", "name": "Generic light shipborne helicopter", "category": "helicopter", "domain": "air",
+      "service": "GEN-NAVY", "propulsion": "PROP-TURBOSHAFT", "damage_profile": "DMG-HELICOPTER",
+      "length_m": 15, "displacement_t": 5.5, "max_speed_kn": 145, "cruise_speed_kn": 120, "accel_mps2": 2.2, "endurance_nm": 300, "max_altitude_m": 4000, "hardpoints": 2,
+      "signatures": [ { "kind": "rcs", "value": 6, "unit": "m2" }, { "kind": "ir", "value": 1, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-RDR-MAR-AIR", "height_m": 0 }, { "sensor": "SEN-EO-AIR", "height_m": 0 } ],
+      "loadouts": [
+        { "id": "GEN-HELO-LIGHT/ASUW", "name": "Anti-surface", "role": "asuw", "items": { "WPN-ASM-LIGHT": 2 } },
+        { "id": "GEN-HELO-LIGHT/ASW", "name": "Anti-submarine", "role": "asw", "items": { "WPN-TORP-LW": 1, "WPN-DEPTH-CHARGE": 1 } }
+      ],
+      "comms": ["COM-UHF", "COM-VHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-UAV-MALE", "name": "Generic medium-altitude long-endurance maritime UAV", "category": "uav", "domain": "air",
+      "service": "GEN-AIR", "propulsion": "PROP-TURBOPROP", "damage_profile": "DMG-HELICOPTER",
+      "length_m": 11, "displacement_t": 5, "max_speed_kn": 240, "cruise_speed_kn": 170, "accel_mps2": 1, "endurance_nm": 5000, "max_altitude_m": 13000, "hardpoints": 4,
+      "signatures": [ { "kind": "rcs", "value": 1, "unit": "m2" }, { "kind": "ir", "value": 0.5, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-RDR-MAR-AIR", "height_m": 0 }, { "sensor": "SEN-EO-AIR", "height_m": 0 }, { "sensor": "SEN-ESM-AIR", "height_m": 0 } ],
+      "loadouts": [ { "id": "GEN-UAV-MALE/ARMED", "name": "Armed overwatch", "role": "strike", "items": { "WPN-BOMB-GUIDED": 2 } } ],
+      "comms": ["COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-UAV-VTOL", "name": "Generic ship-based rotary-wing UAV", "category": "uav", "domain": "air",
+      "service": "GEN-NAVY", "propulsion": "PROP-TURBOSHAFT", "damage_profile": "DMG-HELICOPTER",
+      "length_m": 7, "displacement_t": 1.4, "max_speed_kn": 110, "cruise_speed_kn": 80, "accel_mps2": 1.5, "endurance_nm": 300, "max_altitude_m": 4500,
+      "signatures": [ { "kind": "rcs", "value": 0.5, "unit": "m2" }, { "kind": "ir", "value": 0.3, "unit": "kw_sr" } ],
+      "sensors": [ { "sensor": "SEN-EO-AIR", "height_m": 0 } ],
+      "comms": ["COM-LINK"]
+    }
+  ]
+}

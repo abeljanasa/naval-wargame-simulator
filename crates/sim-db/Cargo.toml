@@ -1,0 +1,28 @@
+[package]
+name = "sim-db"
+description = "Platform database: SQLite schema, forward-only migrations, JSON source loader and validation suite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Enables `DbSource::Accredited`. Build it only in the separate accredited pipeline (master prompt §3).
+accredited = []
+
+[[bin]]
+name = "sim-db"
+path = "src/main.rs"
+
+[dependencies]
+sim-geo.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

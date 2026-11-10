@@ -1,0 +1,316 @@
+{
+  "defaults": {
+    "source_citation": "Generic class value representative of open-literature ranges; not derived from any specific platform (docs/db/data-dictionary.md#generic-values)",
+    "confidence": "D",
+    "classification": "UNCLASSIFIED",
+    "is_generic": true,
+    "created_by": "nws-core-team",
+    "updated_at": "2026-11-10"
+  },
+  "platforms": [
+    {
+      "id": "GEN-CV", "name": "Generic large-deck aircraft carrier", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-NUC-SURFACE", "damage_profile": "DMG-CARRIER",
+      "length_m": 330, "displacement_t": 100000, "draft_m": 12, "max_speed_kn": 30, "cruise_speed_kn": 20, "accel_mps2": 0.03,
+      "signatures": [
+        { "kind": "rcs", "value": 50000, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 165, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-LRAS", "height_m": 40 }, { "sensor": "SEN-RDR-3D-MR", "height_m": 35 },
+        { "sensor": "SEN-RDR-SURF", "height_m": 30 }, { "sensor": "SEN-RDR-NAV", "height_m": 25 },
+        { "sensor": "SEN-RDR-CIWS", "height_m": 18 }, { "sensor": "SEN-ESM-SHIP", "height_m": 35 },
+        { "sensor": "SEN-VISUAL", "height_m": 25 }
+      ],
+      "launchers": [
+        { "name": "Point-defence missile launchers", "height_m": 15, "weapons": ["WPN-SAM-PD"] },
+        { "name": "CIWS mounts", "height_m": 18, "weapons": ["WPN-CIWS"] },
+        { "name": "Decoy launchers", "height_m": 15, "weapons": ["WPN-DECOY-CHAFF"] },
+        { "name": "Torpedo countermeasure", "height_m": 0, "weapons": ["WPN-DECOY-TORP"] }
+      ],
+      "magazines": [
+        { "name": "Point-defence missiles", "capacity": 42, "contents": { "WPN-SAM-PD": 42 } },
+        { "name": "CIWS ammunition (bursts)", "capacity": 80, "contents": { "WPN-CIWS": 80 } },
+        { "name": "Decoy rounds", "capacity": 36, "contents": { "WPN-DECOY-CHAFF": 36 } },
+        { "name": "Torpedo countermeasures", "capacity": 4, "contents": { "WPN-DECOY-TORP": 4 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-LHD", "name": "Generic amphibious assault ship (LHD)", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-GT", "damage_profile": "DMG-AMPHIB",
+      "length_m": 250, "displacement_t": 40000, "draft_m": 8, "max_speed_kn": 22, "cruise_speed_kn": 15, "accel_mps2": 0.03, "endurance_nm": 9000,
+      "signatures": [
+        { "kind": "rcs", "value": 30000, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 165, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-3D-MR", "height_m": 35 }, { "sensor": "SEN-RDR-SURF", "height_m": 30 },
+        { "sensor": "SEN-RDR-NAV", "height_m": 25 }, { "sensor": "SEN-RDR-CIWS", "height_m": 18 },
+        { "sensor": "SEN-ESM-SHIP", "height_m": 30 }, { "sensor": "SEN-VISUAL", "height_m": 22 }
+      ],
+      "launchers": [
+        { "name": "Point-defence missile launchers", "height_m": 15, "weapons": ["WPN-SAM-PD"] },
+        { "name": "CIWS mounts", "height_m": 18, "weapons": ["WPN-CIWS"] },
+        { "name": "Decoy launchers", "height_m": 15, "weapons": ["WPN-DECOY-CHAFF"] }
+      ],
+      "magazines": [
+        { "name": "Point-defence missiles", "capacity": 21, "contents": { "WPN-SAM-PD": 21 } },
+        { "name": "CIWS ammunition (bursts)", "capacity": 60, "contents": { "WPN-CIWS": 60 } },
+        { "name": "Decoy rounds", "capacity": 24, "contents": { "WPN-DECOY-CHAFF": 24 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-CG", "name": "Generic cruiser / large guided-missile destroyer", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-GT", "damage_profile": "DMG-CRUISER",
+      "length_m": 175, "displacement_t": 12000, "draft_m": 7, "max_speed_kn": 31, "cruise_speed_kn": 18, "accel_mps2": 0.06, "endurance_nm": 6000,
+      "signatures": [
+        { "kind": "rcs", "value": 15000, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 155, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 170, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-MFR", "height_m": 30 }, { "sensor": "SEN-RDR-SURF", "height_m": 28 },
+        { "sensor": "SEN-RDR-NAV", "height_m": 22 }, { "sensor": "SEN-RDR-CIWS", "height_m": 16 },
+        { "sensor": "SEN-ESM-SHIP", "height_m": 30 }, { "sensor": "SEN-EO-SHIP", "height_m": 20 },
+        { "sensor": "SEN-VISUAL", "height_m": 18 }, { "sensor": "SEN-SON-HULL-LF", "height_m": -8 },
+        { "sensor": "SEN-SON-TAS", "height_m": -150 }
+      ],
+      "launchers": [
+        { "name": "Vertical launch system", "height_m": 5, "weapons": ["WPN-SAM-LR", "WPN-SAM-MR", "WPN-LACM", "WPN-ASW-ROCKET"] },
+        { "name": "Anti-ship missile canisters", "height_m": 8, "weapons": ["WPN-ASM-SS"] },
+        { "name": "Main gun", "height_m": 10, "weapons": ["WPN-GUN-127"] },
+        { "name": "CIWS mounts", "height_m": 16, "weapons": ["WPN-CIWS"] },
+        { "name": "Torpedo tubes", "height_m": 4, "weapons": ["WPN-TORP-LW"] },
+        { "name": "Decoy launchers", "height_m": 12, "weapons": ["WPN-DECOY-CHAFF"] },
+        { "name": "Torpedo countermeasure", "height_m": 0, "weapons": ["WPN-DECOY-TORP"] }
+      ],
+      "magazines": [
+        { "name": "VLS cells", "capacity": 96, "contents": { "WPN-SAM-LR": 32, "WPN-SAM-MR": 40, "WPN-LACM": 16, "WPN-ASW-ROCKET": 8 } },
+        { "name": "Anti-ship missiles", "capacity": 8, "contents": { "WPN-ASM-SS": 8 } },
+        { "name": "Gun magazine", "capacity": 600, "contents": { "WPN-GUN-127": 600 } },
+        { "name": "CIWS ammunition (bursts)", "capacity": 60, "contents": { "WPN-CIWS": 60 } },
+        { "name": "Torpedo stowage", "capacity": 12, "contents": { "WPN-TORP-LW": 12 } },
+        { "name": "Decoy rounds", "capacity": 24, "contents": { "WPN-DECOY-CHAFF": 24 } },
+        { "name": "Torpedo countermeasures", "capacity": 4, "contents": { "WPN-DECOY-TORP": 4 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-DDG", "name": "Generic air-defence destroyer", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-GT", "damage_profile": "DMG-DESTROYER",
+      "length_m": 155, "displacement_t": 9000, "draft_m": 6.5, "max_speed_kn": 30, "cruise_speed_kn": 18, "accel_mps2": 0.06, "endurance_nm": 5000,
+      "signatures": [
+        { "kind": "rcs", "value": 10000, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 155, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 170, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-MFR", "height_m": 28 }, { "sensor": "SEN-RDR-SURF", "height_m": 25 },
+        { "sensor": "SEN-RDR-NAV", "height_m": 20 }, { "sensor": "SEN-RDR-CIWS", "height_m": 15 },
+        { "sensor": "SEN-ESM-SHIP", "height_m": 28 }, { "sensor": "SEN-EO-SHIP", "height_m": 18 },
+        { "sensor": "SEN-VISUAL", "height_m": 16 }, { "sensor": "SEN-SON-HULL-MF", "height_m": -6 }
+      ],
+      "launchers": [
+        { "name": "Vertical launch system", "height_m": 5, "weapons": ["WPN-SAM-LR", "WPN-SAM-MR", "WPN-ASW-ROCKET"] },
+        { "name": "Anti-ship missile canisters", "height_m": 8, "weapons": ["WPN-ASM-SUB"] },
+        { "name": "Main gun", "height_m": 9, "weapons": ["WPN-GUN-127"] },
+        { "name": "CIWS mounts", "height_m": 15, "weapons": ["WPN-CIWS"] },
+        { "name": "Torpedo tubes", "height_m": 4, "weapons": ["WPN-TORP-LW"] },
+        { "name": "Decoy launchers", "height_m": 12, "weapons": ["WPN-DECOY-CHAFF"] }
+      ],
+      "magazines": [
+        { "name": "VLS cells", "capacity": 64, "contents": { "WPN-SAM-LR": 24, "WPN-SAM-MR": 32, "WPN-ASW-ROCKET": 8 } },
+        { "name": "Anti-ship missiles", "capacity": 8, "contents": { "WPN-ASM-SUB": 8 } },
+        { "name": "Gun magazine", "capacity": 500, "contents": { "WPN-GUN-127": 500 } },
+        { "name": "CIWS ammunition (bursts)", "capacity": 60, "contents": { "WPN-CIWS": 60 } },
+        { "name": "Torpedo stowage", "capacity": 8, "contents": { "WPN-TORP-LW": 8 } },
+        { "name": "Decoy rounds", "capacity": 24, "contents": { "WPN-DECOY-CHAFF": 24 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-FFG", "name": "Generic multi-role frigate", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-CODOG", "damage_profile": "DMG-FRIGATE",
+      "length_m": 135, "displacement_t": 5000, "draft_m": 5, "max_speed_kn": 28, "cruise_speed_kn": 16, "accel_mps2": 0.05, "endurance_nm": 4500,
+      "signatures": [
+        { "kind": "rcs", "value": 5000, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 150, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 168, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-3D-MR", "height_m": 25 }, { "sensor": "SEN-RDR-SURF", "height_m": 22 },
+        { "sensor": "SEN-RDR-NAV", "height_m": 18 }, { "sensor": "SEN-RDR-FC", "height_m": 15 },
+        { "sensor": "SEN-RDR-CIWS", "height_m": 14 }, { "sensor": "SEN-ESM-SHIP", "height_m": 25 },
+        { "sensor": "SEN-EO-SHIP", "height_m": 16 }, { "sensor": "SEN-VISUAL", "height_m": 15 },
+        { "sensor": "SEN-SON-HULL-MF", "height_m": -5 }
+      ],
+      "launchers": [
+        { "name": "Vertical launch system", "height_m": 5, "weapons": ["WPN-SAM-MR"] },
+        { "name": "Anti-ship missile canisters", "height_m": 7, "weapons": ["WPN-ASM-SUB"] },
+        { "name": "Main gun", "height_m": 8, "weapons": ["WPN-GUN-76"] },
+        { "name": "CIWS mount", "height_m": 14, "weapons": ["WPN-CIWS"] },
+        { "name": "Torpedo tubes", "height_m": 4, "weapons": ["WPN-TORP-LW"] },
+        { "name": "Decoy launchers", "height_m": 11, "weapons": ["WPN-DECOY-CHAFF"] }
+      ],
+      "magazines": [
+        { "name": "VLS cells", "capacity": 32, "contents": { "WPN-SAM-MR": 32 } },
+        { "name": "Anti-ship missiles", "capacity": 8, "contents": { "WPN-ASM-SUB": 8 } },
+        { "name": "Gun magazine", "capacity": 400, "contents": { "WPN-GUN-76": 400 } },
+        { "name": "CIWS ammunition (bursts)", "capacity": 40, "contents": { "WPN-CIWS": 40 } },
+        { "name": "Torpedo stowage", "capacity": 6, "contents": { "WPN-TORP-LW": 6 } },
+        { "name": "Decoy rounds", "capacity": 24, "contents": { "WPN-DECOY-CHAFF": 24 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-FFG-ASW", "name": "Generic anti-submarine frigate", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-CODAG", "damage_profile": "DMG-FRIGATE",
+      "length_m": 140, "displacement_t": 6000, "draft_m": 5.5, "max_speed_kn": 27, "cruise_speed_kn": 15, "accel_mps2": 0.05, "endurance_nm": 6000,
+      "signatures": [
+        { "kind": "rcs", "value": 5500, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "slow", "value": 135, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 145, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 165, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-3D-MR", "height_m": 25 }, { "sensor": "SEN-RDR-SURF", "height_m": 22 },
+        { "sensor": "SEN-RDR-NAV", "height_m": 18 }, { "sensor": "SEN-ESM-SHIP", "height_m": 24 },
+        { "sensor": "SEN-VISUAL", "height_m": 15 }, { "sensor": "SEN-SON-HULL-LF", "height_m": -6 },
+        { "sensor": "SEN-SON-TAS", "height_m": -150 }
+      ],
+      "launchers": [
+        { "name": "Vertical launch system", "height_m": 5, "weapons": ["WPN-SAM-MR", "WPN-ASW-ROCKET"] },
+        { "name": "Anti-ship missile canisters", "height_m": 7, "weapons": ["WPN-ASM-SUB"] },
+        { "name": "Main gun", "height_m": 8, "weapons": ["WPN-GUN-127"] },
+        { "name": "Torpedo tubes", "height_m": 4, "weapons": ["WPN-TORP-LW"] },
+        { "name": "Decoy launchers", "height_m": 11, "weapons": ["WPN-DECOY-CHAFF"] },
+        { "name": "Torpedo countermeasure", "height_m": 0, "weapons": ["WPN-DECOY-TORP"] }
+      ],
+      "magazines": [
+        { "name": "VLS cells", "capacity": 32, "contents": { "WPN-SAM-MR": 24, "WPN-ASW-ROCKET": 8 } },
+        { "name": "Anti-ship missiles", "capacity": 8, "contents": { "WPN-ASM-SUB": 8 } },
+        { "name": "Gun magazine", "capacity": 400, "contents": { "WPN-GUN-127": 400 } },
+        { "name": "Torpedo stowage", "capacity": 12, "contents": { "WPN-TORP-LW": 12 } },
+        { "name": "Decoy rounds", "capacity": 24, "contents": { "WPN-DECOY-CHAFF": 24 } },
+        { "name": "Torpedo countermeasures", "capacity": 4, "contents": { "WPN-DECOY-TORP": 4 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK", "COM-UWT"]
+    },
+    {
+      "id": "GEN-FFL", "name": "Generic corvette / light frigate", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-CORVETTE",
+      "length_m": 90, "displacement_t": 2000, "draft_m": 4, "max_speed_kn": 26, "cruise_speed_kn": 14, "accel_mps2": 0.07, "endurance_nm": 3500,
+      "signatures": [
+        { "kind": "rcs", "value": 2000, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 152, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-3D-MR", "height_m": 20 }, { "sensor": "SEN-RDR-NAV", "height_m": 15 },
+        { "sensor": "SEN-RDR-FC", "height_m": 14 }, { "sensor": "SEN-ESM-SHIP", "height_m": 20 },
+        { "sensor": "SEN-EO-SHIP", "height_m": 14 }, { "sensor": "SEN-VISUAL", "height_m": 12 },
+        { "sensor": "SEN-SON-HULL-MF", "height_m": -4 }
+      ],
+      "launchers": [
+        { "name": "Short-range SAM launcher", "height_m": 8, "weapons": ["WPN-SAM-SR"] },
+        { "name": "Anti-ship missile canisters", "height_m": 6, "weapons": ["WPN-ASM-SUB"] },
+        { "name": "Main gun", "height_m": 7, "weapons": ["WPN-GUN-76"] },
+        { "name": "Secondary guns", "height_m": 8, "weapons": ["WPN-GUN-30"] },
+        { "name": "Torpedo tubes", "height_m": 3, "weapons": ["WPN-TORP-LW"] },
+        { "name": "Decoy launchers", "height_m": 9, "weapons": ["WPN-DECOY-CHAFF"] }
+      ],
+      "magazines": [
+        { "name": "SAM magazine", "capacity": 16, "contents": { "WPN-SAM-SR": 16 } },
+        { "name": "Anti-ship missiles", "capacity": 4, "contents": { "WPN-ASM-SUB": 4 } },
+        { "name": "Gun magazine", "capacity": 300, "contents": { "WPN-GUN-76": 300 } },
+        { "name": "Secondary gun ammunition (bursts)", "capacity": 100, "contents": { "WPN-GUN-30": 100 } },
+        { "name": "Torpedo stowage", "capacity": 6, "contents": { "WPN-TORP-LW": 6 } },
+        { "name": "Decoy rounds", "capacity": 12, "contents": { "WPN-DECOY-CHAFF": 12 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-PGG", "name": "Generic missile fast attack craft", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-SMALL-CRAFT",
+      "length_m": 50, "displacement_t": 450, "draft_m": 2.5, "max_speed_kn": 38, "cruise_speed_kn": 18, "accel_mps2": 0.15, "endurance_nm": 1500,
+      "signatures": [
+        { "kind": "rcs", "value": 500, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 155, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-SURF", "height_m": 12 }, { "sensor": "SEN-RDR-NAV", "height_m": 10 },
+        { "sensor": "SEN-RDR-FC", "height_m": 10 }, { "sensor": "SEN-ESM-SHIP", "height_m": 12 },
+        { "sensor": "SEN-VISUAL", "height_m": 8 }
+      ],
+      "launchers": [
+        { "name": "Anti-ship missile canisters", "height_m": 4, "weapons": ["WPN-ASM-SUB"] },
+        { "name": "Main gun", "height_m": 5, "weapons": ["WPN-GUN-76"] },
+        { "name": "Secondary gun", "height_m": 5, "weapons": ["WPN-GUN-30"] },
+        { "name": "Decoy launchers", "height_m": 6, "weapons": ["WPN-DECOY-CHAFF"] }
+      ],
+      "magazines": [
+        { "name": "Anti-ship missiles", "capacity": 4, "contents": { "WPN-ASM-SUB": 4 } },
+        { "name": "Gun magazine", "capacity": 250, "contents": { "WPN-GUN-76": 250 } },
+        { "name": "Secondary gun ammunition (bursts)", "capacity": 60, "contents": { "WPN-GUN-30": 60 } },
+        { "name": "Decoy rounds", "capacity": 8, "contents": { "WPN-DECOY-CHAFF": 8 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-OPV", "name": "Generic offshore patrol vessel", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-CG", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-CORVETTE",
+      "length_m": 85, "displacement_t": 1800, "draft_m": 4, "max_speed_kn": 21, "cruise_speed_kn": 12, "accel_mps2": 0.05, "endurance_nm": 6000,
+      "signatures": [
+        { "kind": "rcs", "value": 1500, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 155, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-SURF", "height_m": 18 }, { "sensor": "SEN-RDR-NAV", "height_m": 15 },
+        { "sensor": "SEN-EO-SHIP", "height_m": 14 }, { "sensor": "SEN-VISUAL", "height_m": 12 }
+      ],
+      "launchers": [ { "name": "Main gun", "height_m": 7, "weapons": ["WPN-GUN-30"] } ],
+      "magazines": [ { "name": "Gun ammunition (bursts)", "capacity": 120, "contents": { "WPN-GUN-30": 120 } } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM"]
+    },
+    {
+      "id": "GEN-MCMV", "name": "Generic mine countermeasures vessel", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-MCM",
+      "length_m": 55, "displacement_t": 700, "draft_m": 3, "max_speed_kn": 15, "cruise_speed_kn": 10, "accel_mps2": 0.05, "endurance_nm": 2500,
+      "signatures": [
+        { "kind": "rcs", "value": 500, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "slow", "value": 120, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 135, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-NAV", "height_m": 12 }, { "sensor": "SEN-VISUAL", "height_m": 9 },
+        { "sensor": "SEN-SON-MINEHUNT", "height_m": -3 }
+      ],
+      "launchers": [ { "name": "Self-defence gun", "height_m": 6, "weapons": ["WPN-GUN-30"] } ],
+      "magazines": [ { "name": "Gun ammunition (bursts)", "capacity": 60, "contents": { "WPN-GUN-30": 60 } } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-LINK", "COM-UWT"]
+    },
+    {
+      "id": "GEN-LST", "name": "Generic tank landing ship / minelayer", "category": "surface_combatant", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-AUXILIARY",
+      "length_m": 125, "displacement_t": 6000, "draft_m": 4.5, "max_speed_kn": 18, "cruise_speed_kn": 12, "accel_mps2": 0.03, "endurance_nm": 7000,
+      "signatures": [
+        { "kind": "rcs", "value": 8000, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 160, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-RDR-SURF", "height_m": 20 }, { "sensor": "SEN-RDR-NAV", "height_m": 18 },
+        { "sensor": "SEN-VISUAL", "height_m": 15 }
+      ],
+      "launchers": [
+        { "name": "Self-defence guns", "height_m": 8, "weapons": ["WPN-GUN-30"] },
+        { "name": "Mine rails", "height_m": 2, "weapons": ["WPN-MINE-BOTTOM"] }
+      ],
+      "magazines": [
+        { "name": "Gun ammunition (bursts)", "capacity": 100, "contents": { "WPN-GUN-30": 100 } },
+        { "name": "Mine deck", "capacity": 100, "contents": { "WPN-MINE-BOTTOM": 100 } }
+      ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    }
+  ]
+}
