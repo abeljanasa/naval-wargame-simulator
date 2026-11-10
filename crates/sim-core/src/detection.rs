@@ -39,6 +39,9 @@ pub const SURFACE_TARGET_HEIGHT_M: f64 = 10.0;
 pub const LAND_TARGET_HEIGHT_M: f64 = 5.0;
 /// Height of a surfaced submarine's sail, for the horizon check.
 pub const SURFACED_SUBMARINE_HEIGHT_M: f64 = 2.0;
+/// A lower bound on metres per degree of geodetic latitude anywhere on WGS-84. The minimum
+/// meridional radius a(1−e²) = 6 335 439 m gives 110 574 m/°; rounding down keeps it a strict bound.
+const MIN_METRES_PER_DEG_LAT: f64 = 110_000.0;
 
 /// Sensor kinds, matching the platform database `sensors.kind` values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -334,6 +337,21 @@ pub(crate) fn detection_system(
         .collect();
     all.sort_by_key(|o| o.id);
 
+    // Broad phase (performance only; results are bit-identical to checking every pair).
+    // Radar-visible targets, sorted by latitude, plus the tallest target height this scan.
+    let mut by_lat: Vec<(f64, usize)> = all
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| target_height_m(t.domain, t.position.altitude_m).is_some())
+        .map(|(i, t)| (t.position.point.lat_deg, i))
+        .collect();
+    by_lat.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    let tallest = all
+        .iter()
+        .filter_map(|t| target_height_m(t.domain, t.position.altitude_m))
+        .fold(0.0_f64, f64::max);
+    let mut candidates: Vec<usize> = Vec::new();
+
     for obs in &all {
         for sensor in obs.sensors.0.iter().filter(|s| s.kind == SensorKind::Radar) {
             let (Some(ref_range), Some(ref_rcs)) = (sensor.ref_range_m, sensor.ref_rcs_m2) else {
@@ -344,11 +362,34 @@ pub(crate) fn detection_system(
             else {
                 continue;
             };
-            for tgt in all.iter().filter(|t| t.side != obs.side) {
+            // No target this scan can be seen beyond `reach`, so none can be detected outside
+            // a latitude band of ±reach / (minimum metres per degree of latitude).
+            let reach = sensor.max_range_m.min(radar_horizon_m(h_s, tallest));
+            let lat0 = obs.position.point.lat_deg;
+            let band = reach / MIN_METRES_PER_DEG_LAT;
+            let lo = by_lat.partition_point(|&(lat, _)| lat < lat0 - band);
+            let hi = by_lat.partition_point(|&(lat, _)| lat <= lat0 + band);
+            candidates.clear();
+            candidates.extend(
+                by_lat[lo..hi]
+                    .iter()
+                    .map(|&(_, i)| i)
+                    .filter(|&i| all[i].side != obs.side),
+            );
+            // `all` is in UnitId order, so index order = UnitId order: the draw order is unchanged.
+            candidates.sort_unstable();
+            for &i in &candidates {
+                let tgt = &all[i];
                 let Some(h_t) = target_height_m(tgt.domain, tgt.position.altitude_m) else {
                     continue;
                 };
                 if tgt.position.altitude_m > sensor.max_target_altitude_m {
+                    continue;
+                }
+                // Exact per-pair lower bound: the geodesic is at least |Δlat| × the minimum
+                // meridional radius, so this skips only pairs the range checks below would skip.
+                let bound = sensor.max_range_m.min(radar_horizon_m(h_s, h_t));
+                if (tgt.position.point.lat_deg - lat0).abs() * MIN_METRES_PER_DEG_LAT > bound {
                     continue;
                 }
                 let range = inverse(obs.position.point, tgt.position.point).distance_m;

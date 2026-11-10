@@ -5,7 +5,9 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::{Context, Result};
+mod bench;
+
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 use sim_core::Tick;
@@ -43,6 +45,22 @@ enum Cmd {
         /// embedded in this binary.
         #[arg(long)]
         db: Option<PathBuf>,
+    },
+    /// Measure throughput (game seconds per wall second) against a performance budget.
+    /// Build with `--release`; debug builds are 10–50× slower.
+    Bench {
+        /// Number of units (split evenly between two sides).
+        #[arg(long, default_value_t = 1000)]
+        units: usize,
+        /// Ticks to time (game seconds).
+        #[arg(long, default_value_t = 600)]
+        ticks: u64,
+        /// Platform database class to instantiate.
+        #[arg(long, default_value = "GEN-FFG")]
+        platform: String,
+        /// Fail (exit 1) if the achieved ratio is below this.
+        #[arg(long)]
+        min_ratio: Option<f64>,
     },
 }
 
@@ -104,6 +122,24 @@ fn main() -> Result<()> {
             if let Some(out) = out {
                 std::fs::write(&out, serde_json::to_string_pretty(&results)? + "\n")
                     .with_context(|| format!("writing {}", out.display()))?;
+            }
+            Ok(())
+        }
+        Cmd::Bench {
+            units,
+            ticks,
+            platform,
+            min_ratio,
+        } => {
+            let db = sim_db::embedded::open_platform_db()?;
+            let r = bench::run(&db, units, ticks, &platform, min_ratio)?;
+            println!("{}", serde_json::to_string(&r)?);
+            if !r.passed {
+                bail!(
+                    "budget missed: {:.1}x real time < required {:.1}x",
+                    r.ratio,
+                    r.min_ratio.unwrap_or_default()
+                );
             }
             Ok(())
         }
