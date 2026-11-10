@@ -30,6 +30,8 @@ export const commands = {
 	orderSpeed: (unit: UnitId, speedMps: number | null) => typedError<null, string>(__TAURI_INVOKE("order_speed", { unit, speedMps })),
 	/**  Sets doctrine (WCS, EMCON, ROE) on one unit; unset fields inherit from its group and side. */
 	orderDoctrine: (unit: UnitId, doctrine: Doctrine_Deserialize) => typedError<null, string>(__TAURI_INVOKE("order_doctrine", { unit, doctrine })),
+	/**  Fires `rounds` of `weapon` from `shooter` at the seat's contact `contact`. */
+	orderEngage: (shooter: UnitId, contact: number, weapon: string, rounds: number) => typedError<null, string>(__TAURI_INVOKE("order_engage", { shooter, contact, weapon, rounds })),
 };
 
 /** Events */
@@ -358,6 +360,10 @@ export type SnapshotUpdate_Deserialize = {
 	environment: Environment_Deserialize,
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
+	/**  The viewer's weapons in flight (sent whole). */
+	weapons: WeaponView[],
+	/**  Why orders from this seat were refused since the last frame. */
+	refusals: string[],
 };
 
 /**
@@ -376,7 +382,30 @@ export type SnapshotUpdate_Serialize = {
 	environment: Environment_Serialize,
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
+	/**  The viewer's weapons in flight (sent whole). */
+	weapons: WeaponView[],
+	/**  Why orders from this seat were refused since the last frame. */
+	refusals: string[],
 };
+
+/**  What a unit can still do. */
+export type Status = "operational" | 
+/**
+ *  Afloat or flying but unable to fight (damage beyond the mission-kill fraction, or both
+ *  propulsion and weapons knocked out).
+ */
+"mission_killed" | 
+/**  Sunk, shot down or destroyed. */
+"destroyed";
+
+/**  Rounds of one weapon carried. */
+export type StoreView = {
+	weapon: string,
+	count: number,
+};
+
+/**  Systems a critical hit can knock out. */
+export type System = "sensors" | "propulsion" | "weapons" | "flight_deck" | "comms";
 
 /**  A simulation tick number. Tick `n` covers game time `[n, n+1)` × [`TICK_SECONDS`]. */
 export type Tick = number;
@@ -414,6 +443,14 @@ export type UnitView_Deserialize = {
 	doctrine: ResolvedDoctrine_Deserialize,
 	/**  Doctrine set on the unit itself (unset fields are inherited). */
 	doctrine_set: Doctrine_Deserialize,
+	status: Status,
+	/**  Damage taken as a fraction of the unit's damage points. */
+	damage_fraction: number | null,
+	criticals: System[],
+	fires: number,
+	flooding: boolean,
+	/**  Rounds carried, by weapon id (sorted). */
+	stores: StoreView[],
 };
 
 export type UnitView_Serialize = {
@@ -436,6 +473,14 @@ export type UnitView_Serialize = {
 	doctrine: ResolvedDoctrine_Serialize,
 	/**  Doctrine set on the unit itself (unset fields are inherited). */
 	doctrine_set: Doctrine_Serialize,
+	status: Status,
+	/**  Damage taken as a fraction of the unit's damage points. */
+	damage_fraction: number | null,
+	criticals: System[],
+	fires: number,
+	flooding: boolean,
+	/**  Rounds carried, by weapon id (sorted). */
+	stores: StoreView[],
 };
 
 /**  Whose picture a snapshot shows. */
@@ -476,6 +521,18 @@ export type Wcs_Serialize =
 "tight" | 
 /**  Fire at any track not identified as friendly or neutral. */
 "free";
+
+/**  A missile or torpedo in flight, as shown to its own side (and the white cell). */
+export type WeaponView = {
+	id: number,
+	side: SideId,
+	weapon: string,
+	position: GeoPoint,
+	altitude_m: number | null,
+	heading_deg: number | null,
+	/**  The seeker has acquired its target. */
+	homing: boolean,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

@@ -33,6 +33,12 @@ const unit = (id: number, overrides: Partial<UnitView> = {}): UnitView => ({
   group: null,
   doctrine: { wcs: "tight", emcon: "active", engage_unfriendly: false },
   doctrine_set: { wcs: null, emcon: null, engage_unfriendly: null },
+  status: "operational",
+  damage_fraction: 0,
+  criticals: [],
+  fires: 0,
+  flooding: false,
+  stores: [],
   ...overrides,
 });
 

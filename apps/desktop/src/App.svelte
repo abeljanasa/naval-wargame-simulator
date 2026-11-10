@@ -21,6 +21,20 @@
   let overlay = $state<MapboxOverlay | null>(null);
   let speedInput = $state("");
   let startError = $state<string | null>(null);
+  let engageContact = $state("");
+  let engageWeapon = $state("");
+  let engageRounds = $state("1");
+
+  // Keep the engage form pointing at something that exists.
+  $effect(() => {
+    const u = sim.selectedUnit;
+    if (u && !u.stores.some((st) => st.weapon === engageWeapon)) {
+      engageWeapon = u.stores[0]?.weapon ?? "";
+    }
+    if (!sim.contacts.some((c) => String(c.number) === engageContact)) {
+      engageContact = sim.contacts[0] ? String(sim.contacts[0].number) : "";
+    }
+  });
 
   const clock = $derived(sim.clock);
   const viewerKey = $derived(viewerToKey(sim.session?.viewer ?? { kind: "white_cell" }));
@@ -84,6 +98,7 @@
         units: sim.units,
         contacts: sim.contacts,
         bearings: sim.bearings,
+        weapons: sim.weapons,
         gameTimeS: n(clock?.game_time_s ?? 0),
         viewer: sim.session?.viewer ?? { kind: "white_cell" },
         selected: sim.selected,
@@ -304,7 +319,51 @@
               <option value="silent">Silent (radar off)</option>
             </select>
           </dd>
+          <dt>Condition</dt>
+          <dd class:hurt={u.status !== "operational"}>
+            {u.status.replaceAll("_", " ")} · {Math.round(n(u.damage_fraction) * 100)} % damage{u.fires >
+            0
+              ? ` · ${u.fires} fire${u.fires > 1 ? "s" : ""}`
+              : ""}{u.flooding ? " · flooding" : ""}{u.criticals.length
+              ? ` · lost: ${u.criticals.join(", ").replaceAll("_", " ")}`
+              : ""}
+          </dd>
+          <dt>Stores</dt>
+          <dd>
+            {#each u.stores as st (st.weapon)}
+              <div>{st.weapon} × {st.count}</div>
+            {:else}
+              none
+            {/each}
+          </dd>
         </dl>
+
+        {#if u.stores.length > 0 && sim.contacts.length > 0}
+          <form
+            class="engage"
+            aria-label="Engage"
+            onsubmit={(e) => {
+              e.preventDefault();
+              void sim.orderEngage(Number(engageContact), engageWeapon, Number(engageRounds));
+            }}
+          >
+            <label for="engage-contact">Target</label>
+            <select id="engage-contact" bind:value={engageContact}>
+              {#each sim.contacts as c (c.number)}
+                <option value={String(c.number)}>C{c.number} · {contactKind(c)}</option>
+              {/each}
+            </select>
+            <label for="engage-weapon">Weapon</label>
+            <select id="engage-weapon" bind:value={engageWeapon}>
+              {#each u.stores as st (st.weapon)}
+                <option value={st.weapon}>{st.weapon} ({st.count})</option>
+              {/each}
+            </select>
+            <label for="engage-rounds">Rounds</label>
+            <input id="engage-rounds" type="number" min="1" step="1" bind:value={engageRounds} />
+            <button type="submit">Fire</button>
+          </form>
+        {/if}
 
         <form
           class="row"
@@ -478,6 +537,19 @@
     margin: 0;
     font-family: var(--mono);
     font-size: 12px;
+  }
+  .engage {
+    display: grid;
+    grid-template-columns: 76px 1fr;
+    gap: 4px 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .engage button {
+    grid-column: 2;
+  }
+  .hurt {
+    color: var(--danger);
   }
   .row {
     display: flex;

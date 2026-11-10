@@ -290,6 +290,22 @@ fn order_doctrine(
         .map_err(|e| e.to_string())
 }
 
+/// Fires `rounds` of `weapon` from `shooter` at the seat's contact `contact`.
+#[tauri::command]
+#[specta::specta]
+fn order_engage(
+    host: State<'_, SharedHost>,
+    shooter: UnitId,
+    contact: u32,
+    weapon: String,
+    rounds: u32,
+) -> Result<(), String> {
+    lock(&host)
+        .order_engage(shooter, contact, weapon, rounds)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -305,6 +321,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_route,
             order_speed,
             order_doctrine,
+            order_engage,
         ])
         .events(collect_events![FrameEvent])
 }

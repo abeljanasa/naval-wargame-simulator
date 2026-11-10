@@ -92,6 +92,23 @@ try {
     "weapons selector shows the inherited WCS",
   );
 
+  await page.getByLabel("Weapon", { exact: true }).selectOption("WPN-SAM-MR");
+  await page.getByRole("button", { name: "Fire" }).click();
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some(
+      (c) =>
+        c.cmd === "order_engage" &&
+        c.args.shooter === 1 &&
+        c.args.contact === 1 &&
+        c.args.weapon === "WPN-SAM-MR" &&
+        c.args.rounds === 1,
+    ),
+    "engage form sends order_engage(shooter 1, C1, WPN-SAM-MR, 1 round)",
+  );
+  await page.getByText(/exceeds the 500 m WPN-SAM-MR needs/).waitFor({ timeout: 5_000 });
+  check(true, "an engine refusal of the order is shown to the player");
+
   await page.getByLabel("Scenario").setInputFiles({
     name: "loaded.json",
     mimeType: "application/json",

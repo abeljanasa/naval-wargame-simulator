@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slices 7 and 8: weapons, Ph and damage)
+
+- **`sim-weapons` crate and combat engine** (`docs/models/weapons-damage.md`, DL-0016, DL-0017):
+  - **`Engage` orders** are checked against the shooter's condition, magazine, target domain, track quality for the guidance type, range, and the WCS/ROE release rule (the white cell may override).
+  - **Missiles and torpedoes** fly toward the side's current track estimate. A seeker gets one acquisition draw when the real target is in range, then homes. Semi-active and command weapons need the track held to impact.
+  - **Guns, CIWS, bombs, depth charges and rockets** resolve at once.
+  - **Ph** = base × size × manoeuvre × sea-state modifiers.
+  - **Damage:** damage points from the warhead, and critical hits on sensors, propulsion, weapons, flight deck or comms. Fire and flooding burn every minute until damage control wins. Units become mission-killed or destroyed.
+  - Every draw is logged with its inputs.
+  - **Gate 2 duel test:** 300 engagements match the hand-calculated 0.72 hit rate.
+- **Database queries** for a platform's stores (magazines, or the first loadout for aircraft), weapon figures and damage profile. The scenario loader sends the weapon catalogue.
+- **Desktop:**
+  - The selected unit shows its condition, damage, criticals and stores, plus an Engage form (target, weapon, rounds).
+  - Weapons in flight appear on the map.
+  - Refused orders show the engine's reason.
+
+### Changed
+
+- Save format 9 (older saves still load).
+- Golden hash is now `1e874e39cf5d2dbe`.
+
 ### Added (Phase 2, slice 6: visual, EO/IR and MAD)
 
 - **Visual, EO/IR and MAD** (`docs/models/optical-mad.md`, DL-0015):

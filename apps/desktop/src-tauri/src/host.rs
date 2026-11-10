@@ -6,7 +6,8 @@
 use serde::{Deserialize, Serialize};
 use sim_core::{
     BearingView, Command, CommandPayload, ContactView, Doctrine, DoctrineScope, Environment,
-    GeoPoint, Issuer, SimError, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer,
+    GeoPoint, Issuer, SimError, SimEventKind, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer,
+    WeaponView,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -56,6 +57,10 @@ pub struct SnapshotUpdate {
     pub environment: Environment,
     /// The viewer's recent ESM bearing lines (sent whole, like contacts).
     pub bearings: Vec<BearingView>,
+    /// The viewer's weapons in flight (sent whole).
+    pub weapons: Vec<WeaponView>,
+    /// Why orders from this seat were refused since the last frame.
+    pub refusals: Vec<String>,
 }
 
 /// Clock status sent with every frame.
@@ -86,6 +91,10 @@ pub struct Host {
     /// Fractional ticks owed from previous frames.
     carry: f64,
     achieved_ratio: f64,
+    /// Orders from this seat not yet applied or refused (sequence numbers).
+    pending: std::collections::BTreeSet<u64>,
+    /// Events already scanned for refusals.
+    events_seen: usize,
 }
 
 impl Host {
@@ -105,6 +114,8 @@ impl Host {
             viewer: first_side.map_or(Viewer::WhiteCell, |side| Viewer::Side { side }),
             carry: 0.0,
             achieved_ratio: 0.0,
+            pending: std::collections::BTreeSet::new(),
+            events_seen: 0,
         })
     }
 
@@ -124,6 +135,8 @@ impl Host {
         self.compression = TimeCompression::X1;
         self.carry = 0.0;
         self.achieved_ratio = 0.0;
+        self.pending.clear();
+        self.events_seen = 0;
         Ok(())
     }
 
@@ -211,6 +224,7 @@ impl Host {
     /// then only the units that changed and the ids of those that left the picture (§6.2).
     pub fn update(&mut self) -> SnapshotUpdate {
         let snap = self.sim.snapshot(self.viewer);
+        let refusals = self.refusals();
         let update = match &self.last_sent {
             Some(prev) if prev.viewer == snap.viewer => {
                 let old: std::collections::BTreeMap<UnitId, &UnitView> =
@@ -236,6 +250,8 @@ impl Host {
                     contacts: snap.contacts.clone(),
                     environment: snap.environment,
                     bearings: snap.bearings.clone(),
+                    weapons: snap.weapons.clone(),
+                    refusals: refusals.clone(),
                 }
             }
             _ => SnapshotUpdate {
@@ -248,6 +264,8 @@ impl Host {
                 contacts: snap.contacts.clone(),
                 environment: snap.environment,
                 bearings: snap.bearings.clone(),
+                weapons: snap.weapons.clone(),
+                refusals,
             },
         };
         self.last_sent = Some(snap);
@@ -266,12 +284,50 @@ impl Host {
             ),
             Viewer::Side { side } => (Issuer::Player { seat: 1 }, Some(side)),
         };
-        self.sim.submit(Command {
+        let seq = self.sim.submit(Command {
             tick: self.sim.tick(),
             issuer,
             side,
             payload,
+        })?;
+        self.pending.insert(seq);
+        Ok(seq)
+    }
+
+    /// Fires `rounds` of `weapon` from `shooter` at this seat's contact `contact`. The engine
+    /// checks the order when it applies it; a refusal comes back in the next update.
+    pub fn order_engage(
+        &mut self,
+        shooter: UnitId,
+        contact: u32,
+        weapon: String,
+        rounds: u32,
+    ) -> Result<u64, SimError> {
+        self.order(CommandPayload::Engage {
+            shooter,
+            contact,
+            weapon,
+            rounds,
         })
+    }
+
+    /// Reasons this seat's orders were refused since the last call.
+    fn refusals(&mut self) -> Vec<String> {
+        let events = self.sim.events();
+        let mut out = Vec::new();
+        for e in &events[self.events_seen.min(events.len())..] {
+            match &e.kind {
+                SimEventKind::CommandRejected { seq, reason } if self.pending.remove(seq) => {
+                    out.push(reason.clone());
+                }
+                SimEventKind::CommandApplied { seq } => {
+                    self.pending.remove(seq);
+                }
+                _ => {}
+            }
+        }
+        self.events_seen = events.len();
+        out
     }
 
     pub fn order_route(&mut self, unit: UnitId, waypoints: Vec<GeoPoint>) -> Result<u64, SimError> {
@@ -301,6 +357,33 @@ mod tests {
         ))
         .unwrap();
         Host::new(s, sim_db::embedded::open_platform_db().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn a_refused_engage_order_reports_its_reason_in_the_next_update() {
+        let mut h = host();
+        h.set_viewer(Viewer::Side {
+            side: sim_core::SideId(1),
+        });
+        h.step(1);
+        let _ = h.update();
+        h.order_engage(UnitId(1), 99, "WPN-ASM-SUB".into(), 1)
+            .unwrap();
+        h.step(1);
+        let u = h.update();
+        assert_eq!(u.refusals.len(), 1, "{:?}", u.refusals);
+        assert!(u.refusals[0].contains("no contact C99"), "{:?}", u.refusals);
+        // Reported once only.
+        h.step(1);
+        assert!(h.update().refusals.is_empty());
+        // The frigate's magazines came from the platform database.
+        let snap = h.sim.snapshot(Viewer::Side {
+            side: sim_core::SideId(1),
+        });
+        assert!(snap.units[0]
+            .stores
+            .iter()
+            .any(|s| s.weapon == "WPN-ASM-SUB" && s.count == 8));
     }
 
     #[test]

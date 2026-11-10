@@ -16,6 +16,7 @@ window.__ipcCalls = [];
 let viewer: Viewer = { kind: "side", side: 1 };
 let paused = true;
 let tick = 0;
+let refusals: string[] = [];
 let emcon: "active" | "silent" | null = null;
 
 const session = (): SessionInfo => ({
@@ -91,6 +92,9 @@ mockIPC(
             message: "mock warning",
           },
         ];
+      case "order_engage":
+        refusals = ["C1 track error 900 m exceeds the 500 m WPN-SAM-MR needs"];
+        return null;
       case "order_doctrine":
         emcon = (args as { doctrine: { emcon: "active" | "silent" | null } }).doctrine.emcon;
         return null;
@@ -105,6 +109,8 @@ mockIPC(
 );
 
 const frame = (): FrameEvent => {
+  const sent = refusals;
+  refusals = [];
   const units = [
     {
       id: 1,
@@ -126,6 +132,15 @@ const frame = (): FrameEvent => {
         engage_unfriendly: false,
       },
       doctrine_set: { wcs: null, emcon, engage_unfriendly: null },
+      status: "operational" as const,
+      damage_fraction: 0,
+      criticals: [],
+      fires: 0,
+      flooding: false,
+      stores: [
+        { weapon: "WPN-ASM-SUB", count: 8 },
+        { weapon: "WPN-SAM-MR", count: 32 },
+      ],
     },
     {
       id: 2,
@@ -143,6 +158,12 @@ const frame = (): FrameEvent => {
       group: null,
       doctrine: { wcs: "tight" as const, emcon: "active" as const, engage_unfriendly: false },
       doctrine_set: { wcs: null, emcon: null, engage_unfriendly: null },
+      status: "operational" as const,
+      damage_fraction: 0,
+      criticals: [],
+      fires: 0,
+      flooding: false,
+      stores: [],
     },
   ].filter((u) => viewer.kind === "white_cell" || u.side === viewer.side);
   const contacts =
@@ -202,6 +223,8 @@ const frame = (): FrameEvent => {
         visibility_km: 40,
       },
       bearings,
+      weapons: [],
+      refusals: sent,
     },
   };
 };

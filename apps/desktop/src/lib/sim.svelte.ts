@@ -14,6 +14,7 @@ import {
   type SessionInfo,
   type TimeCompression,
   type UnitView,
+  type WeaponView,
   type Viewer,
 } from "./bindings";
 import { MPS_PER_KNOT } from "./format";
@@ -34,6 +35,8 @@ class SimSession {
   environment = $state<Environment | null>(null);
   /** The seat's recent ESM bearing lines. */
   bearings = $state<BearingView[]>([]);
+  /** The seat's missiles and torpedoes in flight. */
+  weapons = $state<WeaponView[]>([]);
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */
@@ -68,6 +71,8 @@ class SimSession {
     this.allContacts = u.contacts;
     this.environment = u.environment;
     this.bearings = u.bearings;
+    this.weapons = u.weapons;
+    if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 
   /** Loads a scenario file the user picked; the engine validates it and resets the session. */
@@ -139,6 +144,18 @@ class SimSession {
       return;
     }
     const res = await commands.orderSpeed(this.selected, kn * MPS_PER_KNOT);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Fires `rounds` of `weapon` from the selected unit at contact `contact`. A refusal (range,
+   * track quality, weapons control status…) arrives in a later frame and is shown as an error. */
+  async orderEngage(contact: number, weapon: string, rounds: number) {
+    if (this.selected === null) return;
+    if (!Number.isInteger(rounds) || rounds < 1) {
+      this.error = "Rounds must be a whole number ≥ 1";
+      return;
+    }
+    const res = await commands.orderEngage(this.selected, contact, weapon, rounds);
     this.error = res.status === "error" ? res.error : null;
   }
 

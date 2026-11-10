@@ -10,7 +10,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { IconLayer, LineLayer, PathLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import type { BearingView, ContactView, GeoPoint, UnitView, Viewer } from "./bindings";
+import type { BearingView, ContactView, GeoPoint, UnitView, Viewer, WeaponView } from "./bindings";
 import { n, project } from "./format";
 import { AFFILIATION_COLOUR, symbolUrl, type Affiliation } from "./symbols";
 
@@ -123,6 +123,8 @@ export interface SceneInput {
   contacts: ContactView[];
   /** The viewing side's ESM bearing lines. */
   bearings?: BearingView[];
+  /** Missiles and torpedoes in flight that the viewer may see. */
+  weapons?: WeaponView[];
   gameTimeS: number;
   viewer: Viewer;
   selected: number | null;
@@ -303,6 +305,16 @@ export function buildLayers(s: SceneInput): Layer[] {
     // until postures exist (sim-c2). No ground-truth identity is available to draw.
     // ESM bearing lines: from the intercepting ship along the measured bearing. They fade as
     // they age (60 s at most).
+    // Weapons in flight: a short line along the heading, brighter once the seeker has locked on.
+    new LineLayer<WeaponView>({
+      id: "weapons",
+      data: s.weapons ?? [],
+      getSourcePosition: (w) => pt(w.position),
+      getTargetPosition: (w) =>
+        project(n(w.position.lat_deg), n(w.position.lon_deg), n(w.heading_deg), 1500),
+      getColor: (w) => (w.homing ? [255, 90, 60, 255] : [255, 200, 120, 220]),
+      getWidth: 3,
+    }),
     new PathLayer<BearingView>({
       id: "bearings",
       data: s.bearings ?? [],
