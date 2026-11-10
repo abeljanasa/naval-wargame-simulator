@@ -13,6 +13,7 @@ import {
   type Environment,
   type FrameEvent,
   type GeoPoint,
+  type Message,
   type Minefield,
   type Mission,
   type SessionInfo,
@@ -48,6 +49,8 @@ class SimSession {
   minefields = $state<Minefield[]>([]);
   /** White cell: the most recent overrides. */
   adjudications = $state<AdjudicationRecord[]>([]);
+  /** The seat's message log, oldest first. */
+  messages = $state<Message[]>([]);
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */
@@ -85,6 +88,7 @@ class SimSession {
     this.weapons = u.weapons;
     this.minefields = u.minefields;
     this.adjudications = u.adjudications;
+    this.messages = u.messages;
     if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 

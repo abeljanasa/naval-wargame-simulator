@@ -108,6 +108,15 @@ export type Adjudication_Serialize =
 /**  Set the rounds of one weapon a unit carries (0 removes it). */
 { kind: "set_stores"; unit: UnitId; weapon: string; count: number };
 
+/**  Who receives a message. */
+export type Audience = 
+/**  Every side (and the white cell). */
+{ to: "all" } | 
+/**  One side (and the white cell). */
+{ to: "side"; side: number } | 
+/**  The white cell only. */
+{ to: "white_cell" };
+
 /**  A measured bearing from an observer. */
 export type BearingLine = {
 	from: GeoPoint,
@@ -364,6 +373,15 @@ export type GeoPoint = {
 	lon_deg: number | null,
 };
 
+/**  A message delivered to a message log. */
+export type Message = {
+	tick: Tick,
+	/**  The event's name (or id), or the umpire. */
+	from: string,
+	to: Audience,
+	text: string,
+};
+
 /**  A circular minefield. */
 export type Minefield = {
 	id: number,
@@ -459,6 +477,8 @@ export type SnapshotUpdate_Deserialize = {
 	minefields: Minefield[],
 	/**  White cell only: the most recent overrides (sent whole). */
 	adjudications: AdjudicationRecord_Deserialize[],
+	/**  The seat's message log, latest 100 (sent whole). */
+	messages: Message[],
 };
 
 /**
@@ -485,6 +505,8 @@ export type SnapshotUpdate_Serialize = {
 	minefields: Minefield[],
 	/**  White cell only: the most recent overrides (sent whole). */
 	adjudications: AdjudicationRecord_Serialize[],
+	/**  The seat's message log, latest 100 (sent whole). */
+	messages: Message[],
 };
 
 /**  What a unit can still do. */

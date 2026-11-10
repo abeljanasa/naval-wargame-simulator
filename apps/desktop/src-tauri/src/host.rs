@@ -6,8 +6,8 @@
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, ContactView, Doctrine,
-    DoctrineScope, Environment, GeoPoint, Issuer, Minefield, Mission, SimError, SimEventKind,
-    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponView,
+    DoctrineScope, Environment, GeoPoint, Issuer, Message, Minefield, Mission, SimError,
+    SimEventKind, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponView,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -65,6 +65,8 @@ pub struct SnapshotUpdate {
     pub minefields: Vec<Minefield>,
     /// White cell only: the most recent overrides (sent whole).
     pub adjudications: Vec<AdjudicationRecord>,
+    /// The seat's message log, latest 100 (sent whole).
+    pub messages: Vec<Message>,
 }
 
 /// Clock status sent with every frame.
@@ -258,6 +260,7 @@ impl Host {
                     refusals: refusals.clone(),
                     minefields: snap.minefields.clone(),
                     adjudications: snap.adjudications.clone(),
+                    messages: snap.messages.clone(),
                 }
             }
             _ => SnapshotUpdate {
@@ -274,6 +277,7 @@ impl Host {
                 refusals,
                 minefields: snap.minefields.clone(),
                 adjudications: snap.adjudications.clone(),
+                messages: snap.messages.clone(),
             },
         };
         self.last_sent = Some(snap);

@@ -169,6 +169,13 @@ try {
     "white-cell override sends order_adjudicate with its reason and shows in the log",
   );
 
+  const messages = page.getByRole("region", { name: "Messages" });
+  await messages.getByText("STARTEX: proceed").waitFor({ timeout: 5_000 });
+  check(
+    await messages.getByText("Exercise control → all").isVisible(),
+    "message log shows each message with its sender and, for the white cell, its audience",
+  );
+
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
 } catch (e) {
   failures.push(String(e));

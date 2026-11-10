@@ -24,6 +24,9 @@ const adjudications: {
   action: { kind: "destroy_unit"; unit: number };
 }[] = [];
 let emcon: "active" | "silent" | null = null;
+const messages = [
+  { tick: 0, from: "Exercise control", to: { to: "all" as const }, text: "STARTEX: proceed" },
+];
 
 const session = (): SessionInfo => ({
   scenario_name: "E2E — mock scenario",
@@ -241,6 +244,7 @@ const frame = (): FrameEvent => {
       weapons: [],
       minefields: [],
       adjudications,
+      messages,
       refusals: sent,
     },
   };

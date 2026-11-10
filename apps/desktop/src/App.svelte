@@ -13,7 +13,7 @@
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
-  import type { Emcon, Mission, Viewer, Wcs } from "./lib/bindings";
+  import type { Audience, Emcon, Mission, Viewer, Wcs } from "./lib/bindings";
   import DbBrowser from "./lib/DbBrowser.svelte";
 
   let mapEl: HTMLElement;
@@ -51,6 +51,12 @@
       case "strike":
         return `strike C${m.contact}`;
     }
+  }
+
+  function audienceText(a: Audience): string {
+    if (a.to === "all") return "all";
+    if (a.to === "white_cell") return "white cell";
+    return sim.session?.sides.find((s) => s.id === a.side)?.name ?? `side ${a.side}`;
   }
 
   function unitName(id: number): string {
@@ -420,6 +426,24 @@
       </section>
     {/if}
 
+    <section class="messages" aria-label="Messages">
+      <h2>Messages</h2>
+      <ul class="units">
+        {#each [...sim.messages].reverse() as m, i (i)}
+          <li>
+            <span class="meta"
+              >{gameTime(n(m.tick))} · {m.from}{sim.session?.viewer.kind === "white_cell"
+                ? ` → ${audienceText(m.to)}`
+                : ""}</span
+            >
+            <span>{m.text}</span>
+          </li>
+        {:else}
+          <li class="empty">No messages.</li>
+        {/each}
+      </ul>
+    </section>
+
     <details class="db-panel">
       <summary>Platform database</summary>
       <DbBrowser />
@@ -666,6 +690,11 @@
     color: var(--text-dim);
     font-size: 12px;
     margin: 8px 0 4px;
+  }
+  .messages li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
   .adjudications li {
     display: flex;
