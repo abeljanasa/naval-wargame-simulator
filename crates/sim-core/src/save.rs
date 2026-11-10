@@ -1,5 +1,6 @@
 //! Save games: full world state + RNG state + command log, MessagePack-encoded and versioned.
 
+use crate::ai::MissionState;
 use crate::c2::C2State;
 use crate::combat::{Health, Magazine, WeaponCatalog, WeaponsInFlight};
 use crate::command::LoggedCommand;
@@ -42,7 +43,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   damage profile.
 /// * 10: adds point defence (fire channels, detections, interceptors in the air) and decoys on
 ///   weapons in flight. Older saves load with none.
-pub const SAVE_FORMAT_VERSION: u32 = 10;
+/// * 11: adds unit missions. Older saves load with no missions.
+pub const SAVE_FORMAT_VERSION: u32 = 11;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +65,8 @@ pub struct UnitRecord {
     /// `None` in saves before format 9: an undamaged unit on the domain profile.
     #[serde(default)]
     pub health: Option<Health>,
+    #[serde(default)]
+    pub mission: MissionState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,7 +124,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=9 | SAVE_FORMAT_VERSION => {
+            1..=10 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

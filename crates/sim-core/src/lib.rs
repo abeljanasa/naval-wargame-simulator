@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod ai;
 mod c2;
 mod combat;
 mod command;
@@ -25,6 +26,7 @@ mod snapshot;
 mod sonar;
 mod time;
 
+pub use ai::MissionState;
 pub use c2::C2State;
 pub use combat::{
     default_damage_profile, Health, Magazine, WeaponCatalog, WeaponInFlight, WeaponsInFlight,
@@ -52,6 +54,7 @@ pub use point_defence::{PointDefence, Shot};
 pub use rng::{RngStreams, StreamId};
 pub use save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
 pub use sim::Simulation;
+pub use sim_ai::{Mission, AI_PERIOD_TICKS};
 pub use sim_c2::{Doctrine, Emcon, Posture, ResolvedDoctrine, Wcs};
 pub use sim_sensors::{
     BearingLine, Carrier, Classification, Cov2, Environment, ErrorEllipse, JammerSpec,

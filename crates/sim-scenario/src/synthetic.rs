@@ -41,6 +41,7 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
                 group: None,
                 doctrine: Doctrine::default(),
                 jammer: None,
+                mission: None,
             }
         })
         .collect();

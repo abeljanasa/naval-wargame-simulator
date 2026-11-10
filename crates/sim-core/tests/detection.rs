@@ -65,6 +65,7 @@ fn spawn(
             length_m: None,
             stores: Default::default(),
             damage_profile: None,
+            mission: None,
         }),
     }
 }

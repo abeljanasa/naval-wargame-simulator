@@ -38,6 +38,7 @@ fn ship(at: GeoPoint, heading: f64, speed: f64) -> Command {
             length_m: None,
             stores: Default::default(),
             damage_profile: None,
+            mission: None,
         }),
     }
 }

@@ -5,6 +5,7 @@ use crate::detection::SensorSpec;
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
+use sim_ai::Mission;
 use sim_c2::{Doctrine, Posture};
 use sim_geo::GeoPoint;
 use sim_sensors::{Carrier, Environment, JammerSpec};
@@ -108,6 +109,9 @@ pub struct UnitSpawn {
     /// Damage profile; `None` uses the domain default.
     #[serde(default)]
     pub damage_profile: Option<DamageProfile>,
+    /// Mission at start, if any.
+    #[serde(default)]
+    pub mission: Option<Mission>,
 }
 
 /// One emitter type and the platform classes known to carry it.
@@ -179,6 +183,11 @@ pub enum CommandPayload {
         weapon: String,
         rounds: u32,
     },
+    /// Gives a unit a mission (`None` clears it). A player may task its own units.
+    AssignMission {
+        unit: UnitId,
+        mission: Option<Mission>,
+    },
 }
 
 impl CommandPayload {
@@ -192,7 +201,8 @@ impl CommandPayload {
                 scope: DoctrineScope::Unit { unit },
                 ..
             }
-            | CommandPayload::Engage { shooter: unit, .. } => Some(*unit),
+            | CommandPayload::Engage { shooter: unit, .. }
+            | CommandPayload::AssignMission { unit, .. } => Some(*unit),
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
             | CommandPayload::SetEnvironment { .. }
@@ -238,6 +248,9 @@ impl CommandPayload {
                 if let Some(d) = &s.damage_profile {
                     d.validate()?;
                 }
+                if let Some(m) = &s.mission {
+                    m.validate()?;
+                }
                 if s.length_m.is_some_and(|l| !(l.is_finite() && l >= 0.0)) {
                     return Err("length_m must be finite and >= 0".into());
                 }
@@ -278,6 +291,9 @@ impl CommandPayload {
             CommandPayload::SetEnvironment { environment } => environment.validate(),
             CommandPayload::SetWeaponCatalog { weapons } => {
                 weapons.iter().try_for_each(WeaponSpec::validate)
+            }
+            CommandPayload::AssignMission { mission, .. } => {
+                mission.as_ref().map_or(Ok(()), Mission::validate)
             }
             CommandPayload::Engage { rounds, weapon, .. } => {
                 if *rounds == 0 || weapon.trim().is_empty() {

@@ -167,6 +167,21 @@ pub enum SimEventKind {
         draw: f64,
         hit: bool,
     },
+    /// A patrolling unit picked its next point (two `Ai` draws).
+    MissionWaypoint {
+        unit: UnitId,
+        point: sim_geo::GeoPoint,
+        draws: [f64; 2],
+    },
+    MissionComplete {
+        unit: UnitId,
+    },
+    /// The AI engaged a contact on the unit's behalf (the launch or hit roll follows).
+    MissionEngage {
+        unit: UnitId,
+        contact: u32,
+        weapon: String,
+    },
     /// A defender fired an interceptor (SAM, gun or CIWS) at an incoming weapon.
     PointDefenceShot {
         defender: UnitId,

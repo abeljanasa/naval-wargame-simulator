@@ -9,6 +9,7 @@ use crate::esm::BearingView;
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
+use sim_ai::Mission;
 use sim_c2::{Doctrine, Posture, ResolvedDoctrine};
 use sim_geo::GeoPoint;
 use sim_sensors::{Classification, Environment, ErrorEllipse};
@@ -62,6 +63,8 @@ pub struct UnitView {
     pub flooding: bool,
     /// Rounds carried, by weapon id (sorted).
     pub stores: Vec<StoreView>,
+    pub mission: Option<Mission>,
+    pub mission_complete: bool,
 }
 
 /// Rounds of one weapon carried.

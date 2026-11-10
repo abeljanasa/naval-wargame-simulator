@@ -1,5 +1,6 @@
 //! The `Simulation` facade: the only public way to drive the world.
 
+use crate::ai::{ai_system, MissionState};
 use crate::c2::C2State;
 use crate::combat::{
     damage_control_system, default_damage_profile, engage, weapons_system, Health, Magazine,
@@ -68,7 +69,7 @@ pub(crate) struct LandMaskRes(pub(crate) Option<Arc<LandMask>>);
 
 /// Plans `waypoints` from `from` around land for ships and submarines. Returns the route to store
 /// and, when legs were replanned, how many.
-fn plan_sea_route(
+pub(crate) fn plan_sea_route(
     world: &World,
     domain: Domain,
     from: GeoPoint,
@@ -224,10 +225,11 @@ impl Simulation {
             &Jammer,
             &Magazine,
             &Health,
+            &MissionState,
         )>();
         let mut v: Vec<UnitRecord> = q
             .iter(&self.world)
-            .map(|(u, p, k, r, s, sig, j, m, hl)| UnitRecord {
+            .map(|(u, p, k, r, s, sig, j, m, hl, ms)| UnitRecord {
                 unit: u.clone(),
                 position: *p,
                 kinematics: *k,
@@ -237,6 +239,7 @@ impl Simulation {
                 jammer: j.0,
                 magazine: m.clone(),
                 health: Some(hl.clone()),
+                mission: ms.clone(),
             })
             .collect();
         v.sort_by_key(|r| r.unit.id);
@@ -277,6 +280,8 @@ impl Simulation {
                         .map_or_else(Vec::new, |h| h.criticals.clone()),
                     fires: r.health.as_ref().map_or(0, |h| h.fires),
                     flooding: r.health.as_ref().is_some_and(|h| h.flooding),
+                    mission: r.mission.mission.clone(),
+                    mission_complete: r.mission.complete,
                     stores: r
                         .magazine
                         .0
@@ -427,6 +432,7 @@ impl Simulation {
             h.opt_f64(r.signature.and_then(|s| s.radiated_noise_db));
             h.opt_f64(r.signature.and_then(|s| s.length_m));
             h.opt_str(r.unit.category.as_deref());
+            hash_mission(&mut h, &r.mission);
             h.u64(r.magazine.0.len() as u64);
             for (w, n) in &r.magazine.0 {
                 h.str(w);
@@ -661,6 +667,7 @@ impl Simulation {
                     Jammer(r.jammer),
                     health,
                     r.magazine,
+                    r.mission,
                 ))
                 .id();
             if index.insert(id, e).is_some() {
@@ -669,6 +676,37 @@ impl Simulation {
         }
         sim.world.insert_resource(UnitIndex(index));
         Ok(sim)
+    }
+}
+
+fn hash_mission(h: &mut StateHash, m: &MissionState) {
+    h.u8(u8::from(m.complete));
+    match &m.mission {
+        None => h.u8(255),
+        Some(mission) => {
+            h.u8(mission.code());
+            match mission {
+                sim_ai::Mission::Patrol { centre, radius_m } => {
+                    h.f64(centre.lat_deg);
+                    h.f64(centre.lon_deg);
+                    h.f64(*radius_m);
+                }
+                sim_ai::Mission::Ferry { destination } => {
+                    h.f64(destination.lat_deg);
+                    h.f64(destination.lon_deg);
+                }
+                sim_ai::Mission::Escort {
+                    escorted,
+                    bearing_deg,
+                    range_m,
+                } => {
+                    h.u64(*escorted);
+                    h.f64(*bearing_deg);
+                    h.f64(*range_m);
+                }
+                sim_ai::Mission::Strike { contact } => h.u64(u64::from(*contact)),
+            }
+        }
     }
 }
 
@@ -690,6 +728,7 @@ fn build_schedule() -> Schedule {
             weapons_system,
             damage_control_system,
             detection_system,
+            ai_system,
             advance_clock_system,
         )
             .chain(),
@@ -804,6 +843,15 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
         } => {
             let entity = authorised_entity(world, cmd, *shooter)?;
             engage(world, cmd, *shooter, *contact, weapon, *rounds, entity)
+        }
+        CommandPayload::AssignMission { unit, mission } => {
+            let entity = authorised_entity(world, cmd, *unit)?;
+            let mut m = world
+                .get_mut::<MissionState>(entity)
+                .ok_or_else(|| format!("{unit} cannot take missions"))?;
+            m.mission = mission.clone();
+            m.complete = false;
+            Ok(())
         }
         CommandPayload::SetEnvironment { environment } => {
             if !cmd.issuer.is_privileged() {
@@ -920,6 +968,10 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             },
             Jammer(s.jammer),
             Magazine(s.stores.clone()),
+            MissionState {
+                mission: s.mission.clone(),
+                complete: false,
+            },
             Health::new(
                 s.damage_profile
                     .unwrap_or_else(|| default_damage_profile(s.domain)),

@@ -123,6 +123,7 @@ fn unit(
                 .map(|(w, n)| ((*w).to_owned(), *n))
                 .collect::<BTreeMap<_, _>>(),
             damage_profile: damage,
+            mission: None,
         }),
     )
 }
@@ -575,4 +576,176 @@ fn decoys_and_jamming_lower_ph_at_impact() {
         .unwrap();
     assert!((cm - 0.56).abs() < 1e-12, "{cm}");
     assert!((p - 0.448).abs() < 1e-12, "{p}");
+}
+
+// ---- Missions and automated tasking (slice 10; docs/models/missions.md) ----
+
+fn assign(
+    tick: u64,
+    issuer: Issuer,
+    side: Option<u16>,
+    unit: u64,
+    mission: Option<Mission>,
+) -> Command {
+    cmd(
+        tick,
+        issuer,
+        side,
+        CommandPayload::AssignMission {
+            unit: UnitId(unit),
+            mission,
+        },
+    )
+}
+
+fn mission_events(sim: &Simulation) -> (Vec<GeoPoint>, usize, Vec<(u32, String)>) {
+    let mut points = vec![];
+    let mut complete = 0;
+    let mut engaged = vec![];
+    for e in sim.events() {
+        match &e.kind {
+            SimEventKind::MissionWaypoint { point, .. } => points.push(*point),
+            SimEventKind::MissionComplete { .. } => complete += 1,
+            SimEventKind::MissionEngage {
+                contact, weapon, ..
+            } => engaged.push((*contact, weapon.clone())),
+            _ => {}
+        }
+    }
+    (points, complete, engaged)
+}
+
+#[test]
+fn a_patrol_picks_points_inside_its_area_and_keeps_moving() {
+    let mut sim = scene(31, 30_000.0, None);
+    let centre = direct(ORIGIN, 0.0, 20_000.0).point;
+    sim.submit(assign(
+        1,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        1,
+        Some(Mission::Patrol {
+            centre,
+            radius_m: 10_000.0,
+        }),
+    ))
+    .unwrap();
+    sim.run_ticks(3_600);
+    let (points, _, _) = mission_events(&sim);
+    assert!(points.len() >= 2, "{}", points.len());
+    for p in &points {
+        assert!(sim_geo::inverse(centre, *p).distance_m <= 10_000.0 + 1e-6);
+    }
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert!(blue.units[0].speed_mps > 0.0);
+    assert!(matches!(
+        blue.units[0].mission,
+        Some(Mission::Patrol { .. })
+    ));
+}
+
+#[test]
+fn a_ferry_completes_on_arrival_and_an_escort_holds_station() {
+    let mut sim = scene(32, 30_000.0, None);
+    let dest = direct(ORIGIN, 180.0, 5_000.0).point;
+    sim.submit(assign(
+        1,
+        umpire(),
+        None,
+        1,
+        Some(Mission::Ferry { destination: dest }),
+    ))
+    .unwrap();
+    sim.run_ticks(1_800);
+    let (_, complete, _) = mission_events(&sim);
+    assert_eq!(complete, 1);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert!(blue.units[0].mission_complete);
+
+    // Red escorts nothing of its own here, so escort blue as the white cell's test: station
+    // 2 km on blue's starboard beam.
+    let mut sim = scene(33, 6_000.0, None);
+    sim.submit(assign(
+        1,
+        umpire(),
+        None,
+        2,
+        Some(Mission::Escort {
+            escorted: 1,
+            bearing_deg: 90.0,
+            range_m: 2_000.0,
+        }),
+    ))
+    .unwrap();
+    sim.run_ticks(1_800);
+    let white = sim.snapshot(Viewer::WhiteCell);
+    let (b, r) = (&white.units[0], &white.units[1]);
+    let station = sim_ai_station(b.position, b.heading_deg, 90.0, 2_000.0);
+    assert!(
+        sim_geo::inverse(r.position, station).distance_m < 600.0,
+        "{:?}",
+        sim_geo::inverse(r.position, station)
+    );
+}
+
+fn sim_ai_station(p: GeoPoint, heading: f64, bearing: f64, range: f64) -> GeoPoint {
+    direct(p, heading + bearing, range).point
+}
+
+#[test]
+fn automated_engagement_follows_the_release_rule() {
+    // Weapons free on a patrol: the AI fires one ASM at the nearest contact, and no second one
+    // while the first is in flight.
+    let mut sim = scene(34, 30_000.0, None);
+    sim.submit(weapons_free(1)).unwrap();
+    sim.submit(assign(
+        1,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        1,
+        Some(Mission::Patrol {
+            centre: ORIGIN,
+            radius_m: 5_000.0,
+        }),
+    ))
+    .unwrap();
+    sim.run_ticks(60);
+    let (_, _, engaged) = mission_events(&sim);
+    assert_eq!(engaged, vec![(1, "T-ASM".to_owned())]);
+    assert_eq!(sim.weapons_in_flight().len(), 1);
+
+    // Weapons tight (default): the unidentified contact may not be engaged.
+    let mut sim = scene(34, 30_000.0, None);
+    sim.submit(assign(
+        1,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        1,
+        Some(Mission::Strike { contact: 1 }),
+    ))
+    .unwrap();
+    sim.run_ticks(60);
+    assert!(mission_events(&sim).2.is_empty());
+    assert!(sim.weapons_in_flight().is_empty());
+}
+
+#[test]
+fn players_task_only_their_own_units() {
+    let mut sim = scene(35, 30_000.0, None);
+    sim.submit(assign(1, Issuer::Player { seat: 2 }, Some(2), 1, None))
+        .unwrap();
+    sim.step();
+    assert_eq!(rejected(&sim).len(), 1, "{:?}", rejected(&sim));
+    assert!(sim
+        .submit(assign(
+            2,
+            umpire(),
+            None,
+            1,
+            Some(Mission::Patrol {
+                centre: ORIGIN,
+                radius_m: -5.0,
+            }),
+        ))
+        .is_err());
 }

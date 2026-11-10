@@ -16,8 +16,8 @@ pub mod synthetic;
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
-    Environment, GeoPoint, Guidance, Issuer, JammerSpec, Posture, SensorKind, SensorSpec, SideId,
-    Simulation, Tick, UnitId, UnitSpawn, WeaponKind, WeaponSpec,
+    Environment, GeoPoint, Guidance, Issuer, JammerSpec, Mission, Posture, SensorKind, SensorSpec,
+    SideId, Simulation, Tick, UnitId, UnitSpawn, WeaponKind, WeaponSpec,
 };
 use sim_db::PlatformDb;
 use std::collections::{BTreeMap, BTreeSet};
@@ -113,6 +113,9 @@ pub struct ScenarioUnit {
     /// ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jammer: Option<JammerSpec>,
+    /// Mission at start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<Mission>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -445,6 +448,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         length_m: length,
         stores,
         damage_profile: damage,
+        mission: u.mission.clone(),
     })
 }
 

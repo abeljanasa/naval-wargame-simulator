@@ -3776,6 +3776,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
+name = "sim-ai"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sim-geo",
+ "specta",
+]
+
+[[package]]
 name = "sim-c2"
 version = "0.1.0"
 dependencies = [
@@ -3796,6 +3806,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_json",
+ "sim-ai",
  "sim-c2",
  "sim-geo",
  "sim-sensors",
