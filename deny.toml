@@ -1,0 +1,42 @@
+# Dependency policy (master prompt §12): licence audit, banned sources, security advisories.
+# Run: cargo deny check
+# GPL/AGPL/LGPL are not allowed in shipped binaries; adding any licence here needs an ADR.
+
+[graph]
+all-features = false
+
+[licenses]
+confidence-threshold = 0.9
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "BSL-1.0",
+    # Weak, file-level copyleft: modified MPL files must stay MPL; our own code is unaffected.
+    "MPL-2.0",
+]
+
+[licenses.private]
+# Our own workspace crates (publish = false) are owned outright by the client navy.
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+[advisories]
+# Unmaintained-crate notices (common in the Tauri/GTK stack) are informational, not blocking.
+unmaintained = "none"
