@@ -53,11 +53,10 @@ class SimSession {
     if (u.full) {
       this.units = u.units;
     } else if (u.units.length || u.removed.length) {
-      const byId: Record<number, UnitView> = {};
-      for (const x of this.units) byId[x.id] = x;
-      for (const id of u.removed) delete byId[id];
-      for (const x of u.units) byId[x.id] = x;
-      this.units = Object.values(byId).sort((a, b) => a.id - b.id);
+      const gone = new Set<number>([...u.removed, ...u.units.map((x) => x.id)]);
+      this.units = [...this.units.filter((x) => !gone.has(x.id)), ...u.units].sort(
+        (a, b) => a.id - b.id,
+      );
     }
     this.allContacts = u.contacts;
   }
