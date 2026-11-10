@@ -204,4 +204,10 @@ jobs:
       - run: npm run lint
       - name: npm licence audit (production dependencies)
         run: npm run licenses
+      - name: UI unit tests (Vitest)
+        run: npm test
+      - name: UI end-to-end smoke test (real UI, mocked backend)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
       - run: npm run build

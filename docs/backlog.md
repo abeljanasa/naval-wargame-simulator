@@ -20,14 +20,15 @@ Items deferred out of the current change, or requested out of phase (master prom
 - [ ] Repeat the offline bundle on a physically disconnected machine, and for macOS and Linux.
 - [x] npm licence audit of production dependencies (`npm run licenses`, in CI). 52 packages, 0 rejected.
 - [x] A basic detection model for Gate 1: the interim radar model (DL-0006).
-- [ ] Desktop app: visual check of contacts during a live run. Covered by engine tests so far; there is no automated UI test yet.
+- [x] Desktop app shows contacts: covered by the end-to-end smoke test (Contacts panel) and engine tests.
 - [x] Turn-rate / turning-circle limits on movement (geodesy-and-movement model doc §Turning).
 - [ ] Turn performance as platform-database fields (generic class values are derived in scenario resolution today).
 - [x] Land blocking with route planning round the coastline (DL-0008, land-avoidance model doc).
 - [ ] Shallow water and draft limits (needs bundled GEBCO bathymetry).
 - [ ] Snapshot diffs instead of full snapshots on the UI stream (the protocol is versioned for this).
 - [ ] Scenario loading from file in the desktop app (Phase 1 embeds the demo scenario).
-- [ ] Front-end unit tests (Vitest) and a Tauri end-to-end smoke test (WebDriver).
+- [x] Front-end unit tests (Vitest, 8 tests) and an end-to-end smoke test of the real UI against a mocked backend (Playwright, 9 checks); both in CI.
+- [ ] Full end-to-end test through the packaged Tauri app (WebDriver + tauri-driver).
 - [x] APP-6-style frames by domain (sea surface full, air upper half, subsurface lower half, land) and affiliation.
 - [ ] Function icons inside the frames (frigate, submarine, fighter…); needs a symbology behaviour spec.
 - [x] Light-theme toggle (header button; map base layers recoloured; remembered per viewer).
