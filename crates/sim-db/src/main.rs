@@ -58,6 +58,16 @@ enum Cmd {
         #[arg(long)]
         source: Option<PathBuf>,
     },
+    /// Release scan: fail if a directory holds a non-allowlisted database file, or any record or
+    /// JSON `classification` other than UNCLASSIFIED.
+    Scan {
+        /// Directories to scan (release artefacts, bundles, data).
+        #[arg(required = true)]
+        dirs: Vec<PathBuf>,
+        /// Allowlist of database file names (default: data/db/release-allowlist.txt).
+        #[arg(long)]
+        allowlist: Option<PathBuf>,
+    },
 }
 
 fn default_source() -> PathBuf {
@@ -110,6 +120,10 @@ fn main() -> Result<()> {
             if report(&conn, false)? > 0 {
                 bail!("not writing {}: validation failed", out.display());
             }
+            if let Some(parent) = out.parent().filter(|p| !p.as_os_str().is_empty()) {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("creating {}", parent.display()))?;
+            }
             if out.exists() {
                 std::fs::remove_file(&out)
                     .with_context(|| format!("replacing {}", out.display()))?;
@@ -124,6 +138,29 @@ fn main() -> Result<()> {
             let before = migrate::schema_version(&conn)?;
             let after = migrate::migrate(&mut conn)?;
             println!("{}: schema version {before} -> {after}", db.display());
+        }
+        Cmd::Scan { dirs, allowlist } => {
+            let list_path = allowlist.unwrap_or_else(|| {
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/db/release-allowlist.txt")
+            });
+            let allow = sim_db::scan::read_allowlist(&list_path)?;
+            let mut total = 0;
+            for dir in &dirs {
+                let findings = sim_db::scan::scan(dir, &allow)
+                    .with_context(|| format!("scanning {}", dir.display()))?;
+                for f in &findings {
+                    println!("RELEASE-SCAN {f}");
+                }
+                total += findings.len();
+            }
+            if total > 0 {
+                bail!("release scan failed: {total} finding(s)");
+            }
+            println!(
+                "release scan: clean ({} director{} checked)",
+                dirs.len(),
+                if dirs.len() == 1 { "y" } else { "ies" }
+            );
         }
         Cmd::List { source } => {
             let conn = build_in_memory(&source.unwrap_or_else(default_source))?;

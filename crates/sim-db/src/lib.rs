@@ -16,6 +16,7 @@ mod db;
 pub mod embedded;
 mod error;
 pub mod migrate;
+pub mod scan;
 pub mod source;
 pub mod validate;
 
