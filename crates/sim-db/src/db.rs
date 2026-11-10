@@ -61,6 +61,8 @@ pub struct MountedSensor {
     pub ref_detect_range_m: Option<f64>,
     pub ref_target_rcs_m2: Option<f64>,
     pub max_target_altitude_m: f64,
+    pub clutter_db_per_sea_state: Option<f64>,
+    pub beamwidth_deg: Option<f64>,
 }
 
 const SUMMARY_COLS: &str = "id, name, category, domain, max_speed_mps, cruise_speed_mps, accel_mps2, max_altitude_m, max_depth_m, length_m";
@@ -153,7 +155,8 @@ impl PlatformDb {
     pub fn sensors_of(&self, platform_id: &str) -> Result<Vec<MountedSensor>, DbError> {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.kind, m.height_m, s.min_range_m, s.max_range_m, s.ref_detect_range_m,
-                    s.ref_target_rcs_m2, s.max_target_altitude_m
+                    s.ref_target_rcs_m2, s.max_target_altitude_m, s.clutter_db_per_sea_state,
+                    s.beamwidth_deg
                FROM mounts m JOIN sensors s ON s.id = m.sensor_id
               WHERE m.platform_id = ?1 AND m.kind = 'sensor'
               ORDER BY m.id",
@@ -169,6 +172,8 @@ impl PlatformDb {
                     ref_detect_range_m: r.get(5)?,
                     ref_target_rcs_m2: r.get(6)?,
                     max_target_altitude_m: r.get(7)?,
+                    clutter_db_per_sea_state: r.get(8)?,
+                    beamwidth_deg: r.get(9)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
