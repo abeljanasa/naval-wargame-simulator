@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added (Phase 1, platform database)
+
+- **`sim-db`:**
+  - SQLite schema (migration 0001) with provenance columns on every value table.
+  - Forward-only migrations tracked by `user_version`; newer and outdated schemas are refused.
+  - A JSON source loader (ADR-0004).
+  - A validation suite of 34 rules, each with a seeded-fault test.
+  - `PlatformDb` loading through `DbSource::Open`. `DbSource::Accredited` sits behind the `accredited` feature.
+  - CLI: `validate`, `build`, `migrate`, `list`.
+- **Open generic database** (`data/db/open`): 50 platforms, 33 sensors, 27 weapons, 7 comms systems, 12 propulsion types and 18 damage profiles. All are generic and UNCLASSIFIED, with confidence D.
+- **Docs:** ADR-0004, the data dictionary (`docs/db/data-dictionary.md`), DL-0005.
+
 ### Added (Phase 1, first tranche)
 
 - **ADRs:** ADR-0001 (tech stack), ADR-0002 (Svelte 5 UI), ADR-0003 (determinism strategy).

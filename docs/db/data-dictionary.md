@@ -1,0 +1,95 @@
+# Platform database: data dictionary
+
+- **Schema:** `crates/sim-db/migrations/` (version 1)
+- **Source data:** `data/db/open/`
+- **Format decision:** [ADR-0004](../adr/0004-platform-database-format.md)
+
+Units are SI in the database: m, m/s, m/s², t, kg, s. Authoring JSON uses kn, nm and km where noted, and the builder converts. 1 kn = 1852/3600 m/s; 1 nm = 1852 m.
+
+## Provenance (every value table)
+
+| Column | Meaning |
+|---|---|
+| `source_citation` | Where the value came from. Must not be empty. |
+| `confidence` | A–E, see below. |
+| `classification` | Must be `UNCLASSIFIED` in the open build. Other markings are only valid in the accredited database. |
+| `is_generic` | 1 for a generic class, 0 for a specific real system. The open build warns on 0. |
+| `created_by` | Team or role that entered the record. Never a personal name. |
+| `updated_at` | ISO date, `YYYY-MM-DD`. |
+
+Value tables are listed in `sim_db::PROVENANCE_TABLES`. Link rows (`launcher_weapons`, `magazine_contents`, `loadout_items`, `platform_comms`) inherit their parent's provenance.
+
+### Confidence scale
+
+| Grade | Meaning |
+|---|---|
+| A | Official or manufacturer-published figure for this exact item, or a definitional constant |
+| B | Several independent, credible open sources agree |
+| C | A single credible open source |
+| D | **Generic class estimate:** a representative value inside the range open literature gives for the class, not tied to any real system |
+| E | Placeholder or notional; must be replaced before analytical use |
+
+## Generic values
+
+Phase 1 ships only generic classes (`GEN-*`), all with confidence D. Each value is chosen to sit inside the range typical of its class in general open literature (reference books, encyclopaedic overviews, textbooks). It is **not** taken from any one platform and must not be read as describing one.
+
+- No vendor database was used. Clean-room rule 2 bans Command PE's DB3000/CWDB and any other proprietary database.
+- Where a class spans a wide range, a mid-range value was chosen.
+- Analysts who need specific systems must use the regional database (Phase 4) or the accredited database.
+
+## Tables
+
+| Table | Key | Purpose |
+|---|---|---|
+| `nations` | `id` | Owning nation (`GEN` = generic) |
+| `services` | `id` | Navy, air force, army, coast guard, civil |
+| `propulsion` | `id` | Propulsion type and fuel |
+| `damage_profiles` | `id` | Damage points, mission-kill fraction, fire and flooding susceptibility (0–1). Used by the Phase 2 damage model |
+| `comms_systems` | `id` | Comms kind, range (m), data-link flag |
+| `sensors` | `id` | Kind, role, band, active/passive, min and max range (m), radar reference range (m) at a reference RCS (m²), highest target altitude covered (m) |
+| `weapons` | `id` | Kind, guidance, min and max range (m), speed (m/s), warhead (kg), base Ph (0–1), target domains |
+| `platforms` | `id` | Category, domain, service, propulsion, damage profile, dimensions, speeds (m/s), acceleration (m/s²), endurance (m), ceiling (m), max depth (m), hardpoints |
+| `platform_signatures` | (platform, kind, aspect, speed band) | RCS (m²), IR (kW/sr), acoustic source level (dB re 1 µPa @ 1 m), visual (m) |
+| `mounts` | `id` | A fitted sensor or launcher, with its height above waterline, ground or airframe datum (m; negative = below the waterline, e.g. a sonar dome) |
+| `launcher_weapons` | (mount, weapon) | Which weapons a launcher can fire |
+| `magazines` / `magazine_contents` | `id` / (magazine, weapon) | Stowage capacity and default load |
+| `loadouts` / `loadout_items` | `id` / (loadout, weapon) | Aircraft weapon loads, limited by `platforms.hardpoints` |
+| `platform_comms` | (platform, comms) | Fitted comms |
+
+## Validation rules
+
+Run `cargo run -p sim-db -- validate`. Add `--strict` to treat warnings as errors. Every rule has a seeded-fault test in `crates/sim-db/tests/db.rs`.
+
+| Rule | Severity | Checks |
+|---|---|---|
+| `provenance.citation_missing` | error | Empty `source_citation` |
+| `provenance.created_by_missing` | error | Empty `created_by` |
+| `provenance.updated_at_format` | error | `updated_at` is not `YYYY-MM-DD` |
+| `classification.open_build` | error | Any record not marked `UNCLASSIFIED` in the open build |
+| `provenance.not_generic` | warning | Non-generic record in the open build |
+| `fk.dangling` | error | Any reference to a missing row |
+| `sensor.beyond_horizon` | error | A radar, ESM, IR, EO or visual sensor's max range exceeds the 4/3-earth radar horizon between its mount and a target at the sensor's highest covered altitude. Airborne mounts are assessed at the platform ceiling |
+| `sensor.range_order` | error | `0 ≤ min_range < max_range` |
+| `sensor.reference_range` | error | Radar reference range and RCS must be given together, both positive, with reference range ≤ max range |
+| `sensor.radar_reference` | error | A radar without a reference range and RCS (needed by the Phase 2 detection model) |
+| `weapon.range_order` | error | `0 ≤ min_range < max_range` |
+| `weapon.base_ph` | error | Base Ph outside [0, 1] |
+| `weapon.values` | error | Negative speed or warhead |
+| `weapon.target_domains` | error | Unknown or empty target domains |
+| `weapon.no_launcher` | error | A magazine holds a weapon that no launcher on the same platform can fire |
+| `weapon.unused` | warning | A weapon fitted to no launcher and no loadout |
+| `launcher.empty` | warning | A launcher that lists no weapons |
+| `launcher.no_ammunition` | warning | A launcher can fire a weapon no magazine on the platform holds |
+| `magazine.capacity` / `magazine.quantity` | error | Capacity or quantity ≤ 0 |
+| `magazine.over_capacity` | error | Contents exceed capacity |
+| `loadout.quantity` | error | Loadout quantity ≤ 0 |
+| `loadout.no_hardpoints` / `loadout.over_hardpoints` | error | A loadout on a platform without hardpoints, or one exceeding them |
+| `platform.speed` | error | Speeds must satisfy `0 ≤ cruise ≤ max` |
+| `platform.accel` | error | A mobile platform with acceleration ≤ 0 |
+| `platform.dimensions` | error | Non-positive length, displacement, draft, endurance; negative hardpoints |
+| `platform.depth` | error | A submarine needs a max depth; only submarines may have one |
+| `platform.altitude` | error | An aircraft needs a ceiling; only aircraft may have one |
+| `platform.category_domain` | error | Category inconsistent with domain (e.g. a submarine not subsurface) |
+| `damage.fractions` | error | Damage points ≤ 0 or fractions outside [0, 1] |
+| `signature.value` | error | Negative signature value |
+| `platform.no_rcs` / `platform.no_acoustic` | warning | Missing signature; detection will fall back to a default |
