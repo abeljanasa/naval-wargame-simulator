@@ -1,0 +1,67 @@
+{
+  "defaults": {
+    "source_citation": "Generic class value representative of open-literature ranges; not derived from any specific system (docs/db/data-dictionary.md#generic-values)",
+    "confidence": "D",
+    "classification": "UNCLASSIFIED",
+    "is_generic": true,
+    "created_by": "nws-core-team",
+    "updated_at": "2026-11-10"
+  },
+  "nations": [
+    {
+      "id": "GEN",
+      "name": "Generic",
+      "provenance": { "source_citation": "Original design: placeholder nation for generic classes", "confidence": "A" }
+    }
+  ],
+  "services": [
+    { "id": "GEN-NAVY", "nation": "GEN", "name": "Generic navy", "branch": "navy" },
+    { "id": "GEN-AIR", "nation": "GEN", "name": "Generic air force", "branch": "air_force" },
+    { "id": "GEN-ARMY", "nation": "GEN", "name": "Generic army (coastal defence)", "branch": "army" },
+    { "id": "GEN-CG", "nation": "GEN", "name": "Generic coast guard", "branch": "coast_guard" },
+    { "id": "GEN-CIVIL", "nation": "GEN", "name": "Generic civil / merchant", "branch": "civil" }
+  ],
+  "propulsion": [
+    { "id": "PROP-NUC-SURFACE", "name": "Nuclear steam turbine (surface)", "kind": "nuclear", "fuel_type": "nuclear" },
+    { "id": "PROP-NUC-SUB", "name": "Nuclear steam turbine (submarine)", "kind": "nuclear", "fuel_type": "nuclear" },
+    { "id": "PROP-GT", "name": "All-gas-turbine", "kind": "gas_turbine", "fuel_type": "marine_diesel" },
+    { "id": "PROP-CODOG", "name": "Combined diesel or gas turbine", "kind": "codog", "fuel_type": "marine_diesel" },
+    { "id": "PROP-CODAG", "name": "Combined diesel and gas turbine", "kind": "codag", "fuel_type": "marine_diesel" },
+    { "id": "PROP-DIESEL", "name": "Diesel (direct drive)", "kind": "diesel", "fuel_type": "marine_diesel" },
+    { "id": "PROP-DE-SUB", "name": "Diesel-electric (submarine)", "kind": "diesel_electric", "fuel_type": "marine_diesel" },
+    { "id": "PROP-AIP-SUB", "name": "Diesel-electric with air-independent propulsion", "kind": "aip", "fuel_type": "marine_diesel" },
+    { "id": "PROP-TURBOFAN", "name": "Turbofan", "kind": "turbofan", "fuel_type": "jet" },
+    { "id": "PROP-TURBOPROP", "name": "Turboprop", "kind": "turboprop", "fuel_type": "jet" },
+    { "id": "PROP-TURBOSHAFT", "name": "Turboshaft", "kind": "turboshaft", "fuel_type": "jet" },
+    { "id": "PROP-NONE", "name": "None (fixed site)", "kind": "none", "fuel_type": "none" }
+  ],
+  "damage_profiles": [
+    { "id": "DMG-CARRIER", "name": "Large-deck carrier", "damage_points": 2400, "mission_kill_fraction": 0.35, "fire_susceptibility": 0.6, "flooding_susceptibility": 0.3 },
+    { "id": "DMG-AMPHIB", "name": "Large amphibious ship", "damage_points": 1600, "mission_kill_fraction": 0.4, "fire_susceptibility": 0.6, "flooding_susceptibility": 0.4 },
+    { "id": "DMG-CRUISER", "name": "Cruiser / large destroyer", "damage_points": 900, "mission_kill_fraction": 0.4, "fire_susceptibility": 0.5, "flooding_susceptibility": 0.4 },
+    { "id": "DMG-DESTROYER", "name": "Destroyer", "damage_points": 650, "mission_kill_fraction": 0.4, "fire_susceptibility": 0.5, "flooding_susceptibility": 0.45 },
+    { "id": "DMG-FRIGATE", "name": "Frigate", "damage_points": 450, "mission_kill_fraction": 0.45, "fire_susceptibility": 0.5, "flooding_susceptibility": 0.5 },
+    { "id": "DMG-CORVETTE", "name": "Corvette / OPV", "damage_points": 220, "mission_kill_fraction": 0.5, "fire_susceptibility": 0.55, "flooding_susceptibility": 0.55 },
+    { "id": "DMG-SMALL-CRAFT", "name": "Small combatant craft", "damage_points": 80, "mission_kill_fraction": 0.5, "fire_susceptibility": 0.6, "flooding_susceptibility": 0.6 },
+    { "id": "DMG-MCM", "name": "Mine countermeasures vessel (composite hull)", "damage_points": 140, "mission_kill_fraction": 0.5, "fire_susceptibility": 0.7, "flooding_susceptibility": 0.6 },
+    { "id": "DMG-SUBMARINE", "name": "Submarine", "damage_points": 300, "mission_kill_fraction": 0.3, "fire_susceptibility": 0.4, "flooding_susceptibility": 0.8 },
+    { "id": "DMG-AUXILIARY", "name": "Naval auxiliary", "damage_points": 700, "mission_kill_fraction": 0.45, "fire_susceptibility": 0.7, "flooding_susceptibility": 0.45 },
+    { "id": "DMG-MERCHANT-LARGE", "name": "Large merchant ship", "damage_points": 1200, "mission_kill_fraction": 0.5, "fire_susceptibility": 0.6, "flooding_susceptibility": 0.35 },
+    { "id": "DMG-MERCHANT-SMALL", "name": "Small merchant / fishing vessel", "damage_points": 120, "mission_kill_fraction": 0.5, "fire_susceptibility": 0.6, "flooding_susceptibility": 0.6 },
+    { "id": "DMG-AIRCRAFT-LARGE", "name": "Large aircraft", "damage_points": 30, "mission_kill_fraction": 0.3, "fire_susceptibility": 0.8, "flooding_susceptibility": 0.0 },
+    { "id": "DMG-AIRCRAFT-SMALL", "name": "Fighter / small aircraft", "damage_points": 12, "mission_kill_fraction": 0.3, "fire_susceptibility": 0.8, "flooding_susceptibility": 0.0 },
+    { "id": "DMG-HELICOPTER", "name": "Helicopter / UAV", "damage_points": 10, "mission_kill_fraction": 0.3, "fire_susceptibility": 0.8, "flooding_susceptibility": 0.0 },
+    { "id": "DMG-LAND-SITE", "name": "Dispersed land battery or site", "damage_points": 150, "mission_kill_fraction": 0.5, "fire_susceptibility": 0.4, "flooding_susceptibility": 0.0 },
+    { "id": "DMG-AIRBASE", "name": "Airbase", "damage_points": 5000, "mission_kill_fraction": 0.3, "fire_susceptibility": 0.3, "flooding_susceptibility": 0.0 },
+    { "id": "DMG-PORT", "name": "Port facility", "damage_points": 6000, "mission_kill_fraction": 0.3, "fire_susceptibility": 0.3, "flooding_susceptibility": 0.0 }
+  ],
+  "comms": [
+    { "id": "COM-HF", "name": "Generic HF radio", "kind": "hf", "range_km": 3000, "is_datalink": false },
+    { "id": "COM-VHF", "name": "Generic VHF radio (line of sight)", "kind": "vhf", "range_km": 60, "is_datalink": false },
+    { "id": "COM-UHF", "name": "Generic UHF radio (line of sight)", "kind": "uhf", "range_km": 350, "is_datalink": false },
+    { "id": "COM-SATCOM", "name": "Generic satellite communications", "kind": "satcom", "range_km": 20000, "is_datalink": false },
+    { "id": "COM-LINK", "name": "Generic tactical data link", "kind": "datalink", "range_km": 450, "is_datalink": true },
+    { "id": "COM-UWT", "name": "Generic underwater telephone", "kind": "underwater_telephone", "range_km": 10, "is_datalink": false },
+    { "id": "COM-VLF", "name": "Generic VLF broadcast receiver", "kind": "vlf", "range_km": 10000, "is_datalink": false }
+  ]
+}

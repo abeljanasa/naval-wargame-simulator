@@ -1,0 +1,74 @@
+{
+  "defaults": {
+    "source_citation": "Generic class value representative of open-literature ranges; not derived from any specific system or site (docs/db/data-dictionary.md#generic-values)",
+    "confidence": "D",
+    "classification": "UNCLASSIFIED",
+    "is_generic": true,
+    "created_by": "nws-core-team",
+    "updated_at": "2026-11-10"
+  },
+  "platforms": [
+    {
+      "id": "GEN-SHORE-ASHM", "name": "Generic mobile coastal anti-ship missile battery", "category": "shore_battery", "domain": "land",
+      "service": "GEN-ARMY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-LAND-SITE",
+      "max_speed_kn": 38, "cruise_speed_kn": 25, "accel_mps2": 1,
+      "sensors": [ { "sensor": "SEN-RDR-COASTAL", "height_m": 20 } ],
+      "launchers": [ { "name": "Truck-mounted launchers", "height_m": 3, "weapons": ["WPN-ASM-COASTAL"] } ],
+      "magazines": [ { "name": "Ready missiles", "capacity": 8, "contents": { "WPN-ASM-COASTAL": 8 } } ],
+      "comms": ["COM-HF", "COM-UHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-SHORE-SAM-LR", "name": "Generic long-range SAM battery", "category": "shore_battery", "domain": "land",
+      "service": "GEN-ARMY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-LAND-SITE",
+      "max_speed_kn": 32, "cruise_speed_kn": 20, "accel_mps2": 0.8,
+      "sensors": [ { "sensor": "SEN-RDR-SAM-LR", "height_m": 20 } ],
+      "launchers": [ { "name": "Transporter-erector-launchers", "height_m": 4, "weapons": ["WPN-SAM-LAND-LR"] } ],
+      "magazines": [ { "name": "Ready missiles", "capacity": 32, "contents": { "WPN-SAM-LAND-LR": 32 } } ],
+      "comms": ["COM-HF", "COM-UHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-SHORE-SAM-MR", "name": "Generic medium-range SAM battery", "category": "shore_battery", "domain": "land",
+      "service": "GEN-ARMY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-LAND-SITE",
+      "max_speed_kn": 38, "cruise_speed_kn": 25, "accel_mps2": 1,
+      "sensors": [ { "sensor": "SEN-RDR-SAM-MR", "height_m": 15 } ],
+      "launchers": [ { "name": "Launch vehicles", "height_m": 3, "weapons": ["WPN-SAM-LAND-MR"] } ],
+      "magazines": [ { "name": "Ready missiles", "capacity": 24, "contents": { "WPN-SAM-LAND-MR": 24 } } ],
+      "comms": ["COM-HF", "COM-UHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-SITE-RADAR", "name": "Generic coastal surveillance radar site", "category": "sensor_site", "domain": "land",
+      "service": "GEN-NAVY", "propulsion": "PROP-NONE", "damage_profile": "DMG-LAND-SITE",
+      "max_speed_kn": 0, "cruise_speed_kn": 0, "accel_mps2": 0,
+      "sensors": [ { "sensor": "SEN-RDR-COASTAL", "height_m": 150 }, { "sensor": "SEN-ESM-SHIP", "height_m": 150 }, { "sensor": "SEN-EO-SHIP", "height_m": 150 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-AIRBASE-MAIN", "name": "Generic main operating air base", "category": "airbase", "domain": "land",
+      "service": "GEN-AIR", "propulsion": "PROP-NONE", "damage_profile": "DMG-AIRBASE",
+      "max_speed_kn": 0, "cruise_speed_kn": 0, "accel_mps2": 0,
+      "sensors": [ { "sensor": "SEN-RDR-AIRFIELD", "height_m": 25 }, { "sensor": "SEN-VISUAL", "height_m": 30 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-AIRFIELD-FWD", "name": "Generic forward operating airfield", "category": "airbase", "domain": "land",
+      "service": "GEN-AIR", "propulsion": "PROP-NONE", "damage_profile": "DMG-AIRBASE",
+      "max_speed_kn": 0, "cruise_speed_kn": 0, "accel_mps2": 0,
+      "sensors": [ { "sensor": "SEN-RDR-AIRFIELD", "height_m": 15 } ],
+      "comms": ["COM-HF", "COM-UHF", "COM-LINK"]
+    },
+    {
+      "id": "GEN-PORT-NAVAL", "name": "Generic naval base", "category": "port", "domain": "land",
+      "service": "GEN-NAVY", "propulsion": "PROP-NONE", "damage_profile": "DMG-PORT",
+      "max_speed_kn": 0, "cruise_speed_kn": 0, "accel_mps2": 0,
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 40 }, { "sensor": "SEN-VISUAL", "height_m": 30 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-PORT-COMMERCIAL", "name": "Generic commercial port", "category": "port", "domain": "land",
+      "service": "GEN-CIVIL", "propulsion": "PROP-NONE", "damage_profile": "DMG-PORT",
+      "max_speed_kn": 0, "cruise_speed_kn": 0, "accel_mps2": 0,
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 50 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-SATCOM"]
+    }
+  ]
+}

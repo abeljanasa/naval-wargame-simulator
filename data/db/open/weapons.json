@@ -1,0 +1,39 @@
+{
+  "defaults": {
+    "source_citation": "Generic class value representative of open-literature ranges; not derived from any specific system (docs/db/data-dictionary.md#generic-values)",
+    "confidence": "D",
+    "classification": "UNCLASSIFIED",
+    "is_generic": true,
+    "created_by": "nws-core-team",
+    "updated_at": "2026-11-10"
+  },
+  "weapons": [
+    { "id": "WPN-SAM-LR", "name": "Generic long-range naval SAM", "kind": "sam", "guidance": "inertial_datalink_active_radar", "min_range_km": 3, "max_range_km": 160, "speed_mps": 1200, "warhead_kg": 60, "base_ph": 0.75, "targets": ["air"] },
+    { "id": "WPN-SAM-MR", "name": "Generic medium-range naval SAM", "kind": "sam", "guidance": "inertial_semi_active_radar", "min_range_km": 1, "max_range_km": 50, "speed_mps": 900, "warhead_kg": 40, "base_ph": 0.75, "targets": ["air"] },
+    { "id": "WPN-SAM-SR", "name": "Generic short-range naval SAM", "kind": "sam", "guidance": "command_line_of_sight", "min_range_km": 0.5, "max_range_km": 12, "speed_mps": 750, "warhead_kg": 10, "base_ph": 0.7, "targets": ["air"] },
+    { "id": "WPN-SAM-PD", "name": "Generic point-defence missile", "kind": "sam", "guidance": "passive_rf_ir", "min_range_km": 0.3, "max_range_km": 9, "speed_mps": 700, "warhead_kg": 8, "base_ph": 0.7, "targets": ["air"] },
+    { "id": "WPN-SAM-LAND-LR", "name": "Generic long-range ground-based SAM", "kind": "sam", "guidance": "inertial_datalink_active_radar", "min_range_km": 3, "max_range_km": 200, "speed_mps": 1500, "warhead_kg": 100, "base_ph": 0.75, "targets": ["air"] },
+    { "id": "WPN-SAM-LAND-MR", "name": "Generic medium-range ground-based SAM", "kind": "sam", "guidance": "inertial_semi_active_radar", "min_range_km": 2, "max_range_km": 60, "speed_mps": 1000, "warhead_kg": 50, "base_ph": 0.75, "targets": ["air"] },
+    { "id": "WPN-CIWS", "name": "Generic close-in weapon system (burst)", "kind": "ciws", "guidance": "radar_directed_gun", "max_range_km": 2, "speed_mps": 1100, "warhead_kg": 0.1, "base_ph": 0.3, "targets": ["air", "surface"] },
+    { "id": "WPN-GUN-127", "name": "Generic 127 mm-class naval gun (round)", "kind": "gun", "guidance": "unguided", "max_range_km": 24, "speed_mps": 800, "warhead_kg": 30, "base_ph": 0.2, "targets": ["surface", "land", "air"] },
+    { "id": "WPN-GUN-76", "name": "Generic 76 mm-class naval gun (round)", "kind": "gun", "guidance": "unguided", "max_range_km": 16, "speed_mps": 900, "warhead_kg": 6, "base_ph": 0.25, "targets": ["surface", "air", "land"] },
+    { "id": "WPN-GUN-30", "name": "Generic 30 mm-class cannon (burst)", "kind": "gun", "guidance": "unguided", "max_range_km": 3, "speed_mps": 1000, "warhead_kg": 0.4, "base_ph": 0.3, "targets": ["surface", "air"] },
+    { "id": "WPN-ASM-SUB", "name": "Generic subsonic anti-ship missile", "kind": "asm", "guidance": "inertial_active_radar", "min_range_km": 10, "max_range_km": 180, "speed_mps": 270, "warhead_kg": 220, "base_ph": 0.8, "targets": ["surface"] },
+    { "id": "WPN-ASM-SS", "name": "Generic supersonic anti-ship missile", "kind": "asm", "guidance": "inertial_active_radar", "min_range_km": 10, "max_range_km": 300, "speed_mps": 850, "warhead_kg": 300, "base_ph": 0.75, "targets": ["surface"] },
+    { "id": "WPN-ASM-LIGHT", "name": "Generic light helicopter-launched anti-ship missile", "kind": "asm", "guidance": "semi_active_radar", "min_range_km": 1, "max_range_km": 25, "speed_mps": 280, "warhead_kg": 30, "base_ph": 0.8, "targets": ["surface"] },
+    { "id": "WPN-ASM-AIR", "name": "Generic air-launched anti-ship missile", "kind": "asm", "guidance": "inertial_active_radar", "min_range_km": 10, "max_range_km": 200, "speed_mps": 270, "warhead_kg": 220, "base_ph": 0.8, "targets": ["surface"] },
+    { "id": "WPN-ASM-COASTAL", "name": "Generic coastal-defence anti-ship missile", "kind": "asm", "guidance": "inertial_active_radar", "min_range_km": 10, "max_range_km": 200, "speed_mps": 270, "warhead_kg": 220, "base_ph": 0.8, "targets": ["surface"] },
+    { "id": "WPN-ASM-SUBLAUNCH", "name": "Generic submarine-launched anti-ship missile", "kind": "asm", "guidance": "inertial_active_radar", "min_range_km": 10, "max_range_km": 120, "speed_mps": 270, "warhead_kg": 200, "base_ph": 0.75, "targets": ["surface"] },
+    { "id": "WPN-LACM", "name": "Generic land-attack cruise missile", "kind": "lacm", "guidance": "inertial_gnss_terrain", "min_range_km": 50, "max_range_km": 1200, "speed_mps": 240, "warhead_kg": 450, "base_ph": 0.85, "targets": ["land"] },
+    { "id": "WPN-TORP-HW", "name": "Generic heavyweight torpedo", "kind": "torpedo", "guidance": "wire_active_passive_acoustic", "min_range_km": 0.5, "max_range_km": 40, "speed_mps": 25, "warhead_kg": 250, "base_ph": 0.75, "targets": ["surface", "subsurface"] },
+    { "id": "WPN-TORP-LW", "name": "Generic lightweight torpedo", "kind": "torpedo", "guidance": "active_passive_acoustic", "min_range_km": 0.3, "max_range_km": 10, "speed_mps": 23, "warhead_kg": 45, "base_ph": 0.6, "targets": ["subsurface"] },
+    { "id": "WPN-ASW-ROCKET", "name": "Generic ASW rocket (lightweight torpedo payload)", "kind": "asw_rocket", "guidance": "inertial_then_acoustic", "min_range_km": 1, "max_range_km": 20, "speed_mps": 300, "warhead_kg": 45, "base_ph": 0.6, "targets": ["subsurface"] },
+    { "id": "WPN-AAM-BVR", "name": "Generic beyond-visual-range air-to-air missile", "kind": "aam", "guidance": "inertial_datalink_active_radar", "min_range_km": 2, "max_range_km": 100, "speed_mps": 1200, "warhead_kg": 20, "base_ph": 0.7, "targets": ["air"] },
+    { "id": "WPN-AAM-SR", "name": "Generic short-range infrared air-to-air missile", "kind": "aam", "guidance": "infrared", "min_range_km": 0.3, "max_range_km": 15, "speed_mps": 900, "warhead_kg": 10, "base_ph": 0.75, "targets": ["air"] },
+    { "id": "WPN-BOMB-GUIDED", "name": "Generic guided glide bomb", "kind": "bomb", "guidance": "gnss_laser", "min_range_km": 1, "max_range_km": 15, "speed_mps": 250, "warhead_kg": 230, "base_ph": 0.8, "targets": ["surface", "land"] },
+    { "id": "WPN-MINE-BOTTOM", "name": "Generic influence bottom mine", "kind": "mine", "guidance": "magnetic_acoustic_pressure", "max_range_km": 0.05, "speed_mps": 0, "warhead_kg": 600, "base_ph": 0.5, "targets": ["surface", "subsurface"] },
+    { "id": "WPN-DEPTH-CHARGE", "name": "Generic air-dropped depth charge", "kind": "depth_charge", "guidance": "unguided", "max_range_km": 0.5, "speed_mps": 5, "warhead_kg": 100, "base_ph": 0.2, "targets": ["subsurface"] },
+    { "id": "WPN-DECOY-CHAFF", "name": "Generic chaff / IR decoy round", "kind": "decoy", "guidance": "none", "max_range_km": 2, "speed_mps": 0, "warhead_kg": 0, "base_ph": 0.3, "targets": ["air"] },
+    { "id": "WPN-DECOY-TORP", "name": "Generic torpedo countermeasure", "kind": "decoy", "guidance": "none", "max_range_km": 1, "speed_mps": 10, "warhead_kg": 0, "base_ph": 0.3, "targets": ["subsurface"] }
+  ]
+}

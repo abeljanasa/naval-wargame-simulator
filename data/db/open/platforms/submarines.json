@@ -1,0 +1,129 @@
+{
+  "defaults": {
+    "source_citation": "Generic class value representative of open-literature ranges; not derived from any specific platform (docs/db/data-dictionary.md#generic-values)",
+    "confidence": "D",
+    "classification": "UNCLASSIFIED",
+    "is_generic": true,
+    "created_by": "nws-core-team",
+    "updated_at": "2026-11-10"
+  },
+  "platforms": [
+    {
+      "id": "GEN-SSN", "name": "Generic nuclear attack submarine", "category": "submarine", "domain": "subsurface",
+      "service": "GEN-NAVY", "propulsion": "PROP-NUC-SUB", "damage_profile": "DMG-SUBMARINE",
+      "length_m": 110, "displacement_t": 8000, "draft_m": 10, "max_speed_kn": 30, "cruise_speed_kn": 15, "accel_mps2": 0.05, "max_depth_m": 450,
+      "signatures": [
+        { "kind": "rcs", "value": 300, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "slow", "value": 110, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 120, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 140, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-SON-SUB-BOW", "height_m": -10 }, { "sensor": "SEN-SON-SUB-TAS", "height_m": -200 },
+        { "sensor": "SEN-PERISCOPE", "height_m": 1.5 }, { "sensor": "SEN-ESM-SUB", "height_m": 6 },
+        { "sensor": "SEN-RDR-SUB-MAST", "height_m": 6 }
+      ],
+      "launchers": [
+        { "name": "Torpedo tubes", "height_m": -8, "weapons": ["WPN-TORP-HW", "WPN-ASM-SUBLAUNCH"] },
+        { "name": "Vertical launch tubes", "height_m": -6, "weapons": ["WPN-LACM"] },
+        { "name": "Countermeasure launcher", "height_m": -6, "weapons": ["WPN-DECOY-TORP"] }
+      ],
+      "magazines": [
+        { "name": "Torpedo room", "capacity": 30, "contents": { "WPN-TORP-HW": 22, "WPN-ASM-SUBLAUNCH": 8 } },
+        { "name": "Vertical launch tubes", "capacity": 12, "contents": { "WPN-LACM": 12 } },
+        { "name": "Countermeasures", "capacity": 8, "contents": { "WPN-DECOY-TORP": 8 } }
+      ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-VLF", "COM-UWT", "COM-LINK"]
+    },
+    {
+      "id": "GEN-SSGN", "name": "Generic nuclear guided-missile submarine", "category": "submarine", "domain": "subsurface",
+      "service": "GEN-NAVY", "propulsion": "PROP-NUC-SUB", "damage_profile": "DMG-SUBMARINE",
+      "length_m": 170, "displacement_t": 18000, "draft_m": 11, "max_speed_kn": 25, "cruise_speed_kn": 12, "accel_mps2": 0.04, "max_depth_m": 400,
+      "signatures": [
+        { "kind": "rcs", "value": 500, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "slow", "value": 115, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 125, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 145, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-SON-SUB-BOW", "height_m": -12 }, { "sensor": "SEN-SON-SUB-TAS", "height_m": -200 },
+        { "sensor": "SEN-PERISCOPE", "height_m": 1.5 }, { "sensor": "SEN-ESM-SUB", "height_m": 6 }
+      ],
+      "launchers": [
+        { "name": "Torpedo tubes", "height_m": -9, "weapons": ["WPN-TORP-HW"] },
+        { "name": "Missile tubes", "height_m": -6, "weapons": ["WPN-LACM", "WPN-ASM-SS"] },
+        { "name": "Countermeasure launcher", "height_m": -6, "weapons": ["WPN-DECOY-TORP"] }
+      ],
+      "magazines": [
+        { "name": "Torpedo room", "capacity": 24, "contents": { "WPN-TORP-HW": 24 } },
+        { "name": "Missile tubes", "capacity": 104, "contents": { "WPN-LACM": 80, "WPN-ASM-SS": 24 } },
+        { "name": "Countermeasures", "capacity": 8, "contents": { "WPN-DECOY-TORP": 8 } }
+      ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-VLF", "COM-UWT"]
+    },
+    {
+      "id": "GEN-SSK", "name": "Generic diesel-electric patrol submarine", "category": "submarine", "domain": "subsurface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DE-SUB", "damage_profile": "DMG-SUBMARINE",
+      "length_m": 70, "displacement_t": 2500, "draft_m": 7, "max_speed_kn": 20, "cruise_speed_kn": 8, "accel_mps2": 0.05, "endurance_nm": 8000, "max_depth_m": 300,
+      "signatures": [
+        { "kind": "rcs", "value": 200, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "slow", "value": 105, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 118, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 140, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-SON-SSK-BOW", "height_m": -8 }, { "sensor": "SEN-PERISCOPE", "height_m": 1.5 },
+        { "sensor": "SEN-ESM-SUB", "height_m": 5 }, { "sensor": "SEN-RDR-SUB-MAST", "height_m": 5 }
+      ],
+      "launchers": [
+        { "name": "Torpedo tubes", "height_m": -6, "weapons": ["WPN-TORP-HW", "WPN-ASM-SUBLAUNCH"] },
+        { "name": "Countermeasure launcher", "height_m": -5, "weapons": ["WPN-DECOY-TORP"] }
+      ],
+      "magazines": [
+        { "name": "Torpedo room", "capacity": 18, "contents": { "WPN-TORP-HW": 14, "WPN-ASM-SUBLAUNCH": 4 } },
+        { "name": "Countermeasures", "capacity": 6, "contents": { "WPN-DECOY-TORP": 6 } }
+      ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-VLF", "COM-UWT"]
+    },
+    {
+      "id": "GEN-SSK-AIP", "name": "Generic air-independent-propulsion submarine", "category": "submarine", "domain": "subsurface",
+      "service": "GEN-NAVY", "propulsion": "PROP-AIP-SUB", "damage_profile": "DMG-SUBMARINE",
+      "length_m": 68, "displacement_t": 2000, "draft_m": 6.5, "max_speed_kn": 20, "cruise_speed_kn": 6, "accel_mps2": 0.05, "endurance_nm": 9000, "max_depth_m": 300,
+      "signatures": [
+        { "kind": "rcs", "value": 180, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "slow", "value": 100, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "cruise", "value": 112, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 138, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-SON-SSK-BOW", "height_m": -8 }, { "sensor": "SEN-SON-SUB-TAS", "height_m": -150 },
+        { "sensor": "SEN-PERISCOPE", "height_m": 1.5 }, { "sensor": "SEN-ESM-SUB", "height_m": 5 }
+      ],
+      "launchers": [
+        { "name": "Torpedo tubes", "height_m": -6, "weapons": ["WPN-TORP-HW", "WPN-ASM-SUBLAUNCH"] },
+        { "name": "Countermeasure launcher", "height_m": -5, "weapons": ["WPN-DECOY-TORP"] }
+      ],
+      "magazines": [
+        { "name": "Torpedo room", "capacity": 16, "contents": { "WPN-TORP-HW": 12, "WPN-ASM-SUBLAUNCH": 4 } },
+        { "name": "Countermeasures", "capacity": 6, "contents": { "WPN-DECOY-TORP": 6 } }
+      ],
+      "comms": ["COM-HF", "COM-UHF", "COM-SATCOM", "COM-VLF", "COM-UWT"]
+    },
+    {
+      "id": "GEN-SSM", "name": "Generic midget submarine", "category": "submarine", "domain": "subsurface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DE-SUB", "damage_profile": "DMG-SUBMARINE",
+      "length_m": 30, "displacement_t": 200, "draft_m": 3.5, "max_speed_kn": 10, "cruise_speed_kn": 5, "accel_mps2": 0.05, "endurance_nm": 600, "max_depth_m": 100,
+      "signatures": [
+        { "kind": "rcs", "value": 20, "unit": "m2" },
+        { "kind": "acoustic", "speed_band": "slow", "value": 100, "unit": "db_re_1upa" },
+        { "kind": "acoustic", "speed_band": "max", "value": 125, "unit": "db_re_1upa" }
+      ],
+      "sensors": [
+        { "sensor": "SEN-SON-SSK-BOW", "height_m": -3 }, { "sensor": "SEN-PERISCOPE", "height_m": 1 }
+      ],
+      "launchers": [ { "name": "External torpedo cradles", "height_m": -2, "weapons": ["WPN-TORP-LW"] } ],
+      "magazines": [ { "name": "Torpedo cradles", "capacity": 2, "contents": { "WPN-TORP-LW": 2 } } ],
+      "comms": ["COM-HF", "COM-UHF", "COM-UWT"]
+    }
+  ]
+}

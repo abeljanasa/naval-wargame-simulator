@@ -1,0 +1,104 @@
+{
+  "defaults": {
+    "source_citation": "Generic class value representative of open-literature ranges; not derived from any specific ship (docs/db/data-dictionary.md#generic-values)",
+    "confidence": "D",
+    "classification": "UNCLASSIFIED",
+    "is_generic": true,
+    "created_by": "nws-core-team",
+    "updated_at": "2026-11-10"
+  },
+  "platforms": [
+    {
+      "id": "GEN-AOR", "name": "Generic replenishment oiler", "category": "auxiliary", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-AUXILIARY",
+      "length_m": 200, "displacement_t": 40000, "draft_m": 10, "max_speed_kn": 20, "cruise_speed_kn": 15, "accel_mps2": 0.02, "endurance_nm": 10000,
+      "signatures": [ { "kind": "rcs", "value": 30000, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 168, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-SURF", "height_m": 30 }, { "sensor": "SEN-RDR-NAV", "height_m": 28 }, { "sensor": "SEN-RDR-CIWS", "height_m": 20 }, { "sensor": "SEN-VISUAL", "height_m": 25 } ],
+      "launchers": [ { "name": "CIWS mount", "height_m": 20, "weapons": ["WPN-CIWS"] } ],
+      "magazines": [ { "name": "CIWS ammunition (bursts)", "capacity": 40, "contents": { "WPN-CIWS": 40 } } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-AKE", "name": "Generic ammunition and stores ship", "category": "auxiliary", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-AUXILIARY",
+      "length_m": 210, "displacement_t": 41000, "draft_m": 9.5, "max_speed_kn": 20, "cruise_speed_kn": 15, "accel_mps2": 0.02, "endurance_nm": 14000,
+      "signatures": [ { "kind": "rcs", "value": 30000, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 168, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-SURF", "height_m": 30 }, { "sensor": "SEN-RDR-NAV", "height_m": 28 }, { "sensor": "SEN-VISUAL", "height_m": 25 } ],
+      "launchers": [ { "name": "Self-defence guns", "height_m": 15, "weapons": ["WPN-GUN-30"] } ],
+      "magazines": [ { "name": "Gun ammunition (bursts)", "capacity": 80, "contents": { "WPN-GUN-30": 80 } } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM", "COM-LINK"]
+    },
+    {
+      "id": "GEN-ATF", "name": "Generic ocean-going tug", "category": "auxiliary", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-AUXILIARY",
+      "length_m": 70, "displacement_t": 2500, "draft_m": 5, "max_speed_kn": 15, "cruise_speed_kn": 10, "accel_mps2": 0.04, "endurance_nm": 8000,
+      "signatures": [ { "kind": "rcs", "value": 1500, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 160, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 15 }, { "sensor": "SEN-VISUAL", "height_m": 12 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF"]
+    },
+    {
+      "id": "GEN-AGS", "name": "Generic hydrographic survey ship", "category": "auxiliary", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-AUXILIARY",
+      "length_m": 90, "displacement_t": 3500, "draft_m": 5, "max_speed_kn": 16, "cruise_speed_kn": 12, "accel_mps2": 0.04, "endurance_nm": 12000,
+      "signatures": [ { "kind": "rcs", "value": 2500, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 140, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 18 }, { "sensor": "SEN-RDR-SURF", "height_m": 20 }, { "sensor": "SEN-VISUAL", "height_m": 14 }, { "sensor": "SEN-SON-HULL-MF", "height_m": -5 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM"]
+    },
+    {
+      "id": "GEN-AGI", "name": "Generic intelligence collection ship", "category": "auxiliary", "domain": "surface",
+      "service": "GEN-NAVY", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-AUXILIARY",
+      "length_m": 95, "displacement_t": 3000, "draft_m": 5, "max_speed_kn": 16, "cruise_speed_kn": 12, "accel_mps2": 0.04, "endurance_nm": 10000,
+      "signatures": [ { "kind": "rcs", "value": 2500, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 150, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 18 }, { "sensor": "SEN-RDR-SURF", "height_m": 20 }, { "sensor": "SEN-ESM-SHIP", "height_m": 30 }, { "sensor": "SEN-VISUAL", "height_m": 14 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-UHF", "COM-SATCOM"]
+    },
+    {
+      "id": "GEN-MV-CONTAINER", "name": "Generic large container ship", "category": "merchant", "domain": "surface",
+      "service": "GEN-CIVIL", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-MERCHANT-LARGE",
+      "length_m": 330, "displacement_t": 150000, "draft_m": 14, "max_speed_kn": 24, "cruise_speed_kn": 18, "accel_mps2": 0.01, "endurance_nm": 20000,
+      "signatures": [ { "kind": "rcs", "value": 50000, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 180, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 40 }, { "sensor": "SEN-VISUAL", "height_m": 35 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-SATCOM"]
+    },
+    {
+      "id": "GEN-MV-BULK", "name": "Generic bulk carrier", "category": "merchant", "domain": "surface",
+      "service": "GEN-CIVIL", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-MERCHANT-LARGE",
+      "length_m": 230, "displacement_t": 90000, "draft_m": 14, "max_speed_kn": 15, "cruise_speed_kn": 13, "accel_mps2": 0.01, "endurance_nm": 20000,
+      "signatures": [ { "kind": "rcs", "value": 40000, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 178, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 30 }, { "sensor": "SEN-VISUAL", "height_m": 28 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-SATCOM"]
+    },
+    {
+      "id": "GEN-MV-TANKER", "name": "Generic very large crude carrier", "category": "merchant", "domain": "surface",
+      "service": "GEN-CIVIL", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-MERCHANT-LARGE",
+      "length_m": 330, "displacement_t": 340000, "draft_m": 21, "max_speed_kn": 16, "cruise_speed_kn": 14, "accel_mps2": 0.005, "endurance_nm": 25000,
+      "signatures": [ { "kind": "rcs", "value": 60000, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 182, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 35 }, { "sensor": "SEN-VISUAL", "height_m": 32 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-SATCOM"]
+    },
+    {
+      "id": "GEN-MV-RORO", "name": "Generic roll-on/roll-off ferry", "category": "merchant", "domain": "surface",
+      "service": "GEN-CIVIL", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-MERCHANT-LARGE",
+      "length_m": 180, "displacement_t": 30000, "draft_m": 7, "max_speed_kn": 22, "cruise_speed_kn": 19, "accel_mps2": 0.02, "endurance_nm": 6000,
+      "signatures": [ { "kind": "rcs", "value": 30000, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 175, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 30 }, { "sensor": "SEN-VISUAL", "height_m": 25 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-SATCOM"]
+    },
+    {
+      "id": "GEN-MV-TRAWLER", "name": "Generic fishing trawler", "category": "merchant", "domain": "surface",
+      "service": "GEN-CIVIL", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-MERCHANT-SMALL",
+      "length_m": 40, "displacement_t": 800, "draft_m": 5, "max_speed_kn": 12, "cruise_speed_kn": 9, "accel_mps2": 0.04, "endurance_nm": 6000,
+      "signatures": [ { "kind": "rcs", "value": 300, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 165, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 8 }, { "sensor": "SEN-VISUAL", "height_m": 6 } ],
+      "comms": ["COM-HF", "COM-VHF"]
+    },
+    {
+      "id": "GEN-MV-OSV", "name": "Generic offshore supply vessel", "category": "merchant", "domain": "surface",
+      "service": "GEN-CIVIL", "propulsion": "PROP-DIESEL", "damage_profile": "DMG-MERCHANT-SMALL",
+      "length_m": 80, "displacement_t": 5000, "draft_m": 6, "max_speed_kn": 14, "cruise_speed_kn": 11, "accel_mps2": 0.03, "endurance_nm": 8000,
+      "signatures": [ { "kind": "rcs", "value": 2000, "unit": "m2" }, { "kind": "acoustic", "speed_band": "cruise", "value": 168, "unit": "db_re_1upa" } ],
+      "sensors": [ { "sensor": "SEN-RDR-NAV", "height_m": 15 }, { "sensor": "SEN-VISUAL", "height_m": 12 } ],
+      "comms": ["COM-HF", "COM-VHF", "COM-SATCOM"]
+    }
+  ]
+}

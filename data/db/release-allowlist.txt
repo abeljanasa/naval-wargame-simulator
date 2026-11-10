@@ -1,0 +1,4 @@
+# Database files allowed in an open (UNCLASSIFIED) release. One file name per line.
+# Every listed file must still contain only UNCLASSIFIED records: `sim-db scan` checks contents too.
+# Adding a name here needs a reviewed PR (master prompt §3).
+open-platforms.sqlite

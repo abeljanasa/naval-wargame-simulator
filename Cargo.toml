@@ -1,0 +1,58 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/sim-core",
+    "crates/sim-geo",
+    "crates/sim-db",
+    "crates/sim-scenario",
+    "apps/batch",
+    "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "LicenseRef-Proprietary"
+publish = false
+
+[workspace.dependencies]
+sim-core = { path = "crates/sim-core" }
+sim-db = { path = "crates/sim-db" }
+sim-geo = { path = "crates/sim-geo" }
+sim-scenario = { path = "crates/sim-scenario" }
+
+anyhow = "1"
+bevy_ecs = "0.20"
+clap = { version = "4", features = ["derive"] }
+libm = "0.2"
+proptest = "1"
+rand_chacha = { version = "0.9", features = ["serde"] }
+rmp-serde = "1"
+# Bundled SQLite: identical engine version on every OS and in the air-gapped build.
+rusqlite = { version = "0.41", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# tauri-specta 2.0.0-rc.26 requires exactly this specta release; bump them together.
+specta = { version = "=2.0.0-rc.26", features = ["derive"] }
+specta-typescript = "=0.0.13"
+tauri = "2.12"
+tauri-build = "2.7"
+tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+disallowed_methods = "deny"
+disallowed_types = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
+semicolon_if_nothing_returned = "warn"
+explicit_iter_loop = "warn"
+
+[profile.release]
+debug = 1

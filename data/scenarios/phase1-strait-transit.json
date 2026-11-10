@@ -1,0 +1,38 @@
+{
+  "format": "nws-scenario",
+  "format_version": 2,
+  "name": "Phase 1 — Strait transit",
+  "description": "Gate 1 demonstrator: units move and detect. A generic frigate transits a strait westbound on a four-leg route while a generic bulk carrier transits eastbound; the ships close at about 30 kn and each side's radar picks up the other once inside the radar horizon (about 34 km). All platforms are generic database classes with no real-world values.",
+  "seed": 20261110,
+  "duration_s": 86400,
+  "sides": [
+    { "id": 1, "name": "Blue" },
+    { "id": 2, "name": "Neutral shipping" }
+  ],
+  "units": [
+    {
+      "id": 1,
+      "name": "Generic frigate (FFG) — Alpha",
+      "side": 1,
+      "platform": "GEN-FFG",
+      "position": { "lat_deg": -38.9, "lon_deg": 148.6 },
+      "heading_deg": 250.0,
+      "speed_mps": 9.0,
+      "route": [
+        { "lat_deg": -39.2, "lon_deg": 147.0 },
+        { "lat_deg": -39.4, "lon_deg": 145.5 },
+        { "lat_deg": -39.3, "lon_deg": 143.5 },
+        { "lat_deg": -38.9, "lon_deg": 142.4 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Generic bulk carrier — Bravo",
+      "side": 2,
+      "platform": "GEN-MV-BULK",
+      "position": { "lat_deg": -39.3, "lon_deg": 144.0 },
+      "heading_deg": 90.0,
+      "speed_mps": 6.5
+    }
+  ]
+}

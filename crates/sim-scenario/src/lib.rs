@@ -1,0 +1,399 @@
+//! Scenario files: JSON, versioned, validated on load.
+//!
+//! Phase 1 holds the seed, sides and initial units. A unit names a platform-database class
+//! (`"platform": "GEN-FFG"`), which supplies its domain, performance, sensors and radar
+//! cross-section. Any of the performance values can be overridden per unit. Missions, events
+//! (triggers → conditions → actions), Lua scripts and planning objects arrive in Phase 3.
+//!
+//! Format history:
+//! * v1: units carried domain, max speed and acceleration inline.
+//! * v2: optional `platform` reference; inline values become optional overrides. v1 files still load.
+
+#![forbid(unsafe_code)]
+
+pub mod synthetic;
+
+use serde::{Deserialize, Serialize};
+use sim_core::{
+    Command, CommandPayload, Domain, GeoPoint, Issuer, SensorKind, SensorSpec, SideId, Simulation,
+    Tick, UnitId, UnitSpawn,
+};
+use sim_db::PlatformDb;
+use std::collections::BTreeSet;
+use std::path::Path;
+
+pub const SCENARIO_FORMAT: &str = "nws-scenario";
+pub const SCENARIO_FORMAT_VERSION: u32 = 2;
+
+#[derive(Debug, thiserror::Error)]
+pub enum ScenarioError {
+    #[error("cannot read scenario file: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("scenario JSON is malformed: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("not a scenario file (format = {0:?})")]
+    WrongFormat(String),
+    #[error("scenario format version {found} is newer than this build supports ({supported})")]
+    FutureVersion { found: u32, supported: u32 },
+    #[error("scenario is invalid: {0}")]
+    Invalid(String),
+    #[error("platform database: {0}")]
+    Db(#[from] sim_db::DbError),
+    #[error(transparent)]
+    Sim(#[from] sim_core::SimError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SideDef {
+    pub id: SideId,
+    pub name: String,
+}
+
+/// A unit as written in a scenario file.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioUnit {
+    pub id: UnitId,
+    pub name: String,
+    pub side: SideId,
+    /// Platform database class. When given, it supplies everything below that is left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain: Option<Domain>,
+    pub position: GeoPoint,
+    #[serde(default)]
+    pub altitude_m: f64,
+    #[serde(default)]
+    pub heading_deg: f64,
+    /// Initial (and ordered) speed. Defaults to the platform's cruise speed, or 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed_mps: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_speed_mps: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accel_mps2: Option<f64>,
+    #[serde(default)]
+    pub route: Vec<GeoPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Scenario {
+    pub format: String,
+    pub format_version: u32,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    /// Default RNG seed. Batch runs override it per replication.
+    pub seed: u64,
+    /// Default run length in game seconds.
+    pub duration_s: u64,
+    pub sides: Vec<SideDef>,
+    pub units: Vec<ScenarioUnit>,
+}
+
+fn domain_from_db(s: &str) -> Option<Domain> {
+    Some(match s {
+        "surface" => Domain::Surface,
+        "subsurface" => Domain::Subsurface,
+        "air" => Domain::Air,
+        "land" => Domain::Land,
+        _ => return None,
+    })
+}
+
+impl Scenario {
+    pub fn from_json(text: &str) -> Result<Self, ScenarioError> {
+        #[derive(Deserialize)]
+        struct Header {
+            format: String,
+            format_version: u32,
+        }
+        let header: Header = serde_json::from_str(text)?;
+        if header.format != SCENARIO_FORMAT {
+            return Err(ScenarioError::WrongFormat(header.format));
+        }
+        if header.format_version > SCENARIO_FORMAT_VERSION {
+            return Err(ScenarioError::FutureVersion {
+                found: header.format_version,
+                supported: SCENARIO_FORMAT_VERSION,
+            });
+        }
+        let scenario: Scenario = serde_json::from_str(text)?;
+        scenario.validate()?;
+        Ok(scenario)
+    }
+
+    pub fn load(path: impl AsRef<Path>) -> Result<Self, ScenarioError> {
+        Self::from_json(&std::fs::read_to_string(path)?)
+    }
+
+    /// Structural checks: unique side and unit ids, every unit on a declared side, and every
+    /// unit without a platform carrying its own domain, max speed and acceleration.
+    /// Per-unit value checks run when the spawn command is submitted.
+    pub fn validate(&self) -> Result<(), ScenarioError> {
+        let mut sides = BTreeSet::new();
+        for s in &self.sides {
+            if !sides.insert(s.id) {
+                return Err(ScenarioError::Invalid(format!(
+                    "duplicate side id {}",
+                    s.id
+                )));
+            }
+        }
+        let mut units = BTreeSet::new();
+        for u in &self.units {
+            if !units.insert(u.id) {
+                return Err(ScenarioError::Invalid(format!(
+                    "duplicate unit id {}",
+                    u.id
+                )));
+            }
+            if !sides.contains(&u.side) {
+                return Err(ScenarioError::Invalid(format!(
+                    "unit {} is on undeclared side {}",
+                    u.id, u.side
+                )));
+            }
+            if u.platform.is_none()
+                && (u.domain.is_none() || u.max_speed_mps.is_none() || u.accel_mps2.is_none())
+            {
+                return Err(ScenarioError::Invalid(format!(
+                    "unit {} has no platform, so it needs domain, max_speed_mps and accel_mps2",
+                    u.id
+                )));
+            }
+        }
+        if self.duration_s == 0 {
+            return Err(ScenarioError::Invalid("duration_s must be > 0".into()));
+        }
+        Ok(())
+    }
+
+    /// Run length in ticks. `TICK_SECONDS` is 1.0, so seconds and ticks are the same number (ADR-0003).
+    #[must_use]
+    pub fn duration_ticks(&self) -> Tick {
+        Tick(self.duration_s)
+    }
+
+    /// Resolves every unit against the platform database into a spawn command payload.
+    pub fn resolve(&self, db: &PlatformDb) -> Result<Vec<UnitSpawn>, ScenarioError> {
+        self.units.iter().map(|u| resolve_unit(u, db)).collect()
+    }
+
+    /// Builds a simulation at tick 0, with the initial units queued as scenario commands.
+    pub fn build(&self, seed: Option<u64>, db: &PlatformDb) -> Result<Simulation, ScenarioError> {
+        let spawns = self.resolve(db)?;
+        let mut sim = Simulation::new(seed.unwrap_or(self.seed));
+        // Ships and submarines navigate round the bundled coastline (docs/models/land-avoidance.md).
+        sim.set_land_mask(sim_geo::land::embedded());
+        for s in spawns {
+            sim.submit(Command {
+                tick: Tick(0),
+                issuer: Issuer::Scenario,
+                side: None,
+                payload: CommandPayload::SpawnUnit(s),
+            })?;
+        }
+        Ok(sim)
+    }
+}
+
+fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, ScenarioError> {
+    let invalid = |msg: String| ScenarioError::Invalid(format!("unit {}: {msg}", u.id));
+    let (domain, max_speed, cruise, accel, sensors, rcs, turn) = match &u.platform {
+        Some(pid) => {
+            let p = db
+                .platform(pid)?
+                .ok_or_else(|| invalid(format!("unknown platform {pid}")))?;
+            let db_domain = domain_from_db(&p.domain).ok_or_else(|| {
+                invalid(format!("platform {pid} has unknown domain {}", p.domain))
+            })?;
+            if let Some(d) = u.domain {
+                if d != db_domain {
+                    return Err(invalid(format!(
+                        "domain {d:?} contradicts platform {pid} ({db_domain:?})"
+                    )));
+                }
+            }
+            let sensors = db
+                .sensors_of(pid)?
+                .into_iter()
+                .map(|s| {
+                    let kind = SensorKind::from_db(&s.kind).ok_or_else(|| {
+                        invalid(format!(
+                            "sensor {} has unknown kind {}",
+                            s.sensor_id, s.kind
+                        ))
+                    })?;
+                    Ok(SensorSpec {
+                        sensor_id: s.sensor_id,
+                        kind,
+                        mount_height_m: s.mount_height_m,
+                        min_range_m: s.min_range_m,
+                        max_range_m: s.max_range_m,
+                        ref_range_m: s.ref_detect_range_m,
+                        ref_rcs_m2: s.ref_target_rcs_m2,
+                        max_target_altitude_m: s.max_target_altitude_m,
+                    })
+                })
+                .collect::<Result<Vec<_>, ScenarioError>>()?;
+            (
+                db_domain,
+                u.max_speed_mps.unwrap_or(p.max_speed_mps),
+                p.cruise_speed_mps,
+                u.accel_mps2.unwrap_or(p.accel_mps2),
+                sensors,
+                db.rcs_m2(pid)?,
+                turn_performance(&p.category, p.length_m),
+            )
+        }
+        // `validate` guarantees these are present when there is no platform.
+        None => (
+            u.domain.ok_or_else(|| invalid("missing domain".into()))?,
+            u.max_speed_mps
+                .ok_or_else(|| invalid("missing max_speed_mps".into()))?,
+            0.0,
+            u.accel_mps2
+                .ok_or_else(|| invalid("missing accel_mps2".into()))?,
+            vec![],
+            None,
+            (None, None),
+        ),
+    };
+    Ok(UnitSpawn {
+        id: u.id,
+        name: u.name.clone(),
+        side: u.side,
+        domain,
+        position: u.position,
+        altitude_m: u.altitude_m,
+        heading_deg: u.heading_deg,
+        speed_mps: u.speed_mps.unwrap_or(cruise).min(max_speed),
+        max_speed_mps: max_speed,
+        accel_mps2: accel,
+        route: u.route.clone(),
+        platform: u.platform.clone(),
+        sensors,
+        rcs_m2: rcs,
+        max_turn_rate_dps: turn.0,
+        min_turn_radius_m: turn.1,
+    })
+}
+
+/// Generic turn performance by platform class (the database has no turn data yet; see
+/// docs/models/geodesy-and-movement.md §Turning). Returns (max rate deg/s, min radius m).
+fn turn_performance(category: &str, length_m: Option<f64>) -> (Option<f64>, Option<f64>) {
+    match category {
+        // Ships: tactical diameter ≈ 5 hull lengths → radius 2.5 lengths, capped at 3°/s.
+        "surface_combatant" | "auxiliary" | "merchant" | "submarine" => {
+            (Some(3.0), Some(2.5 * length_m.unwrap_or(100.0)))
+        }
+        "fighter" => (Some(15.0), None),
+        "helicopter" | "uav" => (Some(8.0), None),
+        "mpa" | "aew" | "tanker" => (Some(3.0), None),
+        // Land units and fixed sites: no turn limit.
+        _ => (None, None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const INLINE: &str = r#"{
+        "format": "nws-scenario", "format_version": 1, "name": "t", "seed": 1, "duration_s": 10,
+        "sides": [{"id": 1, "name": "Blue"}],
+        "units": [{"id": 1, "name": "A", "side": 1, "domain": "surface",
+                   "position": {"lat_deg": 0.0, "lon_deg": 0.0},
+                   "max_speed_mps": 10.0, "accel_mps2": 0.1}]
+    }"#;
+
+    const WITH_PLATFORM: &str = r#"{
+        "format": "nws-scenario", "format_version": 2, "name": "t", "seed": 1, "duration_s": 10,
+        "sides": [{"id": 1, "name": "Blue"}],
+        "units": [{"id": 1, "name": "F", "side": 1, "platform": "GEN-FFG",
+                   "position": {"lat_deg": 0.0, "lon_deg": 0.0}}]
+    }"#;
+
+    fn db() -> PlatformDb {
+        sim_db::embedded::open_platform_db().unwrap()
+    }
+
+    #[test]
+    fn v1_inline_units_still_load() {
+        let s = Scenario::from_json(INLINE).unwrap();
+        let mut sim = s.build(None, &db()).unwrap();
+        sim.step();
+        let snap = sim.snapshot(sim_core::Viewer::WhiteCell);
+        assert_eq!(snap.units.len(), 1);
+        assert_eq!(snap.units[0].platform, None);
+    }
+
+    #[test]
+    fn platform_supplies_performance_sensors_and_rcs() {
+        let s = Scenario::from_json(WITH_PLATFORM).unwrap();
+        let spawn = &s.resolve(&db()).unwrap()[0];
+        assert_eq!(spawn.domain, Domain::Surface);
+        assert!((spawn.max_speed_mps - 28.0 * 1852.0 / 3600.0).abs() < 1e-9);
+        // Starts at the platform's cruise speed (16 kn).
+        assert!((spawn.speed_mps - 16.0 * 1852.0 / 3600.0).abs() < 1e-9);
+        assert_eq!(spawn.rcs_m2, Some(5000.0));
+        assert!(spawn
+            .sensors
+            .iter()
+            .any(|s| s.kind == SensorKind::Radar && s.sensor_id == "SEN-RDR-3D-MR"));
+    }
+
+    #[test]
+    fn overrides_win_and_contradictions_are_rejected() {
+        let over = WITH_PLATFORM.replace(
+            r#""platform": "GEN-FFG","#,
+            r#""platform": "GEN-FFG", "max_speed_mps": 5.0, "speed_mps": 9.0,"#,
+        );
+        let spawn = &Scenario::from_json(&over).unwrap().resolve(&db()).unwrap()[0];
+        assert!((spawn.max_speed_mps - 5.0).abs() < 1e-12);
+        assert!(
+            (spawn.speed_mps - 5.0).abs() < 1e-12,
+            "initial speed capped at max"
+        );
+
+        let wrong = WITH_PLATFORM.replace(
+            r#""platform": "GEN-FFG","#,
+            r#""platform": "GEN-FFG", "domain": "air","#,
+        );
+        assert!(matches!(
+            Scenario::from_json(&wrong).unwrap().resolve(&db()),
+            Err(ScenarioError::Invalid(_))
+        ));
+        let unknown = WITH_PLATFORM.replace("GEN-FFG", "GEN-NOPE");
+        assert!(matches!(
+            Scenario::from_json(&unknown).unwrap().resolve(&db()),
+            Err(ScenarioError::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_wrong_format_future_version_and_incomplete_units() {
+        let wrong = INLINE.replace("nws-scenario", "other");
+        assert!(matches!(
+            Scenario::from_json(&wrong),
+            Err(ScenarioError::WrongFormat(_))
+        ));
+        let future = INLINE.replace("\"format_version\": 1", "\"format_version\": 99");
+        assert!(matches!(
+            Scenario::from_json(&future),
+            Err(ScenarioError::FutureVersion { .. })
+        ));
+        let no_speed = INLINE.replace("\"max_speed_mps\": 10.0, ", "");
+        assert!(matches!(
+            Scenario::from_json(&no_speed),
+            Err(ScenarioError::Invalid(_))
+        ));
+        let bad_side = INLINE.replace("\"side\": 1", "\"side\": 2");
+        assert!(matches!(
+            Scenario::from_json(&bad_side),
+            Err(ScenarioError::Invalid(_))
+        ));
+    }
+}
