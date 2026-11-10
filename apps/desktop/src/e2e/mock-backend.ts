@@ -173,7 +173,16 @@ const frame = (): FrameEvent => {
       scenario_duration_s: 86400,
     },
     // The mock always sends full updates; diffs are covered by the backend's own tests.
-    update: { full: true, tick, game_time_s: tick, viewer, units, removed: [], contacts },
+    update: {
+      full: true,
+      tick,
+      game_time_s: tick,
+      viewer,
+      units,
+      removed: [],
+      contacts,
+      environment: { sea_state: 3, weather_loss_db: 0 },
+    },
   };
 };
 

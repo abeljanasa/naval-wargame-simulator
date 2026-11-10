@@ -5,8 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Command, CommandPayload, ContactView, Doctrine, DoctrineScope, GeoPoint, Issuer, SimError,
-    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer,
+    Command, CommandPayload, ContactView, Doctrine, DoctrineScope, Environment, GeoPoint, Issuer,
+    SimError, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -52,6 +52,8 @@ pub struct SnapshotUpdate {
     pub units: Vec<UnitView>,
     pub removed: Vec<UnitId>,
     pub contacts: Vec<ContactView>,
+    /// Sea state and weather (small; sent every frame).
+    pub environment: Environment,
 }
 
 /// Clock status sent with every frame.
@@ -230,6 +232,7 @@ impl Host {
                         .copied()
                         .collect(),
                     contacts: snap.contacts.clone(),
+                    environment: snap.environment,
                 }
             }
             _ => SnapshotUpdate {
@@ -240,6 +243,7 @@ impl Host {
                 units: snap.units.clone(),
                 removed: vec![],
                 contacts: snap.contacts.clone(),
+                environment: snap.environment,
             },
         };
         self.last_sent = Some(snap);

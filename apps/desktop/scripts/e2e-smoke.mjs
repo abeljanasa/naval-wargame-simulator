@@ -48,6 +48,8 @@ try {
     "contact shows its 95 % position error",
   );
 
+  check(await page.getByText("Sea state 3").isVisible(), "header shows the sea state");
+
   await page.keyboard.press("Space");
   await page.waitForTimeout(300);
   check(

@@ -206,6 +206,25 @@ export type Emcon =
 /**  No active emissions. Passive sensors still work. */
 "silent";
 
+/**  Conditions that every radar in the scenario shares. Constant until Phase 4 weather zones. */
+export type Environment = Environment_Serialize | Environment_Deserialize;
+
+/**  Conditions that every radar in the scenario shares. Constant until Phase 4 weather zones. */
+export type Environment_Deserialize = {
+	/**  Douglas sea state, 0 (calm) to 9. */
+	sea_state?: number,
+	/**  Two-way propagation loss from weather (rain, fog), dB, applied to every radar. */
+	weather_loss_db?: number | null,
+};
+
+/**  Conditions that every radar in the scenario shares. Constant until Phase 4 weather zones. */
+export type Environment_Serialize = {
+	/**  Douglas sea state, 0 (calm) to 9. */
+	sea_state: number,
+	/**  Two-way propagation loss from weather (rain, fog), dB, applied to every radar. */
+	weather_loss_db: number | null,
+};
+
 /**  A one-sigma position error ellipse, as shown to players. */
 export type ErrorEllipse = {
 	semi_major_m: number | null,
@@ -299,6 +318,8 @@ export type SnapshotUpdate_Deserialize = {
 	units: UnitView_Deserialize[],
 	removed: UnitId[],
 	contacts: ContactView_Deserialize[],
+	/**  Sea state and weather (small; sent every frame). */
+	environment: Environment_Deserialize,
 };
 
 /**
@@ -313,6 +334,8 @@ export type SnapshotUpdate_Serialize = {
 	units: UnitView_Serialize[],
 	removed: UnitId[],
 	contacts: ContactView_Serialize[],
+	/**  Sea state and weather (small; sent every frame). */
+	environment: Environment_Serialize,
 };
 
 /**  A simulation tick number. Tick `n` covers game time `[n, n+1)` × [`TICK_SECONDS`]. */

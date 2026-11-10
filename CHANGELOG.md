@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 3: radar)
+
+- **Radar model** (`docs/models/radar.md`, DL-0012):
+  - Sea and land clutter shorten detection range against low targets, scaled by sea state.
+  - A scenario-wide weather loss applies to every radar.
+  - Noise jamming, self-screening and stand-off, with main-beam and sidelobe J/N. Burn-through emerges as range closes.
+  - Jammers radiate only while EMCON is active.
+- **Environment:** `SetEnvironment` (scenario and white cell) sets sea state and weather. Every side sees it, and the desktop header shows the sea state.
+- **Database migration 0002:** radar `clutter_db_per_sea_state` and `beamwidth_deg`, filled for all 15 generic radars, with two new validation rules.
+- **Scenario format:** optional `environment` and per-unit `jammer`.
+- Detection events log clutter loss, weather loss and J/N.
+
+### Changed
+
+- Save format 5 (older saves still load).
+- The demo scenario runs in sea state 3. Golden hash is now `271dd129bbb9548d`.
+
 ### Added (Phase 2, slice 2: command and control)
 
 - **`sim-c2` crate:** postures, doctrine inheritance (unit, then group, then side), the WCS weapons-release rule (safe, tight, free) with the ROE `engage_unfriendly` setting, and EMCON (model doc `docs/models/c2-doctrine.md`, DL-0011).

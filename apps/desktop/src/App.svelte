@@ -134,6 +134,13 @@
       <span class="ratio" title="Achieved game seconds per wall second">
         {clock && !clock.paused ? `${Math.round(n(clock.achieved_ratio))}×` : "paused"}
       </span>
+      {#if sim.environment}
+        <span class="env" title="Sea state (clutter against low targets) and weather loss on radar">
+          Sea state {sim.environment.sea_state}{n(sim.environment.weather_loss_db) > 0
+            ? ` · weather −${n(sim.environment.weather_loss_db).toFixed(1)} dB`
+            : ""}
+        </span>
+      {/if}
     </div>
 
     <div class="controls" role="group" aria-label="Time controls">
@@ -380,6 +387,10 @@
   .clock .ratio {
     color: var(--text-dim);
     min-width: 56px;
+  }
+  .clock .env {
+    color: var(--text-dim);
+    font-size: 12px;
   }
   .controls {
     display: flex;

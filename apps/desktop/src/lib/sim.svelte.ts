@@ -7,6 +7,7 @@ import {
   type ClockStatus,
   type ContactView,
   type Doctrine,
+  type Environment,
   type FrameEvent,
   type GeoPoint,
   type SessionInfo,
@@ -28,6 +29,8 @@ export const COMPRESSIONS: { key: TimeCompression; label: string }[] = [
 
 class SimSession {
   session = $state<SessionInfo | null>(null);
+  /** Sea state and weather, from the latest frame. */
+  environment = $state<Environment | null>(null);
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */
@@ -60,6 +63,7 @@ class SimSession {
       );
     }
     this.allContacts = u.contacts;
+    this.environment = u.environment;
   }
 
   /** Loads a scenario file the user picked; the engine validates it and resets the session. */
