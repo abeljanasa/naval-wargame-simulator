@@ -11,6 +11,7 @@ mod esm;
 mod kind;
 mod measurement;
 mod radar;
+mod sonar;
 mod track;
 
 pub use classify::{radar_classification, Classification};
@@ -25,5 +26,10 @@ pub use radar::{
     in_main_beam, jamming_to_noise, pd_jammed, pd_per_scan, ClutterBackground, Environment,
     JammerSpec, CLUTTER_CEILING_M, DEFAULT_BEAMWIDTH_DEG, DEFAULT_CLUTTER_DB_PER_SEA_STATE,
     LAND_CLUTTER_SEA_STATE, SIDELOBE_DB,
+};
+pub use sonar::{
+    active_se_db, ambient_noise_db, noise_at_speed_db, passive_se_db, pd_from_se, power_sum_db,
+    sonar_params, thorp_absorption_db_per_km, transmission_loss_db, SonarParams,
+    DIPPING_MAX_ALTITUDE_M, DIPPING_MAX_SPEED_MPS, SE_SIGMA_DB, SPREADING_TRANSITION_M,
 };
 pub use track::{measured_point, Cov2, ErrorEllipse, TrackEstimate};

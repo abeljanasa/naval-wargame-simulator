@@ -324,7 +324,7 @@ impl Scenario {
 
 fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, ScenarioError> {
     let invalid = |msg: String| ScenarioError::Invalid(format!("unit {}: {msg}", u.id));
-    let (domain, max_speed, cruise, accel, sensors, rcs, turn) = match &u.platform {
+    let (domain, max_speed, cruise, accel, sensors, rcs, turn, noise) = match &u.platform {
         Some(pid) => {
             let p = db
                 .platform(pid)?
@@ -360,6 +360,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
                         max_target_altitude_m: s.max_target_altitude_m,
                         clutter_db_per_sea_state: s.clutter_db_per_sea_state,
                         beamwidth_deg: s.beamwidth_deg,
+                        active: s.is_active,
                     })
                 })
                 .collect::<Result<Vec<_>, ScenarioError>>()?;
@@ -371,6 +372,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
                 sensors,
                 db.rcs_m2(pid)?,
                 turn_performance(&p.category, p.length_m),
+                radiated_noise_db(&p.category),
             )
         }
         // `validate` guarantees these are present when there is no platform.
@@ -384,6 +386,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
             vec![],
             None,
             (None, None),
+            None,
         ),
     };
     Ok(UnitSpawn {
@@ -406,6 +409,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         group: u.group.clone(),
         doctrine: u.doctrine,
         jammer: u.jammer,
+        radiated_noise_db: noise,
     })
 }
 
@@ -439,6 +443,19 @@ fn emitter_library(
             })
         })
         .collect()
+}
+
+/// Generic radiated noise at 10 kn by platform category, dB (the database has no acoustic data
+/// yet; see docs/models/sonar.md). `None` for categories that are not waterborne, and for units
+/// without a platform (the engine's domain default then applies).
+fn radiated_noise_db(category: &str) -> Option<f64> {
+    match category {
+        "submarine" => Some(115.0),
+        "surface_combatant" => Some(140.0),
+        "auxiliary" => Some(145.0),
+        "merchant" => Some(150.0),
+        _ => None,
+    }
 }
 
 /// Generic turn performance by platform class (the database has no turn data yet; see

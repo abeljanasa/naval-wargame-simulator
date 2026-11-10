@@ -96,7 +96,28 @@ pub enum SimEventKind {
         detected: bool,
         bearing_error_deg: Option<f64>,
     },
-    /// Bearings from several observers of a side were combined into a position fix.
+    /// One sonar detection draw, with every term of the sonar equation.
+    SonarAttempt {
+        observer: UnitId,
+        sensor: String,
+        target: UnitId,
+        /// Active transmission (else passive listening).
+        active: bool,
+        range_m: f64,
+        sl_db: f64,
+        tl_db: f64,
+        nl_db: f64,
+        di_db: f64,
+        dt_db: f64,
+        se_db: f64,
+        pd: f64,
+        draw: f64,
+        detected: bool,
+        range_error_m: Option<f64>,
+        bearing_error_deg: Option<f64>,
+    },
+    /// Bearings (ESM and passive sonar) from several observers of a side were combined into a
+    /// position fix.
     EsmFix {
         side: SideId,
         target: UnitId,

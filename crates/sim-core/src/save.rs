@@ -30,7 +30,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   no weather, no jammers and the radar defaults.
 /// * 6: adds ESM bearing lines, the emitter library, and contact category and class. Older saves
 ///   load with none of these.
-pub const SAVE_FORMAT_VERSION: u32 = 6;
+/// * 7: adds sonar: the sensor `active` flag, radiated noise on signatures, and sonar events.
+///   Older saves load with passive-only sensors and the domain noise defaults.
+pub const SAVE_FORMAT_VERSION: u32 = 7;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,7 +99,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=5 | SAVE_FORMAT_VERSION => {
+            1..=6 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

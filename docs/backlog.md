@@ -10,6 +10,8 @@ Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md).
 - [ ] Low air targets over land should see land clutter (needs a land-mask lookup in detection).
 - [ ] ECM equipment (jammers) in the platform database, with soft kill in slice 9; until then jammers are given per unit in scenarios.
 - [ ] Track velocity estimation and association errors (tracks model limitations).
+- [ ] Acoustic figures (radiated noise, sonar frequency, DI, DT, source level) as platform-database fields; generic defaults in code until then.
+- [ ] Sonobuoy laying and towed-array streaming states (missions, slice 10); active-sonar reverberation.
 
 ## Phase 1, still to do (Gate 1: "units move and detect")
 

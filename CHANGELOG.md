@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 5: sonar)
+
+- **Sonar** (`docs/models/sonar.md`, DL-0014):
+  - Passive SE = SL − TL − (NL − DI) − DT and active (noise-limited) sonar equations. Pd = Φ(SE / 5 dB).
+  - Spherical-then-cylindrical spreading with Thorp absorption.
+  - Speed-dependent radiated noise and self-noise; ambient noise set by sea state.
+  - Active sonar transmits under EMCON active, and a pinging ship is heard at its ping level.
+  - Active detections feed tracks. Passive bearings join the ESM pool and triangulate into fixes.
+  - Dipping sonar needs a low hover; sonobuoys wait for missions.
+- Every sonar attempt logs each term of the sonar equation.
+
+### Changed
+
+- Save format 7 (older saves still load). `UnitSpawn.radiated_noise_db` and `SensorSpec.active` are added.
+- Golden hash is now `66e6a556f1ac1068`.
+
 ### Added (Phase 2, slice 4: ESM)
 
 - **ESM** (`docs/models/esm.md`, DL-0013):

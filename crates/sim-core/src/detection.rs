@@ -23,11 +23,12 @@
 //! velocity estimation, association errors (tracks are keyed by the true target), data links.
 
 use crate::c2::C2State;
-use crate::components::{Domain, Position, Unit};
-use crate::esm::{esm_pass, BearingTable, EmitterLibrary};
+use crate::components::{Domain, Kinematics, Position, Unit};
+use crate::esm::{esm_pass, resolve_bearings, BearingTable, EmitterLibrary, FreshBearings};
 use crate::events::{EventLog, SimEventKind};
 use crate::ids::{SideId, UnitId};
 use crate::rng::{RngStreams, StreamId};
+use crate::sonar::sonar_pass;
 use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -77,6 +78,9 @@ pub struct SensorSpec {
     /// Radar: two-way half-power beamwidth, degrees (default 2).
     #[serde(default)]
     pub beamwidth_deg: Option<f64>,
+    /// Sonar: capable of active transmission (database `is_active`).
+    #[serde(default)]
+    pub active: bool,
 }
 
 impl SensorSpec {
@@ -132,6 +136,9 @@ pub struct SensorSuite(pub Vec<SensorSpec>);
 pub struct Signature {
     /// Radar cross-section, m².
     pub rcs_m2: f64,
+    /// Radiated noise at 10 kn, dB (sonar). `None` in saves before format 7: domain default.
+    #[serde(default)]
+    pub radiated_noise_db: Option<f64>,
 }
 
 /// RCS used when the platform database gives none (validation warns about those platforms).
@@ -421,6 +428,9 @@ pub(crate) struct Observed<'a> {
     /// EMCON allows active emissions (radar, jammer).
     pub(crate) emits: bool,
     pub(crate) jammer: Option<JammerSpec>,
+    pub(crate) speed_mps: f64,
+    /// Radiated noise at 10 kn, dB.
+    pub(crate) radiated_noise_db: f64,
 }
 
 // A bevy system takes its world access as parameters; grouping them would only hide that.
@@ -434,7 +444,14 @@ pub(crate) fn detection_system(
     env: Res<EnvState>,
     mut bearings: ResMut<BearingTable>,
     library: Res<EmitterLibrary>,
-    units: Query<(&Unit, &Position, &SensorSuite, &Signature, &Jammer)>,
+    units: Query<(
+        &Unit,
+        &Position,
+        &SensorSuite,
+        &Signature,
+        &Jammer,
+        &Kinematics,
+    )>,
 ) {
     let env = env.0;
     let tick = clock.tick;
@@ -443,7 +460,7 @@ pub(crate) fn detection_system(
     }
     let mut all: Vec<Observed<'_>> = units
         .iter()
-        .map(|(u, p, s, sig, j)| Observed {
+        .map(|(u, p, s, sig, j, k)| Observed {
             id: u.id,
             side: u.side,
             domain: u.domain,
@@ -452,6 +469,10 @@ pub(crate) fn detection_system(
             rcs_m2: sig.rcs_m2,
             emits: c2.doctrine_for(u).emcon == Emcon::Active,
             jammer: j.0,
+            speed_mps: k.speed_mps,
+            radiated_noise_db: sig
+                .radiated_noise_db
+                .unwrap_or_else(|| crate::sonar::default_radiated_noise_db(u.domain)),
         })
         .collect();
     all.sort_by_key(|o| o.id);
@@ -646,16 +667,29 @@ pub(crate) fn detection_system(
             }
         }
     }
+    let mut fresh = FreshBearings::new();
     esm_pass(
         &all,
         &ecef,
         tick,
         &mut rng,
-        &mut contacts,
         &mut log,
         &mut bearings,
         &library,
+        &mut fresh,
     );
+    sonar_pass(
+        &all,
+        &ecef,
+        tick,
+        env,
+        &mut rng,
+        &mut contacts,
+        &mut log,
+        &mut bearings,
+        &mut fresh,
+    );
+    resolve_bearings(fresh, &all, tick, &mut contacts, &mut log, &mut bearings);
     for (side, number, target) in contacts.expire(tick) {
         log.push(
             tick,

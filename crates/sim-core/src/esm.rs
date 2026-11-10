@@ -101,11 +101,61 @@ struct Emitter {
     height_m: f64,
 }
 
-struct Intercepts {
+/// This scan's bearings on one target held by one side, from ESM and passive sonar.
+pub(crate) struct Intercepts {
     target_index: usize,
-    /// One line per observer (the first emitter it intercepted this scan).
+    /// One line per observer (the first it took on this target this scan).
     lines: Vec<(UnitId, BearingLine)>,
     best: Option<Identification>,
+}
+
+/// This scan's bearings, keyed by (holding side, target). Filled by the ESM and sonar passes,
+/// then resolved into fixes and identifications by [`resolve_bearings`].
+pub(crate) type FreshBearings = BTreeMap<(SideId, UnitId), Intercepts>;
+
+/// Records one bearing: in the side's bearing table (for display) and in this scan's pool.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn note_bearing(
+    fresh: &mut FreshBearings,
+    bearings: &mut BearingTable,
+    side: SideId,
+    observer: UnitId,
+    target: UnitId,
+    target_index: usize,
+    line: BearingLine,
+    tick: Tick,
+    label: &str,
+    ident: Identification,
+) {
+    bearings
+        .by_side
+        .entry(side)
+        .or_default()
+        .entry(target)
+        .or_default()
+        .insert(
+            observer,
+            BearingRecord {
+                line,
+                tick,
+                emitter: label.to_owned(),
+            },
+        );
+    let entry = fresh.entry((side, target)).or_insert_with(|| Intercepts {
+        target_index,
+        lines: Vec::new(),
+        best: None,
+    });
+    if !entry.lines.iter().any(|(o, _)| *o == observer) {
+        entry.lines.push((observer, line));
+    }
+    if entry
+        .best
+        .as_ref()
+        .is_none_or(|b| ident.classification > b.classification)
+    {
+        entry.best = Some(ident);
+    }
 }
 
 // The detection system's state, passed through unchanged.
@@ -115,10 +165,10 @@ pub(crate) fn esm_pass(
     ecef: &[[f64; 3]],
     tick: Tick,
     rng: &mut RngStreams,
-    contacts: &mut ContactTable,
     log: &mut EventLog,
     bearings: &mut BearingTable,
     library: &EmitterLibrary,
+    fresh: &mut FreshBearings,
 ) {
     // Radiating emitters: radars and jammers of units whose EMCON is active.
     let mut emitters: Vec<Emitter> = Vec::new();
@@ -150,7 +200,6 @@ pub(crate) fn esm_pass(
             }
         }
     }
-    let mut fresh: BTreeMap<(SideId, UnitId), Intercepts> = BTreeMap::new();
     if !emitters.is_empty() {
         let mut by_lat: Vec<(f64, usize)> = emitters
             .iter()
@@ -244,42 +293,27 @@ pub(crate) fn esm_pass(
                         bearing_deg: normalize_azimuth_deg(inv.azimuth1_deg + err),
                         sigma_deg: sigma,
                     };
-                    bearings
-                        .by_side
-                        .entry(obs.side)
-                        .or_default()
-                        .entry(tgt.id)
-                        .or_default()
-                        .insert(
-                            obs.id,
-                            BearingRecord {
-                                line,
-                                tick,
-                                emitter: em.name.clone(),
-                            },
-                        );
-                    let entry = fresh
-                        .entry((obs.side, tgt.id))
-                        .or_insert_with(|| Intercepts {
-                            target_index: em.unit,
-                            lines: Vec::new(),
-                            best: None,
-                        });
-                    if !entry.lines.iter().any(|(o, _)| *o == obs.id) {
-                        entry.lines.push((obs.id, line));
-                    }
                     let ident = identify(library.0.get(&em.name).map_or(&[], Vec::as_slice));
-                    if entry
-                        .best
-                        .as_ref()
-                        .is_none_or(|b| ident.classification > b.classification)
-                    {
-                        entry.best = Some(ident);
-                    }
+                    note_bearing(
+                        fresh, bearings, obs.side, obs.id, tgt.id, em.unit, line, tick, &em.name,
+                        ident,
+                    );
                 }
             }
         }
     }
+}
+
+/// Turns this scan's bearings into fixes (two or more observers) or identifications (one), then
+/// ages the bearing table.
+pub(crate) fn resolve_bearings(
+    fresh: FreshBearings,
+    all: &[Observed<'_>],
+    tick: Tick,
+    contacts: &mut ContactTable,
+    log: &mut EventLog,
+    bearings: &mut BearingTable,
+) {
     for ((side, target), i) in fresh {
         let domain = all[i.target_index].domain;
         let ident = i.best.unwrap_or(Identification {
@@ -307,7 +341,7 @@ pub(crate) fn esm_pass(
                 platform: ident.platform.clone(),
                 domain,
                 observer: i.lines[0].0,
-                sensor_id: "ESM",
+                sensor_id: "bearings",
             };
             if let Some(number) = contacts.record(side, target, tick, &m) {
                 log.push(

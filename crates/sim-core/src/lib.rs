@@ -19,6 +19,7 @@ mod rng;
 mod save;
 mod sim;
 mod snapshot;
+mod sonar;
 mod time;
 
 pub use c2::C2State;
@@ -47,6 +48,10 @@ pub use sim_sensors::{
     BearingLine, Carrier, Classification, Cov2, Environment, ErrorEllipse, JammerSpec,
 };
 pub use snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
+pub use sonar::{
+    default_radiated_noise_db, sonar_usable, ACOUSTIC_LABEL, DEFAULT_SUBMARINE_NOISE_DB,
+    DEFAULT_SURFACE_NOISE_DB, TARGET_STRENGTH_SUBMARINE_DB, TARGET_STRENGTH_SURFACE_DB,
+};
 pub use time::{SimClock, Tick, TICK_SECONDS};
 
 pub use sim_geo::GeoPoint;

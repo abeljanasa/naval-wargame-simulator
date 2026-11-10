@@ -63,6 +63,8 @@ pub struct MountedSensor {
     pub max_target_altitude_m: f64,
     pub clutter_db_per_sea_state: Option<f64>,
     pub beamwidth_deg: Option<f64>,
+    /// Capable of active transmission.
+    pub is_active: bool,
 }
 
 const SUMMARY_COLS: &str = "id, name, category, domain, max_speed_mps, cruise_speed_mps, accel_mps2, max_altitude_m, max_depth_m, length_m";
@@ -156,7 +158,7 @@ impl PlatformDb {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.kind, m.height_m, s.min_range_m, s.max_range_m, s.ref_detect_range_m,
                     s.ref_target_rcs_m2, s.max_target_altitude_m, s.clutter_db_per_sea_state,
-                    s.beamwidth_deg
+                    s.beamwidth_deg, s.is_active
                FROM mounts m JOIN sensors s ON s.id = m.sensor_id
               WHERE m.platform_id = ?1 AND m.kind = 'sensor'
               ORDER BY m.id",
@@ -174,6 +176,7 @@ impl PlatformDb {
                     max_target_altitude_m: r.get(7)?,
                     clutter_db_per_sea_state: r.get(8)?,
                     beamwidth_deg: r.get(9)?,
+                    is_active: r.get(10)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

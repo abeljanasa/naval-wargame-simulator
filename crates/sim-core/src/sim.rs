@@ -363,6 +363,7 @@ impl Simulation {
             h.opt_str(r.unit.group.as_deref());
             hash_doctrine(&mut h, &r.unit.doctrine);
             h.f64(r.signature.map_or(0.0, |s| s.rcs_m2));
+            h.opt_f64(r.signature.and_then(|s| s.radiated_noise_db));
             h.u64(r.sensors.0.len() as u64);
             for s in &r.sensors.0 {
                 h.str(&s.sensor_id);
@@ -375,6 +376,7 @@ impl Simulation {
                 h.f64(s.max_target_altitude_m);
                 h.opt_f64(s.clutter_db_per_sea_state);
                 h.opt_f64(s.beamwidth_deg);
+                h.u8(u8::from(s.active));
             }
             h.opt_f64(r.jammer.map(|j| j.jn_db_at_1km));
         }
@@ -510,6 +512,7 @@ impl Simulation {
             let id = r.unit.id;
             let signature = r.signature.unwrap_or(Signature {
                 rcs_m2: default_rcs_m2(r.unit.domain),
+                radiated_noise_db: None,
             });
             let e = sim
                 .world
@@ -751,6 +754,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             SensorSuite(s.sensors.clone()),
             Signature {
                 rcs_m2: s.rcs_m2.unwrap_or_else(|| default_rcs_m2(s.domain)),
+                radiated_noise_db: s.radiated_noise_db,
             },
             Jammer(s.jammer),
             Kinematics {

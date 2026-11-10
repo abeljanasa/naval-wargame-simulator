@@ -20,6 +20,7 @@ fn radar() -> SensorSpec {
         max_target_altitude_m: 25_000.0,
         clutter_db_per_sea_state: None,
         beamwidth_deg: None,
+        active: false,
     }
 }
 
@@ -59,6 +60,7 @@ fn spawn(
             group: None,
             doctrine: Doctrine::default(),
             jammer: None,
+            radiated_noise_db: None,
         }),
     }
 }
@@ -868,6 +870,7 @@ fn esm_sensor() -> SensorSpec {
         max_target_altitude_m: 30_000.0,
         clutter_db_per_sea_state: None,
         beamwidth_deg: None,
+        active: false,
     }
 }
 
@@ -1046,4 +1049,258 @@ fn esm_raises_a_radar_track_to_category() {
         c.affiliation, None,
         "category does not reveal whose ship it is"
     );
+}
+
+// ---- Sonar (docs/models/sonar.md) ----
+
+fn sonar(id: &str, kind: SensorKind, active: bool, max_range_m: f64) -> SensorSpec {
+    SensorSpec {
+        sensor_id: id.into(),
+        kind,
+        mount_height_m: -10.0,
+        min_range_m: 0.0,
+        max_range_m,
+        ref_range_m: None,
+        ref_rcs_m2: None,
+        max_target_altitude_m: 0.0,
+        clutter_db_per_sea_state: None,
+        beamwidth_deg: None,
+        active,
+    }
+}
+
+fn with_noise(mut c: Command, db: f64) -> Command {
+    if let CommandPayload::SpawnUnit(u) = &mut c.payload {
+        u.radiated_noise_db = Some(db);
+    }
+    c
+}
+
+/// (active, range, sl, tl, nl, di, dt, se, pd, detected, range_error) of every sonar attempt.
+#[allow(clippy::type_complexity)]
+fn sonar_terms(
+    sim: &Simulation,
+) -> Vec<(
+    bool,
+    f64,
+    f64,
+    f64,
+    f64,
+    f64,
+    f64,
+    f64,
+    f64,
+    bool,
+    Option<f64>,
+)> {
+    sim.events()
+        .iter()
+        .filter_map(|e| match &e.kind {
+            SimEventKind::SonarAttempt {
+                active,
+                range_m,
+                sl_db,
+                tl_db,
+                nl_db,
+                di_db,
+                dt_db,
+                se_db,
+                pd,
+                detected,
+                range_error_m,
+                ..
+            } => Some((
+                *active,
+                *range_m,
+                *sl_db,
+                *tl_db,
+                *nl_db,
+                *di_db,
+                *dt_db,
+                *se_db,
+                *pd,
+                *detected,
+                *range_error_m,
+            )),
+            _ => None,
+        })
+        .collect()
+}
+
+const KN10: f64 = 10.0 * 1852.0 / 3600.0;
+
+#[test]
+fn passive_towed_array_matches_the_sonar_equation() {
+    // Towed array on a ship at 10 kn, sea state 3; submarine (115 dB at 10 kn) at 10 kn, 20 km
+    // north, both heading north. Hand value at exactly 20 km: SE = −10.569 dB, Pd = 0.0173.
+    let mut sim = Simulation::new(41);
+    set_environment(&mut sim, 3, 0.0);
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Surface,
+        ORIGIN,
+        0.0,
+        0.0,
+        KN10,
+        vec![sonar("TEST-TAS", SensorKind::SonarTowed, false, 120_000.0)],
+        5000.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 0.0, 20_000.0).point;
+    sim.submit(with_noise(
+        spawn(2, 2, Domain::Subsurface, at, -100.0, 0.0, KN10, vec![], 1.0),
+        115.0,
+    ))
+    .unwrap();
+    sim.run_ticks(SENSOR_PERIOD_TICKS);
+    let (active, range, sl, tl, nl, di, dt, se, pd, _, _) = sonar_terms(&sim)[0];
+    assert!(!active);
+    assert!((range - 20_000.0).abs() < 1.0, "{range}");
+    assert!((sl - 115.0).abs() < 1e-9 && di == 25.0 && dt == 10.0);
+    // NL = ambient 60 ⊕ towed self-noise 35 at 10 kn.
+    assert!((nl - 60.013_712).abs() < 1e-5, "{nl}");
+    assert!((tl - sim_sensors::transmission_loss_db(range, 0.5)).abs() < 1e-12);
+    assert!((se - (sl - tl - (nl - di) - dt)).abs() < 1e-12);
+    assert!((se - -10.568_7).abs() < 0.01, "{se}");
+    assert!((pd - sim_sensors::pd_from_se(se)).abs() < 1e-15 && pd < 0.02);
+}
+
+#[test]
+fn active_hull_sonar_tracks_a_submarine_and_emcon_makes_it_listen_instead() {
+    let mut sim = Simulation::new(42);
+    set_environment(&mut sim, 3, 0.0);
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Surface,
+        ORIGIN,
+        0.0,
+        0.0,
+        0.0,
+        vec![sonar("TEST-HULL", SensorKind::SonarHull, true, 35_000.0)],
+        5000.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 90.0, 10_000.0).point;
+    sim.submit(spawn(
+        2,
+        2,
+        Domain::Subsurface,
+        at,
+        -100.0,
+        0.0,
+        0.0,
+        vec![],
+        1.0,
+    ))
+    .unwrap();
+    sim.run_ticks(SENSOR_PERIOD_TICKS);
+    let t = sonar_terms(&sim)[0];
+    assert!(t.0, "EMCON active: the hull sonar transmits");
+    // Active SE = 220 − 2 TL + 15 − (NL − 20) − 10, with own noise at the 2 kn floor.
+    assert!((t.2 - 220.0).abs() < 1e-12);
+    assert!(t.9 && t.10.is_some(), "detected, with a range error");
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(blue.contacts.len(), 1);
+    assert_eq!(blue.contacts[0].domain, Some(Domain::Subsurface));
+
+    sim.submit(order(
+        5,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Unit { unit: UnitId(1) },
+            doctrine: doctrine_emcon(Emcon::Silent),
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(SENSOR_PERIOD_TICKS);
+    let t = sonar_terms(&sim)[1];
+    assert!(!t.0, "EMCON silent: the same sonar listens passively");
+    assert_eq!(t.10, None);
+}
+
+#[test]
+fn a_pinging_ship_is_heard_at_its_ping_level() {
+    // A frigate pinging (220 dB) is heard by a submarine's passive bow array far beyond the
+    // range at which its own radiated noise (140 dB) would be.
+    let mut sim = Simulation::new(43);
+    set_environment(&mut sim, 3, 0.0);
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Subsurface,
+        ORIGIN,
+        -100.0,
+        0.0,
+        0.0,
+        vec![sonar("TEST-BOW", SensorKind::SonarHull, false, 80_000.0)],
+        1.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 90.0, 60_000.0).point;
+    sim.submit(spawn(
+        2,
+        2,
+        Domain::Surface,
+        at,
+        0.0,
+        0.0,
+        0.0,
+        vec![sonar("TEST-HULL", SensorKind::SonarHull, true, 35_000.0)],
+        5000.0,
+    ))
+    .unwrap();
+    sim.run_ticks(SENSOR_PERIOD_TICKS);
+    let heard = sonar_terms(&sim)
+        .into_iter()
+        .find(|t| !t.0 && t.1 > 50_000.0)
+        .unwrap();
+    // SL = (140 − 27.96 at the 2 kn floor) ⊕ 220 ≈ 220 dB.
+    assert!((heard.2 - 220.0).abs() < 1e-6, "{heard:?}");
+    assert!(heard.7 > 20.0 && heard.9, "{heard:?}");
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(blue.bearings.len(), 1);
+    assert_eq!(blue.bearings[0].emitter, ACOUSTIC_LABEL);
+}
+
+#[test]
+fn dipping_sonar_needs_a_low_hover_and_sonobuoys_need_laying() {
+    assert!(sonar_usable(
+        SensorKind::SonarDipping,
+        Domain::Air,
+        30.0,
+        0.0
+    ));
+    assert!(!sonar_usable(
+        SensorKind::SonarDipping,
+        Domain::Air,
+        300.0,
+        0.0
+    ));
+    assert!(!sonar_usable(
+        SensorKind::SonarDipping,
+        Domain::Air,
+        30.0,
+        40.0
+    ));
+    assert!(!sonar_usable(
+        SensorKind::Sonobuoy,
+        Domain::Air,
+        300.0,
+        60.0
+    ));
+    assert!(sonar_usable(
+        SensorKind::SonarHull,
+        Domain::Subsurface,
+        -50.0,
+        5.0
+    ));
+    assert!(!sonar_usable(
+        SensorKind::SonarHull,
+        Domain::Air,
+        100.0,
+        50.0
+    ));
 }
