@@ -36,6 +36,9 @@ pub struct Unit {
     /// Platform database class, if the unit came from one.
     #[serde(default)]
     pub platform: Option<String>,
+    /// Platform category (e.g. `surface_combatant`), for identification.
+    #[serde(default)]
+    pub category: Option<String>,
     /// Group (task group, formation) within the side, for doctrine inheritance.
     #[serde(default)]
     pub group: Option<String>,

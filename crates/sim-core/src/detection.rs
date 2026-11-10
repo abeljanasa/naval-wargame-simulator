@@ -27,6 +27,7 @@ use crate::components::{Domain, Kinematics, Position, Unit};
 use crate::esm::{esm_pass, resolve_bearings, BearingTable, EmitterLibrary, FreshBearings};
 use crate::events::{EventLog, SimEventKind};
 use crate::ids::{SideId, UnitId};
+use crate::optical::optical_pass;
 use crate::rng::{RngStreams, StreamId};
 use crate::sonar::sonar_pass;
 use crate::time::{SimClock, Tick};
@@ -139,6 +140,9 @@ pub struct Signature {
     /// Radiated noise at 10 kn, dB (sonar). `None` in saves before format 7: domain default.
     #[serde(default)]
     pub radiated_noise_db: Option<f64>,
+    /// Length overall, metres (optical size). `None`: domain default.
+    #[serde(default)]
+    pub length_m: Option<f64>,
 }
 
 /// RCS used when the platform database gives none (validation warns about those platforms).
@@ -431,6 +435,9 @@ pub(crate) struct Observed<'a> {
     pub(crate) speed_mps: f64,
     /// Radiated noise at 10 kn, dB.
     pub(crate) radiated_noise_db: f64,
+    pub(crate) platform: Option<&'a str>,
+    pub(crate) category: Option<&'a str>,
+    pub(crate) length_m: f64,
 }
 
 // A bevy system takes its world access as parameters; grouping them would only hide that.
@@ -473,6 +480,11 @@ pub(crate) fn detection_system(
             radiated_noise_db: sig
                 .radiated_noise_db
                 .unwrap_or_else(|| crate::sonar::default_radiated_noise_db(u.domain)),
+            platform: u.platform.as_deref(),
+            category: u.category.as_deref(),
+            length_m: sig
+                .length_m
+                .unwrap_or_else(|| crate::optical::default_length_m(u.domain)),
         })
         .collect();
     all.sort_by_key(|o| o.id);
@@ -679,6 +691,17 @@ pub(crate) fn detection_system(
         &mut fresh,
     );
     sonar_pass(
+        &all,
+        &ecef,
+        tick,
+        env,
+        &mut rng,
+        &mut contacts,
+        &mut log,
+        &mut bearings,
+        &mut fresh,
+    );
+    optical_pass(
         &all,
         &ecef,
         tick,

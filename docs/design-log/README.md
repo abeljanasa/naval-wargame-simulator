@@ -28,3 +28,4 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0012](DL-0012-radar-clutter-jamming.md) | Radar clutter, weather loss and noise jamming | Project spec §8 + radar textbook + original design |
 | [DL-0013](DL-0013-esm.md) | ESM: intercept, bearings, fixes and identification | Project spec §8 + textbook geometry + original design |
 | [DL-0014](DL-0014-sonar.md) | Sonar: passive and active sonar equations | Project spec §8 + underwater acoustics textbook + original design |
+| [DL-0015](DL-0015-optical-mad.md) | Visual, EO/IR and MAD | Project spec §8 + solar geometry + original design |

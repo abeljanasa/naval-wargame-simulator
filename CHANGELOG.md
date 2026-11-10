@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 6: visual, EO/IR and MAD)
+
+- **Visual, EO/IR and MAD** (`docs/models/optical-mad.md`, DL-0015):
+  - Daylight from solar elevation at the scenario's start time.
+  - Optical range set by the sensor, target size, light and visibility. IR works at night and sees further through haze.
+  - Close looks identify to category or class, and class reveals affiliation.
+  - Visual gives positions; EO and IR give precise bearings that join the fix pool.
+  - MAD on aircraft finds submarines within about a kilometre of slant range.
+- Environment gains a start time (UTC) and visibility. Units carry their category and length from the database.
+
+### Changed
+
+- Save format 8 (older saves still load).
+- The demo starts at 2026-11-10 00:00 UTC, in daylight. Golden hash is now `a6d33e91f79e97ea`.
+
 ### Added (Phase 2, slice 5: sonar)
 
 - **Sonar** (`docs/models/sonar.md`, DL-0014):

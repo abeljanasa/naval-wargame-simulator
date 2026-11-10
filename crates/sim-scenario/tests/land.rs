@@ -34,6 +34,8 @@ fn ship(at: GeoPoint, heading: f64, speed: f64) -> Command {
             doctrine: Doctrine::default(),
             jammer: None,
             radiated_noise_db: None,
+            category: None,
+            length_m: None,
         }),
     }
 }

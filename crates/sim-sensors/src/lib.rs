@@ -10,6 +10,7 @@ mod classify;
 mod esm;
 mod kind;
 mod measurement;
+mod optical;
 mod radar;
 mod sonar;
 mod track;
@@ -21,11 +22,17 @@ pub use esm::{
 };
 pub use kind::SensorKind;
 pub use measurement::{gaussian_pair, measurement_error, MeasurementError};
+pub use optical::{
+    light, light_factor, mad_r50_m, optical_identification, optical_r50_m, size_factor,
+    slant_range_m, sun_elevation_deg, Light, CATEGORY_ID_FRACTION, CLASS_ID_FRACTION,
+    FULL_SIZE_LENGTH_M, IR_VISIBILITY_FACTOR, MAD_POSITION_SIGMA_M, MAD_R50_FRACTION,
+    OPTICAL_R50_FRACTION,
+};
 pub use radar::{
     burn_through_range_m, clutter_loss_db, detection_range_m, detection_range_with_loss_m,
     in_main_beam, jamming_to_noise, pd_jammed, pd_per_scan, ClutterBackground, Environment,
     JammerSpec, CLUTTER_CEILING_M, DEFAULT_BEAMWIDTH_DEG, DEFAULT_CLUTTER_DB_PER_SEA_STATE,
-    LAND_CLUTTER_SEA_STATE, SIDELOBE_DB,
+    DEFAULT_VISIBILITY_KM, LAND_CLUTTER_SEA_STATE, SIDELOBE_DB,
 };
 pub use sonar::{
     active_se_db, ambient_noise_db, noise_at_speed_db, passive_se_db, pd_from_se, power_sum_db,

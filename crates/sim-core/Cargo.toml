@@ -13,6 +13,7 @@ specta = ["dep:specta", "sim-geo/specta", "sim-sensors/specta", "sim-c2/specta"]
 
 [dependencies]
 sim-geo.workspace = true
+libm.workspace = true
 sim-sensors.workspace = true
 sim-c2.workspace = true
 bevy_ecs.workspace = true
@@ -23,7 +24,6 @@ thiserror.workspace = true
 specta = { workspace = true, optional = true }
 
 [dev-dependencies]
-libm.workspace = true
 proptest.workspace = true
 serde_json.workspace = true
 

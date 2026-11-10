@@ -94,6 +94,12 @@ pub struct UnitSpawn {
     /// Radiated noise at 10 kn, dB; `None` uses the domain default.
     #[serde(default)]
     pub radiated_noise_db: Option<f64>,
+    /// Platform category, for identification.
+    #[serde(default)]
+    pub category: Option<String>,
+    /// Length overall, metres; `None` uses the domain default.
+    #[serde(default)]
+    pub length_m: Option<f64>,
 }
 
 /// One emitter type and the platform classes known to carry it.
@@ -207,6 +213,9 @@ impl CommandPayload {
                 }
                 for sensor in &s.sensors {
                     sensor.validate()?;
+                }
+                if s.length_m.is_some_and(|l| !(l.is_finite() && l >= 0.0)) {
+                    return Err("length_m must be finite and >= 0".into());
                 }
                 if s.radiated_noise_db.is_some_and(|n| !n.is_finite()) {
                     return Err("radiated_noise_db must be finite".into());

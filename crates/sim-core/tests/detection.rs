@@ -61,6 +61,8 @@ fn spawn(
             doctrine: Doctrine::default(),
             jammer: None,
             radiated_noise_db: None,
+            category: None,
+            length_m: None,
         }),
     }
 }
@@ -693,6 +695,7 @@ fn set_environment(sim: &mut Simulation, sea_state: u8, weather_loss_db: f64) {
             environment: Environment {
                 sea_state,
                 weather_loss_db,
+                ..Environment::default()
             },
         },
     ))
@@ -818,6 +821,7 @@ fn environment_is_set_by_the_white_cell_and_shown_to_every_side() {
             environment: Environment {
                 sea_state: 6,
                 weather_loss_db: 0.0,
+                ..Environment::default()
             },
         },
     ))
@@ -830,6 +834,7 @@ fn environment_is_set_by_the_white_cell_and_shown_to_every_side() {
             environment: Environment {
                 sea_state: 3,
                 weather_loss_db: 1.0,
+                ..Environment::default()
             },
         },
     ))
@@ -850,6 +855,7 @@ fn environment_is_set_by_the_white_cell_and_shown_to_every_side() {
                 environment: Environment {
                     sea_state: 12,
                     weather_loss_db: 0.0,
+                    ..Environment::default()
                 },
             },
         ))
@@ -1303,4 +1309,217 @@ fn dipping_sonar_needs_a_low_hover_and_sonobuoys_need_laying() {
         100.0,
         50.0
     ));
+}
+
+// ---- Visual, EO/IR and MAD (docs/models/optical-mad.md) ----
+
+/// 2026-11-10 00:00 UTC. At longitude 0 that is midnight; +12 h is noon.
+const NOV10: i64 = 1_794_268_800;
+
+fn optical(id: &str, kind: SensorKind, max_range_m: f64) -> SensorSpec {
+    SensorSpec {
+        sensor_id: id.into(),
+        kind,
+        mount_height_m: 15.0,
+        min_range_m: 0.0,
+        max_range_m,
+        ref_range_m: None,
+        ref_rcs_m2: None,
+        max_target_altitude_m: 10_000.0,
+        clutter_db_per_sea_state: None,
+        beamwidth_deg: None,
+        active: false,
+    }
+}
+
+fn identity(mut c: Command, platform: &str, category: &str, length_m: f64) -> Command {
+    if let CommandPayload::SpawnUnit(u) = &mut c.payload {
+        u.platform = Some(platform.into());
+        u.category = Some(category.into());
+        u.length_m = Some(length_m);
+    }
+    c
+}
+
+fn set_time(sim: &mut Simulation, start_unix_s: i64, visibility_km: f64) {
+    sim.submit(order(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetEnvironment {
+            environment: Environment {
+                start_unix_s,
+                visibility_km,
+                ..Environment::default()
+            },
+        },
+    ))
+    .unwrap();
+}
+
+/// (light, r50, pd, detected, identified) of every optical attempt.
+fn optical_terms(sim: &Simulation) -> Vec<(u8, f64, f64, bool, Option<Classification>)> {
+    sim.events()
+        .iter()
+        .filter_map(|e| match &e.kind {
+            SimEventKind::OpticalAttempt {
+                light,
+                r50_m,
+                pd,
+                detected,
+                identified,
+                ..
+            } => Some((*light, *r50_m, *pd, *detected, *identified)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A lookout (30 km max) and a 100 m merchant `range_m` east, at the given time and visibility.
+fn lookout_scene(seed: u64, start: i64, visibility_km: f64, range_m: f64) -> Simulation {
+    let mut sim = Simulation::new(seed);
+    set_time(&mut sim, start, visibility_km);
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Surface,
+        ORIGIN,
+        0.0,
+        0.0,
+        0.0,
+        vec![optical("TEST-EYE", SensorKind::Visual, 30_000.0)],
+        5000.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 90.0, range_m).point;
+    sim.submit(identity(
+        spawn(2, 2, Domain::Surface, at, 0.0, 0.0, 0.0, vec![], 40_000.0),
+        "GEN-MV-BULK",
+        "merchant",
+        100.0,
+    ))
+    .unwrap();
+    sim.run_ticks(1);
+    sim
+}
+
+#[test]
+fn a_lookout_sees_far_by_day_short_at_night_and_is_capped_by_haze() {
+    // Noon at longitude 0: R₅₀ = 0.7 × 30 km = 21 km.
+    let day = lookout_scene(51, NOV10 + 43_200, 40.0, 3_000.0);
+    let (light, r50, _, _, _) = optical_terms(&day)[0];
+    assert_eq!(light, 0);
+    assert!((r50 - 21_000.0).abs() < 1e-9, "{r50}");
+    // Midnight: a tenth, 2.1 km.
+    let night = lookout_scene(51, NOV10, 40.0, 3_000.0);
+    let (light, r50, _, _, _) = optical_terms(&night)[0];
+    assert_eq!(light, 2);
+    assert!((r50 - 2_100.0).abs() < 1e-9, "{r50}");
+    // Haze: 5 km visibility caps the eye at 5 km.
+    let haze = lookout_scene(51, NOV10 + 43_200, 5.0, 3_000.0);
+    assert!((optical_terms(&haze)[0].1 - 5_000.0).abs() < 1e-9);
+}
+
+#[test]
+fn a_close_look_identifies_the_class_and_reveals_affiliation() {
+    // 3 km by day: within 0.3 × 21 km, so the merchant is identified to its class.
+    let mut sim = lookout_scene(52, NOV10 + 43_200, 40.0, 3_000.0);
+    let (_, _, pd, detected, identified) = optical_terms(&sim)[0];
+    assert!(pd > 0.999 && detected);
+    assert_eq!(identified, Some(Classification::Class));
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    let c = &blue.contacts[0];
+    assert_eq!(c.platform.as_deref(), Some("GEN-MV-BULK"));
+    assert_eq!(c.category.as_deref(), Some("merchant"));
+    assert_eq!(c.affiliation, Some(Posture::Neutral));
+    // At 15 km the same lookout reaches only domain (beyond 0.6 × R₅₀ = 12.6 km).
+    let far = lookout_scene(52, NOV10 + 43_200, 40.0, 15_000.0);
+    if let Some((_, _, _, true, level)) = optical_terms(&far).first().copied() {
+        assert_eq!(level, Some(Classification::Domain));
+    }
+}
+
+#[test]
+fn eo_bearing_identifies_an_existing_radar_track() {
+    let mut sim = Simulation::new(53);
+    set_time(&mut sim, NOV10 + 43_200, 40.0);
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Surface,
+        ORIGIN,
+        0.0,
+        0.0,
+        0.0,
+        vec![radar(), optical("TEST-EO", SensorKind::Eo, 30_000.0)],
+        5000.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 90.0, 5_000.0).point;
+    sim.submit(identity(
+        spawn(2, 2, Domain::Surface, at, 0.0, 0.0, 0.0, vec![], 5000.0),
+        "GEN-FFG",
+        "surface_combatant",
+        130.0,
+    ))
+    .unwrap();
+    sim.run_ticks(1);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(blue.contacts[0].classification, Classification::Class);
+    assert_eq!(blue.contacts[0].platform.as_deref(), Some("GEN-FFG"));
+    assert!(blue.bearings.iter().any(|b| b.emitter == "EO"));
+}
+
+#[test]
+fn mad_finds_a_submerged_submarine_that_the_eye_cannot() {
+    // Aircraft at 150 m over a submarine at −100 m, 600 m away: slant 650 m, R₅₀ 900 m.
+    let mut sim = Simulation::new(54);
+    set_time(&mut sim, NOV10 + 43_200, 40.0);
+    let mad = SensorSpec {
+        max_range_m: 1_500.0,
+        max_target_altitude_m: 0.0,
+        ..optical("TEST-MAD", SensorKind::Mad, 1_500.0)
+    };
+    sim.submit(spawn(
+        1,
+        1,
+        Domain::Air,
+        ORIGIN,
+        150.0,
+        0.0,
+        0.0,
+        vec![mad, optical("TEST-EYE", SensorKind::Visual, 30_000.0)],
+        5.0,
+    ))
+    .unwrap();
+    let at = direct(ORIGIN, 90.0, 600.0).point;
+    sim.submit(spawn(
+        2,
+        2,
+        Domain::Subsurface,
+        at,
+        -100.0,
+        0.0,
+        0.0,
+        vec![],
+        1.0,
+    ))
+    .unwrap();
+    sim.run_ticks(1);
+    let mad_attempt = sim.events().iter().find_map(|e| match e.kind {
+        SimEventKind::MadAttempt {
+            slant_range_m,
+            r50_m,
+            pd,
+            ..
+        } => Some((slant_range_m, r50_m, pd)),
+        _ => None,
+    });
+    let (slant, r50, pd) = mad_attempt.unwrap();
+    assert!((slant - 650.0).abs() < 0.01, "{slant}");
+    assert!((r50 - 900.0).abs() < 1e-9);
+    let x: f64 = slant / r50;
+    assert!((pd - 1.0 / (1.0 + x.powi(8))).abs() < 1e-6);
+    // The eye cannot see a submerged submarine: no optical attempt at all.
+    assert!(optical_terms(&sim).is_empty());
 }

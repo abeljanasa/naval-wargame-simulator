@@ -195,7 +195,12 @@ const frame = (): FrameEvent => {
       units,
       removed: [],
       contacts,
-      environment: { sea_state: 3, weather_loss_db: 0 },
+      environment: {
+        sea_state: 3,
+        weather_loss_db: 0,
+        start_unix_s: 1794268800,
+        visibility_km: 40,
+      },
       bearings,
     },
   };

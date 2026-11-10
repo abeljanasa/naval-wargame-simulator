@@ -234,23 +234,31 @@ export type Emcon =
 /**  No active emissions. Passive sensors still work. */
 "silent";
 
-/**  Conditions that every radar in the scenario shares. Constant until Phase 4 weather zones. */
+/**  Conditions shared by the whole scenario. Constant until Phase 4 weather zones. */
 export type Environment = Environment_Serialize | Environment_Deserialize;
 
-/**  Conditions that every radar in the scenario shares. Constant until Phase 4 weather zones. */
+/**  Conditions shared by the whole scenario. Constant until Phase 4 weather zones. */
 export type Environment_Deserialize = {
 	/**  Douglas sea state, 0 (calm) to 9. */
 	sea_state?: number,
 	/**  Two-way propagation loss from weather (rain, fog), dB, applied to every radar. */
 	weather_loss_db?: number | null,
+	/**  Scenario start as UTC seconds since 1970-01-01 (for daylight). Default: the epoch. */
+	start_unix_s?: number | null,
+	/**  Meteorological visibility, km (caps visual, EO and IR range). Default: 40 km (clear). */
+	visibility_km?: number | null,
 };
 
-/**  Conditions that every radar in the scenario shares. Constant until Phase 4 weather zones. */
+/**  Conditions shared by the whole scenario. Constant until Phase 4 weather zones. */
 export type Environment_Serialize = {
 	/**  Douglas sea state, 0 (calm) to 9. */
 	sea_state: number,
 	/**  Two-way propagation loss from weather (rain, fog), dB, applied to every radar. */
 	weather_loss_db: number | null,
+	/**  Scenario start as UTC seconds since 1970-01-01 (for daylight). Default: the epoch. */
+	start_unix_s: number | null,
+	/**  Meteorological visibility, km (caps visual, EO and IR range). Default: 40 km (clear). */
+	visibility_km: number | null,
 };
 
 /**  A one-sigma position error ellipse, as shown to players. */

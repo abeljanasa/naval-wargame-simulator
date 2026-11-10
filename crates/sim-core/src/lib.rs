@@ -15,6 +15,7 @@ mod events;
 mod hash;
 mod ids;
 mod movement;
+mod optical;
 mod rng;
 mod save;
 mod sim;
@@ -40,6 +41,7 @@ pub use esm::{
 pub use events::{SimEvent, SimEventKind};
 pub use hash::StateHash;
 pub use ids::{SideId, UnitId};
+pub use optical::default_length_m;
 pub use rng::{RngStreams, StreamId};
 pub use save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
 pub use sim::Simulation;

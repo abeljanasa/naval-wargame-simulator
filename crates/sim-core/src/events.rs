@@ -116,6 +116,34 @@ pub enum SimEventKind {
         range_error_m: Option<f64>,
         bearing_error_deg: Option<f64>,
     },
+    /// One visual, EO or IR detection draw.
+    OpticalAttempt {
+        observer: UnitId,
+        sensor: String,
+        target: UnitId,
+        range_m: f64,
+        horizon_m: f64,
+        r50_m: f64,
+        /// 0 day, 1 twilight, 2 night (at the observer).
+        light: u8,
+        pd: f64,
+        draw: f64,
+        detected: bool,
+        /// Identification level reached by a detection.
+        identified: Option<sim_sensors::Classification>,
+        range_error_m: Option<f64>,
+        bearing_error_deg: Option<f64>,
+    },
+    /// One MAD detection draw.
+    MadAttempt {
+        observer: UnitId,
+        target: UnitId,
+        slant_range_m: f64,
+        r50_m: f64,
+        pd: f64,
+        draw: f64,
+        detected: bool,
+    },
     /// Bearings (ESM and passive sonar) from several observers of a side were combined into a
     /// position fix.
     EsmFix {

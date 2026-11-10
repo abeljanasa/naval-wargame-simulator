@@ -32,7 +32,10 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   load with none of these.
 /// * 7: adds sonar: the sensor `active` flag, radiated noise on signatures, and sonar events.
 ///   Older saves load with passive-only sensors and the domain noise defaults.
-pub const SAVE_FORMAT_VERSION: u32 = 7;
+/// * 8: adds visual/EO/IR/MAD: environment start time and visibility, unit category and length,
+///   and their detection events. Older saves load with a 1970 start, 40 km visibility and the
+///   domain length defaults.
+pub const SAVE_FORMAT_VERSION: u32 = 8;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,7 +102,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=6 | SAVE_FORMAT_VERSION => {
+            1..=7 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

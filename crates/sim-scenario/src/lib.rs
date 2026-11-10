@@ -324,71 +324,76 @@ impl Scenario {
 
 fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, ScenarioError> {
     let invalid = |msg: String| ScenarioError::Invalid(format!("unit {}: {msg}", u.id));
-    let (domain, max_speed, cruise, accel, sensors, rcs, turn, noise) = match &u.platform {
-        Some(pid) => {
-            let p = db
-                .platform(pid)?
-                .ok_or_else(|| invalid(format!("unknown platform {pid}")))?;
-            let db_domain = domain_from_db(&p.domain).ok_or_else(|| {
-                invalid(format!("platform {pid} has unknown domain {}", p.domain))
-            })?;
-            if let Some(d) = u.domain {
-                if d != db_domain {
-                    return Err(invalid(format!(
-                        "domain {d:?} contradicts platform {pid} ({db_domain:?})"
-                    )));
+    let (domain, max_speed, cruise, accel, sensors, rcs, turn, noise, category, length) =
+        match &u.platform {
+            Some(pid) => {
+                let p = db
+                    .platform(pid)?
+                    .ok_or_else(|| invalid(format!("unknown platform {pid}")))?;
+                let db_domain = domain_from_db(&p.domain).ok_or_else(|| {
+                    invalid(format!("platform {pid} has unknown domain {}", p.domain))
+                })?;
+                if let Some(d) = u.domain {
+                    if d != db_domain {
+                        return Err(invalid(format!(
+                            "domain {d:?} contradicts platform {pid} ({db_domain:?})"
+                        )));
+                    }
                 }
-            }
-            let sensors = db
-                .sensors_of(pid)?
-                .into_iter()
-                .map(|s| {
-                    let kind = SensorKind::from_db(&s.kind).ok_or_else(|| {
-                        invalid(format!(
-                            "sensor {} has unknown kind {}",
-                            s.sensor_id, s.kind
-                        ))
-                    })?;
-                    Ok(SensorSpec {
-                        sensor_id: s.sensor_id,
-                        kind,
-                        mount_height_m: s.mount_height_m,
-                        min_range_m: s.min_range_m,
-                        max_range_m: s.max_range_m,
-                        ref_range_m: s.ref_detect_range_m,
-                        ref_rcs_m2: s.ref_target_rcs_m2,
-                        max_target_altitude_m: s.max_target_altitude_m,
-                        clutter_db_per_sea_state: s.clutter_db_per_sea_state,
-                        beamwidth_deg: s.beamwidth_deg,
-                        active: s.is_active,
+                let sensors = db
+                    .sensors_of(pid)?
+                    .into_iter()
+                    .map(|s| {
+                        let kind = SensorKind::from_db(&s.kind).ok_or_else(|| {
+                            invalid(format!(
+                                "sensor {} has unknown kind {}",
+                                s.sensor_id, s.kind
+                            ))
+                        })?;
+                        Ok(SensorSpec {
+                            sensor_id: s.sensor_id,
+                            kind,
+                            mount_height_m: s.mount_height_m,
+                            min_range_m: s.min_range_m,
+                            max_range_m: s.max_range_m,
+                            ref_range_m: s.ref_detect_range_m,
+                            ref_rcs_m2: s.ref_target_rcs_m2,
+                            max_target_altitude_m: s.max_target_altitude_m,
+                            clutter_db_per_sea_state: s.clutter_db_per_sea_state,
+                            beamwidth_deg: s.beamwidth_deg,
+                            active: s.is_active,
+                        })
                     })
-                })
-                .collect::<Result<Vec<_>, ScenarioError>>()?;
-            (
-                db_domain,
-                u.max_speed_mps.unwrap_or(p.max_speed_mps),
-                p.cruise_speed_mps,
-                u.accel_mps2.unwrap_or(p.accel_mps2),
-                sensors,
-                db.rcs_m2(pid)?,
-                turn_performance(&p.category, p.length_m),
-                radiated_noise_db(&p.category),
-            )
-        }
-        // `validate` guarantees these are present when there is no platform.
-        None => (
-            u.domain.ok_or_else(|| invalid("missing domain".into()))?,
-            u.max_speed_mps
-                .ok_or_else(|| invalid("missing max_speed_mps".into()))?,
-            0.0,
-            u.accel_mps2
-                .ok_or_else(|| invalid("missing accel_mps2".into()))?,
-            vec![],
-            None,
-            (None, None),
-            None,
-        ),
-    };
+                    .collect::<Result<Vec<_>, ScenarioError>>()?;
+                (
+                    db_domain,
+                    u.max_speed_mps.unwrap_or(p.max_speed_mps),
+                    p.cruise_speed_mps,
+                    u.accel_mps2.unwrap_or(p.accel_mps2),
+                    sensors,
+                    db.rcs_m2(pid)?,
+                    turn_performance(&p.category, p.length_m),
+                    radiated_noise_db(&p.category),
+                    Some(p.category.clone()),
+                    p.length_m,
+                )
+            }
+            // `validate` guarantees these are present when there is no platform.
+            None => (
+                u.domain.ok_or_else(|| invalid("missing domain".into()))?,
+                u.max_speed_mps
+                    .ok_or_else(|| invalid("missing max_speed_mps".into()))?,
+                0.0,
+                u.accel_mps2
+                    .ok_or_else(|| invalid("missing accel_mps2".into()))?,
+                vec![],
+                None,
+                (None, None),
+                None,
+                None,
+                None,
+            ),
+        };
     Ok(UnitSpawn {
         id: u.id,
         name: u.name.clone(),
@@ -410,6 +415,8 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         doctrine: u.doctrine,
         jammer: u.jammer,
         radiated_noise_db: noise,
+        category,
+        length_m: length,
     })
 }
 

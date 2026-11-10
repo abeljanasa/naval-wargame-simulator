@@ -364,6 +364,8 @@ impl Simulation {
             hash_doctrine(&mut h, &r.unit.doctrine);
             h.f64(r.signature.map_or(0.0, |s| s.rcs_m2));
             h.opt_f64(r.signature.and_then(|s| s.radiated_noise_db));
+            h.opt_f64(r.signature.and_then(|s| s.length_m));
+            h.opt_str(r.unit.category.as_deref());
             h.u64(r.sensors.0.len() as u64);
             for s in &r.sensors.0 {
                 h.str(&s.sensor_id);
@@ -410,6 +412,9 @@ impl Simulation {
         let env = self.world.resource::<EnvState>().0;
         h.u8(env.sea_state);
         h.f64(env.weather_loss_db);
+        #[allow(clippy::cast_sign_loss)]
+        h.u64(env.start_unix_s as u64);
+        h.f64(env.visibility_km);
         let c2 = self.world.resource::<C2State>();
         for (&(side, toward), posture) in &c2.postures {
             h.u16(side.0);
@@ -513,6 +518,7 @@ impl Simulation {
             let signature = r.signature.unwrap_or(Signature {
                 rcs_m2: default_rcs_m2(r.unit.domain),
                 radiated_noise_db: None,
+                length_m: None,
             });
             let e = sim
                 .world
@@ -744,6 +750,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 side: s.side,
                 domain: s.domain,
                 platform: s.platform.clone(),
+                category: s.category.clone(),
                 group: s.group.clone(),
                 doctrine: s.doctrine,
             },
@@ -755,6 +762,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             Signature {
                 rcs_m2: s.rcs_m2.unwrap_or_else(|| default_rcs_m2(s.domain)),
                 radiated_noise_db: s.radiated_noise_db,
+                length_m: s.length_m,
             },
             Jammer(s.jammer),
             Kinematics {

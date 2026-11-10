@@ -17,8 +17,8 @@ pub const DEFAULT_BEAMWIDTH_DEG: f64 = 2.0;
 /// Sidelobe suppression against a jammer outside the main beam, dB.
 pub const SIDELOBE_DB: f64 = 30.0;
 
-/// Conditions that every radar in the scenario shares. Constant until Phase 4 weather zones.
-#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+/// Conditions shared by the whole scenario. Constant until Phase 4 weather zones.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Environment {
     /// Douglas sea state, 0 (calm) to 9.
@@ -27,12 +27,41 @@ pub struct Environment {
     /// Two-way propagation loss from weather (rain, fog), dB, applied to every radar.
     #[serde(default)]
     pub weather_loss_db: f64,
+    /// Scenario start as UTC seconds since 1970-01-01 (for daylight). Default: the epoch.
+    // Exported to TypeScript as a number: Unix seconds are exact in f64 (below 2^53).
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = f64))]
+    pub start_unix_s: i64,
+    /// Meteorological visibility, km (caps visual, EO and IR range). Default: 40 km (clear).
+    #[serde(default = "default_visibility_km")]
+    pub visibility_km: f64,
+}
+
+/// Clear-air visibility, km.
+pub const DEFAULT_VISIBILITY_KM: f64 = 40.0;
+
+fn default_visibility_km() -> f64 {
+    DEFAULT_VISIBILITY_KM
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self {
+            sea_state: 0,
+            weather_loss_db: 0.0,
+            start_unix_s: 0,
+            visibility_km: DEFAULT_VISIBILITY_KM,
+        }
+    }
 }
 
 impl Environment {
     pub fn validate(&self) -> Result<(), String> {
         if self.sea_state > 9 {
             return Err("sea_state must be 0..=9".into());
+        }
+        if !(self.visibility_km.is_finite() && self.visibility_km > 0.0) {
+            return Err("visibility_km must be finite and > 0".into());
         }
         if !(self.weather_loss_db.is_finite() && self.weather_loss_db >= 0.0) {
             return Err("weather_loss_db must be finite and >= 0".into());
@@ -238,13 +267,14 @@ mod tests {
         assert!(Environment::default().validate().is_ok());
         assert!(Environment {
             sea_state: 10,
-            weather_loss_db: 0.0
+            ..Environment::default()
         }
         .validate()
         .is_err());
         assert!(Environment {
             sea_state: 3,
-            weather_loss_db: -1.0
+            weather_loss_db: -1.0,
+            ..Environment::default()
         }
         .validate()
         .is_err());
