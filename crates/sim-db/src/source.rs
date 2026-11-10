@@ -305,54 +305,98 @@ pub struct BuildStats {
     pub files: usize,
 }
 
-fn read_json<T: DeserializeOwned>(path: &Path) -> Result<T, DbError> {
-    let text = std::fs::read_to_string(path).map_err(|source| DbError::Io {
-        path: path.to_owned(),
-        source,
-    })?;
-    serde_json::from_str(&text).map_err(|source| DbError::Json {
-        path: path.to_owned(),
+/// One source file: a display name (relative path) and its text.
+#[derive(Debug, Clone)]
+pub struct SourceFile {
+    pub name: String,
+    pub text: String,
+}
+
+/// A complete source tree, read from disk or embedded in the binary.
+#[derive(Debug, Clone)]
+pub struct SourceSet {
+    pub reference: SourceFile,
+    pub sensors: SourceFile,
+    pub weapons: SourceFile,
+    /// Platform files, sorted by name so row ids are reproducible.
+    pub platforms: Vec<SourceFile>,
+}
+
+fn read_file(dir: &Path, rel: &str) -> Result<SourceFile, DbError> {
+    let path = dir.join(rel);
+    let text = std::fs::read_to_string(&path).map_err(|source| DbError::Io { path, source })?;
+    Ok(SourceFile {
+        name: rel.to_owned(),
+        text,
+    })
+}
+
+impl SourceSet {
+    /// Reads a source directory (see the module docs for the layout).
+    pub fn read_dir(dir: &Path) -> Result<Self, DbError> {
+        let pdir = dir.join("platforms");
+        let mut names: Vec<String> = std::fs::read_dir(&pdir)
+            .map_err(|source| DbError::Io {
+                path: pdir.clone(),
+                source,
+            })?
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|x| x == "json"))
+            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .collect();
+        names.sort();
+        Ok(Self {
+            reference: read_file(dir, "reference.json")?,
+            sensors: read_file(dir, "sensors.json")?,
+            weapons: read_file(dir, "weapons.json")?,
+            platforms: names
+                .iter()
+                .map(|n| read_file(dir, &format!("platforms/{n}")))
+                .collect::<Result<_, _>>()?,
+        })
+    }
+
+    fn sorted(mut self) -> Self {
+        self.platforms.sort_by(|a, b| a.name.cmp(&b.name));
+        self
+    }
+}
+
+fn parse<T: DeserializeOwned>(f: &SourceFile) -> Result<T, DbError> {
+    serde_json::from_str(&f.text).map_err(|source| DbError::Json {
+        path: PathBuf::from(&f.name),
         source,
     })
 }
 
-/// Platform files in a stable (sorted) order, so row ids are reproducible.
-fn platform_files(dir: &Path) -> Result<Vec<PathBuf>, DbError> {
-    let pdir = dir.join("platforms");
-    let mut files: Vec<PathBuf> = std::fs::read_dir(&pdir)
-        .map_err(|source| DbError::Io {
-            path: pdir.clone(),
-            source,
-        })?
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|x| x == "json"))
-        .collect();
-    files.sort();
-    Ok(files)
+/// Creates the schema on `conn` (which must be empty) and loads a source directory into it.
+pub fn build(conn: &mut Connection, dir: &Path) -> Result<BuildStats, DbError> {
+    build_set(conn, SourceSet::read_dir(dir)?)
 }
 
-/// Creates the schema on `conn` (which must be empty) and loads every source file into it.
-pub fn build(conn: &mut Connection, dir: &Path) -> Result<BuildStats, DbError> {
+/// Creates the schema on `conn` (which must be empty) and loads `set` into it.
+pub fn build_set(conn: &mut Connection, set: SourceSet) -> Result<BuildStats, DbError> {
+    let set = set.sorted();
     migrate(conn)?;
     // Referential integrity is checked by validation, which reports every problem with context.
     conn.pragma_update(None, "foreign_keys", false)?;
     let tx = conn.transaction()?;
     let mut stats = BuildStats::default();
 
-    let reference: ReferenceFile = read_json(&dir.join("reference.json"))?;
+    let reference: ReferenceFile = parse(&set.reference)?;
     insert_reference(&tx, &reference)?;
-    let sensors: SensorsFile = read_json(&dir.join("sensors.json"))?;
+    let sensors: SensorsFile = parse(&set.sensors)?;
     stats.sensors = insert_sensors(&tx, &sensors)?;
-    let weapons: WeaponsFile = read_json(&dir.join("weapons.json"))?;
+    let weapons: WeaponsFile = parse(&set.weapons)?;
     stats.weapons = insert_weapons(&tx, &weapons)?;
     stats.files = 3;
-    for path in platform_files(dir)? {
-        let file: PlatformsFile = read_json(&path)?;
+    for f in &set.platforms {
+        let file: PlatformsFile = parse(f)?;
         for p in &file.platforms {
             insert_platform(&tx, &file.defaults, p).map_err(|e| match e {
                 DbError::Sqlite(err) => DbError::Source {
-                    context: format!("{} / platform {}", path.display(), p.id),
+                    context: format!("{} / platform {}", f.name, p.id),
                     message: err.to_string(),
                 },
                 other => other,

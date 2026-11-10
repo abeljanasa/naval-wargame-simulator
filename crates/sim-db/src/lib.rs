@@ -13,12 +13,13 @@
 #![forbid(unsafe_code)]
 
 mod db;
+pub mod embedded;
 mod error;
 pub mod migrate;
 pub mod source;
 pub mod validate;
 
-pub use db::{DbSource, PlatformDb, PlatformSummary};
+pub use db::{DbSource, MountedSensor, PlatformDb, PlatformSummary};
 pub use error::DbError;
 pub use validate::{Issue, Policy, Severity};
 

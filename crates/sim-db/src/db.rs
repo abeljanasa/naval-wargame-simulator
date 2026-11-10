@@ -47,6 +47,20 @@ impl PlatformSummary {
     }
 }
 
+/// A sensor as fitted to a platform.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MountedSensor {
+    pub sensor_id: String,
+    /// Database sensor kind, e.g. `radar`, `esm`, `sonar_hull`.
+    pub kind: String,
+    pub mount_height_m: f64,
+    pub min_range_m: f64,
+    pub max_range_m: f64,
+    pub ref_detect_range_m: Option<f64>,
+    pub ref_target_rcs_m2: Option<f64>,
+    pub max_target_altitude_m: f64,
+}
+
 const SUMMARY_COLS: &str = "id, name, category, domain, max_speed_mps, cruise_speed_mps, accel_mps2, max_altitude_m, max_depth_m";
 
 /// A validated, read-only platform database.
@@ -123,6 +137,48 @@ impl PlatformDb {
                 &format!("SELECT {SUMMARY_COLS} FROM platforms WHERE id = ?1"),
                 [id],
                 PlatformSummary::from_row,
+            )
+            .optional()?)
+    }
+
+    /// Sensors fitted to a platform, in mount order.
+    pub fn sensors_of(&self, platform_id: &str) -> Result<Vec<MountedSensor>, DbError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT s.id, s.kind, m.height_m, s.min_range_m, s.max_range_m, s.ref_detect_range_m,
+                    s.ref_target_rcs_m2, s.max_target_altitude_m
+               FROM mounts m JOIN sensors s ON s.id = m.sensor_id
+              WHERE m.platform_id = ?1 AND m.kind = 'sensor'
+              ORDER BY m.id",
+        )?;
+        let v = stmt
+            .query_map([platform_id], |r| {
+                Ok(MountedSensor {
+                    sensor_id: r.get(0)?,
+                    kind: r.get(1)?,
+                    mount_height_m: r.get(2)?,
+                    min_range_m: r.get(3)?,
+                    max_range_m: r.get(4)?,
+                    ref_detect_range_m: r.get(5)?,
+                    ref_target_rcs_m2: r.get(6)?,
+                    max_target_altitude_m: r.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(v)
+    }
+
+    /// The platform's all-aspect, any-speed radar cross-section (m²), falling back to the
+    /// most general RCS entry available.
+    pub fn rcs_m2(&self, platform_id: &str) -> Result<Option<f64>, DbError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT value FROM platform_signatures
+                  WHERE platform_id = ?1 AND kind = 'rcs'
+                  ORDER BY (aspect = 'all') DESC, (speed_band = 'any') DESC, aspect, speed_band
+                  LIMIT 1",
+                [platform_id],
+                |r| r.get(0),
             )
             .optional()?)
     }
