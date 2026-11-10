@@ -15,11 +15,12 @@ pub mod synthetic;
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Command, CommandPayload, Domain, GeoPoint, Issuer, SensorKind, SensorSpec, SideId, Simulation,
-    Tick, UnitId, UnitSpawn,
+    Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
+    Environment, GeoPoint, Guidance, Issuer, JammerSpec, Mission, Posture, SensorKind, SensorSpec,
+    SideId, Simulation, Tick, UnitId, UnitSpawn, WeaponKind, WeaponSpec,
 };
 use sim_db::PlatformDb;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 pub const SCENARIO_FORMAT: &str = "nws-scenario";
@@ -47,6 +48,45 @@ pub enum ScenarioError {
 pub struct SideDef {
     pub id: SideId,
     pub name: String,
+    /// How this side regards the others. Sides not listed are neutral.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub postures: Vec<SidePosture>,
+    /// Side-wide doctrine; groups and units inherit unset fields from it.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub doctrine: Doctrine,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SidePosture {
+    pub toward: SideId,
+    pub posture: Posture,
+}
+
+/// A named group (task group, formation) of one side, with its doctrine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GroupDef {
+    pub side: SideId,
+    pub name: String,
+    #[serde(default)]
+    pub doctrine: Doctrine,
+}
+
+/// A minefield laid before the scenario starts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioMinefield {
+    pub side: SideId,
+    pub centre: GeoPoint,
+    pub radius_m: f64,
+    pub mines: u32,
+    /// Mine type (platform database weapon id).
+    pub weapon: String,
+}
+
+fn is_default<T: Default + PartialEq>(v: &T) -> bool {
+    *v == T::default()
 }
 
 /// A unit as written in a scenario file.
@@ -75,6 +115,19 @@ pub struct ScenarioUnit {
     pub accel_mps2: Option<f64>,
     #[serde(default)]
     pub route: Vec<GeoPoint>,
+    /// Group within the side (declared in `groups`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// Doctrine set on this unit; unset fields inherit from its group and side.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub doctrine: Doctrine,
+    /// A noise jammer (radiates while the unit's EMCON is active). Until the database carries
+    /// ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jammer: Option<JammerSpec>,
+    /// Mission at start.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<Mission>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +142,14 @@ pub struct Scenario {
     /// Default run length in game seconds.
     pub duration_s: u64,
     pub sides: Vec<SideDef>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<GroupDef>,
+    /// Minefields at the start.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub minefields: Vec<ScenarioMinefield>,
+    /// Sea state and weather loss for the whole scenario (default: calm, clear).
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub environment: Environment,
     pub units: Vec<ScenarioUnit>,
 }
 
@@ -141,8 +202,41 @@ impl Scenario {
                 )));
             }
         }
+        for s in &self.sides {
+            for p in &s.postures {
+                if p.toward == s.id || !sides.contains(&p.toward) {
+                    return Err(ScenarioError::Invalid(format!(
+                        "side {} has a posture toward {}, which is itself or undeclared",
+                        s.id, p.toward
+                    )));
+                }
+            }
+        }
+        let mut groups = BTreeSet::new();
+        for g in &self.groups {
+            if !sides.contains(&g.side) || g.name.trim().is_empty() {
+                return Err(ScenarioError::Invalid(format!(
+                    "group {:?} needs a declared side and a name",
+                    g.name
+                )));
+            }
+            if !groups.insert((g.side, g.name.clone())) {
+                return Err(ScenarioError::Invalid(format!(
+                    "duplicate group {:?} on side {}",
+                    g.name, g.side
+                )));
+            }
+        }
         let mut units = BTreeSet::new();
         for u in &self.units {
+            if let Some(g) = &u.group {
+                if !groups.contains(&(u.side, g.clone())) {
+                    return Err(ScenarioError::Invalid(format!(
+                        "unit {} is in group {g:?}, which its side does not declare",
+                        u.id
+                    )));
+                }
+            }
             if !units.insert(u.id) {
                 return Err(ScenarioError::Invalid(format!(
                     "duplicate unit id {}",
@@ -164,6 +258,20 @@ impl Scenario {
                 )));
             }
         }
+        for m in &self.minefields {
+            if !sides.contains(&m.side)
+                || !(m.radius_m.is_finite() && m.radius_m > 0.0)
+                || m.mines == 0
+            {
+                return Err(ScenarioError::Invalid(format!(
+                    "minefield of {} × {} needs a declared side, a radius > 0 and mines > 0",
+                    m.mines, m.weapon
+                )));
+            }
+        }
+        self.environment
+            .validate()
+            .map_err(|e| ScenarioError::Invalid(format!("environment: {e}")))?;
         if self.duration_s == 0 {
             return Err(ScenarioError::Invalid("duration_s must be > 0".into()));
         }
@@ -187,6 +295,68 @@ impl Scenario {
         let mut sim = Simulation::new(seed.unwrap_or(self.seed));
         // Ships and submarines navigate round the bundled coastline (docs/models/land-avoidance.md).
         sim.set_land_mask(sim_geo::land::embedded());
+        // Environment, the ESM emitter library, postures and doctrine first, so they are in
+        // force when the units spawn.
+        let mut c2 = Vec::new();
+        let catalog = weapon_catalog(
+            &spawns,
+            self.minefields.iter().map(|m| m.weapon.as_str()),
+            db,
+        )?;
+        if !catalog.is_empty() {
+            c2.push(CommandPayload::SetWeaponCatalog { weapons: catalog });
+        }
+        let library = emitter_library(&spawns, db)?;
+        if !library.is_empty() {
+            c2.push(CommandPayload::SetEmitterLibrary { entries: library });
+        }
+        if self.environment != Environment::default() {
+            c2.push(CommandPayload::SetEnvironment {
+                environment: self.environment,
+            });
+        }
+        for s in &self.sides {
+            for p in &s.postures {
+                c2.push(CommandPayload::SetPosture {
+                    side: s.id,
+                    toward: p.toward,
+                    posture: p.posture,
+                });
+            }
+            if s.doctrine != Doctrine::default() {
+                c2.push(CommandPayload::SetDoctrine {
+                    scope: DoctrineScope::Side { side: s.id },
+                    doctrine: s.doctrine,
+                });
+            }
+        }
+        for g in &self.groups {
+            c2.push(CommandPayload::SetDoctrine {
+                scope: DoctrineScope::Group {
+                    side: g.side,
+                    group: g.name.clone(),
+                },
+                doctrine: g.doctrine,
+            });
+        }
+        // Minefields need the catalogue (sent above) for their mine type.
+        for m in &self.minefields {
+            c2.push(CommandPayload::CreateMinefield {
+                side: m.side,
+                centre: m.centre,
+                radius_m: m.radius_m,
+                mines: m.mines,
+                weapon: m.weapon.clone(),
+            });
+        }
+        for payload in c2 {
+            sim.submit(Command {
+                tick: Tick(0),
+                issuer: Issuer::Scenario,
+                side: None,
+                payload,
+            })?;
+        }
         for s in spawns {
             sim.submit(Command {
                 tick: Tick(0),
@@ -201,7 +371,20 @@ impl Scenario {
 
 fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, ScenarioError> {
     let invalid = |msg: String| ScenarioError::Invalid(format!("unit {}: {msg}", u.id));
-    let (domain, max_speed, cruise, accel, sensors, rcs, turn) = match &u.platform {
+    let (
+        domain,
+        max_speed,
+        cruise,
+        accel,
+        sensors,
+        rcs,
+        turn,
+        noise,
+        category,
+        length,
+        stores,
+        damage,
+    ) = match &u.platform {
         Some(pid) => {
             let p = db
                 .platform(pid)?
@@ -235,6 +418,9 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
                         ref_range_m: s.ref_detect_range_m,
                         ref_rcs_m2: s.ref_target_rcs_m2,
                         max_target_altitude_m: s.max_target_altitude_m,
+                        clutter_db_per_sea_state: s.clutter_db_per_sea_state,
+                        beamwidth_deg: s.beamwidth_deg,
+                        active: s.is_active,
                     })
                 })
                 .collect::<Result<Vec<_>, ScenarioError>>()?;
@@ -246,6 +432,17 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
                 sensors,
                 db.rcs_m2(pid)?,
                 turn_performance(&p.category, p.length_m),
+                radiated_noise_db(&p.category),
+                Some(p.category.clone()),
+                p.length_m,
+                db.stores_of(pid)?.into_iter().collect(),
+                db.damage_profile_of(pid)?
+                    .map(|(dp, mk, fire, flood)| DamageProfile {
+                        damage_points: dp,
+                        mission_kill_fraction: mk,
+                        fire_susceptibility: fire,
+                        flooding_susceptibility: flood,
+                    }),
             )
         }
         // `validate` guarantees these are present when there is no platform.
@@ -259,6 +456,11 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
             vec![],
             None,
             (None, None),
+            None,
+            None,
+            None,
+            BTreeMap::new(),
+            None,
         ),
     };
     Ok(UnitSpawn {
@@ -278,7 +480,99 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         rcs_m2: rcs,
         max_turn_rate_dps: turn.0,
         min_turn_radius_m: turn.1,
+        group: u.group.clone(),
+        doctrine: u.doctrine,
+        jammer: u.jammer,
+        radiated_noise_db: noise,
+        category,
+        length_m: length,
+        stores,
+        damage_profile: damage,
+        mission: u.mission.clone(),
     })
+}
+
+/// The weapon catalogue: every weapon carried by a unit in this scenario, from the database.
+fn weapon_catalog<'a>(
+    spawns: &'a [UnitSpawn],
+    mine_types: impl Iterator<Item = &'a str>,
+    db: &PlatformDb,
+) -> Result<Vec<WeaponSpec>, ScenarioError> {
+    let ids: BTreeSet<&str> = spawns
+        .iter()
+        .flat_map(|s| s.stores.keys())
+        .map(String::as_str)
+        .chain(mine_types)
+        .collect();
+    let mut out = Vec::new();
+    for want in ids {
+        let Some((id, name, kind, guidance, min, max, speed, warhead, ph, domains)) =
+            db.weapon(want)?
+        else {
+            return Err(ScenarioError::Invalid(format!("unknown weapon {want}")));
+        };
+        let kind = WeaponKind::from_db(&kind).ok_or_else(|| {
+            ScenarioError::Invalid(format!("weapon {id} has unknown kind {kind}"))
+        })?;
+        out.push(WeaponSpec {
+            id,
+            name,
+            kind,
+            guidance: Guidance::from_db(&guidance),
+            min_range_m: min,
+            max_range_m: max,
+            speed_mps: speed,
+            warhead_kg: warhead,
+            base_ph: ph,
+            target_domains: domains.split(',').map(|d| d.trim().to_owned()).collect(),
+        });
+    }
+    Ok(out)
+}
+
+/// The ESM emitter library for the radars fitted in this scenario: each radar type with every
+/// database platform class that carries it (not only the classes present in the scenario).
+fn emitter_library(
+    spawns: &[UnitSpawn],
+    db: &PlatformDb,
+) -> Result<Vec<EmitterEntry>, ScenarioError> {
+    let radars: BTreeSet<&str> = spawns
+        .iter()
+        .flat_map(|s| s.sensors.iter())
+        .filter(|s| s.kind == SensorKind::Radar)
+        .map(|s| s.sensor_id.as_str())
+        .collect();
+    radars
+        .into_iter()
+        .map(|r| {
+            let carriers = db
+                .carriers_of(r)?
+                .into_iter()
+                .map(|(platform, category, domain)| Carrier {
+                    platform,
+                    category,
+                    domain,
+                })
+                .collect();
+            Ok(EmitterEntry {
+                emitter: r.to_owned(),
+                carriers,
+            })
+        })
+        .collect()
+}
+
+/// Generic radiated noise at 10 kn by platform category, dB (the database has no acoustic data
+/// yet; see docs/models/sonar.md). `None` for categories that are not waterborne, and for units
+/// without a platform (the engine's domain default then applies).
+fn radiated_noise_db(category: &str) -> Option<f64> {
+    match category {
+        "submarine" => Some(115.0),
+        "surface_combatant" => Some(140.0),
+        "auxiliary" => Some(145.0),
+        "merchant" => Some(150.0),
+        _ => None,
+    }
 }
 
 /// Generic turn performance by platform class (the database has no turn data yet; see
@@ -393,6 +687,77 @@ mod tests {
         let bad_side = INLINE.replace("\"side\": 1", "\"side\": 2");
         assert!(matches!(
             Scenario::from_json(&bad_side),
+            Err(ScenarioError::Invalid(_))
+        ));
+    }
+
+    const WITH_C2: &str = r#"{
+        "format": "nws-scenario", "format_version": 2, "name": "c2", "seed": 1, "duration_s": 10,
+        "sides": [
+            {"id": 1, "name": "Blue", "postures": [{"toward": 2, "posture": "hostile"}],
+             "doctrine": {"wcs": "free", "emcon": "silent"}},
+            {"id": 2, "name": "Red"}
+        ],
+        "groups": [{"side": 1, "name": "TG1", "doctrine": {"wcs": "safe"}}],
+        "units": [{"id": 1, "name": "A", "side": 1, "domain": "surface", "group": "TG1",
+                   "doctrine": {"emcon": "active"},
+                   "position": {"lat_deg": 0.0, "lon_deg": 0.0},
+                   "max_speed_mps": 10.0, "accel_mps2": 0.1}]
+    }"#;
+
+    #[test]
+    fn postures_groups_and_doctrine_load_and_apply() {
+        let s = Scenario::from_json(WITH_C2).unwrap();
+        let mut sim = s.build(None, &db()).unwrap();
+        sim.step();
+        let snap = sim.snapshot(sim_core::Viewer::Side { side: SideId(1) });
+        let d = snap.units[0].doctrine;
+        assert_eq!(d.wcs, sim_core::Wcs::Safe, "group over side");
+        assert_eq!(d.emcon, sim_core::Emcon::Active, "unit over side");
+        assert_eq!(snap.postures.len(), 1);
+        assert_eq!(snap.postures[0].posture, Posture::Hostile);
+    }
+
+    #[test]
+    fn bad_postures_and_groups_are_rejected() {
+        for (from, to) in [
+            (r#""toward": 2"#, r#""toward": 1"#),
+            (r#""toward": 2"#, r#""toward": 9"#),
+            (r#""group": "TG1""#, r#""group": "TG9""#),
+            (r#""side": 1, "name": "TG1""#, r#""side": 7, "name": "TG1""#),
+        ] {
+            let bad = WITH_C2.replacen(from, to, 1);
+            assert!(
+                matches!(Scenario::from_json(&bad), Err(ScenarioError::Invalid(_))),
+                "{to}"
+            );
+        }
+    }
+
+    #[test]
+    fn environment_and_jammers_load_and_are_validated() {
+        let with = INLINE
+            .replacen(
+                r#""duration_s": 10,"#,
+                r#""duration_s": 10, "environment": {"sea_state": 4, "weather_loss_db": 2.0},"#,
+                1,
+            )
+            .replacen(
+                r#""accel_mps2": 0.1}"#,
+                r#""accel_mps2": 0.1, "jammer": {"jn_db_at_1km": 50.0}}"#,
+                1,
+            );
+        let s = Scenario::from_json(&with).unwrap();
+        assert_eq!(s.environment.sea_state, 4);
+        let spawn = &s.resolve(&db()).unwrap()[0];
+        assert_eq!(spawn.jammer.map(|j| j.jn_db_at_1km), Some(50.0));
+        let mut sim = s.build(None, &db()).unwrap();
+        sim.step();
+        let env = sim.snapshot(sim_core::Viewer::WhiteCell).environment;
+        assert_eq!((env.sea_state, env.weather_loss_db), (4, 2.0));
+        let rough = with.replacen(r#""sea_state": 4"#, r#""sea_state": 11"#, 1);
+        assert!(matches!(
+            Scenario::from_json(&rough),
             Err(ScenarioError::Invalid(_))
         ));
     }

@@ -55,6 +55,17 @@ let units: UnitView[] = Array.from({ length: N }, (_, i) => ({
   max_speed_mps: 15,
   platform: "GEN-FFG",
   route: null,
+  group: null,
+  doctrine: { wcs: "tight" as const, emcon: "active" as const, engage_unfriendly: false },
+  doctrine_set: { wcs: null, emcon: null, engage_unfriendly: null },
+  status: "operational" as const,
+  damage_fraction: 0,
+  criticals: [],
+  fires: 0,
+  flooding: false,
+  mission: null,
+  mission_complete: false,
+  stores: [],
 }));
 
 function rendererName(): string {

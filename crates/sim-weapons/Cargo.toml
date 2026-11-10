@@ -1,0 +1,19 @@
+[package]
+name = "sim-weapons"
+description = "Weapon, engagement, hit-probability and damage models. Pure functions, no ECS"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+specta = ["dep:specta"]
+
+[dependencies]
+serde.workspace = true
+libm.workspace = true
+specta = { workspace = true, optional = true }
+
+[lints]
+workspace = true

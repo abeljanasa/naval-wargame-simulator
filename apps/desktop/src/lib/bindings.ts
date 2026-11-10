@@ -28,6 +28,12 @@ export const commands = {
 	stepTicks: (ticks: number) => __TAURI_INVOKE<void>("step_ticks", { ticks }),
 	orderRoute: (unit: UnitId, waypoints: GeoPoint[]) => typedError<null, string>(__TAURI_INVOKE("order_route", { unit, waypoints })),
 	orderSpeed: (unit: UnitId, speedMps: number | null) => typedError<null, string>(__TAURI_INVOKE("order_speed", { unit, speedMps })),
+	/**  Sets doctrine (WCS, EMCON, ROE) on one unit; unset fields inherit from its group and side. */
+	orderDoctrine: (unit: UnitId, doctrine: Doctrine_Deserialize) => typedError<null, string>(__TAURI_INVOKE("order_doctrine", { unit, doctrine })),
+	/**  Fires `rounds` of `weapon` from `shooter` at the seat's contact `contact`. */
+	orderEngage: (shooter: UnitId, contact: number, weapon: string, rounds: number) => typedError<null, string>(__TAURI_INVOKE("order_engage", { shooter, contact, weapon, rounds })),
+	/**  Gives a unit a mission (patrol, ferry, escort, strike), or clears it with `null`. */
+	orderMission: (unit: UnitId, mission: Mission | null) => typedError<null, string>(__TAURI_INVOKE("order_mission", { unit, mission })),
 };
 
 /** Events */
@@ -36,6 +42,39 @@ export const events = {
 };
 
 /* Types */
+/**  A measured bearing from an observer. */
+export type BearingLine = {
+	from: GeoPoint,
+	/**  Measured bearing, degrees clockwise from north. */
+	bearing_deg: number | null,
+	/**  One-sigma bearing error, degrees. */
+	sigma_deg: number | null,
+};
+
+/**  A bearing line as shown to its side. */
+export type BearingView = {
+	side: SideId,
+	/**  Own unit that took the bearing. */
+	observer: UnitId,
+	line: BearingLine,
+	age_s: number | null,
+	/**  Intercepted emitter type. */
+	emitter: string,
+};
+
+/**  How much a side knows about a track. Ordered: a track only ever climbs the ladder. */
+export type Classification = 
+/**  Something is there. */
+"unknown" | 
+/**  Surface, subsurface, air or land. */
+"domain" | 
+/**  e.g. surface combatant, merchant, fighter. */
+"category" | 
+/**  The platform class, e.g. GEN-FFG. */
+"class" | 
+/**  The individual unit. */
+"identified";
+
 /**  Clock status sent with every frame. */
 export type ClockStatus = {
 	tick: Tick,
@@ -51,12 +90,59 @@ export type ClockStatus = {
  *  One entry in a side's perceived picture. It deliberately carries no target unit id, so a
  *  side's client cannot learn ground truth from the stream (fog of war, design principle 4).
  */
-export type ContactView = {
+export type ContactView = ContactView_Serialize | ContactView_Deserialize;
+
+/**
+ *  One entry in a side's perceived picture. It deliberately carries no target unit id, so a
+ *  side's client cannot learn ground truth from the stream (fog of war, design principle 4).
+ */
+export type ContactView_Deserialize = {
 	/**  The side holding the contact. */
 	side: SideId,
 	/**  Contact number within that side's picture (C1, C2, …). */
 	number: number,
+	/**  Estimated position (not the target's true position). */
 	position: GeoPoint,
+	/**  One-sigma position error at the snapshot time, grown since the last update. */
+	error: ErrorEllipse,
+	classification: Classification,
+	/**  Present once the classification reaches `domain`. */
+	domain?: Domain | null,
+	/**  The holding side's posture toward the track's side, once identified to class level. */
+	affiliation?: Posture | null,
+	/**  Platform category, once classified to category. */
+	category?: string | null,
+	/**  Platform class, once classified to class. */
+	platform?: string | null,
+	first_seen_s: number | null,
+	last_seen_s: number | null,
+	/**  Own unit whose sensor last detected it. */
+	detected_by: UnitId,
+	sensor_id: string,
+};
+
+/**
+ *  One entry in a side's perceived picture. It deliberately carries no target unit id, so a
+ *  side's client cannot learn ground truth from the stream (fog of war, design principle 4).
+ */
+export type ContactView_Serialize = {
+	/**  The side holding the contact. */
+	side: SideId,
+	/**  Contact number within that side's picture (C1, C2, …). */
+	number: number,
+	/**  Estimated position (not the target's true position). */
+	position: GeoPoint,
+	/**  One-sigma position error at the snapshot time, grown since the last update. */
+	error: ErrorEllipse,
+	classification: Classification,
+	/**  Present once the classification reaches `domain`. */
+	domain: Domain | null,
+	/**  The holding side's posture toward the track's side, once identified to class level. */
+	affiliation: Posture | null,
+	/**  Platform category, once classified to category. */
+	category: string | null,
+	/**  Platform class, once classified to class. */
+	platform: string | null,
 	first_seen_s: number | null,
 	last_seen_s: number | null,
 	/**  Own unit whose sensor last detected it. */
@@ -120,8 +206,72 @@ export type DbSensorRow = {
 	max_range_m: number | null,
 };
 
+/**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
+export type Doctrine = Doctrine_Serialize | Doctrine_Deserialize;
+
+/**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
+export type Doctrine_Deserialize = {
+	wcs?: Wcs_Deserialize | null,
+	emcon?: Emcon | null,
+	/**  ROE: may unfriendly (not only hostile) tracks be engaged? */
+	engage_unfriendly?: boolean | null,
+};
+
+/**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
+export type Doctrine_Serialize = {
+	wcs: Wcs_Serialize | null,
+	emcon: Emcon | null,
+	/**  ROE: may unfriendly (not only hostile) tracks be engaged? */
+	engage_unfriendly: boolean | null,
+};
+
 /**  Broad physical domain of a unit. */
 export type Domain = "surface" | "subsurface" | "air" | "land";
+
+/**
+ *  Emission control for active sensors. Phase 2 slice 2 has two states; graded states (for
+ *  example navigation radar only) can be added without changing the inheritance rules.
+ */
+export type Emcon = 
+/**  Active sensors (radar, active sonar) may transmit. */
+"active" | 
+/**  No active emissions. Passive sensors still work. */
+"silent";
+
+/**  Conditions shared by the whole scenario. Constant until Phase 4 weather zones. */
+export type Environment = Environment_Serialize | Environment_Deserialize;
+
+/**  Conditions shared by the whole scenario. Constant until Phase 4 weather zones. */
+export type Environment_Deserialize = {
+	/**  Douglas sea state, 0 (calm) to 9. */
+	sea_state?: number,
+	/**  Two-way propagation loss from weather (rain, fog), dB, applied to every radar. */
+	weather_loss_db?: number | null,
+	/**  Scenario start as UTC seconds since 1970-01-01 (for daylight). Default: the epoch. */
+	start_unix_s?: number | null,
+	/**  Meteorological visibility, km (caps visual, EO and IR range). Default: 40 km (clear). */
+	visibility_km?: number | null,
+};
+
+/**  Conditions shared by the whole scenario. Constant until Phase 4 weather zones. */
+export type Environment_Serialize = {
+	/**  Douglas sea state, 0 (calm) to 9. */
+	sea_state: number,
+	/**  Two-way propagation loss from weather (rain, fog), dB, applied to every radar. */
+	weather_loss_db: number | null,
+	/**  Scenario start as UTC seconds since 1970-01-01 (for daylight). Default: the epoch. */
+	start_unix_s: number | null,
+	/**  Meteorological visibility, km (caps visual, EO and IR range). Default: 40 km (clear). */
+	visibility_km: number | null,
+};
+
+/**  A one-sigma position error ellipse, as shown to players. */
+export type ErrorEllipse = {
+	semi_major_m: number | null,
+	semi_minor_m: number | null,
+	/**  Bearing of the major axis, degrees clockwise from north, in [0, 180). */
+	orientation_deg: number | null,
+};
 
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent = FrameEvent_Serialize | FrameEvent_Deserialize;
@@ -146,6 +296,51 @@ export type FrameEvent_Serialize = {
 export type GeoPoint = {
 	lat_deg: number | null,
 	lon_deg: number | null,
+};
+
+/**  A circular minefield. */
+export type Minefield = {
+	id: number,
+	side: SideId,
+	centre: GeoPoint,
+	radius_m: number | null,
+	/**  Mines left. */
+	mines: number,
+	/**  Mine type (platform database weapon id). */
+	weapon: string,
+};
+
+/**  What a unit has been told to do. */
+export type Mission = 
+/**  Steam between random points in a circular area. */
+{ kind: "patrol"; centre: GeoPoint; radius_m: number | null } | 
+/**  Go to a point, then the mission is complete. */
+{ kind: "ferry"; destination: GeoPoint } | 
+/**  Keep station on another unit: `bearing_deg` relative to its heading, at `range_m`. */
+{ kind: "escort"; escorted: number; bearing_deg: number | null; range_m: number | null } | 
+/**  Close and attack one of the side's contacts. */
+{ kind: "strike"; contact: number };
+
+/**  How one side regards another. */
+export type Posture = "friendly" | 
+/**  The default between sides that have not set a posture. */
+"neutral" | "unfriendly" | "hostile";
+
+/**  Doctrine with every field decided. */
+export type ResolvedDoctrine = ResolvedDoctrine_Serialize | ResolvedDoctrine_Deserialize;
+
+/**  Doctrine with every field decided. */
+export type ResolvedDoctrine_Deserialize = {
+	wcs: Wcs_Deserialize,
+	emcon: Emcon,
+	engage_unfriendly: boolean,
+};
+
+/**  Doctrine with every field decided. */
+export type ResolvedDoctrine_Serialize = {
+	wcs: Wcs_Serialize,
+	emcon: Emcon,
+	engage_unfriendly: boolean,
 };
 
 export type RouteView = {
@@ -185,7 +380,17 @@ export type SnapshotUpdate_Deserialize = {
 	viewer: Viewer,
 	units: UnitView_Deserialize[],
 	removed: UnitId[],
-	contacts: ContactView[],
+	contacts: ContactView_Deserialize[],
+	/**  Sea state and weather (small; sent every frame). */
+	environment: Environment_Deserialize,
+	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
+	bearings: BearingView[],
+	/**  The viewer's weapons in flight (sent whole). */
+	weapons: WeaponView[],
+	/**  Why orders from this seat were refused since the last frame. */
+	refusals: string[],
+	/**  The viewer's minefields (own side; every field for the white cell). */
+	minefields: Minefield[],
 };
 
 /**
@@ -199,8 +404,37 @@ export type SnapshotUpdate_Serialize = {
 	viewer: Viewer,
 	units: UnitView_Serialize[],
 	removed: UnitId[],
-	contacts: ContactView[],
+	contacts: ContactView_Serialize[],
+	/**  Sea state and weather (small; sent every frame). */
+	environment: Environment_Serialize,
+	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
+	bearings: BearingView[],
+	/**  The viewer's weapons in flight (sent whole). */
+	weapons: WeaponView[],
+	/**  Why orders from this seat were refused since the last frame. */
+	refusals: string[],
+	/**  The viewer's minefields (own side; every field for the white cell). */
+	minefields: Minefield[],
 };
+
+/**  What a unit can still do. */
+export type Status = "operational" | 
+/**
+ *  Afloat or flying but unable to fight (damage beyond the mission-kill fraction, or both
+ *  propulsion and weapons knocked out).
+ */
+"mission_killed" | 
+/**  Sunk, shot down or destroyed. */
+"destroyed";
+
+/**  Rounds of one weapon carried. */
+export type StoreView = {
+	weapon: string,
+	count: number,
+};
+
+/**  Systems a critical hit can knock out. */
+export type System = "sensors" | "propulsion" | "weapons" | "flight_deck" | "comms";
 
 /**  A simulation tick number. Tick `n` covers game time `[n, n+1)` × [`TICK_SECONDS`]. */
 export type Tick = number;
@@ -233,6 +467,21 @@ export type UnitView_Deserialize = {
 	platform?: string | null,
 	/**  Present for units the viewer controls. */
 	route?: RouteView | null,
+	group?: string | null,
+	/**  Doctrine in force (unit, then group, then side, then default). */
+	doctrine: ResolvedDoctrine_Deserialize,
+	/**  Doctrine set on the unit itself (unset fields are inherited). */
+	doctrine_set: Doctrine_Deserialize,
+	status: Status,
+	/**  Damage taken as a fraction of the unit's damage points. */
+	damage_fraction: number | null,
+	criticals: System[],
+	fires: number,
+	flooding: boolean,
+	/**  Rounds carried, by weapon id (sorted). */
+	stores: StoreView[],
+	mission?: Mission | null,
+	mission_complete: boolean,
 };
 
 export type UnitView_Serialize = {
@@ -250,6 +499,21 @@ export type UnitView_Serialize = {
 	platform: string | null,
 	/**  Present for units the viewer controls. */
 	route: RouteView | null,
+	group: string | null,
+	/**  Doctrine in force (unit, then group, then side, then default). */
+	doctrine: ResolvedDoctrine_Serialize,
+	/**  Doctrine set on the unit itself (unset fields are inherited). */
+	doctrine_set: Doctrine_Serialize,
+	status: Status,
+	/**  Damage taken as a fraction of the unit's damage points. */
+	damage_fraction: number | null,
+	criticals: System[],
+	fires: number,
+	flooding: boolean,
+	/**  Rounds carried, by weapon id (sorted). */
+	stores: StoreView[],
+	mission: Mission | null,
+	mission_complete: boolean,
 };
 
 /**  Whose picture a snapshot shows. */
@@ -258,6 +522,50 @@ export type Viewer =
 { kind: "white_cell" } | 
 /**  The perceived picture of one side. */
 { kind: "side"; side: SideId };
+
+/**  Weapons control status. */
+export type Wcs = Wcs_Serialize | Wcs_Deserialize;
+
+/**  Weapons control status. */
+export type Wcs_Deserialize = 
+/**
+ *  Weapons safe: do not fire (self-defence arrives with point defence, Phase 2 slice 9).
+ *  Called "hold" before 2026-11-10; files using that word still load.
+ */
+"safe" | 
+/**
+ *  Weapons safe: do not fire (self-defence arrives with point defence, Phase 2 slice 9).
+ *  Called "hold" before 2026-11-10; files using that word still load.
+ */
+"hold" | 
+/**  Fire only at tracks identified as hostile. */
+"tight" | 
+/**  Fire at any track not identified as friendly or neutral. */
+"free";
+
+/**  Weapons control status. */
+export type Wcs_Serialize = 
+/**
+ *  Weapons safe: do not fire (self-defence arrives with point defence, Phase 2 slice 9).
+ *  Called "hold" before 2026-11-10; files using that word still load.
+ */
+"safe" | 
+/**  Fire only at tracks identified as hostile. */
+"tight" | 
+/**  Fire at any track not identified as friendly or neutral. */
+"free";
+
+/**  A missile or torpedo in flight, as shown to its own side (and the white cell). */
+export type WeaponView = {
+	id: number,
+	side: SideId,
+	weapon: string,
+	position: GeoPoint,
+	altitude_m: number | null,
+	heading_deg: number | null,
+	/**  The seeker has acquired its target. */
+	homing: boolean,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

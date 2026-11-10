@@ -1,8 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/sim-ai",
+    "crates/sim-c2",
     "crates/sim-core",
     "crates/sim-geo",
+    "crates/sim-sensors",
+    "crates/sim-weapons",
     "crates/sim-db",
     "crates/sim-scenario",
     "apps/batch",
@@ -16,10 +20,14 @@ license = "LicenseRef-Proprietary"
 publish = false
 
 [workspace.dependencies]
+sim-ai = { path = "crates/sim-ai" }
+sim-c2 = { path = "crates/sim-c2" }
 sim-core = { path = "crates/sim-core" }
 sim-db = { path = "crates/sim-db" }
 sim-geo = { path = "crates/sim-geo" }
 sim-scenario = { path = "crates/sim-scenario" }
+sim-sensors = { path = "crates/sim-sensors" }
+sim-weapons = { path = "crates/sim-weapons" }
 
 anyhow = "1"
 bevy_ecs = "0.20"

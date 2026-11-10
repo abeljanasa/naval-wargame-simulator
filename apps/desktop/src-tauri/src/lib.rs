@@ -7,7 +7,7 @@ mod host;
 
 use host::{ClockStatus, Host, SnapshotUpdate, TimeCompression};
 use serde::{Deserialize, Serialize};
-use sim_core::{GeoPoint, SideId, UnitId, Viewer};
+use sim_core::{Doctrine, GeoPoint, Mission, SideId, UnitId, Viewer};
 use sim_scenario::Scenario;
 use specta_typescript::Typescript;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -276,6 +276,50 @@ fn order_speed(host: State<'_, SharedHost>, unit: UnitId, speed_mps: f64) -> Res
         .map_err(|e| e.to_string())
 }
 
+/// Sets doctrine (WCS, EMCON, ROE) on one unit; unset fields inherit from its group and side.
+#[tauri::command]
+#[specta::specta]
+fn order_doctrine(
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    doctrine: Doctrine,
+) -> Result<(), String> {
+    lock(&host)
+        .order_doctrine(unit, doctrine)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// Fires `rounds` of `weapon` from `shooter` at the seat's contact `contact`.
+#[tauri::command]
+#[specta::specta]
+fn order_engage(
+    host: State<'_, SharedHost>,
+    shooter: UnitId,
+    contact: u32,
+    weapon: String,
+    rounds: u32,
+) -> Result<(), String> {
+    lock(&host)
+        .order_engage(shooter, contact, weapon, rounds)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// Gives a unit a mission (patrol, ferry, escort, strike), or clears it with `null`.
+#[tauri::command]
+#[specta::specta]
+fn order_mission(
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    mission: Option<Mission>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_mission(unit, mission)
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -290,6 +334,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             step_ticks,
             order_route,
             order_speed,
+            order_doctrine,
+            order_engage,
+            order_mission,
         ])
         .events(collect_events![FrameEvent])
 }

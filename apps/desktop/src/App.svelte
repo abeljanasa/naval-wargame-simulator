@@ -2,10 +2,18 @@
   import { onMount } from "svelte";
   import type { Map as MapLibreMap } from "maplibre-gl";
   import type { MapboxOverlay } from "@deck.gl/mapbox";
-  import { createMap, buildLayers, contactAge, setMapTheme, type MapTheme } from "./lib/map";
+  import {
+    createMap,
+    buildLayers,
+    contactAge,
+    contactKind,
+    setMapTheme,
+    CONTAINMENT_95,
+    type MapTheme,
+  } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
-  import { bearing, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
-  import type { Viewer } from "./lib/bindings";
+  import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
+  import type { Emcon, Mission, Viewer, Wcs } from "./lib/bindings";
   import DbBrowser from "./lib/DbBrowser.svelte";
 
   let mapEl: HTMLElement;
@@ -13,9 +21,36 @@
   let overlay = $state<MapboxOverlay | null>(null);
   let speedInput = $state("");
   let startError = $state<string | null>(null);
+  let engageContact = $state("");
+  let engageWeapon = $state("");
+  let engageRounds = $state("1");
+
+  // Keep the engage form pointing at something that exists.
+  $effect(() => {
+    const u = sim.selectedUnit;
+    if (u && !u.stores.some((st) => st.weapon === engageWeapon)) {
+      engageWeapon = u.stores[0]?.weapon ?? "";
+    }
+    if (!sim.contacts.some((c) => String(c.number) === engageContact)) {
+      engageContact = sim.contacts[0] ? String(sim.contacts[0].number) : "";
+    }
+  });
 
   const clock = $derived(sim.clock);
   const viewerKey = $derived(viewerToKey(sim.session?.viewer ?? { kind: "white_cell" }));
+
+  function missionText(m: Mission): string {
+    switch (m.kind) {
+      case "patrol":
+        return `patrol ${(n(m.radius_m) / 1000).toFixed(0)} km around ${latLon(m.centre.lat_deg, m.centre.lon_deg)}`;
+      case "ferry":
+        return `ferry to ${latLon(m.destination.lat_deg, m.destination.lon_deg)}`;
+      case "escort":
+        return `escort ${unitName(m.escorted)}`;
+      case "strike":
+        return `strike C${m.contact}`;
+    }
+  }
 
   function unitName(id: number): string {
     return sim.units.find((u) => u.id === id)?.name ?? `unit ${id}`;
@@ -75,6 +110,9 @@
       layers: buildLayers({
         units: sim.units,
         contacts: sim.contacts,
+        bearings: sim.bearings,
+        weapons: sim.weapons,
+        minefields: sim.minefields,
         gameTimeS: n(clock?.game_time_s ?? 0),
         viewer: sim.session?.viewer ?? { kind: "white_cell" },
         selected: sim.selected,
@@ -126,6 +164,13 @@
       <span class="ratio" title="Achieved game seconds per wall second">
         {clock && !clock.paused ? `${Math.round(n(clock.achieved_ratio))}×` : "paused"}
       </span>
+      {#if sim.environment}
+        <span class="env" title="Sea state (clutter against low targets) and weather loss on radar">
+          Sea state {sim.environment.sea_state}{n(sim.environment.weather_loss_db) > 0
+            ? ` · weather −${n(sim.environment.weather_loss_db).toFixed(1)} dB`
+            : ""}
+        </span>
+      {/if}
     </div>
 
     <div class="controls" role="group" aria-label="Time controls">
@@ -216,12 +261,13 @@
         <ul class="units">
           {#each sim.contacts as c (c.number)}
             <li class="contact">
-              <span class="name">C{c.number} · unknown</span>
+              <span class="name">C{c.number} · {contactKind(c)}</span>
               <span class="meta">
-                {latLon(c.position.lat_deg, c.position.lon_deg)} · seen {contactAge(
-                  n(clock?.game_time_s ?? 0),
-                  c,
-                )} ago by {unitName(c.detected_by)}
+                {latLon(c.position.lat_deg, c.position.lon_deg)} ± {distance(
+                  n(c.error.semi_major_m) * CONTAINMENT_95,
+                )} (95 %) · seen {contactAge(n(clock?.game_time_s ?? 0), c)} ago by {unitName(
+                  c.detected_by,
+                )}
               </span>
             </li>
           {:else}
@@ -256,7 +302,92 @@
               none
             {/if}
           </dd>
+          <dt><label for="wcs">Weapons</label></dt>
+          <dd>
+            <select
+              id="wcs"
+              value={u.doctrine_set.wcs ?? "inherit"}
+              onchange={(e) => {
+                const v = e.currentTarget.value;
+                void sim.orderDoctrine({ wcs: v === "inherit" ? null : (v as Wcs) });
+              }}
+            >
+              <option value="inherit">Inherit ({u.doctrine.wcs})</option>
+              <option value="safe">Safe</option>
+              <option value="tight">Tight</option>
+              <option value="free">Free</option>
+            </select>
+          </dd>
+          <dt><label for="emcon">Emissions</label></dt>
+          <dd>
+            <select
+              id="emcon"
+              value={u.doctrine_set.emcon ?? "inherit"}
+              onchange={(e) => {
+                const v = e.currentTarget.value;
+                void sim.orderDoctrine({ emcon: v === "inherit" ? null : (v as Emcon) });
+              }}
+            >
+              <option value="inherit">Inherit ({u.doctrine.emcon})</option>
+              <option value="active">Active</option>
+              <option value="silent">Silent (radar off)</option>
+            </select>
+          </dd>
+          <dt>Condition</dt>
+          <dd class:hurt={u.status !== "operational"}>
+            {u.status.replaceAll("_", " ")} · {Math.round(n(u.damage_fraction) * 100)} % damage{u.fires >
+            0
+              ? ` · ${u.fires} fire${u.fires > 1 ? "s" : ""}`
+              : ""}{u.flooding ? " · flooding" : ""}{u.criticals.length
+              ? ` · lost: ${u.criticals.join(", ").replaceAll("_", " ")}`
+              : ""}
+          </dd>
+          <dt>Mission</dt>
+          <dd>
+            {u.mission ? missionText(u.mission) : "none"}{u.mission_complete ? " (complete)" : ""}
+            <div class="row">
+              <button type="button" onclick={() => sim.orderPatrolHere()}>Patrol here</button>
+              {#if u.mission}
+                <button type="button" onclick={() => sim.orderPatrolHere(true)}>Clear</button>
+              {/if}
+            </div>
+          </dd>
+          <dt>Stores</dt>
+          <dd>
+            {#each u.stores as st (st.weapon)}
+              <div>{st.weapon} × {st.count}</div>
+            {:else}
+              none
+            {/each}
+          </dd>
         </dl>
+
+        {#if u.stores.length > 0 && sim.contacts.length > 0}
+          <form
+            class="engage"
+            aria-label="Engage"
+            onsubmit={(e) => {
+              e.preventDefault();
+              void sim.orderEngage(Number(engageContact), engageWeapon, Number(engageRounds));
+            }}
+          >
+            <label for="engage-contact">Target</label>
+            <select id="engage-contact" bind:value={engageContact}>
+              {#each sim.contacts as c (c.number)}
+                <option value={String(c.number)}>C{c.number} · {contactKind(c)}</option>
+              {/each}
+            </select>
+            <label for="engage-weapon">Weapon</label>
+            <select id="engage-weapon" bind:value={engageWeapon}>
+              {#each u.stores as st (st.weapon)}
+                <option value={st.weapon}>{st.weapon} ({st.count})</option>
+              {/each}
+            </select>
+            <label for="engage-rounds">Rounds</label>
+            <input id="engage-rounds" type="number" min="1" step="1" bind:value={engageRounds} />
+            <button type="submit">Fire</button>
+          </form>
+        {/if}
 
         <form
           class="row"
@@ -340,6 +471,10 @@
   .clock .ratio {
     color: var(--text-dim);
     min-width: 56px;
+  }
+  .clock .env {
+    color: var(--text-dim);
+    font-size: 12px;
   }
   .controls {
     display: flex;
@@ -426,6 +561,19 @@
     margin: 0;
     font-family: var(--mono);
     font-size: 12px;
+  }
+  .engage {
+    display: grid;
+    grid-template-columns: 76px 1fr;
+    gap: 4px 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .engage button {
+    grid-column: 2;
+  }
+  .hurt {
+    color: var(--danger);
   }
   .row {
     display: flex;

@@ -168,6 +168,10 @@ fn sensors(conn: &Connection, out: &mut Collector) -> Result<(), DbError> {
         "SELECT 'sensors/' || id, 'min_range_m ' || min_range_m || ' must be >= 0 and < max_range_m ' || max_range_m FROM sensors WHERE min_range_m < 0 OR min_range_m >= max_range_m ORDER BY 1")?;
     rows(conn, out, Severity::Error, "sensor.reference_range",
         "SELECT 'sensors/' || id, 'ref_detect_range_m and ref_target_rcs_m2 must be given together, positive, with ref range <= max range' FROM sensors WHERE (ref_detect_range_m IS NULL) != (ref_target_rcs_m2 IS NULL) OR ref_detect_range_m <= 0 OR ref_target_rcs_m2 <= 0 OR ref_detect_range_m > max_range_m ORDER BY 1")?;
+    rows(conn, out, Severity::Error, "sensor.radar_fields",
+        "SELECT 'sensors/' || id, 'clutter_db_per_sea_state (>= 0) and beamwidth_deg (0 < b <= 360) apply to radars only' FROM sensors WHERE ((clutter_db_per_sea_state IS NOT NULL OR beamwidth_deg IS NOT NULL) AND kind != 'radar') OR clutter_db_per_sea_state < 0 OR beamwidth_deg <= 0 OR beamwidth_deg > 360 ORDER BY 1")?;
+    rows(conn, out, Severity::Warning, "sensor.radar_defaults",
+        "SELECT 'sensors/' || id, 'radar has no clutter_db_per_sea_state or beamwidth_deg; the model defaults apply' FROM sensors WHERE kind = 'radar' AND (clutter_db_per_sea_state IS NULL OR beamwidth_deg IS NULL) ORDER BY 1")?;
     rows(conn, out, Severity::Error, "sensor.radar_reference",
         "SELECT 'sensors/' || id, 'radar needs ref_detect_range_m and ref_target_rcs_m2 (Phase 2 detection model)' FROM sensors WHERE kind = 'radar' AND ref_detect_range_m IS NULL ORDER BY 1")?;
 

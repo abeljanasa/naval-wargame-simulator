@@ -5,7 +5,12 @@ use crate::detection::SensorSpec;
 use crate::ids::{SideId, UnitId};
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
+use sim_ai::Mission;
+use sim_c2::{Doctrine, Posture};
 use sim_geo::GeoPoint;
+use sim_sensors::{Carrier, Environment, JammerSpec};
+use sim_weapons::{DamageProfile, WeaponSpec};
+use std::collections::BTreeMap;
 
 /// Version of the command and snapshot wire protocol. Bump it on any breaking change to
 /// [`Command`], [`CommandPayload`] or [`crate::Snapshot`], and add a migration.
@@ -83,12 +88,57 @@ pub struct UnitSpawn {
     /// Minimum turn radius, metres (0 or absent = no radius limit).
     #[serde(default)]
     pub min_turn_radius_m: Option<f64>,
+    #[serde(default)]
+    pub group: Option<String>,
+    #[serde(default)]
+    pub doctrine: Doctrine,
+    #[serde(default)]
+    pub jammer: Option<JammerSpec>,
+    /// Radiated noise at 10 kn, dB; `None` uses the domain default.
+    #[serde(default)]
+    pub radiated_noise_db: Option<f64>,
+    /// Platform category, for identification.
+    #[serde(default)]
+    pub category: Option<String>,
+    /// Length overall, metres; `None` uses the domain default.
+    #[serde(default)]
+    pub length_m: Option<f64>,
+    /// Rounds carried, by weapon id.
+    #[serde(default)]
+    pub stores: BTreeMap<String, u32>,
+    /// Damage profile; `None` uses the domain default.
+    #[serde(default)]
+    pub damage_profile: Option<DamageProfile>,
+    /// Mission at start, if any.
+    #[serde(default)]
+    pub mission: Option<Mission>,
+}
+
+/// One emitter type and the platform classes known to carry it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct EmitterEntry {
+    pub emitter: String,
+    pub carriers: Vec<Carrier>,
+}
+
+/// Where a doctrine setting applies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(tag = "level", rename_all = "snake_case")]
+pub enum DoctrineScope {
+    Side { side: SideId },
+    Group { side: SideId, group: String },
+    Unit { unit: UnitId },
 }
 
 /// What a command does.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
+// Spawns are much larger than orders, but commands are few (thousands per run, not millions) and
+// boxing would change every constructor and the serialised form's Rust API for no measurable gain.
+#[allow(clippy::large_enum_variant)]
 pub enum CommandPayload {
     SpawnUnit(UnitSpawn),
     /// Replace the unit's route. An empty list clears it, and the unit holds its current course.
@@ -101,6 +151,57 @@ pub enum CommandPayload {
         unit: UnitId,
         speed_mps: f64,
     },
+    /// How `side` regards `toward`. Scenario and white cell only.
+    SetPosture {
+        side: SideId,
+        toward: SideId,
+        posture: Posture,
+    },
+    /// Replaces the doctrine set at `scope` (unset fields inherit). A player may set doctrine
+    /// for their own side, its groups and its units.
+    SetDoctrine {
+        scope: DoctrineScope,
+        doctrine: Doctrine,
+    },
+    /// Sea state and weather loss for every radar. Scenario and white cell only.
+    SetEnvironment {
+        environment: Environment,
+    },
+    /// Replaces the ESM emitter library (built from the platform database). Scenario and white
+    /// cell only.
+    SetEmitterLibrary {
+        entries: Vec<EmitterEntry>,
+    },
+    /// Replaces the weapon catalogue (from the platform database). Scenario and white cell only.
+    SetWeaponCatalog {
+        weapons: Vec<WeaponSpec>,
+    },
+    /// Fire `rounds` of `weapon` from `shooter` at the shooter side's contact `contact`.
+    Engage {
+        shooter: UnitId,
+        contact: u32,
+        weapon: String,
+        rounds: u32,
+    },
+    /// Creates a minefield. Scenario and white cell only.
+    CreateMinefield {
+        side: SideId,
+        centre: GeoPoint,
+        radius_m: f64,
+        mines: u32,
+        weapon: String,
+    },
+    /// Lays `mines` of the unit's mines in a circle of `radius_m` round its position.
+    LayMines {
+        unit: UnitId,
+        mines: u32,
+        radius_m: f64,
+    },
+    /// Gives a unit a mission (`None` clears it). A player may task its own units.
+    AssignMission {
+        unit: UnitId,
+        mission: Option<Mission>,
+    },
 }
 
 impl CommandPayload {
@@ -108,10 +209,22 @@ impl CommandPayload {
     #[must_use]
     pub fn target_unit(&self) -> Option<UnitId> {
         match self {
-            CommandPayload::SpawnUnit(_) => None,
-            CommandPayload::SetRoute { unit, .. } | CommandPayload::SetSpeed { unit, .. } => {
-                Some(*unit)
+            CommandPayload::SetRoute { unit, .. }
+            | CommandPayload::SetSpeed { unit, .. }
+            | CommandPayload::SetDoctrine {
+                scope: DoctrineScope::Unit { unit },
+                ..
             }
+            | CommandPayload::Engage { shooter: unit, .. }
+            | CommandPayload::AssignMission { unit, .. }
+            | CommandPayload::LayMines { unit, .. } => Some(*unit),
+            CommandPayload::SpawnUnit(_)
+            | CommandPayload::SetPosture { .. }
+            | CommandPayload::SetEnvironment { .. }
+            | CommandPayload::SetEmitterLibrary { .. }
+            | CommandPayload::SetWeaponCatalog { .. }
+            | CommandPayload::CreateMinefield { .. }
+            | CommandPayload::SetDoctrine { .. } => None,
         }
     }
 
@@ -148,6 +261,21 @@ impl CommandPayload {
                 for sensor in &s.sensors {
                     sensor.validate()?;
                 }
+                if let Some(d) = &s.damage_profile {
+                    d.validate()?;
+                }
+                if let Some(m) = &s.mission {
+                    m.validate()?;
+                }
+                if s.length_m.is_some_and(|l| !(l.is_finite() && l >= 0.0)) {
+                    return Err("length_m must be finite and >= 0".into());
+                }
+                if s.radiated_noise_db.is_some_and(|n| !n.is_finite()) {
+                    return Err("radiated_noise_db must be finite".into());
+                }
+                if s.jammer.is_some_and(|j| !j.jn_db_at_1km.is_finite()) {
+                    return Err("jammer jn_db_at_1km must be finite".into());
+                }
                 if !(s.speed_mps.is_finite()
                     && s.heading_deg.is_finite()
                     && s.altitude_m.is_finite())
@@ -162,6 +290,63 @@ impl CommandPayload {
                     Ok(())
                 } else {
                     Err("speed must be finite and >= 0".into())
+                }
+            }
+            CommandPayload::SetPosture { side, toward, .. } => {
+                if side == toward {
+                    Err("a side is always friendly to itself".into())
+                } else {
+                    Ok(())
+                }
+            }
+            CommandPayload::SetDoctrine {
+                scope: DoctrineScope::Group { group, .. },
+                ..
+            } if group.trim().is_empty() => Err("group name is empty".into()),
+            CommandPayload::SetDoctrine { .. } => Ok(()),
+            CommandPayload::SetEnvironment { environment } => environment.validate(),
+            CommandPayload::SetWeaponCatalog { weapons } => {
+                weapons.iter().try_for_each(WeaponSpec::validate)
+            }
+            CommandPayload::CreateMinefield {
+                centre,
+                radius_m,
+                mines,
+                weapon,
+                ..
+            } => {
+                if !centre.is_valid() || !(radius_m.is_finite() && *radius_m > 0.0) || *mines == 0 {
+                    Err("minefield needs a valid centre, a radius > 0 and mines > 0".into())
+                } else if weapon.trim().is_empty() {
+                    Err("minefield needs a mine type".into())
+                } else {
+                    Ok(())
+                }
+            }
+            CommandPayload::LayMines {
+                mines, radius_m, ..
+            } => {
+                if *mines == 0 || !(radius_m.is_finite() && *radius_m > 0.0) {
+                    Err("laying needs mines > 0 and a radius > 0".into())
+                } else {
+                    Ok(())
+                }
+            }
+            CommandPayload::AssignMission { mission, .. } => {
+                mission.as_ref().map_or(Ok(()), Mission::validate)
+            }
+            CommandPayload::Engage { rounds, weapon, .. } => {
+                if *rounds == 0 || weapon.trim().is_empty() {
+                    Err("engage needs a weapon and at least one round".into())
+                } else {
+                    Ok(())
+                }
+            }
+            CommandPayload::SetEmitterLibrary { entries } => {
+                if entries.iter().any(|e| e.emitter.trim().is_empty()) {
+                    Err("emitter library entry has no emitter name".into())
+                } else {
+                    Ok(())
                 }
             }
         }

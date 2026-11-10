@@ -1,8 +1,10 @@
 # Model: Gate 1 interim radar detection and contacts
 
+> **Phase 2 extends this model** with clutter, weather and jamming: see [radar.md](radar.md). The geometry gates, R₅₀ and Pd curve below are unchanged.
+
 > **Interim model.** It exists so Gate 1 ("units move and detect") can be demonstrated with platform-database sensors. Phase 2 replaces it with the full sensor suite (radar clutter and jamming, ESM, sonar, IR/EO, visual, MAD) in a `sim-sensors` crate. Treat its outputs as illustrative, not analytical.
 
-- **Code:** `crates/sim-core/src/detection.rs`
+- **Code:** `crates/sim-sensors/src/radar.rs` (R₅₀, Pd) and `crates/sim-core/src/detection.rs` (geometry gates, draws, scheduling)
 - **Tests:** `crates/sim-core/tests/detection.rs` (duel tests), plus unit tests in the module
 - **Design log:** [DL-0006](../design-log/DL-0006-gate1-radar-detection.md)
 
@@ -36,7 +38,9 @@ The model runs on ticks where `tick % 5 == 0`, after movement. It loops over obs
 
 ## Contacts
 
-- **Gained:** a detection creates a contact in the observer side's picture, numbered C1, C2, … per side, and logs `ContactGained`. Later detections refresh its position and last-seen time.
+Since Phase 2 slice 1, contacts are tracks: each detection measures the position with error and is fused into the track, whose error grows between updates. That model is in [tracks.md](tracks.md); the rules below still hold.
+
+- **Gained:** a detection creates a contact in the observer side's picture, numbered C1, C2, … per side, and logs `ContactGained`. Later detections update its estimate and last-seen time.
 - **Lost:** a contact not re-detected for 300 s is dropped and `ContactLost` is logged.
 - **Fog of war:** side snapshots carry contacts (number, position, times, detecting own unit, sensor) but **never the target's unit id**. Only the white cell sees ground truth.
 - **Stored but hidden:** the engine keeps the target id internally, for adjudication and AAR.
@@ -86,6 +90,5 @@ Further tests cover:
 These are known and deliberate:
 - Radar only. ESM, sonar, visual, EO/IR and MAD are ignored even when fitted.
 - No clutter, multipath, jamming, weather, terrain masking, aspect-dependent RCS or EMCON.
-- No position error, classification ladder, track correlation or data-link sharing.
-- Contact positions are exact.
+- Track correlation and data-link sharing are not modelled (see [tracks.md](tracks.md) for position error and classification).
 - Scans are independent draws every 5 s regardless of each radar's own scan period.

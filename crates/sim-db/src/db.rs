@@ -61,6 +61,10 @@ pub struct MountedSensor {
     pub ref_detect_range_m: Option<f64>,
     pub ref_target_rcs_m2: Option<f64>,
     pub max_target_altitude_m: f64,
+    pub clutter_db_per_sea_state: Option<f64>,
+    pub beamwidth_deg: Option<f64>,
+    /// Capable of active transmission.
+    pub is_active: bool,
 }
 
 const SUMMARY_COLS: &str = "id, name, category, domain, max_speed_mps, cruise_speed_mps, accel_mps2, max_altitude_m, max_depth_m, length_m";
@@ -153,7 +157,8 @@ impl PlatformDb {
     pub fn sensors_of(&self, platform_id: &str) -> Result<Vec<MountedSensor>, DbError> {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.kind, m.height_m, s.min_range_m, s.max_range_m, s.ref_detect_range_m,
-                    s.ref_target_rcs_m2, s.max_target_altitude_m
+                    s.ref_target_rcs_m2, s.max_target_altitude_m, s.clutter_db_per_sea_state,
+                    s.beamwidth_deg, s.is_active
                FROM mounts m JOIN sensors s ON s.id = m.sensor_id
               WHERE m.platform_id = ?1 AND m.kind = 'sensor'
               ORDER BY m.id",
@@ -169,10 +174,118 @@ impl PlatformDb {
                     ref_detect_range_m: r.get(5)?,
                     ref_target_rcs_m2: r.get(6)?,
                     max_target_altitude_m: r.get(7)?,
+                    clutter_db_per_sea_state: r.get(8)?,
+                    beamwidth_deg: r.get(9)?,
+                    is_active: r.get(10)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(v)
+    }
+
+    /// Every platform class that mounts `sensor_id`, as (platform id, category, domain), sorted
+    /// by platform id: the ESM emitter library entry for that sensor.
+    pub fn carriers_of(&self, sensor_id: &str) -> Result<Vec<(String, String, String)>, DbError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT p.id, p.category, p.domain
+               FROM mounts m JOIN platforms p ON p.id = m.platform_id
+              WHERE m.kind = 'sensor' AND m.sensor_id = ?1
+              ORDER BY p.id",
+        )?;
+        let v = stmt
+            .query_map([sensor_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(v)
+    }
+
+    /// Rounds a platform carries by default, by weapon id (sorted): its magazines' default
+    /// contents, or for a platform without magazines (aircraft) its first loadout by id.
+    pub fn stores_of(&self, platform_id: &str) -> Result<Vec<(String, u32)>, DbError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT mc.weapon_id, SUM(mc.quantity)
+               FROM magazines m JOIN magazine_contents mc ON mc.magazine_id = m.id
+              WHERE m.platform_id = ?1
+              GROUP BY mc.weapon_id ORDER BY mc.weapon_id",
+        )?;
+        let mut v = stmt
+            .query_map([platform_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<Result<Vec<(String, u32)>, _>>()?;
+        if v.is_empty() {
+            let mut stmt = self.conn.prepare(
+                "SELECT weapon_id, quantity FROM loadout_items
+                  WHERE loadout_id = (SELECT id FROM loadouts WHERE platform_id = ?1
+                                      ORDER BY id LIMIT 1)
+                  ORDER BY weapon_id",
+            )?;
+            v = stmt
+                .query_map([platform_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        Ok(v)
+    }
+
+    /// A weapon's figures: (id, name, kind, guidance, min range m, max range m, speed m/s,
+    /// warhead kg, base Ph, comma-separated target domains).
+    #[allow(clippy::type_complexity)]
+    pub fn weapon(
+        &self,
+        id: &str,
+    ) -> Result<
+        Option<(
+            String,
+            String,
+            String,
+            String,
+            f64,
+            f64,
+            f64,
+            f64,
+            f64,
+            String,
+        )>,
+        DbError,
+    > {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT id, name, kind, guidance, min_range_m, max_range_m, speed_mps, warhead_kg,
+                        base_ph, target_domains FROM weapons WHERE id = ?1",
+                [id],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get(4)?,
+                        r.get(5)?,
+                        r.get(6)?,
+                        r.get(7)?,
+                        r.get(8)?,
+                        r.get(9)?,
+                    ))
+                },
+            )
+            .optional()?)
+    }
+
+    /// A platform's damage profile: (damage points, mission-kill fraction, fire susceptibility,
+    /// flooding susceptibility).
+    pub fn damage_profile_of(
+        &self,
+        platform_id: &str,
+    ) -> Result<Option<(f64, f64, f64, f64)>, DbError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT d.damage_points, d.mission_kill_fraction, d.fire_susceptibility,
+                        d.flooding_susceptibility
+                   FROM platforms p JOIN damage_profiles d ON d.id = p.damage_profile_id
+                  WHERE p.id = ?1",
+                [platform_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .optional()?)
     }
 
     /// The platform's all-aspect, any-speed radar cross-section (m²), falling back to the

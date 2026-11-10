@@ -10,14 +10,21 @@ pub struct Migration {
 }
 
 /// All migrations, in order. Append only: never edit or reorder a merged migration.
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "0001_initial_schema",
-    sql: include_str!("../migrations/0001_initial_schema.sql"),
-}];
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "0001_initial_schema",
+        sql: include_str!("../migrations/0001_initial_schema.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "0002_radar_clutter_beamwidth",
+        sql: include_str!("../migrations/0002_radar_clutter_beamwidth.sql"),
+    },
+];
 
 /// Schema version produced by applying every migration.
-pub const LATEST_VERSION: u32 = 1;
+pub const LATEST_VERSION: u32 = 2;
 
 pub fn schema_version(conn: &Connection) -> Result<u32, DbError> {
     Ok(conn.pragma_query_value(None, "user_version", |r| r.get(0))?)

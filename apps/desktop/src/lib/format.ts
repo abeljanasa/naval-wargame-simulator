@@ -12,6 +12,13 @@ export function knots(mps: number | null): string {
   return Number.isFinite(v) ? `${v.toFixed(1)} kn` : "—";
 }
 
+/** A distance: metres below 1 km, else km to one decimal. */
+export function distance(m: number | null): string {
+  const v = n(m);
+  if (!Number.isFinite(v)) return "—";
+  return v < 1000 ? `${Math.round(v)} m` : `${(v / 1000).toFixed(1)} km`;
+}
+
 export function bearing(deg: number | null): string {
   const v = n(deg);
   return Number.isFinite(v) ? `${Math.round(v).toString().padStart(3, "0")}°` : "—";

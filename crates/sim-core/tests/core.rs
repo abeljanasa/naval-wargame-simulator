@@ -25,6 +25,15 @@ fn spawn(id: u64, side: u16, lat: f64, lon: f64, route: Vec<GeoPoint>) -> Comman
             rcs_m2: None,
             max_turn_rate_dps: None,
             min_turn_radius_m: None,
+            group: None,
+            doctrine: Doctrine::default(),
+            jammer: None,
+            radiated_noise_db: None,
+            category: None,
+            length_m: None,
+            stores: Default::default(),
+            damage_profile: None,
+            mission: None,
         }),
     }
 }

@@ -4,16 +4,25 @@
 import {
   commands,
   events,
+  type BearingView,
   type ClockStatus,
   type ContactView,
+  type Doctrine,
+  type Environment,
   type FrameEvent,
   type GeoPoint,
+  type Minefield,
+  type Mission,
   type SessionInfo,
   type TimeCompression,
   type UnitView,
+  type WeaponView,
   type Viewer,
 } from "./bindings";
 import { MPS_PER_KNOT } from "./format";
+
+/** Radius of a patrol ordered from the unit panel, metres. */
+export const PATROL_RADIUS_M = 30_000;
 
 export const COMPRESSIONS: { key: TimeCompression; label: string }[] = [
   { key: "x1", label: "1×" },
@@ -27,6 +36,14 @@ export const COMPRESSIONS: { key: TimeCompression; label: string }[] = [
 
 class SimSession {
   session = $state<SessionInfo | null>(null);
+  /** Sea state and weather, from the latest frame. */
+  environment = $state<Environment | null>(null);
+  /** The seat's recent ESM bearing lines. */
+  bearings = $state<BearingView[]>([]);
+  /** The seat's missiles and torpedoes in flight. */
+  weapons = $state<WeaponView[]>([]);
+  /** The seat's minefields. */
+  minefields = $state<Minefield[]>([]);
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */
@@ -59,6 +76,11 @@ class SimSession {
       );
     }
     this.allContacts = u.contacts;
+    this.environment = u.environment;
+    this.bearings = u.bearings;
+    this.weapons = u.weapons;
+    this.minefields = u.minefields;
+    if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 
   /** Loads a scenario file the user picked; the engine validates it and resets the session. */
@@ -130,6 +152,38 @@ class SimSession {
       return;
     }
     const res = await commands.orderSpeed(this.selected, kn * MPS_PER_KNOT);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Fires `rounds` of `weapon` from the selected unit at contact `contact`. A refusal (range,
+   * track quality, weapons control status…) arrives in a later frame and is shown as an error. */
+  async orderEngage(contact: number, weapon: string, rounds: number) {
+    if (this.selected === null) return;
+    if (!Number.isInteger(rounds) || rounds < 1) {
+      this.error = "Rounds must be a whole number ≥ 1";
+      return;
+    }
+    const res = await commands.orderEngage(this.selected, contact, weapon, rounds);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Patrols the selected unit around its current position (30 km radius), or clears its
+   * mission with `null`. */
+  async orderPatrolHere(clear = false) {
+    const u = this.selectedUnit;
+    if (!u) return;
+    const mission: Mission | null = clear
+      ? null
+      : { kind: "patrol", centre: u.position, radius_m: PATROL_RADIUS_M };
+    const res = await commands.orderMission(u.id, mission);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Changes doctrine set on the selected unit; fields given as null go back to inheriting. */
+  async orderDoctrine(change: Partial<Doctrine>) {
+    const u = this.selectedUnit;
+    if (!u) return;
+    const res = await commands.orderDoctrine(u.id, { ...u.doctrine_set, ...change });
     this.error = res.status === "error" ? res.error : null;
   }
 }

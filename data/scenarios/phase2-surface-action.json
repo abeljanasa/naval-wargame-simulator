@@ -1,0 +1,94 @@
+{
+  "format": "nws-scenario",
+  "format_version": 2,
+  "name": "Phase 2 — Surface action in Bass Strait",
+  "description": "Gate 2 demonstrator: core combat. Two Blue warships (an air-defence destroyer and a multi-role frigate) and two Red missile corvettes patrol toward each other with weapons free. They detect, classify and engage; anti-ship missiles meet point defence, decoys and jamming; hits do damage that burns and floods. Red has laid a minefield inside the patrol area. A neutral merchant passes far to the west, out of the fight. All platforms are generic database classes with no real-world values.",
+  "seed": 20261111,
+  "duration_s": 7200,
+  "environment": { "sea_state": 3, "start_unix_s": 1794268800 },
+  "sides": [
+    {
+      "id": 1,
+      "name": "Blue",
+      "postures": [
+        { "toward": 2, "posture": "hostile" },
+        { "toward": 3, "posture": "neutral" }
+      ],
+      "doctrine": { "wcs": "free", "emcon": "active" }
+    },
+    {
+      "id": 2,
+      "name": "Red",
+      "postures": [
+        { "toward": 1, "posture": "hostile" },
+        { "toward": 3, "posture": "neutral" }
+      ],
+      "doctrine": { "wcs": "free", "emcon": "active" }
+    },
+    { "id": 3, "name": "Neutral shipping" }
+  ],
+  "minefields": [
+    {
+      "side": 2,
+      "centre": { "lat_deg": -39.62, "lon_deg": 146.45 },
+      "radius_m": 3000,
+      "mines": 20,
+      "weapon": "WPN-MINE-BOTTOM"
+    }
+  ],
+  "units": [
+    {
+      "id": 1,
+      "name": "Blue destroyer (DDG) — Anvil",
+      "side": 1,
+      "platform": "GEN-DDG",
+      "position": { "lat_deg": -39.6, "lon_deg": 146.3 },
+      "heading_deg": 90.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": { "lat_deg": -39.62, "lon_deg": 146.55 },
+        "radius_m": 10000
+      }
+    },
+    {
+      "id": 2,
+      "name": "Blue frigate (FFG) — Bastion",
+      "side": 1,
+      "platform": "GEN-FFG",
+      "position": { "lat_deg": -39.65, "lon_deg": 146.25 },
+      "heading_deg": 90.0,
+      "mission": { "kind": "escort", "escorted": 1, "bearing_deg": 135.0, "range_m": 4000 }
+    },
+    {
+      "id": 3,
+      "name": "Red corvette (FFL) — Cinder",
+      "side": 2,
+      "platform": "GEN-FFL",
+      "position": { "lat_deg": -39.6, "lon_deg": 146.8 },
+      "heading_deg": 270.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": { "lat_deg": -39.62, "lon_deg": 146.55 },
+        "radius_m": 10000
+      }
+    },
+    {
+      "id": 4,
+      "name": "Red corvette (FFL) — Dross",
+      "side": 2,
+      "platform": "GEN-FFL",
+      "position": { "lat_deg": -39.65, "lon_deg": 146.85 },
+      "heading_deg": 270.0,
+      "mission": { "kind": "escort", "escorted": 3, "bearing_deg": 225.0, "range_m": 4000 }
+    },
+    {
+      "id": 5,
+      "name": "Bulk carrier — Ember",
+      "side": 3,
+      "platform": "GEN-MV-BULK",
+      "position": { "lat_deg": -40.2, "lon_deg": 144.6 },
+      "heading_deg": 270.0,
+      "mission": { "kind": "ferry", "destination": { "lat_deg": -40.2, "lon_deg": 144.0 } }
+    }
+  ]
+}

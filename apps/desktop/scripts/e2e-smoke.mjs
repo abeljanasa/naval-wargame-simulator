@@ -39,7 +39,16 @@ try {
     (await page.getByRole("button", { name: /Bulk carrier Bravo/ }).count()) === 0,
     "other side's unit hidden from the Blue seat",
   );
-  check(await page.getByText(/C1 · unknown/).isVisible(), "contact C1 shown in the Contacts panel");
+  check(
+    await page.getByText(/C1 · surface combatant/).isVisible(),
+    "contact C1 shown in the Contacts panel with its ESM category",
+  );
+  check(
+    await page.getByText("± 1.2 km (95 %)", { exact: false }).isVisible(),
+    "contact shows its 95 % position error",
+  );
+
+  check(await page.getByText("Sea state 3").isVisible(), "header shows the sea state");
 
   await page.keyboard.press("Space");
   await page.waitForTimeout(300);
@@ -67,6 +76,46 @@ try {
   check(
     route && route.args.unit === 1 && route.args.waypoints.length === 2,
     "map clicks + Enter send order_route with 2 waypoints",
+  );
+
+  await page.getByLabel("Emissions").selectOption("silent");
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some(
+      (c) => c.cmd === "order_doctrine" && c.args.unit === 1 && c.args.doctrine.emcon === "silent",
+    ),
+    "emissions selector sends order_doctrine(emcon silent)",
+  );
+  check(
+    (await page.getByLabel("Weapons").inputValue()) === "inherit" &&
+      (await page.getByRole("option", { name: "Inherit (safe)" }).count()) === 1,
+    "weapons selector shows the inherited WCS",
+  );
+
+  await page.getByLabel("Weapon", { exact: true }).selectOption("WPN-SAM-MR");
+  await page.getByRole("button", { name: "Fire" }).click();
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some(
+      (c) =>
+        c.cmd === "order_engage" &&
+        c.args.shooter === 1 &&
+        c.args.contact === 1 &&
+        c.args.weapon === "WPN-SAM-MR" &&
+        c.args.rounds === 1,
+    ),
+    "engage form sends order_engage(shooter 1, C1, WPN-SAM-MR, 1 round)",
+  );
+  await page.getByText(/exceeds the 500 m WPN-SAM-MR needs/).waitFor({ timeout: 5_000 });
+  check(true, "an engine refusal of the order is shown to the player");
+
+  await page.getByRole("button", { name: "Patrol here" }).click();
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some(
+      (c) => c.cmd === "order_mission" && c.args.unit === 1 && c.args.mission?.kind === "patrol",
+    ),
+    "Patrol here sends order_mission(patrol)",
   );
 
   await page.getByLabel("Scenario").setInputFiles({

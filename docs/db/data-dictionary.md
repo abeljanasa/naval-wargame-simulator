@@ -46,7 +46,7 @@ Phase 1 ships only generic classes (`GEN-*`), all with confidence D. Each value 
 | `propulsion` | `id` | Propulsion type and fuel |
 | `damage_profiles` | `id` | Damage points, mission-kill fraction, fire and flooding susceptibility (0–1). Used by the Phase 2 damage model |
 | `comms_systems` | `id` | Comms kind, range (m), data-link flag |
-| `sensors` | `id` | Kind, role, band, active/passive, min and max range (m), radar reference range (m) at a reference RCS (m²), highest target altitude covered (m) |
+| `sensors` | `id` | Kind, role, band, active/passive, min and max range (m), radar reference range (m) at a reference RCS (m²), highest target altitude covered (m); radars also carry clutter loss per sea-state step (dB) and beamwidth (°), added in migration 0002 |
 | `weapons` | `id` | Kind, guidance, min and max range (m), speed (m/s), warhead (kg), base Ph (0–1), target domains |
 | `platforms` | `id` | Category, domain, service, propulsion, damage profile, dimensions, speeds (m/s), acceleration (m/s²), endurance (m), ceiling (m), max depth (m), hardpoints |
 | `platform_signatures` | (platform, kind, aspect, speed band) | RCS (m²), IR (kW/sr), acoustic source level (dB re 1 µPa @ 1 m), visual (m) |
@@ -71,6 +71,8 @@ Run `cargo run -p sim-db -- validate`. Add `--strict` to treat warnings as error
 | `sensor.beyond_horizon` | error | A radar, ESM, IR, EO or visual sensor's max range exceeds the 4/3-earth radar horizon between its mount and a target at the sensor's highest covered altitude. Airborne mounts are assessed at the platform ceiling |
 | `sensor.range_order` | error | `0 ≤ min_range < max_range` |
 | `sensor.reference_range` | error | Radar reference range and RCS must be given together, both positive, with reference range ≤ max range |
+| `sensor.radar_fields` | error | `clutter_db_per_sea_state` (≥ 0) and `beamwidth_deg` (0 < b ≤ 360) only on radars |
+| `sensor.radar_defaults` | warning | A radar without `clutter_db_per_sea_state` or `beamwidth_deg`; the radar model's defaults (1.5 dB, 2°) apply |
 | `sensor.radar_reference` | error | A radar without a reference range and RCS (needed by the Phase 2 detection model) |
 | `weapon.range_order` | error | `0 ≤ min_range < max_range` |
 | `weapon.base_ph` | error | Base Ph outside [0, 1] |

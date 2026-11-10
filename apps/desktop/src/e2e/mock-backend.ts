@@ -16,6 +16,8 @@ window.__ipcCalls = [];
 let viewer: Viewer = { kind: "side", side: 1 };
 let paused = true;
 let tick = 0;
+let refusals: string[] = [];
+let emcon: "active" | "silent" | null = null;
 
 const session = (): SessionInfo => ({
   scenario_name: "E2E — mock scenario",
@@ -90,6 +92,12 @@ mockIPC(
             message: "mock warning",
           },
         ];
+      case "order_engage":
+        refusals = ["C1 track error 900 m exceeds the 500 m WPN-SAM-MR needs"];
+        return null;
+      case "order_doctrine":
+        emcon = (args as { doctrine: { emcon: "active" | "silent" | null } }).doctrine.emcon;
+        return null;
       case "set_viewer":
         viewer = (args as { viewer: Viewer }).viewer;
         return null;
@@ -101,6 +109,8 @@ mockIPC(
 );
 
 const frame = (): FrameEvent => {
+  const sent = refusals;
+  refusals = [];
   const units = [
     {
       id: 1,
@@ -115,6 +125,24 @@ const frame = (): FrameEvent => {
       max_speed_mps: 14.4,
       platform: "GEN-FFG",
       route: { waypoints: [{ lat_deg: -39.4, lon_deg: 145.5 }], next: 0 },
+      group: null,
+      doctrine: {
+        wcs: "safe" as const,
+        emcon: emcon ?? ("active" as const),
+        engage_unfriendly: false,
+      },
+      doctrine_set: { wcs: null, emcon, engage_unfriendly: null },
+      status: "operational" as const,
+      damage_fraction: 0,
+      criticals: [],
+      fires: 0,
+      flooding: false,
+      mission: null,
+      mission_complete: false,
+      stores: [
+        { weapon: "WPN-ASM-SUB", count: 8 },
+        { weapon: "WPN-SAM-MR", count: 32 },
+      ],
     },
     {
       id: 2,
@@ -129,6 +157,17 @@ const frame = (): FrameEvent => {
       max_speed_mps: 7.7,
       platform: "GEN-MV-BULK",
       route: null,
+      group: null,
+      doctrine: { wcs: "tight" as const, emcon: "active" as const, engage_unfriendly: false },
+      doctrine_set: { wcs: null, emcon: null, engage_unfriendly: null },
+      status: "operational" as const,
+      damage_fraction: 0,
+      criticals: [],
+      fires: 0,
+      flooding: false,
+      mission: null,
+      mission_complete: false,
+      stores: [],
     },
   ].filter((u) => viewer.kind === "white_cell" || u.side === viewer.side);
   const contacts =
@@ -138,10 +177,28 @@ const frame = (): FrameEvent => {
             side: viewer.side,
             number: 1,
             position: { lat_deg: -39.3, lon_deg: viewer.side === 1 ? 145.6 : 146.0 },
+            error: { semi_major_m: 500, semi_minor_m: 60, orientation_deg: 0 },
+            classification: "domain" as const,
+            domain: "surface" as const,
+            affiliation: null,
+            category: "surface_combatant",
+            platform: null,
             first_seen_s: 0,
             last_seen_s: tick,
             detected_by: viewer.side === 1 ? 1 : 2,
             sensor_id: "SEN-RDR-3D-MR",
+          },
+        ]
+      : [];
+  const bearings =
+    viewer.kind === "side" && viewer.side === 1
+      ? [
+          {
+            side: 1,
+            observer: 1,
+            line: { from: { lat_deg: -39.3, lon_deg: 146.0 }, bearing_deg: 270, sigma_deg: 2 },
+            age_s: 5,
+            emitter: "SEN-RDR-NAV",
           },
         ]
       : [];
@@ -155,7 +212,25 @@ const frame = (): FrameEvent => {
       scenario_duration_s: 86400,
     },
     // The mock always sends full updates; diffs are covered by the backend's own tests.
-    update: { full: true, tick, game_time_s: tick, viewer, units, removed: [], contacts },
+    update: {
+      full: true,
+      tick,
+      game_time_s: tick,
+      viewer,
+      units,
+      removed: [],
+      contacts,
+      environment: {
+        sea_state: 3,
+        weather_loss_db: 0,
+        start_unix_s: 1794268800,
+        visibility_km: 40,
+      },
+      bearings,
+      weapons: [],
+      minefields: [],
+      refusals: sent,
+    },
   };
 };
 

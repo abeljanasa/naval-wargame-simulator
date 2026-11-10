@@ -7,7 +7,7 @@
 use crate::{Scenario, ScenarioUnit, SideDef, SCENARIO_FORMAT, SCENARIO_FORMAT_VERSION};
 use rand_chacha::rand_core::{RngCore, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use sim_core::{GeoPoint, SideId, UnitId};
+use sim_core::{Doctrine, GeoPoint, SideId, UnitId};
 
 fn unit_f64(rng: &mut ChaCha8Rng) -> f64 {
     #[allow(clippy::cast_precision_loss)] // exact: < 2^53
@@ -38,6 +38,10 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
                 max_speed_mps: None,
                 accel_mps2: None,
                 route: vec![],
+                group: None,
+                doctrine: Doctrine::default(),
+                jammer: None,
+                mission: None,
             }
         })
         .collect();
@@ -52,12 +56,19 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
             SideDef {
                 id: SideId(1),
                 name: "A".into(),
+                postures: vec![],
+                doctrine: Doctrine::default(),
             },
             SideDef {
                 id: SideId(2),
                 name: "B".into(),
+                postures: vec![],
+                doctrine: Doctrine::default(),
             },
         ],
+        groups: vec![],
+        minefields: vec![],
+        environment: Default::default(),
         units,
     }
 }

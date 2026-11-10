@@ -23,3 +23,14 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0007](DL-0007-scenario-platform-references.md) | Scenario units reference platform-database classes | Original design |
 | [DL-0008](DL-0008-land-avoidance.md) | Land avoidance and route planning | Project spec §8 + Natural Earth + original design |
 | [DL-0009](DL-0009-database-browser.md) | In-app platform database browser | Project spec §9 + original design |
+| [DL-0010](DL-0010-tracks.md) | Tracks: measurement error, fusion, error growth, classification | Project spec §8 + textbook estimation + original design |
+| [DL-0011](DL-0011-c2-doctrine.md) | Postures, doctrine inheritance, WCS, EMCON, ROE | Project spec §8 + public naval usage + original design |
+| [DL-0012](DL-0012-radar-clutter-jamming.md) | Radar clutter, weather loss and noise jamming | Project spec §8 + radar textbook + original design |
+| [DL-0013](DL-0013-esm.md) | ESM: intercept, bearings, fixes and identification | Project spec §8 + textbook geometry + original design |
+| [DL-0014](DL-0014-sonar.md) | Sonar: passive and active sonar equations | Project spec §8 + underwater acoustics textbook + original design |
+| [DL-0015](DL-0015-optical-mad.md) | Visual, EO/IR and MAD | Project spec §8 + solar geometry + original design |
+| [DL-0016](DL-0016-weapons.md) | Weapons as entities and engagements | Project spec §8 + platform database + original design |
+| [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
+| [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
+| [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0020](DL-0020-mines.md) | Basic mines: fields, laying, transit risk | Project spec §8 + textbook mine-warfare threat formula + platform database |
