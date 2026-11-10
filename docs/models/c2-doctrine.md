@@ -14,11 +14,13 @@ Only the scenario and the white cell may set postures (`SetPosture`). A side see
 
 ## Doctrine and inheritance
 
+The client names the weapons control states **safe, tight and free** (the master prompt's "hold" is renamed "safe"; files that still say `"hold"` load as safe).
+
 Doctrine has three fields, each settable on a side, a group (named per side) or a unit:
 
 | Field | Values | Default |
 |---|---|---|
-| `wcs` (weapons control status) | hold, tight, free | tight |
+| `wcs` (weapons control status) | safe, tight, free | tight |
 | `emcon` (emission control) | active, silent | active |
 | `engage_unfriendly` (ROE) | true, false | false |
 
@@ -30,11 +32,11 @@ Each field resolves independently: **unit, then group, then side, then the defau
 
 | WCS | Not identified | Friendly | Neutral | Unfriendly | Hostile |
 |---|---|---|---|---|---|
-| Hold | no | no | no | no | no |
+| Safe | no | no | no | no | no |
 | Tight | no | no | no | if ROE allows | yes |
 | Free | yes | no | no | if ROE allows | yes |
 
-"If ROE allows" means `engage_unfriendly` is true. The rule is used by the engagement model (slice 7); weapon range, track quality and fire channels are checked there. Self-defence under Hold arrives with point defence (slice 9).
+"If ROE allows" means `engage_unfriendly` is true. The rule is used by the engagement model (slice 7); weapon range, track quality and fire channels are checked there. Self-defence under Safe arrives with point defence (slice 9).
 
 ## EMCON
 
@@ -50,7 +52,7 @@ Optional fields, so existing v2 scenario files still load:
     "postures": [{ "toward": 2, "posture": "hostile" }],
     "doctrine": { "wcs": "free", "emcon": "silent" } }
 ],
-"groups": [{ "side": 1, "name": "TG1", "doctrine": { "wcs": "hold" } }],
+"groups": [{ "side": 1, "name": "TG1", "doctrine": { "wcs": "safe" } }],
 "units": [{ "id": 1, "group": "TG1", "doctrine": { "emcon": "active" }, "...": "..." }]
 ```
 
@@ -58,7 +60,7 @@ Validation rejects a posture toward the side itself or an undeclared side, a gro
 
 ## Worked example
 
-Blue sets `wcs: free, emcon: silent, engage_unfriendly: true` on the side, group TG1 sets `wcs: hold`, and unit A in TG1 sets `emcon: active`. Unit A resolves to WCS **hold** (group), EMCON **active** (unit), engage unfriendly **true** (side). Its radar transmits, and it may not fire at anything.
+Blue sets `wcs: free, emcon: silent, engage_unfriendly: true` on the side, group TG1 sets `wcs: safe`, and unit A in TG1 sets `emcon: active`. Unit A resolves to WCS **safe** (group), EMCON **active** (unit), engage unfriendly **true** (side). Its radar transmits, and it may not fire at anything.
 
 ## Limitations
 

@@ -276,7 +276,7 @@
               }}
             >
               <option value="inherit">Inherit ({u.doctrine.wcs})</option>
-              <option value="hold">Hold</option>
+              <option value="safe">Safe</option>
               <option value="tight">Tight</option>
               <option value="free">Free</option>
             </select>

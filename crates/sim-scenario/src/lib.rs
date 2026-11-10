@@ -508,7 +508,7 @@ mod tests {
              "doctrine": {"wcs": "free", "emcon": "silent"}},
             {"id": 2, "name": "Red"}
         ],
-        "groups": [{"side": 1, "name": "TG1", "doctrine": {"wcs": "hold"}}],
+        "groups": [{"side": 1, "name": "TG1", "doctrine": {"wcs": "safe"}}],
         "units": [{"id": 1, "name": "A", "side": 1, "domain": "surface", "group": "TG1",
                    "doctrine": {"emcon": "active"},
                    "position": {"lat_deg": 0.0, "lon_deg": 0.0},
@@ -522,7 +522,7 @@ mod tests {
         sim.step();
         let snap = sim.snapshot(sim_core::Viewer::Side { side: SideId(1) });
         let d = snap.units[0].doctrine;
-        assert_eq!(d.wcs, sim_core::Wcs::Hold, "group over side");
+        assert_eq!(d.wcs, sim_core::Wcs::Safe, "group over side");
         assert_eq!(d.emcon, sim_core::Emcon::Active, "unit over side");
         assert_eq!(snap.postures.len(), 1);
         assert_eq!(snap.postures[0].posture, Posture::Hostile);

@@ -4,7 +4,7 @@
 - **Phase:** 2, slice 2 ([plan](../plan/phase-2.md))
 - **Sources:**
   - Master prompt §8 ("C2: sides and postures (friendly/neutral/unfriendly/hostile); doctrine inheritance side → group → unit; ROE; WCS (hold/tight/free); EMCON states").
-  - Common, publicly documented naval usage of weapons control status (hold, tight, free).
+  - Common, publicly documented naval usage of weapons control status. At the client's direction (2026-11-10) the states are named safe, tight and free; the master prompt's "hold" is accepted as an alias for safe.
   - The release-rule table, the "identified to class level" condition for knowing affiliation, the defaults and the two-state EMCON are original design.
   - No vendor product, database or binary was consulted.
 - **Model doc:** [c2-doctrine.md](../models/c2-doctrine.md)
@@ -22,5 +22,5 @@
 
 - Save format 4; older saves load with no postures and default doctrine.
 - Scenario format: optional `postures`, `doctrine`, `groups`, unit `group`. Existing files load unchanged.
-- The demo scenario now states its peacetime set-up: both sides neutral, Blue weapons hold.
+- The demo scenario now states its peacetime set-up: both sides neutral, Blue weapons safe.
 - Golden hash `8a1f96e397c0a0b7` → `d46bae3f7ea350a8`: doctrine is part of the state hash. Detection results are unchanged (radars stay active).

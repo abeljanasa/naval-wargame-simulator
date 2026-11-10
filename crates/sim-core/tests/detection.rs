@@ -515,7 +515,7 @@ fn doctrine_inherits_side_then_group_then_unit() {
             group: "TG1".into(),
         },
         Doctrine {
-            wcs: Some(Wcs::Hold),
+            wcs: Some(Wcs::Safe),
             ..Doctrine::default()
         },
     ))
@@ -528,7 +528,7 @@ fn doctrine_inherits_side_then_group_then_unit() {
     sim.step();
     let u = &sim.snapshot(Viewer::Side { side: SideId(1) }).units[0];
     assert_eq!(u.group.as_deref(), Some("TG1"));
-    assert_eq!(u.doctrine.wcs, Wcs::Hold, "group over side");
+    assert_eq!(u.doctrine.wcs, Wcs::Safe, "group over side");
     assert_eq!(u.doctrine.emcon, Emcon::Active, "unit over side");
     assert!(u.doctrine.engage_unfriendly, "from side");
     assert_eq!(u.doctrine_set, doctrine_emcon(Emcon::Active));

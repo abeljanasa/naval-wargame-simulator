@@ -10,7 +10,7 @@
       "id": 1,
       "name": "Blue",
       "postures": [{ "toward": 2, "posture": "neutral" }],
-      "doctrine": { "wcs": "hold", "emcon": "active" }
+      "doctrine": { "wcs": "safe", "emcon": "active" }
     },
     { "id": 2, "name": "Neutral shipping", "postures": [{ "toward": 1, "posture": "neutral" }] }
   ],

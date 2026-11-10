@@ -40,8 +40,10 @@ impl Posture {
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum Wcs {
-    /// Do not fire (self-defence arrives with point defence, Phase 2 slice 9).
-    Hold,
+    /// Weapons safe: do not fire (self-defence arrives with point defence, Phase 2 slice 9).
+    /// Called "hold" before 2026-11-10; files using that word still load.
+    #[serde(alias = "hold")]
+    Safe,
     /// Fire only at tracks identified as hostile.
     Tight,
     /// Fire at any track not identified as friendly or neutral.
@@ -140,7 +142,7 @@ pub fn track_affiliation(
 pub fn may_engage(doctrine: ResolvedDoctrine, known: Option<Posture>) -> bool {
     let unfriendly_ok = doctrine.engage_unfriendly;
     match doctrine.wcs {
-        Wcs::Hold => false,
+        Wcs::Safe => false,
         Wcs::Tight => match known {
             Some(Posture::Hostile) => true,
             Some(Posture::Unfriendly) => unfriendly_ok,
@@ -178,8 +180,8 @@ mod tests {
         ];
         // Expected results in the order of `knowns`.
         let table = [
-            (Wcs::Hold, false, [false, false, false, false, false]),
-            (Wcs::Hold, true, [false, false, false, false, false]),
+            (Wcs::Safe, false, [false, false, false, false, false]),
+            (Wcs::Safe, true, [false, false, false, false, false]),
             (Wcs::Tight, false, [false, false, false, false, true]),
             (Wcs::Tight, true, [false, false, false, true, true]),
             (Wcs::Free, false, [true, false, false, false, true]),
@@ -234,6 +236,10 @@ mod tests {
         let d: Doctrine = serde_json::from_str(r#"{"wcs":"free"}"#).unwrap();
         assert_eq!(d.wcs, Some(Wcs::Free));
         assert_eq!(d.emcon, None);
+        // "safe" is the name; "hold" (the earlier name) still loads as safe and saves as safe.
+        let w: Wcs = serde_json::from_str(r#""hold""#).unwrap();
+        assert_eq!(w, Wcs::Safe);
+        assert_eq!(serde_json::to_string(&Wcs::Safe).unwrap(), r#""safe""#);
         let p: Posture = serde_json::from_str(r#""hostile""#).unwrap();
         assert_eq!(p, Posture::Hostile);
     }

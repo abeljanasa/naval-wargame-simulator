@@ -121,7 +121,7 @@ const frame = (): FrameEvent => {
       route: { waypoints: [{ lat_deg: -39.4, lon_deg: 145.5 }], next: 0 },
       group: null,
       doctrine: {
-        wcs: "hold" as const,
+        wcs: "safe" as const,
         emcon: emcon ?? ("active" as const),
         engage_unfriendly: false,
       },

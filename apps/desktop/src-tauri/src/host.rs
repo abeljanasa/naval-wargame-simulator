@@ -312,8 +312,8 @@ mod tests {
             side: sim_core::SideId(1),
         });
         assert_eq!(snap.units[0].doctrine.emcon, sim_core::Emcon::Silent);
-        // The demo's Blue side doctrine (WCS hold) is inherited.
-        assert_eq!(snap.units[0].doctrine.wcs, sim_core::Wcs::Hold);
+        // The demo's Blue side doctrine (WCS safe) is inherited.
+        assert_eq!(snap.units[0].doctrine.wcs, sim_core::Wcs::Safe);
     }
 
     #[test]

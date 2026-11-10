@@ -179,7 +179,7 @@ export type Doctrine = Doctrine_Serialize | Doctrine_Deserialize;
 
 /**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
 export type Doctrine_Deserialize = {
-	wcs?: Wcs | null,
+	wcs?: Wcs_Deserialize | null,
 	emcon?: Emcon | null,
 	/**  ROE: may unfriendly (not only hostile) tracks be engaged? */
 	engage_unfriendly?: boolean | null,
@@ -187,7 +187,7 @@ export type Doctrine_Deserialize = {
 
 /**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
 export type Doctrine_Serialize = {
-	wcs: Wcs | null,
+	wcs: Wcs_Serialize | null,
 	emcon: Emcon | null,
 	/**  ROE: may unfriendly (not only hostile) tracks be engaged? */
 	engage_unfriendly: boolean | null,
@@ -245,8 +245,18 @@ export type Posture = "friendly" |
 "neutral" | "unfriendly" | "hostile";
 
 /**  Doctrine with every field decided. */
-export type ResolvedDoctrine = {
-	wcs: Wcs,
+export type ResolvedDoctrine = ResolvedDoctrine_Serialize | ResolvedDoctrine_Deserialize;
+
+/**  Doctrine with every field decided. */
+export type ResolvedDoctrine_Deserialize = {
+	wcs: Wcs_Deserialize,
+	emcon: Emcon,
+	engage_unfriendly: boolean,
+};
+
+/**  Doctrine with every field decided. */
+export type ResolvedDoctrine_Serialize = {
+	wcs: Wcs_Serialize,
 	emcon: Emcon,
 	engage_unfriendly: boolean,
 };
@@ -338,7 +348,7 @@ export type UnitView_Deserialize = {
 	route?: RouteView | null,
 	group?: string | null,
 	/**  Doctrine in force (unit, then group, then side, then default). */
-	doctrine: ResolvedDoctrine,
+	doctrine: ResolvedDoctrine_Deserialize,
 	/**  Doctrine set on the unit itself (unset fields are inherited). */
 	doctrine_set: Doctrine_Deserialize,
 };
@@ -360,7 +370,7 @@ export type UnitView_Serialize = {
 	route: RouteView | null,
 	group: string | null,
 	/**  Doctrine in force (unit, then group, then side, then default). */
-	doctrine: ResolvedDoctrine,
+	doctrine: ResolvedDoctrine_Serialize,
 	/**  Doctrine set on the unit itself (unset fields are inherited). */
 	doctrine_set: Doctrine_Serialize,
 };
@@ -373,9 +383,32 @@ export type Viewer =
 { kind: "side"; side: SideId };
 
 /**  Weapons control status. */
-export type Wcs = 
-/**  Do not fire (self-defence arrives with point defence, Phase 2 slice 9). */
+export type Wcs = Wcs_Serialize | Wcs_Deserialize;
+
+/**  Weapons control status. */
+export type Wcs_Deserialize = 
+/**
+ *  Weapons safe: do not fire (self-defence arrives with point defence, Phase 2 slice 9).
+ *  Called "hold" before 2026-11-10; files using that word still load.
+ */
+"safe" | 
+/**
+ *  Weapons safe: do not fire (self-defence arrives with point defence, Phase 2 slice 9).
+ *  Called "hold" before 2026-11-10; files using that word still load.
+ */
 "hold" | 
+/**  Fire only at tracks identified as hostile. */
+"tight" | 
+/**  Fire at any track not identified as friendly or neutral. */
+"free";
+
+/**  Weapons control status. */
+export type Wcs_Serialize = 
+/**
+ *  Weapons safe: do not fire (self-defence arrives with point defence, Phase 2 slice 9).
+ *  Called "hold" before 2026-11-10; files using that word still load.
+ */
+"safe" | 
 /**  Fire only at tracks identified as hostile. */
 "tight" | 
 /**  Fire at any track not identified as friendly or neutral. */

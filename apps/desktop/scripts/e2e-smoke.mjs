@@ -86,7 +86,7 @@ try {
   );
   check(
     (await page.getByLabel("Weapons").inputValue()) === "inherit" &&
-      (await page.getByRole("option", { name: "Inherit (hold)" }).count()) === 1,
+      (await page.getByRole("option", { name: "Inherit (safe)" }).count()) === 1,
     "weapons selector shows the inherited WCS",
   );
 
