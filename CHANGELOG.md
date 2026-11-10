@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 4: ESM)
+
+- **ESM** (`docs/models/esm.md`, DL-0013):
+  - Passive intercept of radiating radars and jammers, out to 2.5× the radar's reference range within the horizon. Draws and bearing errors are logged.
+  - Bearings from two or more platforms in one scan triangulate into a fix that feeds or creates a track.
+  - An emitter library from the platform database identifies the carrier to class, category or domain. Class-level identification reveals affiliation.
+- **Engine:** `SetEmitterLibrary` command, issued by the scenario loader. Contacts carry category and class. Snapshots carry the side's bearing lines.
+- **Desktop:** ESM bearing lines on the map; contacts named by class, category or domain.
+- **Performance:** an exact chord-distance pre-check and per-unit geodesic reuse in the radar and ESM passes. 1,000 units run at 451× real time and 10,000 at 5.0× (budgets 60× and 1×). Results are unchanged.
+
+### Changed
+
+- Save format 6 (older saves still load).
+- Golden hash is now `e32c602bbebfedbb`.
+
 ### Added (Phase 2, slice 3: radar)
 
 - **Radar model** (`docs/models/radar.md`, DL-0012):

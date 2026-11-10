@@ -156,10 +156,24 @@ const frame = (): FrameEvent => {
             classification: "domain" as const,
             domain: "surface" as const,
             affiliation: null,
+            category: "surface_combatant",
+            platform: null,
             first_seen_s: 0,
             last_seen_s: tick,
             detected_by: viewer.side === 1 ? 1 : 2,
             sensor_id: "SEN-RDR-3D-MR",
+          },
+        ]
+      : [];
+  const bearings =
+    viewer.kind === "side" && viewer.side === 1
+      ? [
+          {
+            side: 1,
+            observer: 1,
+            line: { from: { lat_deg: -39.3, lon_deg: 146.0 }, bearing_deg: 270, sigma_deg: 2 },
+            age_s: 5,
+            emitter: "SEN-RDR-NAV",
           },
         ]
       : [];
@@ -182,6 +196,7 @@ const frame = (): FrameEvent => {
       removed: [],
       contacts,
       environment: { sea_state: 3, weather_loss_db: 0 },
+      bearings,
     },
   };
 };

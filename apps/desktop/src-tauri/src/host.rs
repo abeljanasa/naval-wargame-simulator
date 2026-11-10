@@ -5,8 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Command, CommandPayload, ContactView, Doctrine, DoctrineScope, Environment, GeoPoint, Issuer,
-    SimError, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer,
+    BearingView, Command, CommandPayload, ContactView, Doctrine, DoctrineScope, Environment,
+    GeoPoint, Issuer, SimError, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -54,6 +54,8 @@ pub struct SnapshotUpdate {
     pub contacts: Vec<ContactView>,
     /// Sea state and weather (small; sent every frame).
     pub environment: Environment,
+    /// The viewer's recent ESM bearing lines (sent whole, like contacts).
+    pub bearings: Vec<BearingView>,
 }
 
 /// Clock status sent with every frame.
@@ -233,6 +235,7 @@ impl Host {
                         .collect(),
                     contacts: snap.contacts.clone(),
                     environment: snap.environment,
+                    bearings: snap.bearings.clone(),
                 }
             }
             _ => SnapshotUpdate {
@@ -244,6 +247,7 @@ impl Host {
                 removed: vec![],
                 contacts: snap.contacts.clone(),
                 environment: snap.environment,
+                bearings: snap.bearings.clone(),
             },
         };
         self.last_sent = Some(snap);

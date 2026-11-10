@@ -83,6 +83,7 @@
       layers: buildLayers({
         units: sim.units,
         contacts: sim.contacts,
+        bearings: sim.bearings,
         gameTimeS: n(clock?.game_time_s ?? 0),
         viewer: sim.session?.viewer ?? { kind: "white_cell" },
         selected: sim.selected,

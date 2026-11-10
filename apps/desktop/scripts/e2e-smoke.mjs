@@ -40,8 +40,8 @@ try {
     "other side's unit hidden from the Blue seat",
   );
   check(
-    await page.getByText(/C1 · surface/).isVisible(),
-    "contact C1 shown in the Contacts panel with its classified domain",
+    await page.getByText(/C1 · surface combatant/).isVisible(),
+    "contact C1 shown in the Contacts panel with its ESM category",
   );
   check(
     await page.getByText("± 1.2 km (95 %)", { exact: false }).isVisible(),

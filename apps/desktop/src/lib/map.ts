@@ -10,7 +10,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { IconLayer, LineLayer, PathLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import type { ContactView, GeoPoint, UnitView, Viewer } from "./bindings";
+import type { BearingView, ContactView, GeoPoint, UnitView, Viewer } from "./bindings";
 import { n, project } from "./format";
 import { AFFILIATION_COLOUR, symbolUrl, type Affiliation } from "./symbols";
 
@@ -121,6 +121,8 @@ export interface SceneInput {
   units: UnitView[];
   /** The viewing side's contacts (empty for the white cell, which sees ground truth). */
   contacts: ContactView[];
+  /** The viewing side's ESM bearing lines. */
+  bearings?: BearingView[];
   gameTimeS: number;
   viewer: Viewer;
   selected: number | null;
@@ -176,10 +178,13 @@ export function contactAffiliation(c: ContactView): Affiliation {
   }
 }
 
-/** What the side knows about a contact, e.g. "unknown" or "surface". */
+/** What the side knows about a contact: its class, else category, else domain, else unknown. */
 export function contactKind(c: ContactView): string {
-  return c.domain ?? "unknown";
+  return c.platform ?? c.category?.replaceAll("_", " ") ?? c.domain ?? "unknown";
 }
+
+/** Length a bearing line is drawn on the map, metres. */
+export const BEARING_DRAW_M = 150_000;
 
 export function buildLayers(s: SceneInput): Layer[] {
   const routes = s.units
@@ -296,6 +301,25 @@ export function buildLayers(s: SceneInput): Layer[] {
     // Contacts: what the viewing side believes is out there, at the estimated position, with the
     // 95 % error ellipse. The frame shows the domain once classified; affiliation stays unknown
     // until postures exist (sim-c2). No ground-truth identity is available to draw.
+    // ESM bearing lines: from the intercepting ship along the measured bearing. They fade as
+    // they age (60 s at most).
+    new PathLayer<BearingView>({
+      id: "bearings",
+      data: s.bearings ?? [],
+      getPath: (b) => [
+        pt(b.line.from),
+        project(
+          n(b.line.from.lat_deg),
+          n(b.line.from.lon_deg),
+          n(b.line.bearing_deg),
+          BEARING_DRAW_M,
+        ),
+      ],
+      getColor: (b) => [255, 170, 80, Math.round(200 * (1 - Math.min(n(b.age_s), 60) / 75))],
+      getWidth: 1.5,
+      widthUnits: "pixels",
+      updateTriggers: { getColor: [s.gameTimeS] },
+    }),
     new PathLayer<ContactView>({
       id: "contact-error",
       data: s.contacts,

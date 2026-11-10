@@ -118,6 +118,10 @@ describe("map layers", () => {
     expect(ring[1]?.[0]).toBeCloseTo((100 * CONTAINMENT_95) / 111_194.93, 6);
     expect(ring[4]).toEqual(ring[0]);
     expect(contactKind(c)).toBe("surface");
+    expect(contactKind({ ...c, category: "surface_combatant" })).toBe("surface combatant");
+    expect(contactKind({ ...c, category: "surface_combatant", platform: "GEN-FFG" })).toBe(
+      "GEN-FFG",
+    );
     expect(contactKind({ domain: null } as ContactView)).toBe("unknown");
     expect(contactAffiliation(c)).toBe("unknown");
     expect(contactAffiliation({ ...c, affiliation: "unfriendly" })).toBe("hostile");

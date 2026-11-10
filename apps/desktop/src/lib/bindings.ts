@@ -38,6 +38,26 @@ export const events = {
 };
 
 /* Types */
+/**  A measured bearing from an observer. */
+export type BearingLine = {
+	from: GeoPoint,
+	/**  Measured bearing, degrees clockwise from north. */
+	bearing_deg: number | null,
+	/**  One-sigma bearing error, degrees. */
+	sigma_deg: number | null,
+};
+
+/**  A bearing line as shown to its side. */
+export type BearingView = {
+	side: SideId,
+	/**  Own unit that took the bearing. */
+	observer: UnitId,
+	line: BearingLine,
+	age_s: number | null,
+	/**  Intercepted emitter type. */
+	emitter: string,
+};
+
 /**  How much a side knows about a track. Ordered: a track only ever climbs the ladder. */
 export type Classification = 
 /**  Something is there. */
@@ -86,6 +106,10 @@ export type ContactView_Deserialize = {
 	domain?: Domain | null,
 	/**  The holding side's posture toward the track's side, once identified to class level. */
 	affiliation?: Posture | null,
+	/**  Platform category, once classified to category. */
+	category?: string | null,
+	/**  Platform class, once classified to class. */
+	platform?: string | null,
 	first_seen_s: number | null,
 	last_seen_s: number | null,
 	/**  Own unit whose sensor last detected it. */
@@ -111,6 +135,10 @@ export type ContactView_Serialize = {
 	domain: Domain | null,
 	/**  The holding side's posture toward the track's side, once identified to class level. */
 	affiliation: Posture | null,
+	/**  Platform category, once classified to category. */
+	category: string | null,
+	/**  Platform class, once classified to class. */
+	platform: string | null,
 	first_seen_s: number | null,
 	last_seen_s: number | null,
 	/**  Own unit whose sensor last detected it. */
@@ -320,6 +348,8 @@ export type SnapshotUpdate_Deserialize = {
 	contacts: ContactView_Deserialize[],
 	/**  Sea state and weather (small; sent every frame). */
 	environment: Environment_Deserialize,
+	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
+	bearings: BearingView[],
 };
 
 /**
@@ -336,6 +366,8 @@ export type SnapshotUpdate_Serialize = {
 	contacts: ContactView_Serialize[],
 	/**  Sea state and weather (small; sent every frame). */
 	environment: Environment_Serialize,
+	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
+	bearings: BearingView[],
 };
 
 /**  A simulation tick number. Tick `n` covers game time `[n, n+1)` × [`TICK_SECONDS`]. */
