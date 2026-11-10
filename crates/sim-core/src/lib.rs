@@ -16,6 +16,7 @@ mod esm;
 mod events;
 mod hash;
 mod ids;
+mod mines;
 mod movement;
 mod optical;
 mod point_defence;
@@ -49,6 +50,7 @@ pub use esm::{
 pub use events::{SimEvent, SimEventKind};
 pub use hash::StateHash;
 pub use ids::{SideId, UnitId};
+pub use mines::{Minefield, Minefields, MINE_CHECK_PERIOD_TICKS};
 pub use optical::default_length_m;
 pub use point_defence::{PointDefence, Shot};
 pub use rng::{RngStreams, StreamId};

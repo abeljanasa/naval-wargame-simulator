@@ -67,6 +67,7 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
             },
         ],
         groups: vec![],
+        minefields: vec![],
         environment: Default::default(),
         units,
     }

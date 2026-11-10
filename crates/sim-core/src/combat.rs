@@ -291,7 +291,7 @@ pub(crate) fn engage(
 }
 
 /// Rolls Ph for a weapon arriving at `target`, and applies the hit.
-fn apply_hit_roll(
+pub(crate) fn apply_hit_roll(
     world: &mut World,
     spec: &WeaponSpec,
     weapon_id: Option<u64>,
@@ -347,7 +347,7 @@ fn apply_hit_roll(
             world,
             target,
             spec.warhead_kg,
-            spec.kind == WeaponKind::Torpedo,
+            matches!(spec.kind, WeaponKind::Torpedo | WeaponKind::Mine),
             tick,
         );
     }

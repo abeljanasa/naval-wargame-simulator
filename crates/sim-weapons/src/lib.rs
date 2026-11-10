@@ -316,6 +316,50 @@ pub fn countermeasure_modifier(
     decoy * ecm
 }
 
+// ---- Mines (slice 11) ----
+
+/// Width a mine field sweeps against a passing ship: twice the mine's actuation radius
+/// (its database maximum range).
+#[must_use]
+pub fn mine_swept_width_m(mine: &WeaponSpec) -> f64 {
+    2.0 * mine.max_range_m
+}
+
+/// Probability that a ship moving `distance_m` through a uniform field of `mines` mines over a
+/// circle of `radius_m` comes within actuation range of at least one: the simple initial threat
+/// P = 1 − exp(−ρ·W·d), with density ρ = mines / (π r²) and swept width W.
+#[must_use]
+pub fn mine_encounter_probability(
+    mines: u32,
+    radius_m: f64,
+    swept_width_m: f64,
+    distance_m: f64,
+) -> f64 {
+    if mines == 0 || radius_m <= 0.0 {
+        return 0.0;
+    }
+    let density = f64::from(mines) / (core::f64::consts::PI * radius_m * radius_m);
+    1.0 - libm::exp(-density * swept_width_m.max(0.0) * distance_m.max(0.0))
+}
+
+#[cfg(test)]
+mod mine_tests {
+    use super::*;
+
+    #[test]
+    fn simple_initial_threat_hand_values() {
+        // 20 mines over a 2 km circle: ρ = 20 / (π × 4×10⁶) = 1.5915×10⁻⁶ per m²; W = 100 m.
+        // Crossing the full 4 km diameter: λ = 1.5915e-6 × 100 × 4000 = 0.6366, P = 0.4710.
+        let p = mine_encounter_probability(20, 2_000.0, 100.0, 4_000.0);
+        assert!((p - 0.471_0).abs() < 1e-4, "{p}");
+        // One 10 s step at 10 m/s (100 m): λ = 0.015 915, P = 0.015 79.
+        let step = mine_encounter_probability(20, 2_000.0, 100.0, 100.0);
+        assert!((step - 0.015_79).abs() < 1e-5, "{step}");
+        assert_eq!(mine_encounter_probability(0, 2_000.0, 100.0, 100.0), 0.0);
+        assert_eq!(mine_encounter_probability(20, 2_000.0, 100.0, 0.0), 0.0);
+    }
+}
+
 #[cfg(test)]
 mod pd_tests {
     use super::*;

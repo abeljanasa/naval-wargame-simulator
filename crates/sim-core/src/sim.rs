@@ -17,6 +17,7 @@ use crate::esm::{BearingTable, EmitterLibrary};
 use crate::events::{EventLog, SimEvent, SimEventKind};
 use crate::hash::StateHash;
 use crate::ids::{SideId, UnitId};
+use crate::mines::{lay_mines, mine_system, Minefields};
 use crate::movement::movement_system;
 use crate::point_defence::{point_defence_system, PointDefence};
 use crate::rng::RngStreams;
@@ -119,6 +120,7 @@ impl Simulation {
         world.insert_resource(WeaponCatalog::default());
         world.insert_resource(WeaponsInFlight::default());
         world.insert_resource(PointDefence::default());
+        world.insert_resource(Minefields::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
         Self {
@@ -354,6 +356,10 @@ impl Simulation {
                 })
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
+            minefields: self.world.resource::<Minefields>().visible(match viewer {
+                Viewer::WhiteCell => None,
+                Viewer::Side { side } => Some(side),
+            }),
             weapons: self
                 .world
                 .resource::<WeaponsInFlight>()
@@ -489,6 +495,22 @@ impl Simulation {
             h.u8(u8::from(w.seeker_tried) | (u8::from(w.homing) << 1));
             h.opt_f64(w.decoy_effect);
         }
+        let mf = self.world.resource::<Minefields>();
+        h.u64(u64::from(mf.next_id));
+        for f in &mf.fields {
+            h.u64(u64::from(f.id));
+            h.u16(f.side.0);
+            h.f64(f.centre.lat_deg);
+            h.f64(f.centre.lon_deg);
+            h.f64(f.radius_m);
+            h.u64(u64::from(f.mines));
+            h.str(&f.weapon);
+        }
+        for (u, p) in &mf.last_position {
+            h.u64(u.0);
+            h.f64(p.lat_deg);
+            h.f64(p.lon_deg);
+        }
         let pd = self.world.resource::<PointDefence>();
         for ((d, w), busy) in &pd.channels {
             h.u64(d.0);
@@ -607,6 +629,7 @@ impl Simulation {
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
             weapons_in_flight: self.world.resource::<WeaponsInFlight>().clone(),
             point_defence: self.world.resource::<PointDefence>().clone(),
+            minefields: self.world.resource::<Minefields>().clone(),
         }
     }
 
@@ -639,6 +662,7 @@ impl Simulation {
         sim.world.insert_resource(save.weapon_catalog);
         sim.world.insert_resource(save.weapons_in_flight);
         sim.world.insert_resource(save.point_defence);
+        sim.world.insert_resource(save.minefields);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -726,6 +750,7 @@ fn build_schedule() -> Schedule {
             movement_system,
             point_defence_system,
             weapons_system,
+            mine_system,
             damage_control_system,
             detection_system,
             ai_system,
@@ -843,6 +868,36 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
         } => {
             let entity = authorised_entity(world, cmd, *shooter)?;
             engage(world, cmd, *shooter, *contact, weapon, *rounds, entity)
+        }
+        CommandPayload::CreateMinefield {
+            side,
+            centre,
+            radius_m,
+            mines,
+            weapon,
+        } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may create minefields".into());
+            }
+            if !world.resource::<WeaponCatalog>().0.contains_key(weapon) {
+                return Err(format!("unknown mine type {weapon}"));
+            }
+            world.resource_mut::<Minefields>().add(
+                *side,
+                *centre,
+                *radius_m,
+                *mines,
+                weapon.clone(),
+            );
+            Ok(())
+        }
+        CommandPayload::LayMines {
+            unit,
+            mines,
+            radius_m,
+        } => {
+            let entity = authorised_entity(world, cmd, *unit)?;
+            lay_mines(world, *unit, entity, *mines, *radius_m).map(|_| ())
         }
         CommandPayload::AssignMission { unit, mission } => {
             let entity = authorised_entity(world, cmd, *unit)?;

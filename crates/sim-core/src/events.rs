@@ -167,6 +167,15 @@ pub enum SimEventKind {
         draw: f64,
         hit: bool,
     },
+    /// One transit-risk draw for a ship moving through another side's minefield.
+    MineEncounter {
+        unit: UnitId,
+        field: u32,
+        distance_m: f64,
+        p: f64,
+        draw: f64,
+        encountered: bool,
+    },
     /// A patrolling unit picked its next point (two `Ai` draws).
     MissionWaypoint {
         unit: UnitId,

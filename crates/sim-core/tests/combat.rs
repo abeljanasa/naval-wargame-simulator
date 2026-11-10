@@ -749,3 +749,164 @@ fn players_task_only_their_own_units() {
         ))
         .is_err());
 }
+
+// ---- Basic mines (slice 11) ----
+
+fn mine() -> WeaponSpec {
+    WeaponSpec {
+        id: "T-MINE".into(),
+        name: "test bottom mine".into(),
+        kind: WeaponKind::Mine,
+        guidance: Guidance::Unguided,
+        min_range_m: 0.0,
+        max_range_m: 50.0,
+        speed_mps: 0.0,
+        warhead_kg: 600.0,
+        base_ph: 0.5,
+        target_domains: vec!["surface".into(), "subsurface".into()],
+    }
+}
+
+/// A side-1 ship crosses (west to east, 10 m/s) a side-2 field of 20 mines, radius 2 km,
+/// centred on the origin.
+fn mined_transit(seed: u64) -> Simulation {
+    let mut sim = Simulation::new(seed);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![mine()],
+        },
+    ))
+    .unwrap();
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::CreateMinefield {
+            side: SideId(2),
+            centre: ORIGIN,
+            radius_m: 2_000.0,
+            mines: 20,
+            weapon: "T-MINE".into(),
+        },
+    ))
+    .unwrap();
+    let start = direct(ORIGIN, 270.0, 3_000.0).point;
+    let mut ship = unit(1, 1, start, vec![], &[], None);
+    if let CommandPayload::SpawnUnit(u) = &mut ship.payload {
+        u.heading_deg = 90.0;
+        u.speed_mps = 10.0;
+        u.route = vec![direct(ORIGIN, 90.0, 3_000.0).point];
+        u.damage_profile = Some(DamageProfile {
+            damage_points: 100_000.0,
+            mission_kill_fraction: 0.99,
+            fire_susceptibility: 0.0,
+            flooding_susceptibility: 0.0,
+        });
+    }
+    sim.submit(ship).unwrap();
+    sim.run_ticks(650);
+    sim
+}
+
+#[test]
+fn mine_transit_risk_matches_the_simple_initial_threat() {
+    // λ = ρ W d = 20 / (π × 2000²) × 100 × 4000 = 0.6366; P(≥ 1 encounter) = 0.4710.
+    // 200 transits: σ = √(0.471 × 0.529 / 200) = 0.0353; tolerance 4σ.
+    let n: u32 = 200;
+    let hit = (0..n)
+        .filter(|&s| {
+            mined_transit(5_000 + u64::from(s))
+                .events()
+                .iter()
+                .any(|e| {
+                    matches!(
+                        e.kind,
+                        SimEventKind::MineEncounter {
+                            encountered: true,
+                            ..
+                        }
+                    )
+                })
+        })
+        .count();
+    let rate = hit as f64 / f64::from(n);
+    assert!((rate - 0.471).abs() < 4.0 * 0.0353, "rate {rate}");
+    // Each 10 s check inside the field logs its probability: 100 m step, P = 0.01579.
+    let sim = mined_transit(5_000);
+    let p = sim
+        .events()
+        .iter()
+        .find_map(|e| match e.kind {
+            SimEventKind::MineEncounter { p, distance_m, .. }
+                if (distance_m - 100.0).abs() < 0.5 =>
+            {
+                Some(p)
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert!((p - 0.015_79).abs() < 2e-4, "{p}");
+}
+
+#[test]
+fn a_ship_lays_its_own_field_and_is_not_at_risk_in_it() {
+    let mut sim = Simulation::new(61);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![mine()],
+        },
+    ))
+    .unwrap();
+    let mut layer = unit(1, 1, ORIGIN, vec![], &[("T-MINE", 30)], None);
+    if let CommandPayload::SpawnUnit(u) = &mut layer.payload {
+        u.speed_mps = 8.0;
+        u.heading_deg = 90.0;
+        u.route = vec![direct(ORIGIN, 90.0, 5_000.0).point];
+    }
+    sim.submit(layer).unwrap();
+    sim.submit(unit(
+        2,
+        2,
+        direct(ORIGIN, 0.0, 50_000.0).point,
+        vec![],
+        &[],
+        None,
+    ))
+    .unwrap();
+    sim.submit(cmd(
+        1,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        CommandPayload::LayMines {
+            unit: UnitId(1),
+            mines: 20,
+            radius_m: 3_000.0,
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(600);
+    assert!(rejected(&sim).is_empty(), "{:?}", rejected(&sim));
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(blue.minefields.len(), 1);
+    assert_eq!(blue.minefields[0].mines, 20);
+    assert!(blue.units[0]
+        .stores
+        .iter()
+        .any(|s| s.weapon == "T-MINE" && s.count == 10));
+    // The layer steamed through its own field without a single draw.
+    assert!(!sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::MineEncounter { .. })));
+    // Red does not see Blue's field.
+    assert!(sim
+        .snapshot(Viewer::Side { side: SideId(2) })
+        .minefields
+        .is_empty());
+}

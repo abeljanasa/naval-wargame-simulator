@@ -1,10 +1,10 @@
 # Model: Weapons, engagements, Ph and damage
 
-> Phase 2 slices 7, 8 and 9. Original design using the platform database's weapon and damage-profile figures; **not SME-validated**.
+> Phase 2 slices 7, 8, 9 and 11. Original design using the platform database's weapon and damage-profile figures; **not SME-validated**.
 
 - **Code:** `crates/sim-weapons` (model), `crates/sim-core/src/combat.rs` (engagements, flight, damage)
 - **Tests:** unit tests in `sim-weapons` (hand values); engine and duel tests in `crates/sim-core/tests/combat.rs`
-- **Design log:** [DL-0016](../design-log/DL-0016-weapons.md) (weapons), [DL-0017](../design-log/DL-0017-ph-damage.md) (Ph and damage), [DL-0018](../design-log/DL-0018-point-defence.md) (point defence and soft kill)
+- **Design log:** [DL-0016](../design-log/DL-0016-weapons.md) (weapons), [DL-0017](../design-log/DL-0017-ph-damage.md) (Ph and damage), [DL-0018](../design-log/DL-0018-point-defence.md) (point defence and soft kill), [DL-0020](../design-log/DL-0020-mines.md) (mines)
 
 ## Data
 
@@ -81,6 +81,8 @@ Every tick, before weapons move:
 | SAM (900 m/s) at an ASM 20 km out | 20 000 / (270 + 900) | intercept after **18 s** |
 | Radar R₅₀ 120 km at 1 m² against a 0.1 m² missile | 120 × 0.1^¼ | **67.5 km** (then the horizon limits a sea-skimmer to ≈ 34 km) |
 | Chaff plus jamming against an active radar ASM (0.8) | 0.8 × 0.7 × 0.8 | Ph **0.448** |
+| 20 mines, 2 km radius, W 100 m, crossing the 4 km diameter | λ = 20/(π·2000²) × 100 × 4000 = 0.637 | P(encounter) **0.471**; × Ph 0.5 → hit 0.236 for the first encounter |
+| Same field, one 10 s step at 10 m/s | λ = 0.0159 | P **0.0158** |
 
 ## Damage (slice 8)
 
@@ -103,6 +105,21 @@ Every tick, before weapons move:
   - **Destroyed** at full damage points: the unit is removed (`UnitDestroyed`).
 
 Logged: `WeaponLaunched`, `SeekerAcquisition`, `HitRoll`, `WeaponMissed` (with the reason), `DamageTaken`, `DamageControl` and `UnitDestroyed`, each with its draws and inputs.
+
+## Mines (slice 11, basic)
+
+- **Fields:** a minefield is a circle (centre, radius) with a number of mines of one database type. It is created by the scenario or white cell (`CreateMinefield`), or laid by a ship or submarine from its stores (`LayMines`, centred on its position).
+- **Transit risk:** every 10 s, each ship or submarine that moved since the last check, and is inside a field of another side, takes one `Weapons` draw against the simple initial threat:
+
+  P = 1 − exp(−ρ · W · d)
+
+  - ρ is the field's mines per m², over π r².
+  - W is the swept width, twice the mine's actuation radius (its database maximum range: 50 m for the generic bottom mine, so W = 100 m).
+  - d is the distance moved since the last check.
+- **An encounter** uses up a mine and rolls the mine's Ph (database base 0.5, with the usual modifiers). A hit does warhead damage, and floods like a torpedo (below the waterline).
+- **Safe lanes:** the owning side is not at risk in its own fields. A side sees only its own fields; the white cell sees all.
+- **Logged:** `MineEncounter`, with distance, P, the draw and the outcome.
+- Mine countermeasures and mine-hunting missions are P2 (full mines) and not in this slice.
 
 ## Worked examples
 
@@ -133,6 +150,9 @@ Logged: `WeaponLaunched`, `SeekerAcquisition`, `HitRoll`, `WeaponMissed` (with t
 | `sams_engage_incoming_missiles_with_the_hand_calculated_ph` | engine: engaged after the reaction time; intercept Ph 0.675 |
 | `two_sam_channels_limit_a_four_missile_raid` | engine: never more than two SAMs in the air from one ship |
 | `decoys_and_jamming_lower_ph_at_impact` | engine: decoy effect 0.3; countermeasures 0.56; Ph 0.448 |
+| `simple_initial_threat_hand_values` | P 0.4710 crossing, 0.01579 per step |
+| **`mine_transit_risk_matches_the_simple_initial_threat`** | **duel: 200 transits encounter at 0.471 ± 4σ**; per-step P logged |
+| `a_ship_lays_its_own_field_and_is_not_at_risk_in_it` | engine: laying from stores; owner immune; fog of war on fields |
 
 ## Limitations
 

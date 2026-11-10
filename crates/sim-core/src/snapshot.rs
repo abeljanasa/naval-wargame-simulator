@@ -7,6 +7,7 @@
 use crate::components::Domain;
 use crate::esm::BearingView;
 use crate::ids::{SideId, UnitId};
+use crate::mines::Minefield;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_ai::Mission;
@@ -146,4 +147,6 @@ pub struct Snapshot {
     pub bearings: Vec<BearingView>,
     /// Side viewer: its own weapons in flight. White cell: every weapon in flight.
     pub weapons: Vec<WeaponView>,
+    /// Side viewer: its own minefields. White cell: every minefield.
+    pub minefields: Vec<Minefield>,
 }

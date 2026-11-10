@@ -10,6 +10,7 @@ use crate::error::SimError;
 use crate::esm::{BearingTable, EmitterLibrary};
 use crate::events::SimEvent;
 use crate::ids::SideId;
+use crate::mines::Minefields;
 use crate::point_defence::PointDefence;
 use crate::rng::RngStreams;
 use crate::time::Tick;
@@ -44,7 +45,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 10: adds point defence (fire channels, detections, interceptors in the air) and decoys on
 ///   weapons in flight. Older saves load with none.
 /// * 11: adds unit missions. Older saves load with no missions.
-pub const SAVE_FORMAT_VERSION: u32 = 11;
+/// * 12: adds minefields. Older saves load with none.
+pub const SAVE_FORMAT_VERSION: u32 = 12;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,6 +102,8 @@ pub struct SaveGame {
     pub weapons_in_flight: WeaponsInFlight,
     #[serde(default)]
     pub point_defence: PointDefence,
+    #[serde(default)]
+    pub minefields: Minefields,
 }
 
 impl SaveGame {
@@ -124,7 +128,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=10 | SAVE_FORMAT_VERSION => {
+            1..=11 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

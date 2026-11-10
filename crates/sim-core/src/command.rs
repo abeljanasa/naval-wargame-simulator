@@ -183,6 +183,20 @@ pub enum CommandPayload {
         weapon: String,
         rounds: u32,
     },
+    /// Creates a minefield. Scenario and white cell only.
+    CreateMinefield {
+        side: SideId,
+        centre: GeoPoint,
+        radius_m: f64,
+        mines: u32,
+        weapon: String,
+    },
+    /// Lays `mines` of the unit's mines in a circle of `radius_m` round its position.
+    LayMines {
+        unit: UnitId,
+        mines: u32,
+        radius_m: f64,
+    },
     /// Gives a unit a mission (`None` clears it). A player may task its own units.
     AssignMission {
         unit: UnitId,
@@ -202,12 +216,14 @@ impl CommandPayload {
                 ..
             }
             | CommandPayload::Engage { shooter: unit, .. }
-            | CommandPayload::AssignMission { unit, .. } => Some(*unit),
+            | CommandPayload::AssignMission { unit, .. }
+            | CommandPayload::LayMines { unit, .. } => Some(*unit),
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
             | CommandPayload::SetEnvironment { .. }
             | CommandPayload::SetEmitterLibrary { .. }
             | CommandPayload::SetWeaponCatalog { .. }
+            | CommandPayload::CreateMinefield { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -291,6 +307,30 @@ impl CommandPayload {
             CommandPayload::SetEnvironment { environment } => environment.validate(),
             CommandPayload::SetWeaponCatalog { weapons } => {
                 weapons.iter().try_for_each(WeaponSpec::validate)
+            }
+            CommandPayload::CreateMinefield {
+                centre,
+                radius_m,
+                mines,
+                weapon,
+                ..
+            } => {
+                if !centre.is_valid() || !(radius_m.is_finite() && *radius_m > 0.0) || *mines == 0 {
+                    Err("minefield needs a valid centre, a radius > 0 and mines > 0".into())
+                } else if weapon.trim().is_empty() {
+                    Err("minefield needs a mine type".into())
+                } else {
+                    Ok(())
+                }
+            }
+            CommandPayload::LayMines {
+                mines, radius_m, ..
+            } => {
+                if *mines == 0 || !(radius_m.is_finite() && *radius_m > 0.0) {
+                    Err("laying needs mines > 0 and a radius > 0".into())
+                } else {
+                    Ok(())
+                }
             }
             CommandPayload::AssignMission { mission, .. } => {
                 mission.as_ref().map_or(Ok(()), Mission::validate)

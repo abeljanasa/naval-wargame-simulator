@@ -12,6 +12,7 @@ specta = ["dep:specta"]
 
 [dependencies]
 serde.workspace = true
+libm.workspace = true
 specta = { workspace = true, optional = true }
 
 [lints]

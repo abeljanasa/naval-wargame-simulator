@@ -73,6 +73,18 @@ pub struct GroupDef {
     pub doctrine: Doctrine,
 }
 
+/// A minefield laid before the scenario starts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScenarioMinefield {
+    pub side: SideId,
+    pub centre: GeoPoint,
+    pub radius_m: f64,
+    pub mines: u32,
+    /// Mine type (platform database weapon id).
+    pub weapon: String,
+}
+
 fn is_default<T: Default + PartialEq>(v: &T) -> bool {
     *v == T::default()
 }
@@ -132,6 +144,9 @@ pub struct Scenario {
     pub sides: Vec<SideDef>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub groups: Vec<GroupDef>,
+    /// Minefields at the start.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub minefields: Vec<ScenarioMinefield>,
     /// Sea state and weather loss for the whole scenario (default: calm, clear).
     #[serde(default, skip_serializing_if = "is_default")]
     pub environment: Environment,
@@ -243,6 +258,17 @@ impl Scenario {
                 )));
             }
         }
+        for m in &self.minefields {
+            if !sides.contains(&m.side)
+                || !(m.radius_m.is_finite() && m.radius_m > 0.0)
+                || m.mines == 0
+            {
+                return Err(ScenarioError::Invalid(format!(
+                    "minefield of {} × {} needs a declared side, a radius > 0 and mines > 0",
+                    m.mines, m.weapon
+                )));
+            }
+        }
         self.environment
             .validate()
             .map_err(|e| ScenarioError::Invalid(format!("environment: {e}")))?;
@@ -272,7 +298,11 @@ impl Scenario {
         // Environment, the ESM emitter library, postures and doctrine first, so they are in
         // force when the units spawn.
         let mut c2 = Vec::new();
-        let catalog = weapon_catalog(&spawns, db)?;
+        let catalog = weapon_catalog(
+            &spawns,
+            self.minefields.iter().map(|m| m.weapon.as_str()),
+            db,
+        )?;
         if !catalog.is_empty() {
             c2.push(CommandPayload::SetWeaponCatalog { weapons: catalog });
         }
@@ -307,6 +337,16 @@ impl Scenario {
                     group: g.name.clone(),
                 },
                 doctrine: g.doctrine,
+            });
+        }
+        // Minefields need the catalogue (sent above) for their mine type.
+        for m in &self.minefields {
+            c2.push(CommandPayload::CreateMinefield {
+                side: m.side,
+                centre: m.centre,
+                radius_m: m.radius_m,
+                mines: m.mines,
+                weapon: m.weapon.clone(),
             });
         }
         for payload in c2 {
@@ -453,11 +493,16 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
 }
 
 /// The weapon catalogue: every weapon carried by a unit in this scenario, from the database.
-fn weapon_catalog(spawns: &[UnitSpawn], db: &PlatformDb) -> Result<Vec<WeaponSpec>, ScenarioError> {
+fn weapon_catalog<'a>(
+    spawns: &'a [UnitSpawn],
+    mine_types: impl Iterator<Item = &'a str>,
+    db: &PlatformDb,
+) -> Result<Vec<WeaponSpec>, ScenarioError> {
     let ids: BTreeSet<&str> = spawns
         .iter()
         .flat_map(|s| s.stores.keys())
         .map(String::as_str)
+        .chain(mine_types)
         .collect();
     let mut out = Vec::new();
     for want in ids {
