@@ -15,6 +15,12 @@ export const commands = {
 	 *  scenario: format and version, structure, platform resolution and command validation.
 	 */
 	loadScenario: (json: string) => typedError<SessionInfo, string>(__TAURI_INVOKE("load_scenario", { json })),
+	/**  Platforms whose id, name or category contains `query` (case-insensitive), sorted by id. */
+	dbSearch: (query: string) => typedError<DbPlatformRow[], string>(__TAURI_INVOKE("db_search", { query })),
+	/**  One platform record, with its sensors, RCS and provenance. */
+	dbPlatform: (id: string) => typedError<DbPlatformDetail_Serialize, string>(__TAURI_INVOKE("db_platform", { id })),
+	/**  Every validation finding on the loaded database (warnings only: errors stop it loading). */
+	dbIssues: () => typedError<DbIssue[], string>(__TAURI_INVOKE("db_issues")),
 	setPaused: (paused: boolean) => __TAURI_INVOKE<void>("set_paused", { paused }),
 	setTimeCompression: (compression: TimeCompression) => __TAURI_INVOKE<void>("set_time_compression", { compression }),
 	setViewer: (viewer: Viewer) => __TAURI_INVOKE<void>("set_viewer", { viewer }),
@@ -56,6 +62,62 @@ export type ContactView = {
 	/**  Own unit whose sensor last detected it. */
 	detected_by: UnitId,
 	sensor_id: string,
+};
+
+/**  A validation finding on the platform database. */
+export type DbIssue = {
+	/**  `error` or `warning`. */
+	severity: string,
+	rule: string,
+	/**  `table/record`, e.g. `platforms/GEN-FFG`. */
+	location: string,
+	message: string,
+};
+
+/**  One platform record with its provenance. */
+export type DbPlatformDetail = DbPlatformDetail_Serialize | DbPlatformDetail_Deserialize;
+
+/**  One platform record with its provenance. */
+export type DbPlatformDetail_Deserialize = {
+	row: DbPlatformRow,
+	cruise_speed_mps: number | null,
+	accel_mps2: number | null,
+	length_m?: number | null,
+	rcs_m2?: number | null,
+	sensors: DbSensorRow[],
+	source_citation: string,
+	confidence: string,
+	classification: string,
+};
+
+/**  One platform record with its provenance. */
+export type DbPlatformDetail_Serialize = {
+	row: DbPlatformRow,
+	cruise_speed_mps: number | null,
+	accel_mps2: number | null,
+	length_m: number | null,
+	rcs_m2: number | null,
+	sensors: DbSensorRow[],
+	source_citation: string,
+	confidence: string,
+	classification: string,
+};
+
+/**  One row of the platform database browser. */
+export type DbPlatformRow = {
+	id: string,
+	name: string,
+	category: string,
+	domain: string,
+	max_speed_mps: number | null,
+};
+
+/**  A fitted sensor as shown in the browser. */
+export type DbSensorRow = {
+	sensor_id: string,
+	kind: string,
+	mount_height_m: number | null,
+	max_range_m: number | null,
 };
 
 /**  Broad physical domain of a unit. */

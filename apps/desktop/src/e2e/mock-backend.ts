@@ -27,6 +27,23 @@ const session = (): SessionInfo => ({
   viewer,
 });
 
+const platforms = [
+  {
+    id: "GEN-FFG",
+    name: "Generic frigate",
+    category: "frigate",
+    domain: "surface",
+    max_speed_mps: 14.4,
+  },
+  {
+    id: "GEN-MV-BULK",
+    name: "Generic bulk carrier",
+    category: "merchant",
+    domain: "surface",
+    max_speed_mps: 7.7,
+  },
+];
+
 mockWindows("main");
 mockIPC(
   (cmd, args) => {
@@ -41,6 +58,38 @@ mockIPC(
         const parsed = JSON.parse((args as { json: string }).json) as { name: string };
         return { ...session(), scenario_name: parsed.name };
       }
+      case "db_search": {
+        const q = (args as { query: string }).query.toLowerCase();
+        return platforms.filter(
+          (p) => !q || `${p.id} ${p.name} ${p.category}`.toLowerCase().includes(q),
+        );
+      }
+      case "db_platform": {
+        const p = platforms.find((x) => x.id === (args as { id: string }).id);
+        if (!p) throw `no platform ${(args as { id: string }).id}`;
+        return {
+          row: p,
+          cruise_speed_mps: 9,
+          accel_mps2: 0.1,
+          length_m: 130,
+          rcs_m2: 3000,
+          sensors: [
+            { sensor_id: "SEN-RDR-3D-MR", kind: "radar", mount_height_m: 25, max_range_m: 180000 },
+          ],
+          source_citation: "Generic open-source figure (mock)",
+          confidence: "medium",
+          classification: "UNCLASSIFIED",
+        };
+      }
+      case "db_issues":
+        return [
+          {
+            severity: "warning",
+            rule: "W-MOCK",
+            location: "platforms/GEN-FFG",
+            message: "mock warning",
+          },
+        ];
       case "set_viewer":
         viewer = (args as { viewer: Viewer }).viewer;
         return null;

@@ -89,6 +89,21 @@ try {
     "white-cell seat sends set_viewer and shows every unit",
   );
 
+  await page.getByText("Platform database", { exact: true }).first().click();
+  await page.getByPlaceholder("Search id, name or category").fill("bulk");
+  await page.getByRole("button", { name: /Generic bulk carrier/ }).waitFor({ timeout: 5_000 });
+  check(
+    (await page.getByRole("list", { name: "Platforms" }).getByRole("button").count()) === 1,
+    "database search filters the platform list",
+  );
+  await page.getByPlaceholder("Search id, name or category").fill("");
+  await page.getByRole("button", { name: /Generic frigate/ }).click();
+  await page.getByText("Generic open-source figure (mock)").waitFor({ timeout: 5_000 });
+  check(
+    await page.getByText("W-MOCK: mock warning").isVisible(),
+    "platform record shows provenance and its validation warning",
+  );
+
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
 } catch (e) {
   failures.push(String(e));

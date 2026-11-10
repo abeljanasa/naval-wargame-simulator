@@ -123,6 +123,12 @@ impl Host {
         Ok(())
     }
 
+    /// The platform database (validated when it was opened).
+    #[must_use]
+    pub fn platforms(&self) -> &sim_db::PlatformDb {
+        &self.platforms
+    }
+
     pub fn set_paused(&mut self, paused: bool) {
         self.paused = paused;
         self.carry = 0.0;
@@ -279,6 +285,24 @@ mod tests {
         ))
         .unwrap();
         Host::new(s, sim_db::embedded::open_platform_db().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn platform_database_is_browsable_with_provenance() {
+        let h = host();
+        let db = h.platforms();
+        let all = db.platforms().unwrap();
+        assert!(all.len() >= 50);
+        let (citation, _confidence, classification) =
+            db.platform_provenance("GEN-FFG").unwrap().unwrap();
+        assert!(!citation.is_empty());
+        assert_eq!(classification, "UNCLASSIFIED");
+        assert!(db.platform_provenance("NO-SUCH").unwrap().is_none());
+        assert!(db
+            .issues()
+            .unwrap()
+            .iter()
+            .all(|i| i.severity == sim_db::Severity::Warning));
     }
 
     #[test]

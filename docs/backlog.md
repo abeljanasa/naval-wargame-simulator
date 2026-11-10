@@ -6,7 +6,8 @@ Items deferred out of the current change, or requested out of phase (master prom
 
 - [x] `sim-db`: SQLite schema, forward-only migrations, `cargo run -p sim-db -- validate`, and 50 generic platform types with citations, confidence and classification fields (DL-0005).
 - [x] Scenarios reference database platforms (`"platform": "GEN-FFG"`) (DL-0007).
-- [ ] In-app database editor (search, record diff, citation entry, live validation). It edits the JSON source (ADR-0004).
+- [x] In-app database browser: search, record detail with source citation, confidence and marking, and validation feedback (DL-0009).
+- [ ] In-app database *editing* (record diff, citation entry, live validation while typing). It writes the JSON source (ADR-0004). Phase 2; until then records are edited in `data/db/open/` and checked with `sim-db validate`.
 - [ ] Planning-layer facility attributes for airbases and ports (runways, berths, draft limit, repair/rearm), needed by §7.1 in Phase 3.
 - [x] Release scan (`sim-db scan`), run in the release workflow.
 - [x] Installers, signed when secrets are configured, plus SBOMs and a `cargo deny` licence audit (docs/build/releasing.md).
@@ -27,7 +28,7 @@ Items deferred out of the current change, or requested out of phase (master prom
 - [ ] Shallow water and draft limits (needs bundled GEBCO bathymetry).
 - [x] Snapshot diffs on the UI stream: full picture first and after seat/scenario changes, then changed units + removed ids.
 - [x] Scenario loading from file in the desktop app (webview reads the file; engine validates; 5 MB limit; no filesystem permission).
-- [x] Front-end unit tests (Vitest, 8 tests) and an end-to-end smoke test of the real UI against a mocked backend (Playwright, 9 checks); both in CI.
+- [x] Front-end unit tests (Vitest, 8 tests) and an end-to-end smoke test of the real UI against a mocked backend (Playwright, 11 checks); both in CI.
 - [ ] Full end-to-end test through the packaged Tauri app (WebDriver + tauri-driver).
 - [x] APP-6-style frames by domain (sea surface full, air upper half, subsurface lower half, land) and affiliation.
 - [ ] Function icons inside the frames (frigate, submarine, fighter…); needs a symbology behaviour spec.

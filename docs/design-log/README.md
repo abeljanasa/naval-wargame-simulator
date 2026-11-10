@@ -22,3 +22,4 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0006](DL-0006-gate1-radar-detection.md) | Gate 1 interim radar detection and contacts | Project spec §6.2, §8 + radar textbook + original design |
 | [DL-0007](DL-0007-scenario-platform-references.md) | Scenario units reference platform-database classes | Original design |
 | [DL-0008](DL-0008-land-avoidance.md) | Land avoidance and route planning | Project spec §8 + Natural Earth + original design |
+| [DL-0009](DL-0009-database-browser.md) | In-app platform database browser | Project spec §9 + original design |

@@ -6,6 +6,7 @@
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import type { Viewer } from "./lib/bindings";
+  import DbBrowser from "./lib/DbBrowser.svelte";
 
   let mapEl: HTMLElement;
   let map: MapLibreMap | null = null;
@@ -286,6 +287,11 @@
         {/if}
       </section>
     {/if}
+
+    <details class="db-panel">
+      <summary>Platform database</summary>
+      <DbBrowser />
+    </details>
 
     {#if sim.error}
       <p class="error" role="alert">{sim.error}</p>

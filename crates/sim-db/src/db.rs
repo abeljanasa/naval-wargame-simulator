@@ -127,6 +127,12 @@ impl PlatformDb {
         Ok(Self { conn, policy })
     }
 
+    /// Re-runs the validation suite. An open database has no errors (opening would have failed),
+    /// so this returns its warnings: the feedback a data reviewer acts on.
+    pub fn issues(&self) -> Result<Vec<crate::validate::Issue>, DbError> {
+        validate(&self.conn, self.policy)
+    }
+
     #[must_use]
     pub fn policy(&self) -> Policy {
         self.policy
@@ -181,6 +187,21 @@ impl PlatformDb {
                   LIMIT 1",
                 [platform_id],
                 |r| r.get(0),
+            )
+            .optional()?)
+    }
+
+    /// (source citation, confidence, classification) of a platform record.
+    pub fn platform_provenance(
+        &self,
+        id: &str,
+    ) -> Result<Option<(String, String, String)>, DbError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT source_citation, confidence, classification FROM platforms WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .optional()?)
     }

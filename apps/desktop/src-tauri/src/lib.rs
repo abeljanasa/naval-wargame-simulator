@@ -80,6 +80,138 @@ fn load_scenario(host: State<'_, SharedHost>, json: String) -> Result<SessionInf
     Ok(session_info(&h))
 }
 
+/// One row of the platform database browser.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbPlatformRow {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    pub domain: String,
+    pub max_speed_mps: f64,
+}
+
+/// A fitted sensor as shown in the browser.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbSensorRow {
+    pub sensor_id: String,
+    pub kind: String,
+    pub mount_height_m: f64,
+    pub max_range_m: f64,
+}
+
+/// One platform record with its provenance.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbPlatformDetail {
+    pub row: DbPlatformRow,
+    pub cruise_speed_mps: f64,
+    pub accel_mps2: f64,
+    pub length_m: Option<f64>,
+    pub rcs_m2: Option<f64>,
+    pub sensors: Vec<DbSensorRow>,
+    pub source_citation: String,
+    pub confidence: String,
+    pub classification: String,
+}
+
+fn row(p: &sim_db::PlatformSummary) -> DbPlatformRow {
+    DbPlatformRow {
+        id: p.id.clone(),
+        name: p.name.clone(),
+        category: p.category.clone(),
+        domain: p.domain.clone(),
+        max_speed_mps: p.max_speed_mps,
+    }
+}
+
+/// Platforms whose id, name or category contains `query` (case-insensitive), sorted by id.
+#[tauri::command]
+#[specta::specta]
+fn db_search(host: State<'_, SharedHost>, query: String) -> Result<Vec<DbPlatformRow>, String> {
+    let q = query.trim().to_lowercase();
+    let h = lock(&host);
+    let all = h.platforms().platforms().map_err(|e| e.to_string())?;
+    Ok(all
+        .iter()
+        .filter(|p| {
+            q.is_empty()
+                || p.id.to_lowercase().contains(&q)
+                || p.name.to_lowercase().contains(&q)
+                || p.category.to_lowercase().contains(&q)
+        })
+        .map(row)
+        .collect())
+}
+
+/// One platform record, with its sensors, RCS and provenance.
+#[tauri::command]
+#[specta::specta]
+fn db_platform(host: State<'_, SharedHost>, id: String) -> Result<DbPlatformDetail, String> {
+    let h = lock(&host);
+    let db = h.platforms();
+    let p = db
+        .platform(&id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("no platform {id}"))?;
+    let (source_citation, confidence, classification) = db
+        .platform_provenance(&id)
+        .map_err(|e| e.to_string())?
+        .unwrap_or_default();
+    Ok(DbPlatformDetail {
+        row: row(&p),
+        cruise_speed_mps: p.cruise_speed_mps,
+        accel_mps2: p.accel_mps2,
+        length_m: p.length_m,
+        rcs_m2: db.rcs_m2(&id).map_err(|e| e.to_string())?,
+        sensors: db
+            .sensors_of(&id)
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|s| DbSensorRow {
+                sensor_id: s.sensor_id,
+                kind: s.kind,
+                mount_height_m: s.mount_height_m,
+                max_range_m: s.max_range_m,
+            })
+            .collect(),
+        source_citation,
+        confidence,
+        classification,
+    })
+}
+
+/// A validation finding on the platform database.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbIssue {
+    /// `error` or `warning`.
+    pub severity: String,
+    pub rule: String,
+    /// `table/record`, e.g. `platforms/GEN-FFG`.
+    pub location: String,
+    pub message: String,
+}
+
+/// Every validation finding on the loaded database (warnings only: errors stop it loading).
+#[tauri::command]
+#[specta::specta]
+fn db_issues(host: State<'_, SharedHost>) -> Result<Vec<DbIssue>, String> {
+    let h = lock(&host);
+    Ok(h.platforms()
+        .issues()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|i| DbIssue {
+            severity: match i.severity {
+                sim_db::validate::Severity::Error => "error",
+                sim_db::validate::Severity::Warning => "warning",
+            }
+            .to_owned(),
+            rule: i.rule.to_owned(),
+            location: i.location,
+            message: i.message,
+        })
+        .collect())
+}
+
 fn session_info(h: &Host) -> SessionInfo {
     SessionInfo {
         scenario_name: h.scenario.name.clone(),
@@ -149,6 +281,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .commands(collect_commands![
             get_session,
             load_scenario,
+            db_search,
+            db_platform,
+            db_issues,
             set_paused,
             set_time_compression,
             set_viewer,
