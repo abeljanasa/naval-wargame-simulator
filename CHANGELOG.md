@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Added (Phase 1, Gate 1: units move and detect)
+
+- **Scenario format v2:**
+  - A unit can name a platform class (`"platform": "GEN-FFG"`) that supplies its performance, sensors and RCS. Inline values override it, and v1 files still load.
+  - The resolved values travel in the spawn command, so replays don't depend on the database.
+- **Embedded open database** (`sim_db::embedded`): the desktop app and batch runner need no data files. `nws-batch --db <file>` loads a built database instead.
+- **Interim radar detection model:**
+  - Runs every 5 s: radar horizon, RCS^¼ range scaling, Pd = 1/(1+(r/R₅₀)⁸), one seeded draw per scan.
+  - Every draw is logged with its inputs.
+  - Per-side contacts are dropped after 300 s without a detection.
+  - Side snapshots show contacts without target ids.
+  - Duel tests check it against hand calculation (model doc `docs/models/radar-detection-gate1.md`, DL-0006).
+- **Desktop:** contacts on the map and in a Contacts panel, and the unit's class in the details panel.
+- **Demo scenario:** the bulk carrier now transits eastbound, so the two ships meet and detect each other. A Gate 1 test asserts both move and both detect.
+
+### Changed
+
+- **Save format v2:** adds sensors, signatures and contacts. v1 saves still load.
+- **Golden hash re-blessed** (`92931f90968e0415`): engine state now includes platforms, sensors, RCS, contacts and detection draws, and the demo scenario uses database classes.
+
 ### Added (Phase 1, platform database)
 
 - **`sim-db`:**

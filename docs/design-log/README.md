@@ -19,3 +19,5 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0003](DL-0003-radar-horizon.md) | Radar horizon | Public radar engineering literature |
 | [DL-0004](DL-0004-desktop-map-and-time-controls.md) | Desktop map, unit symbols, time controls, seats | Project spec §10 + public symbology standards + original design |
 | [DL-0005](DL-0005-platform-database.md) | Platform database: schema, migrations, validation, 50 generic types | Project spec §3, §9 + original design + generic open-literature ranges |
+| [DL-0006](DL-0006-gate1-radar-detection.md) | Gate 1 interim radar detection and contacts | Project spec §6.2, §8 + radar textbook + original design |
+| [DL-0007](DL-0007-scenario-platform-references.md) | Scenario units reference platform-database classes | Original design |
