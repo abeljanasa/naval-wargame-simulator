@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added (Phase 1, remaining delivery items)
+
+- **Criterion benchmarks** (`cargo bench -p sim-scenario --bench engine`), with a PR CI job that fails on a > 15 % regression against the base commit, measured on the same runner.
+- **Map rendering benchmark** (`npm run bench:map`): the production map code with 10,000 symbols at 30 Hz updates reaches 59.2 fps on integrated graphics.
+- **Map decluttering:** above 1,500 units, name labels and heading leaders are drawn only for the selected unit; with every label drawn it fell to 27.8 fps. Symbol URLs are cached, and the label glyph set is fixed.
+- **npm licence audit** of production dependencies (`npm run licenses`, in CI).
+- The synthetic benchmark scenario moved to `sim_scenario::synthetic`. The output is unchanged (bench hash `14c631676919c2af`).
+
+### Fixed
+
+- The map's coastline URL is now root-relative, so pages outside the site root can load it.
+
 ### Added (Phase 1, delivery)
 
 - **Performance:** an exact latitude broad phase in detection with bit-identical results. 1,000 units run at 203× real time and 10,000 at 2.2× (budgets: 60× and 1×). Measure with `nws-batch bench`.

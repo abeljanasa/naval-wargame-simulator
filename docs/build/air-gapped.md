@@ -31,4 +31,10 @@ The open database, demo scenario, offline coastline and help content need no net
 ## Verified
 
 - On 2026-11-10 the engine crates (`sim-core`, `sim-geo`, `sim-db`, `sim-scenario`) built and passed all tests from a vendored source tree with `--offline`.
-- The full desktop bundle has not been built on a disconnected machine yet (backlog).
+- On 2026-11-10 the **full Windows desktop bundle** (MSI 5.4 MB and NSIS 4.1 MB) built from vendored sources under these conditions:
+  - a throwaway `CARGO_HOME` with source replacement and `net.offline = true`
+  - `npm_config_offline=true`
+  - `HTTP_PROXY`/`HTTPS_PROXY` pointed at a dead port, so any network attempt would fail
+  - WiX and NSIS taken from the pre-staged Tauri tool cache
+- The same run found one procedural trap: **re-vendor after every `Cargo.lock` change**. A vendored tree made before a dependency was added fails offline with `no matching package named …`.
+- Still to do: a run on a physically disconnected machine, and the macOS and Linux bundles offline.

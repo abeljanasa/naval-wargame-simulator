@@ -13,10 +13,12 @@ Items deferred out of the current change, or requested out of phase (master prom
 - [x] Air-gapped vendored build, with the engine verified offline (docs/build/air-gapped.md).
 - [x] Throughput budgets met (`nws-batch bench`; docs/build/performance.md), with a CI gate on 1,000 units at ≥ 60×.
 - [ ] Code-signing certificates: the client provides them as Actions secrets. Until then installers are unsigned.
-- [ ] Criterion micro-benchmarks and an automatic "> 15 % regression against the stored baseline" CI check.
-- [ ] Map at 60 fps with 10,000 symbols: needs an automated UI performance test.
-- [ ] Build the full desktop bundle on a disconnected machine, with pre-staged WiX/NSIS tools.
-- [ ] npm dependency licence audit (the Rust side is covered by cargo deny).
+- [x] Criterion benchmarks, with a PR check that fails on a > 15 % regression against the base commit (docs/build/performance.md).
+- [x] Map at 60 fps with 10,000 symbols: `npm run bench:map`. 59.2 fps with 30 Hz updates on Intel UHD, with labels decluttered above 1,500 units.
+- [ ] Rerun the map and engine benchmarks on the actual reference laptop at the Gate 1 review.
+- [x] Full Windows desktop bundle built from vendored sources with every network path blocked (docs/build/air-gapped.md).
+- [ ] Repeat the offline bundle on a physically disconnected machine, and for macOS and Linux.
+- [x] npm licence audit of production dependencies (`npm run licenses`, in CI). 52 packages, 0 rejected.
 - [x] A basic detection model for Gate 1: the interim radar model (DL-0006).
 - [ ] Desktop app: visual check of contacts during a live run. Covered by engine tests so far; there is no automated UI test yet.
 - [ ] Turn-rate / turning-circle limits on movement.
