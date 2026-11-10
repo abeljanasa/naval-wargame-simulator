@@ -2,6 +2,8 @@
 
 Items deferred out of the current change, or requested out of phase (master prompt §14). Each item names the phase it belongs to.
 
+Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md).
+
 ## Phase 1, still to do (Gate 1: "units move and detect")
 
 - [x] `sim-db`: SQLite schema, forward-only migrations, `cargo run -p sim-db -- validate`, and 50 generic platform types with citations, confidence and classification fields (DL-0005).
