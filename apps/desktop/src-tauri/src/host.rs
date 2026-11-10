@@ -5,7 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Command, CommandPayload, GeoPoint, Issuer, SimError, Simulation, Snapshot, Tick, UnitId, Viewer,
+    Command, CommandPayload, ContactView, GeoPoint, Issuer, SimError, Simulation, Snapshot, Tick,
+    UnitId, UnitView, Viewer,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -40,6 +41,19 @@ impl TimeCompression {
     }
 }
 
+/// One frame's change to the viewer's picture. `full` = replace everything; otherwise `units`
+/// are added or replaced by id and `removed` are dropped. Contacts are always sent whole.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct SnapshotUpdate {
+    pub full: bool,
+    pub tick: Tick,
+    pub game_time_s: f64,
+    pub viewer: Viewer,
+    pub units: Vec<UnitView>,
+    pub removed: Vec<UnitId>,
+    pub contacts: Vec<ContactView>,
+}
+
 /// Clock status sent with every frame.
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 pub struct ClockStatus {
@@ -60,6 +74,8 @@ pub struct Host {
     pub scenario: Scenario,
     platforms: sim_db::PlatformDb,
     sim: Simulation,
+    /// The picture last streamed to the UI, for diffing; `None` forces a full update.
+    last_sent: Option<Snapshot>,
     paused: bool,
     compression: TimeCompression,
     viewer: Viewer,
@@ -79,6 +95,7 @@ impl Host {
             scenario,
             platforms,
             sim,
+            last_sent: None,
             paused: true,
             compression: TimeCompression::X1,
             viewer: first_side.map_or(Viewer::WhiteCell, |side| Viewer::Side { side }),
@@ -98,6 +115,7 @@ impl Host {
             .map_or(Viewer::WhiteCell, |s| Viewer::Side { side: s.id });
         self.scenario = scenario;
         self.sim = sim;
+        self.last_sent = None;
         self.paused = true;
         self.compression = TimeCompression::X1;
         self.carry = 0.0;
@@ -117,6 +135,7 @@ impl Host {
 
     pub fn set_viewer(&mut self, viewer: Viewer) {
         self.viewer = viewer;
+        self.last_sent = None;
     }
 
     #[must_use]
@@ -178,8 +197,47 @@ impl Host {
         }
     }
 
-    pub fn snapshot(&mut self) -> Snapshot {
-        self.sim.snapshot(self.viewer)
+    /// The next UI update: a full picture the first time (and after any seat or scenario change),
+    /// then only the units that changed and the ids of those that left the picture (§6.2).
+    pub fn update(&mut self) -> SnapshotUpdate {
+        let snap = self.sim.snapshot(self.viewer);
+        let update = match &self.last_sent {
+            Some(prev) if prev.viewer == snap.viewer => {
+                let old: std::collections::BTreeMap<UnitId, &UnitView> =
+                    prev.units.iter().map(|u| (u.id, u)).collect();
+                let new_ids: std::collections::BTreeSet<UnitId> =
+                    snap.units.iter().map(|u| u.id).collect();
+                SnapshotUpdate {
+                    full: false,
+                    tick: snap.tick,
+                    game_time_s: snap.game_time_s,
+                    viewer: snap.viewer,
+                    units: snap
+                        .units
+                        .iter()
+                        .filter(|u| old.get(&u.id).is_none_or(|o| *o != *u))
+                        .cloned()
+                        .collect(),
+                    removed: old
+                        .keys()
+                        .filter(|id| !new_ids.contains(id))
+                        .copied()
+                        .collect(),
+                    contacts: snap.contacts.clone(),
+                }
+            }
+            _ => SnapshotUpdate {
+                full: true,
+                tick: snap.tick,
+                game_time_s: snap.game_time_s,
+                viewer: snap.viewer,
+                units: snap.units.clone(),
+                removed: vec![],
+                contacts: snap.contacts.clone(),
+            },
+        };
+        self.last_sent = Some(snap);
+        update
     }
 
     /// Issues an order from the current seat. The white-cell seat may order any unit; a side
@@ -261,7 +319,7 @@ mod tests {
         let seq = h.order_speed(UnitId(2), 1.0).unwrap();
         h.step(1);
         h.set_viewer(Viewer::WhiteCell);
-        let snap = h.snapshot();
+        let snap = h.sim.snapshot(Viewer::WhiteCell);
         let merchant = snap.units.iter().find(|u| u.id == UnitId(2)).unwrap();
         assert!(
             (merchant.ordered_speed_mps - 6.5).abs() < 1e-9,
@@ -269,7 +327,7 @@ mod tests {
         );
         h.order_speed(UnitId(2), 1.0).unwrap();
         h.step(1);
-        let snap = h.snapshot();
+        let snap = h.sim.snapshot(Viewer::WhiteCell);
         let merchant = snap.units.iter().find(|u| u.id == UnitId(2)).unwrap();
         assert!((merchant.ordered_speed_mps - 1.0).abs() < 1e-9);
     }
@@ -299,5 +357,31 @@ mod tests {
             h.scenario.name, "Loaded",
             "failed load must not change the session"
         );
+    }
+
+    #[test]
+    fn updates_are_full_first_then_only_changes() {
+        let mut h = host();
+        h.set_viewer(Viewer::WhiteCell);
+        h.step(1); // units spawn on the first tick
+        let first = h.update();
+        assert!(first.full);
+        assert_eq!(first.units.len(), 2);
+        // Paused and nothing ordered: nothing changed, so nothing is resent.
+        let idle = h.update();
+        assert!(!idle.full);
+        assert!(idle.units.is_empty() && idle.removed.is_empty());
+        // One tick of movement: both ships moved, so both are resent (and only once).
+        h.step(1);
+        let moved = h.update();
+        assert!(!moved.full);
+        assert_eq!(moved.units.len(), 2);
+        // A seat change forces a full picture for the new viewer.
+        h.set_viewer(Viewer::Side {
+            side: sim_core::SideId(1),
+        });
+        let seat = h.update();
+        assert!(seat.full);
+        assert_eq!(seat.units.len(), 1);
     }
 }

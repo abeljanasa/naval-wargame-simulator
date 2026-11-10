@@ -13,7 +13,7 @@
   let speedInput = $state("");
   let startError = $state<string | null>(null);
 
-  const clock = $derived(sim.frame?.clock ?? null);
+  const clock = $derived(sim.clock);
   const viewerKey = $derived(viewerToKey(sim.session?.viewer ?? { kind: "white_cell" }));
 
   function unitName(id: number): string {

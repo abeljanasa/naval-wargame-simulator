@@ -67,13 +67,13 @@ export type FrameEvent = FrameEvent_Serialize | FrameEvent_Deserialize;
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent_Deserialize = {
 	clock: ClockStatus,
-	snapshot: Snapshot_Deserialize,
+	update: SnapshotUpdate_Deserialize,
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent_Serialize = {
 	clock: ClockStatus,
-	snapshot: Snapshot_Serialize,
+	update: SnapshotUpdate_Serialize,
 };
 
 /**
@@ -106,28 +106,37 @@ export type SideInfo = {
 	name: string,
 };
 
-/**  A full state snapshot for one viewer. Units are sorted by `id`. */
-export type Snapshot = Snapshot_Serialize | Snapshot_Deserialize;
+/**
+ *  One frame's change to the viewer's picture. `full` = replace everything; otherwise `units`
+ *  are added or replaced by id and `removed` are dropped. Contacts are always sent whole.
+ */
+export type SnapshotUpdate = SnapshotUpdate_Serialize | SnapshotUpdate_Deserialize;
 
-/**  A full state snapshot for one viewer. Units are sorted by `id`. */
-export type Snapshot_Deserialize = {
-	protocol_version: number,
+/**
+ *  One frame's change to the viewer's picture. `full` = replace everything; otherwise `units`
+ *  are added or replaced by id and `removed` are dropped. Contacts are always sent whole.
+ */
+export type SnapshotUpdate_Deserialize = {
+	full: boolean,
 	tick: Tick,
 	game_time_s: number | null,
 	viewer: Viewer,
 	units: UnitView_Deserialize[],
-	/**  Side viewer: that side's contacts. White cell: every side's contacts. */
+	removed: UnitId[],
 	contacts: ContactView[],
 };
 
-/**  A full state snapshot for one viewer. Units are sorted by `id`. */
-export type Snapshot_Serialize = {
-	protocol_version: number,
+/**
+ *  One frame's change to the viewer's picture. `full` = replace everything; otherwise `units`
+ *  are added or replaced by id and `removed` are dropped. Contacts are always sent whole.
+ */
+export type SnapshotUpdate_Serialize = {
+	full: boolean,
 	tick: Tick,
 	game_time_s: number | null,
 	viewer: Viewer,
 	units: UnitView_Serialize[],
-	/**  Side viewer: that side's contacts. White cell: every side's contacts. */
+	removed: UnitId[],
 	contacts: ContactView[],
 };
 

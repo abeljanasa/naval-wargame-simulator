@@ -25,7 +25,7 @@ Items deferred out of the current change, or requested out of phase (master prom
 - [ ] Turn performance as platform-database fields (generic class values are derived in scenario resolution today).
 - [x] Land blocking with route planning round the coastline (DL-0008, land-avoidance model doc).
 - [ ] Shallow water and draft limits (needs bundled GEBCO bathymetry).
-- [ ] Snapshot diffs instead of full snapshots on the UI stream (the protocol is versioned for this).
+- [x] Snapshot diffs on the UI stream: full picture first and after seat/scenario changes, then changed units + removed ids.
 - [x] Scenario loading from file in the desktop app (webview reads the file; engine validates; 5 MB limit; no filesystem permission).
 - [x] Front-end unit tests (Vitest, 8 tests) and an end-to-end smoke test of the real UI against a mocked backend (Playwright, 9 checks); both in CI.
 - [ ] Full end-to-end test through the packaged Tauri app (WebDriver + tauri-driver).

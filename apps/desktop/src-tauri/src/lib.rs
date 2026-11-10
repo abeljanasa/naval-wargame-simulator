@@ -5,9 +5,9 @@
 
 mod host;
 
-use host::{ClockStatus, Host, TimeCompression};
+use host::{ClockStatus, Host, SnapshotUpdate, TimeCompression};
 use serde::{Deserialize, Serialize};
-use sim_core::{GeoPoint, SideId, Snapshot, UnitId, Viewer};
+use sim_core::{GeoPoint, SideId, UnitId, Viewer};
 use sim_scenario::Scenario;
 use specta_typescript::Typescript;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -36,7 +36,7 @@ fn lock(h: &SharedHost) -> MutexGuard<'_, Host> {
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type, tauri_specta::Event)]
 pub struct FrameEvent {
     pub clock: ClockStatus,
-    pub snapshot: Snapshot,
+    pub update: SnapshotUpdate,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -189,7 +189,7 @@ fn spawn_runner(app: tauri::AppHandle, host: SharedHost) {
                     h.advance(elapsed, MAX_MODE_BUDGET);
                     FrameEvent {
                         clock: h.clock(),
-                        snapshot: h.snapshot(),
+                        update: h.update(),
                     }
                 };
                 if frame.emit(&app).is_err() {

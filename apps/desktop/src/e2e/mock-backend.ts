@@ -105,7 +105,8 @@ const frame = (): FrameEvent => {
       achieved_ratio: paused ? 0 : 1,
       scenario_duration_s: 86400,
     },
-    snapshot: { protocol_version: 1, tick, game_time_s: tick, viewer, units, contacts },
+    // The mock always sends full updates; diffs are covered by the backend's own tests.
+    update: { full: true, tick, game_time_s: tick, viewer, units, removed: [], contacts },
   };
 };
 

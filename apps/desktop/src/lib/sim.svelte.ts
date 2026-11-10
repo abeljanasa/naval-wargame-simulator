@@ -4,10 +4,13 @@
 import {
   commands,
   events,
+  type ClockStatus,
+  type ContactView,
   type FrameEvent,
   type GeoPoint,
   type SessionInfo,
   type TimeCompression,
+  type UnitView,
   type Viewer,
 } from "./bindings";
 import { MPS_PER_KNOT } from "./format";
@@ -24,24 +27,39 @@ export const COMPRESSIONS: { key: TimeCompression; label: string }[] = [
 
 class SimSession {
   session = $state<SessionInfo | null>(null);
-  frame = $state<FrameEvent | null>(null);
+  /** Latest clock from the engine. */
+  clock = $state<ClockStatus | null>(null);
+  /** The viewer's picture, kept up to date from full and diff updates. */
+  units = $state<UnitView[]>([]);
+  allContacts = $state<ContactView[]>([]);
   selected = $state<number | null>(null);
   /** Waypoints being planned for the selected unit; null when not planning. */
   draft = $state<GeoPoint[] | null>(null);
   error = $state<string | null>(null);
 
-  units = $derived(this.frame?.snapshot.units ?? []);
   /** Contacts of the viewing side. The white cell sees ground truth, so its view shows none. */
-  contacts = $derived(
-    this.session?.viewer.kind === "side" ? (this.frame?.snapshot.contacts ?? []) : [],
-  );
+  contacts = $derived(this.session?.viewer.kind === "side" ? this.allContacts : []);
   selectedUnit = $derived(this.units.find((u) => u.id === this.selected) ?? null);
 
   async start() {
     this.session = await commands.getSession();
-    await events.frameEvent.listen((e) => {
-      this.frame = e.payload;
-    });
+    await events.frameEvent.listen((e) => this.apply(e.payload));
+  }
+
+  /** Applies one frame: a full picture replaces the units; a diff upserts by id and removes. */
+  apply(frame: FrameEvent) {
+    const u = frame.update;
+    this.clock = frame.clock;
+    if (u.full) {
+      this.units = u.units;
+    } else if (u.units.length || u.removed.length) {
+      const byId: Record<number, UnitView> = {};
+      for (const x of this.units) byId[x.id] = x;
+      for (const id of u.removed) delete byId[id];
+      for (const x of u.units) byId[x.id] = x;
+      this.units = Object.values(byId).sort((a, b) => a.id - b.id);
+    }
+    this.allContacts = u.contacts;
   }
 
   /** Loads a scenario file the user picked; the engine validates it and resets the session. */
@@ -52,14 +70,16 @@ class SimSession {
       return;
     }
     this.session = res.data;
-    this.frame = null;
+    this.clock = null;
+    this.units = [];
+    this.allContacts = [];
     this.selected = null;
     this.draft = null;
     this.error = null;
   }
 
   async togglePause() {
-    await commands.setPaused(!(this.frame?.clock.paused ?? true));
+    await commands.setPaused(!(this.clock?.paused ?? true));
   }
 
   async setCompression(c: TimeCompression) {
