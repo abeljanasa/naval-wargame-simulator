@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added (Phase 1, close-out)
+
+- **Turn rates:** units turn at ω = min(cap, v/r_min) and reach a waypoint within their turning radius. Generic class values come from scenario resolution (ships r_min = 2.5 × length).
+- **Land avoidance:** Natural Earth 50m land rasterised at 1/30°, A* routes round the coast with a coastal penalty and string-pulling, and a grounding guard. Blocked routes are rejected and logged (DL-0008).
+- **Desktop:**
+  - APP-6-style frames per domain (surface, air, subsurface, land) and affiliation.
+  - Light theme alongside the default dark theme.
+  - Load a scenario from a file.
+  - Snapshot diffs on the UI stream: a full picture first, then only changed and removed units.
+  - **Platform database browser:** search, record detail with citation, confidence and marking, and validation feedback (DL-0009).
+- **Front-end tests:** Vitest unit tests and a Playwright end-to-end smoke test against a mocked backend, both in CI.
+
+### Changed
+
+- CI and release builds skip macOS for now (the jobs are commented, not deleted).
+- Golden hash for the Phase 1 scenario is now `7ad884a980341eb1` (turn rates and land mask).
+
 ### Added (Phase 1, remaining delivery items)
 
 - **Criterion benchmarks** (`cargo bench -p sim-scenario --bench engine`), with a PR CI job that fails on a > 15 % regression against the base commit, measured on the same runner.
