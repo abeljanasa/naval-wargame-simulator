@@ -140,6 +140,34 @@ jobs:
           name: benchmarks
           path: bench-*.json
 
+  # Criterion regression gate (master prompt §12): the PR's base and head are benchmarked on the
+  # same runner, and the job fails if any benchmark is > 15 % slower (scripts/check_bench_regression.py).
+  bench-regression:
+    name: Benchmark regression (> 15 % fails)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+      - name: Benchmark the base commit
+        run: |
+          git checkout --quiet ${{ github.event.pull_request.base.sha }}
+          if [ -f crates/sim-scenario/benches/engine.rs ]; then
+            cargo bench -p sim-scenario --bench engine -- --save-baseline base
+          else
+            echo "base has no criterion benchmarks yet; comparison skipped"
+          fi
+          git checkout --quiet ${{ github.event.pull_request.head.sha }}
+      - name: Benchmark the change against the base
+        run: |
+          if [ -d target/criterion ]; then
+            cargo bench -p sim-scenario --bench engine -- --baseline base
+          fi
+          python3 scripts/check_bench_regression.py target/criterion --threshold 0.15
+
   # Air-gapped build path: every dependency vendored, then built with no network.
   offline-build:
     name: Air-gapped build (vendored, offline)
@@ -172,4 +200,6 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run lint
+      - name: npm licence audit (production dependencies)
+        run: npm run licenses
       - run: npm run build

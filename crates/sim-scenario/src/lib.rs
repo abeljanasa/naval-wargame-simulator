@@ -11,6 +11,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod synthetic;
+
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Command, CommandPayload, Domain, GeoPoint, Issuer, SensorKind, SensorSpec, SideId, Simulation,
