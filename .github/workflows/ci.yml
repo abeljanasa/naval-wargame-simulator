@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with: { components: rustfmt }
+      - run: cargo fmt --all -- --check
+
+  rust:
+    name: Lint and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with: { components: clippy }
+      - uses: Swatinem/rust-cache@v2
+      - name: Linux system deps for Tauri
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Front-end dist placeholder (tauri::generate_context! needs it to exist)
+        shell: bash
+        run: mkdir -p apps/desktop/dist
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests (unit, property, determinism, golden replays, save/load)
+        run: cargo test --workspace --locked
+      - name: Generated TypeScript bindings are up to date
+        shell: bash
+        run: git diff --exit-code -- apps/desktop/src/lib/bindings.ts
+
+  # Cross-OS determinism (ADR-0003 §5): every OS must produce identical final hashes.
+  determinism:
+    name: Determinism hashes (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+      - name: Run shipped scenarios for several seeds
+        shell: bash
+        run: |
+          cargo run --release --locked -p nws-batch -- run data/scenarios/*.json \
+            --seeds 1,2,3,42,20261110 --out hashes.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hashes-${{ matrix.os }}
+          path: hashes.json
+
+  determinism-compare:
+    name: Determinism matrix agrees
+    needs: determinism
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: hashes-*, path: hashes }
+      - name: Compare hashes across OSes
+        run: |
+          set -euo pipefail
+          first=""
+          for f in hashes/*/hashes.json; do
+            echo "== $f"; cat "$f"
+            if [ -z "$first" ]; then first="$f"; continue; fi
+            if ! diff <(jq -S . "$first") <(jq -S . "$f"); then
+              echo "::error::Determinism failure: $f differs from $first"
+              exit 1
+            fi
+          done
+          echo "All OSes produced identical hashes."
+
+  frontend:
+    name: Front end (typecheck, lint, build)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run lint
+      - run: npm run build
