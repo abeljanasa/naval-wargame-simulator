@@ -1,0 +1,72 @@
+/* Dark theme by default (spec §10). A light theme will hang off [data-theme="light"]. */
+:root {
+  --surface-1: #101a23;
+  --surface-2: #0b141c;
+  --surface-3: #1a2a38;
+  --border: #253645;
+  --text: #dde6ee;
+  --text-dim: #8aa0b2;
+  --accent: #5fb3d9;
+  --on-accent: #06121c;
+  --warn: #ffd250;
+  --danger: #ff8a80;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --surface-1: #f3f6f8;
+  --surface-2: #e6ecf1;
+  --surface-3: #d8e3ec;
+  --border: #c2cfda;
+  --text: #13202b;
+  --text-dim: #4d6273;
+  --accent: #1a6f99;
+  --on-accent: #ffffff;
+  --warn: #8a5a00;
+  --danger: #b3261e;
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--surface-1);
+  color: var(--text);
+  font:
+    13px/1.4 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

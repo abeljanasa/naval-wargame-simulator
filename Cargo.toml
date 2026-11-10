@@ -5,6 +5,7 @@ members = [
     "crates/sim-geo",
     "crates/sim-scenario",
     "apps/batch",
+    "apps/desktop/src-tauri",
 ]
 
 [workspace.package]
