@@ -39,7 +39,14 @@ try {
     (await page.getByRole("button", { name: /Bulk carrier Bravo/ }).count()) === 0,
     "other side's unit hidden from the Blue seat",
   );
-  check(await page.getByText(/C1 · unknown/).isVisible(), "contact C1 shown in the Contacts panel");
+  check(
+    await page.getByText(/C1 · surface/).isVisible(),
+    "contact C1 shown in the Contacts panel with its classified domain",
+  );
+  check(
+    await page.getByText("± 1.2 km (95 %)", { exact: false }).isVisible(),
+    "contact shows its 95 % position error",
+  );
 
   await page.keyboard.press("Space");
   await page.waitForTimeout(300);

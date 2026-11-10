@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 1: tracks)
+
+- **Phase 2 plan** (`docs/plan/phase-2.md`) and **ADR-0005**: model crates hold pure functions, and `sim-core` runs them.
+- **`sim-sensors` crate:** the radar Pd model moved here, plus measurement error, track fusion and the classification ladder.
+- **Tracks:**
+  - A detection reports a position with drawn range and bearing error, logged on the detection event.
+  - Each side fuses every detection of a target into one track (Kalman update). The error grows between updates by the domain's speed bound.
+  - Radar classifies tracks to their domain.
+  - Model doc `docs/models/tracks.md` (DL-0010).
+- **Desktop:** contacts show the estimated position, a 95 % error ellipse on the map, their domain and their error in the Contacts panel.
+
+### Changed
+
+- Save format 3 (v2 saves still load).
+- Golden hash for the Phase 1 scenario is now `8a1f96e397c0a0b7`: detections draw their measurement errors.
+
 ### Added (Phase 1, close-out)
 
 - **Turn rates:** units turn at ω = min(cap, v/r_min) and reach a waypoint within their turning radius. Generic class values come from scenario resolution (ships r_min = 2.5 × length).

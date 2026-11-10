@@ -2,9 +2,16 @@
 // Unit tests for the desktop UI helpers: display formatting, symbology and map decluttering.
 
 import { describe, expect, it } from "vitest";
-import { bearing, gameTime, knots, latLon, MPS_PER_KNOT, project } from "./format";
+import { bearing, distance, gameTime, knots, latLon, MPS_PER_KNOT, project } from "./format";
 import { frameSvg, symbolUrl } from "./symbols";
-import { buildLayers, contactAge, LABEL_LIMIT } from "./map";
+import {
+  buildLayers,
+  contactAge,
+  contactKind,
+  CONTAINMENT_95,
+  ellipseRing,
+  LABEL_LIMIT,
+} from "./map";
 import type { ContactView, UnitView } from "./bindings";
 // @ts-expect-error: plain ES module without type declarations
 import { satisfiable } from "../../scripts/check-licenses.mjs";
@@ -32,6 +39,8 @@ describe("format", () => {
     expect(knots(10 * MPS_PER_KNOT)).toBe("10.0 kn");
     expect(knots(null)).toBe("—");
     expect(bearing(5)).toBe("005°");
+    expect(distance(430.4)).toBe("430 m");
+    expect(distance(1223.85)).toBe("1.2 km");
     expect(latLon(-39.5, 146.25)).toBe("39°30.0′S 146°15.0′E");
   });
 
@@ -88,6 +97,24 @@ describe("map layers", () => {
     expect(layer(layers, "labels").props.data).toHaveLength(1);
     expect(layer(layers, "leaders").props.data).toHaveLength(1);
     expect(layer(layers, "units").props.data).toHaveLength(LABEL_LIMIT + 1);
+  });
+
+  it("draws the 95 % error ellipse with its major axis on the reported bearing", () => {
+    const c = {
+      position: { lat_deg: 0, lon_deg: 0 },
+      error: { semi_major_m: 1000, semi_minor_m: 100, orientation_deg: 0 },
+      domain: "surface",
+    } as ContactView;
+    const ring = ellipseRing(c, 4);
+    expect(ring).toHaveLength(5);
+    // t = 0: the major axis tip, due north at 2.4477 km: 2447.7 m / 111 195 m per degree.
+    expect(ring[0]?.[0]).toBeCloseTo(0, 9);
+    expect(ring[0]?.[1]).toBeCloseTo((1000 * CONTAINMENT_95) / 111_194.93, 6);
+    // t = 90°: the minor axis tip, due east at 244.77 m.
+    expect(ring[1]?.[0]).toBeCloseTo((100 * CONTAINMENT_95) / 111_194.93, 6);
+    expect(ring[4]).toEqual(ring[0]);
+    expect(contactKind(c)).toBe("surface");
+    expect(contactKind({ domain: null } as ContactView)).toBe("unknown");
   });
 
   it("formats contact age from the last detection", () => {

@@ -2,9 +2,17 @@
   import { onMount } from "svelte";
   import type { Map as MapLibreMap } from "maplibre-gl";
   import type { MapboxOverlay } from "@deck.gl/mapbox";
-  import { createMap, buildLayers, contactAge, setMapTheme, type MapTheme } from "./lib/map";
+  import {
+    createMap,
+    buildLayers,
+    contactAge,
+    contactKind,
+    setMapTheme,
+    CONTAINMENT_95,
+    type MapTheme,
+  } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
-  import { bearing, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
+  import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import type { Viewer } from "./lib/bindings";
   import DbBrowser from "./lib/DbBrowser.svelte";
 
@@ -216,12 +224,13 @@
         <ul class="units">
           {#each sim.contacts as c (c.number)}
             <li class="contact">
-              <span class="name">C{c.number} · unknown</span>
+              <span class="name">C{c.number} · {contactKind(c)}</span>
               <span class="meta">
-                {latLon(c.position.lat_deg, c.position.lon_deg)} · seen {contactAge(
-                  n(clock?.game_time_s ?? 0),
-                  c,
-                )} ago by {unitName(c.detected_by)}
+                {latLon(c.position.lat_deg, c.position.lon_deg)} ± {distance(
+                  n(c.error.semi_major_m) * CONTAINMENT_95,
+                )} (95 %) · seen {contactAge(n(clock?.game_time_s ?? 0), c)} ago by {unitName(
+                  c.detected_by,
+                )}
               </span>
             </li>
           {:else}

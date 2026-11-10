@@ -36,6 +36,19 @@ export const events = {
 };
 
 /* Types */
+/**  How much a side knows about a track. Ordered: a track only ever climbs the ladder. */
+export type Classification = 
+/**  Something is there. */
+"unknown" | 
+/**  Surface, subsurface, air or land. */
+"domain" | 
+/**  e.g. surface combatant, merchant, fighter. */
+"category" | 
+/**  The platform class, e.g. GEN-FFG. */
+"class" | 
+/**  The individual unit. */
+"identified";
+
 /**  Clock status sent with every frame. */
 export type ClockStatus = {
 	tick: Tick,
@@ -51,12 +64,47 @@ export type ClockStatus = {
  *  One entry in a side's perceived picture. It deliberately carries no target unit id, so a
  *  side's client cannot learn ground truth from the stream (fog of war, design principle 4).
  */
-export type ContactView = {
+export type ContactView = ContactView_Serialize | ContactView_Deserialize;
+
+/**
+ *  One entry in a side's perceived picture. It deliberately carries no target unit id, so a
+ *  side's client cannot learn ground truth from the stream (fog of war, design principle 4).
+ */
+export type ContactView_Deserialize = {
 	/**  The side holding the contact. */
 	side: SideId,
 	/**  Contact number within that side's picture (C1, C2, …). */
 	number: number,
+	/**  Estimated position (not the target's true position). */
 	position: GeoPoint,
+	/**  One-sigma position error at the snapshot time, grown since the last update. */
+	error: ErrorEllipse,
+	classification: Classification,
+	/**  Present once the classification reaches `domain`. */
+	domain?: Domain | null,
+	first_seen_s: number | null,
+	last_seen_s: number | null,
+	/**  Own unit whose sensor last detected it. */
+	detected_by: UnitId,
+	sensor_id: string,
+};
+
+/**
+ *  One entry in a side's perceived picture. It deliberately carries no target unit id, so a
+ *  side's client cannot learn ground truth from the stream (fog of war, design principle 4).
+ */
+export type ContactView_Serialize = {
+	/**  The side holding the contact. */
+	side: SideId,
+	/**  Contact number within that side's picture (C1, C2, …). */
+	number: number,
+	/**  Estimated position (not the target's true position). */
+	position: GeoPoint,
+	/**  One-sigma position error at the snapshot time, grown since the last update. */
+	error: ErrorEllipse,
+	classification: Classification,
+	/**  Present once the classification reaches `domain`. */
+	domain: Domain | null,
 	first_seen_s: number | null,
 	last_seen_s: number | null,
 	/**  Own unit whose sensor last detected it. */
@@ -123,6 +171,14 @@ export type DbSensorRow = {
 /**  Broad physical domain of a unit. */
 export type Domain = "surface" | "subsurface" | "air" | "land";
 
+/**  A one-sigma position error ellipse, as shown to players. */
+export type ErrorEllipse = {
+	semi_major_m: number | null,
+	semi_minor_m: number | null,
+	/**  Bearing of the major axis, degrees clockwise from north, in [0, 180). */
+	orientation_deg: number | null,
+};
+
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent = FrameEvent_Serialize | FrameEvent_Deserialize;
 
@@ -185,7 +241,7 @@ export type SnapshotUpdate_Deserialize = {
 	viewer: Viewer,
 	units: UnitView_Deserialize[],
 	removed: UnitId[],
-	contacts: ContactView[],
+	contacts: ContactView_Deserialize[],
 };
 
 /**
@@ -199,7 +255,7 @@ export type SnapshotUpdate_Serialize = {
 	viewer: Viewer,
 	units: UnitView_Serialize[],
 	removed: UnitId[],
-	contacts: ContactView[],
+	contacts: ContactView_Serialize[],
 };
 
 /**  A simulation tick number. Tick `n` covers game time `[n, n+1)` × [`TICK_SECONDS`]. */
