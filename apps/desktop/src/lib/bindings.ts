@@ -8,7 +8,7 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
-	getSession: () => __TAURI_INVOKE<SessionInfo>("get_session"),
+	getSession: () => typedError<SessionInfo, string>(__TAURI_INVOKE("get_session")),
 	/**
 	 *  Loads a scenario from the JSON text of a file the user picked in the UI. The webview reads
 	 *  the file, so the app needs no filesystem permission. The text gets the same checks as any
@@ -21,11 +21,23 @@ export const commands = {
 	dbPlatform: (id: string) => typedError<DbPlatformDetail_Serialize, string>(__TAURI_INVOKE("db_platform", { id })),
 	/**  Every validation finding on the loaded database (warnings only: errors stop it loading). */
 	dbIssues: () => typedError<DbIssue[], string>(__TAURI_INVOKE("db_issues")),
-	setPaused: (paused: boolean) => __TAURI_INVOKE<void>("set_paused", { paused }),
-	setTimeCompression: (compression: TimeCompression) => __TAURI_INVOKE<void>("set_time_compression", { compression }),
-	setViewer: (viewer: Viewer) => __TAURI_INVOKE<void>("set_viewer", { viewer }),
-	/**  Advances a paused simulation by `ticks` (single-step for the umpire). */
-	stepTicks: (ticks: number) => __TAURI_INVOKE<void>("step_ticks", { ticks }),
+	/**  Runs or pauses the clock (white-cell windows only). */
+	setPaused: (paused: boolean) => typedError<null, string>(__TAURI_INVOKE("set_paused", { paused })),
+	/**  Sets time compression (white-cell windows only). */
+	setTimeCompression: (compression: TimeCompression) => typedError<null, string>(__TAURI_INVOKE("set_time_compression", { compression })),
+	/**  Moves the main window to another seat (seat windows are locked). */
+	setSeat: (seat: number) => typedError<SessionInfo, string>(__TAURI_INVOKE("set_seat", { seat })),
+	/**  Adds a seat for `side`, or a white-cell seat when `side` is null (white-cell windows only). */
+	addSeat: (name: string, side: SideId | null) => typedError<SessionInfo, string>(__TAURI_INVOKE("add_seat", { name, side })),
+	/**  Removes a seat and closes its windows (white-cell windows only). */
+	removeSeat: (seat: number) => typedError<SessionInfo, string>(__TAURI_INVOKE("remove_seat", { seat })),
+	/**
+	 *  Opens a window locked to `seat` (white-cell windows only). Async: on Windows, creating a
+	 *  window from a synchronous command deadlocks.
+	 */
+	openSeatWindow: (seat: number) => typedError<null, string>(__TAURI_INVOKE("open_seat_window", { seat })),
+	/**  Advances a paused simulation by `ticks` (single-step for the umpire; white-cell windows only). */
+	stepTicks: (ticks: number) => typedError<null, string>(__TAURI_INVOKE("step_ticks", { ticks })),
 	orderRoute: (unit: UnitId, waypoints: GeoPoint[]) => typedError<null, string>(__TAURI_INVOKE("order_route", { unit, waypoints })),
 	orderSpeed: (unit: UnitId, speedMps: number | null) => typedError<null, string>(__TAURI_INVOKE("order_speed", { unit, speedMps })),
 	/**  Sets doctrine (WCS, EMCON, ROE) on one unit; unset fields inherit from its group and side. */
@@ -534,11 +546,33 @@ export type RouteView = {
 	next: number,
 };
 
+/**  A player position. */
+export type Seat = {
+	id: number,
+	/**  Unique. A white-cell seat's name is the umpire id on its overrides and injects. */
+	name: string,
+} & SeatRole;
+
+/**  What a seat may do. */
+export type SeatRole = 
+/**  Ground truth, every side, overrides, injects and time. */
+{ role: "white_cell" } | 
+/**  One side's picture and units. */
+{ role: "side"; side: SideId };
+
 export type SessionInfo = {
 	scenario_name: string,
 	description: string,
 	sides: SideInfo[],
 	viewer: Viewer,
+	/**  This window's seat. */
+	seat: Seat,
+	/**  Every seat (for the seat picker and seat management). */
+	seats: Seat[],
+	/**  This window is locked to its seat (a seat window). */
+	locked: boolean,
+	/**  This window may run the clock and manage seats. */
+	controls_time: boolean,
 };
 
 /**  Side (faction) identifier. */

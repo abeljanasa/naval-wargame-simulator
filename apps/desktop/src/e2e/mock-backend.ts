@@ -4,7 +4,7 @@
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import type { FrameEvent, SessionInfo, Viewer } from "../lib/bindings";
+import type { FrameEvent, Seat, SessionInfo, Viewer } from "../lib/bindings";
 
 declare global {
   interface Window {
@@ -13,7 +13,15 @@ declare global {
 }
 window.__ipcCalls = [];
 
+const seats: Seat[] = [
+  { id: 0, name: "White cell", role: "white_cell" },
+  { id: 1, name: "Blue", role: "side", side: 1 },
+  { id: 2, name: "Neutral shipping", role: "side", side: 2 },
+];
+let seatId = 1;
 let viewer: Viewer = { kind: "side", side: 1 };
+const seatViewer = (s: Seat): Viewer =>
+  s.role === "white_cell" ? { kind: "white_cell" } : { kind: "side", side: s.side };
 let paused = true;
 let tick = 0;
 let refusals: string[] = [];
@@ -68,6 +76,10 @@ const session = (): SessionInfo => ({
     { id: 2, name: "Neutral shipping" },
   ],
   viewer,
+  seat: seats.find((s) => s.id === seatId) ?? { id: 0, name: "White cell", role: "white_cell" },
+  seats: [...seats],
+  locked: false,
+  controls_time: true,
 });
 
 const platforms = [
@@ -160,8 +172,30 @@ mockIPC(
       case "order_doctrine":
         emcon = (args as { doctrine: { emcon: "active" | "silent" | null } }).doctrine.emcon;
         return null;
-      case "set_viewer":
-        viewer = (args as { viewer: Viewer }).viewer;
+      case "set_seat": {
+        const s = seats.find((x) => x.id === (args as { seat: number }).seat);
+        if (s) {
+          seatId = s.id;
+          viewer = seatViewer(s);
+        }
+        return session();
+      }
+      case "add_seat": {
+        const a = args as { name: string; side: number | null };
+        const id = Math.max(...seats.map((s) => s.id)) + 1;
+        seats.push(
+          a.side === null
+            ? { id, name: a.name, role: "white_cell" }
+            : { id, name: a.name, role: "side", side: a.side },
+        );
+        return session();
+      }
+      case "remove_seat": {
+        const i = seats.findIndex((s) => s.id === (args as { seat: number }).seat);
+        if (i >= 0) seats.splice(i, 1);
+        return session();
+      }
+      case "open_seat_window":
         return null;
       default:
         return null;

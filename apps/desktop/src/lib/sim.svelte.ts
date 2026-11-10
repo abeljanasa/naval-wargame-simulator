@@ -23,9 +23,9 @@ import {
   type TimeCompression,
   type UnitView,
   type WeaponView,
-  type Viewer,
 } from "./bindings";
 import { MPS_PER_KNOT } from "./format";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 /** Radius of a patrol ordered from the unit panel, metres. */
 export const PATROL_RADIUS_M = 30_000;
@@ -73,8 +73,11 @@ class SimSession {
   selectedUnit = $derived(this.units.find((u) => u.id === this.selected) ?? null);
 
   async start() {
-    this.session = await commands.getSession();
-    await events.frameEvent.listen((e) => this.apply(e.payload));
+    const res = await commands.getSession();
+    if (res.status === "error") throw new Error(res.error);
+    this.session = res.data;
+    // Each window listens to its own frames: a seat window sees only its seat's picture.
+    await events.frameEvent(getCurrentWebviewWindow()).listen((e) => this.apply(e.payload));
   }
 
   /** Applies one frame: a full picture replaces the units; a diff upserts by id and removes. */
@@ -117,23 +120,64 @@ class SimSession {
     this.error = null;
   }
 
+  /** Can this window run the clock? (The main window and white-cell seats can.) */
+  get controlsTime(): boolean {
+    return this.session?.controls_time ?? false;
+  }
+
   async togglePause() {
-    await commands.setPaused(!(this.clock?.paused ?? true));
+    if (!this.controlsTime) return;
+    const res = await commands.setPaused(!(this.clock?.paused ?? true));
+    if (res.status === "error") this.error = res.error;
   }
 
   async setCompression(c: TimeCompression) {
-    await commands.setTimeCompression(c);
+    if (!this.controlsTime) return;
+    const res = await commands.setTimeCompression(c);
+    if (res.status === "error") this.error = res.error;
   }
 
   async step(ticks: number) {
-    await commands.stepTicks(ticks);
+    if (!this.controlsTime) return;
+    const res = await commands.stepTicks(ticks);
+    if (res.status === "error") this.error = res.error;
   }
 
-  async setViewer(v: Viewer) {
+  /** Moves this (unlocked) window to another seat. */
+  async setSeat(seat: number) {
     this.cancelPlan();
     this.selected = null;
-    await commands.setViewer(v);
-    if (this.session) this.session.viewer = v;
+    const res = await commands.setSeat(seat);
+    if (res.status === "error") this.error = res.error;
+    else this.session = res.data;
+  }
+
+  /** Adds a seat for a side, or a white-cell seat when `side` is null. */
+  async addSeat(name: string, side: number | null) {
+    if (!name.trim()) {
+      this.error = "Give the seat a name";
+      return false;
+    }
+    const res = await commands.addSeat(name.trim(), side);
+    if (res.status === "error") {
+      this.error = res.error;
+      return false;
+    }
+    this.session = res.data;
+    this.error = null;
+    return true;
+  }
+
+  async removeSeat(seat: number) {
+    const res = await commands.removeSeat(seat);
+    if (res.status === "error") this.error = res.error;
+    else this.session = res.data;
+  }
+
+  /** Opens a window locked to `seat`, e.g. on a second screen for a side's commander. */
+  async openSeatWindow(seat: number) {
+    const res = await commands.openSeatWindow(seat);
+    this.error = res.status === "error" ? res.error : null;
   }
 
   select(id: number | null) {

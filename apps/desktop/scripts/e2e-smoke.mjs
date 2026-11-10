@@ -131,11 +131,11 @@ try {
     "picking a scenario file sends load_scenario and shows the new scenario",
   );
 
-  await page.getByLabel("Seat").selectOption("white");
+  await page.getByLabel("Seat").selectOption({ label: "White cell (white cell: ground truth)" });
   await page.getByRole("button", { name: /Bulk carrier Bravo/ }).waitFor({ timeout: 5_000 });
   check(
-    (await calls()).some((c) => c.cmd === "set_viewer" && c.args.viewer.kind === "white_cell"),
-    "white-cell seat sends set_viewer and shows every unit",
+    (await calls()).some((c) => c.cmd === "set_seat" && c.args.seat === 0),
+    "choosing the white-cell seat sends set_seat and shows every unit",
   );
 
   await page.getByText("Platform database", { exact: true }).first().click();
@@ -187,6 +187,21 @@ try {
     ) && (await page.getByText("sent ×1").isVisible()),
     "white cell sends an inject from the library; it appears in the message log, counted",
   );
+
+  // Seat management: add a seat for Blue's executive officer and open a window for it.
+  await page.getByLabel("New seat", { exact: true }).fill("Blue XO");
+  await page.getByLabel("New seat plays").selectOption({ label: "Blue" });
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Open a window for Blue XO" }).click();
+  await page.waitForTimeout(300);
+  {
+    const c = await calls();
+    check(
+      c.some((x) => x.cmd === "add_seat" && x.args.name === "Blue XO" && x.args.side === 1) &&
+        c.some((x) => x.cmd === "open_seat_window" && x.args.seat === 3),
+      "the white cell adds a seat for a side and opens a window locked to it",
+    );
+  }
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
 } catch (e) {

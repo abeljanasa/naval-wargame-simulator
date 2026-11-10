@@ -13,7 +13,7 @@
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
-  import type { Audience, Emcon, Mission, Viewer, Wcs } from "./lib/bindings";
+  import type { Audience, Emcon, Mission, Seat, Wcs } from "./lib/bindings";
   import DbBrowser from "./lib/DbBrowser.svelte";
 
   let mapEl: HTMLElement;
@@ -26,6 +26,8 @@
   let engageRounds = $state("1");
   let umpireReason = $state("");
   let messageTo = $state("all");
+  let newSeatName = $state("");
+  let newSeatRole = $state("white");
   let messageText = $state("");
 
   function audienceFromKey(k: string): Audience {
@@ -46,7 +48,6 @@
   });
 
   const clock = $derived(sim.clock);
-  const viewerKey = $derived(viewerToKey(sim.session?.viewer ?? { kind: "white_cell" }));
 
   function missionText(m: Mission): string {
     switch (m.kind) {
@@ -71,12 +72,10 @@
     return sim.units.find((u) => u.id === id)?.name ?? `unit ${id}`;
   }
 
-  function viewerToKey(v: Viewer): string {
-    return v.kind === "white_cell" ? "white" : `side-${v.side}`;
-  }
-
-  function keyToViewer(k: string): Viewer {
-    return k === "white" ? { kind: "white_cell" } : { kind: "side", side: Number(k.slice(5)) };
+  function seatRoleText(s: Seat): string {
+    return s.role === "white_cell"
+      ? "white cell"
+      : (sim.session?.sides.find((x) => x.id === s.side)?.name ?? `side ${s.side}`);
   }
 
   // Dark by default (spec §10); the viewer's choice is remembered on this machine only.
@@ -147,6 +146,8 @@
 
   function onKey(e: KeyboardEvent) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+    if (!sim.controlsTime && (e.key === " " || e.key === "." || (e.key >= "1" && e.key <= "7")))
+      return;
     if (e.key === " ") {
       e.preventDefault();
       void sim.togglePause();
@@ -188,22 +189,33 @@
       {/if}
     </div>
 
-    <div class="controls" role="group" aria-label="Time controls">
+    <div
+      class="controls"
+      role="group"
+      aria-label="Time controls"
+      title={sim.controlsTime ? undefined : "The white cell controls time"}
+    >
       <button
         class="play"
         class:running={clock && !clock.paused}
         onclick={() => sim.togglePause()}
+        disabled={!sim.controlsTime}
         title="Pause / resume (Space)"
       >
         {clock?.paused === false ? "❚❚ Pause" : "▶ Run"}
       </button>
-      <button onclick={() => sim.step(1)} disabled={!clock?.paused} title="Step one tick (.)">
+      <button
+        onclick={() => sim.step(1)}
+        disabled={!clock?.paused || !sim.controlsTime}
+        title="Step one tick (.)"
+      >
         Step
       </button>
       {#each COMPRESSIONS as c, i (c.key)}
         <button
           class:active={clock?.compression === c.key}
           onclick={() => sim.setCompression(c.key)}
+          disabled={!sim.controlsTime}
           title={`Time compression ${c.label} (${i + 1})`}
         >
           {c.label}
@@ -240,18 +252,27 @@
     </section>
 
     <section>
-      <h2><label for="seat">Seat</label></h2>
-      <select
-        id="seat"
-        class="seat"
-        value={viewerKey}
-        onchange={(e) => sim.setViewer(keyToViewer(e.currentTarget.value))}
-      >
-        {#each sim.session?.sides ?? [] as s (s.id)}
-          <option value={`side-${s.id}`}>{s.name}</option>
-        {/each}
-        <option value="white">White cell (ground truth)</option>
-      </select>
+      {#if sim.session?.locked}
+        <h2>Seat</h2>
+        <p class="seat-locked">
+          <strong>{sim.session.seat.name}</strong>
+          <span class="dim">({seatRoleText(sim.session.seat)}; this window is locked to it)</span>
+        </p>
+      {:else}
+        <h2><label for="seat">Seat</label></h2>
+        <select
+          id="seat"
+          class="seat"
+          value={String(sim.session?.seat.id ?? "")}
+          onchange={(e) => sim.setSeat(Number(e.currentTarget.value))}
+        >
+          {#each sim.session?.seats ?? [] as s (s.id)}
+            <option value={String(s.id)}
+              >{s.name}{s.role === "white_cell" ? " (white cell: ground truth)" : ""}</option
+            >
+          {/each}
+        </select>
+      {/if}
     </section>
 
     <section>
@@ -605,6 +626,48 @@
           />
           <button type="submit">Send</button>
         </form>
+        <h3>Seats</h3>
+        <ul class="units" aria-label="Seats">
+          {#each sim.session?.seats ?? [] as s (s.id)}
+            <li class="row">
+              <span>{s.name} <span class="dim">· {seatRoleText(s)}</span></span>
+              <button
+                type="button"
+                aria-label={`Open a window for ${s.name}`}
+                onclick={() => sim.openSeatWindow(s.id)}>Open window</button
+              >
+              {#if s.id !== sim.session?.seat.id}
+                <button
+                  type="button"
+                  aria-label={`Remove ${s.name}`}
+                  onclick={() => sim.removeSeat(s.id)}>Remove</button
+                >
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        <form
+          class="send-message"
+          aria-label="Add seat"
+          onsubmit={(e) => {
+            e.preventDefault();
+            void sim
+              .addSeat(newSeatName, newSeatRole === "white" ? null : Number(newSeatRole.slice(5)))
+              .then((ok) => {
+                if (ok) newSeatName = "";
+              });
+          }}
+        >
+          <label for="seat-name">New seat</label>
+          <input id="seat-name" type="text" bind:value={newSeatName} placeholder="e.g. Blue XO" />
+          <select aria-label="New seat plays" bind:value={newSeatRole}>
+            <option value="white">White cell</option>
+            {#each sim.session?.sides ?? [] as s (s.id)}
+              <option value={`side-${s.id}`}>{s.name}</option>
+            {/each}
+          </select>
+          <button type="submit">Add</button>
+        </form>
         <p class="dim">Override log:</p>
         <ul class="units adjudications">
           {#each [...sim.adjudications].reverse() as a, i (i)}
@@ -782,6 +845,12 @@
     color: var(--text-dim);
     font-size: 12px;
     margin: 8px 0 4px;
+  }
+  .seat-locked {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
   }
   .injects li,
   .messages li {

@@ -5,14 +5,16 @@
 
 mod host;
 
-use host::{ClockStatus, Host, SnapshotUpdate, TimeCompression};
+use host::{ClockStatus, Host, SnapshotUpdate, TimeCompression, MAIN_WINDOW};
 use serde::{Deserialize, Serialize};
-use sim_core::{Adjudication, Doctrine, Facilitation, GeoPoint, Mission, SideId, UnitId, Viewer};
+use sim_core::{
+    Adjudication, Doctrine, Facilitation, GeoPoint, Mission, Seat, SideId, UnitId, Viewer,
+};
 use sim_scenario::Scenario;
 use specta_typescript::Typescript;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
-use tauri::{Manager, State};
+use tauri::{EventTarget, Manager, State, WebviewWindow};
 use tauri_specta::{collect_commands, collect_events, Event};
 
 /// Phase 1 ships one built-in scenario, embedded so the app works with no files and no network.
@@ -51,12 +53,30 @@ pub struct SessionInfo {
     pub description: String,
     pub sides: Vec<SideInfo>,
     pub viewer: Viewer,
+    /// This window's seat.
+    pub seat: Seat,
+    /// Every seat (for the seat picker and seat management).
+    pub seats: Vec<Seat>,
+    /// This window is locked to its seat (a seat window).
+    pub locked: bool,
+    /// This window may run the clock and manage seats.
+    pub controls_time: bool,
 }
 
 #[tauri::command]
 #[specta::specta]
-fn get_session(host: State<'_, SharedHost>) -> SessionInfo {
-    session_info(&lock(&host))
+fn get_session(window: WebviewWindow, host: State<'_, SharedHost>) -> Result<SessionInfo, String> {
+    session_info(&lock(&host), window.label())
+}
+
+/// Closes seat windows whose seats are gone.
+fn close_windows(window: &WebviewWindow, labels: &[String]) {
+    for l in labels {
+        if let Some(w) = window.app_handle().get_webview_window(l) {
+            // A window that fails to close is unbound already; it just shows nothing new.
+            let _ = w.close();
+        }
+    }
 }
 
 /// Largest scenario file accepted from the UI (a scenario is text; 5 MB is far above any real one).
@@ -67,7 +87,11 @@ const MAX_SCENARIO_BYTES: usize = 5 * 1024 * 1024;
 /// scenario: format and version, structure, platform resolution and command validation.
 #[tauri::command]
 #[specta::specta]
-fn load_scenario(host: State<'_, SharedHost>, json: String) -> Result<SessionInfo, String> {
+fn load_scenario(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    json: String,
+) -> Result<SessionInfo, String> {
     if json.len() > MAX_SCENARIO_BYTES {
         return Err(format!(
             "scenario file is {} bytes; the limit is {MAX_SCENARIO_BYTES}",
@@ -76,8 +100,12 @@ fn load_scenario(host: State<'_, SharedHost>, json: String) -> Result<SessionInf
     }
     let scenario = Scenario::from_json(&json).map_err(|e| e.to_string())?;
     let mut h = lock(&host);
-    h.load(scenario).map_err(|e| e.to_string())?;
-    Ok(session_info(&h))
+    if !h.controls_time(window.label()) {
+        return Err("only the white cell loads scenarios".into());
+    }
+    let closing = h.load(scenario).map_err(|e| e.to_string())?;
+    close_windows(&window, &closing);
+    session_info(&h, MAIN_WINDOW)
 }
 
 /// One row of the platform database browser.
@@ -212,8 +240,8 @@ fn db_issues(host: State<'_, SharedHost>) -> Result<Vec<DbIssue>, String> {
         .collect())
 }
 
-fn session_info(h: &Host) -> SessionInfo {
-    SessionInfo {
+fn session_info(h: &Host, label: &str) -> Result<SessionInfo, String> {
+    Ok(SessionInfo {
         scenario_name: h.scenario.name.clone(),
         description: h.scenario.description.clone(),
         sides: h
@@ -225,53 +253,151 @@ fn session_info(h: &Host) -> SessionInfo {
                 name: s.name.clone(),
             })
             .collect(),
-        viewer: h.viewer(),
-    }
+        viewer: h.viewer(label),
+        seat: h.seat_of(label)?.clone(),
+        seats: h.seats(),
+        locked: h.locked(label),
+        controls_time: h.controls_time(label),
+    })
 }
 
+/// Runs or pauses the clock (white-cell windows only).
 #[tauri::command]
 #[specta::specta]
-fn set_paused(host: State<'_, SharedHost>, paused: bool) {
-    lock(&host).set_paused(paused);
+fn set_paused(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    paused: bool,
+) -> Result<(), String> {
+    lock(&host).set_paused(window.label(), paused)
 }
 
+/// Sets time compression (white-cell windows only).
 #[tauri::command]
 #[specta::specta]
-fn set_time_compression(host: State<'_, SharedHost>, compression: TimeCompression) {
-    lock(&host).set_compression(compression);
+fn set_time_compression(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    compression: TimeCompression,
+) -> Result<(), String> {
+    lock(&host).set_compression(window.label(), compression)
 }
 
+/// Moves the main window to another seat (seat windows are locked).
 #[tauri::command]
 #[specta::specta]
-fn set_viewer(host: State<'_, SharedHost>, viewer: Viewer) {
-    lock(&host).set_viewer(viewer);
+fn set_seat(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    seat: u32,
+) -> Result<SessionInfo, String> {
+    let mut h = lock(&host);
+    h.set_seat(window.label(), seat)?;
+    session_info(&h, window.label())
 }
 
-/// Advances a paused simulation by `ticks` (single-step for the umpire).
+/// Adds a seat for `side`, or a white-cell seat when `side` is null (white-cell windows only).
 #[tauri::command]
 #[specta::specta]
-fn step_ticks(host: State<'_, SharedHost>, ticks: u32) {
-    lock(&host).step(u64::from(ticks));
+fn add_seat(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    name: String,
+    side: Option<SideId>,
+) -> Result<SessionInfo, String> {
+    let mut h = lock(&host);
+    h.add_seat(window.label(), &name, side)?;
+    session_info(&h, window.label())
+}
+
+/// Removes a seat and closes its windows (white-cell windows only).
+#[tauri::command]
+#[specta::specta]
+fn remove_seat(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    seat: u32,
+) -> Result<SessionInfo, String> {
+    let mut h = lock(&host);
+    let closing = h.remove_seat(window.label(), seat)?;
+    close_windows(&window, &closing);
+    session_info(&h, window.label())
+}
+
+/// Opens a window locked to `seat` (white-cell windows only). Async: on Windows, creating a
+/// window from a synchronous command deadlocks.
+#[tauri::command]
+#[specta::specta]
+async fn open_seat_window(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    seat: u32,
+) -> Result<(), String> {
+    let (label, title) = {
+        let mut h = lock(&host);
+        if !h.controls_time(window.label()) {
+            return Err("only the white cell opens seat windows".into());
+        }
+        let name = h
+            .seats()
+            .into_iter()
+            .find(|s| s.id == seat)
+            .map(|s| s.name)
+            .ok_or_else(|| format!("no seat {seat}"))?;
+        let label = h.next_window_label(seat);
+        h.bind(window.label(), &label, seat)?;
+        (label, format!("Naval Wargame Simulator — {name}"))
+    };
+    tauri::WebviewWindowBuilder::new(
+        window.app_handle(),
+        &label,
+        tauri::WebviewUrl::App("index.html".into()),
+    )
+    .title(title)
+    .inner_size(1280.0, 800.0)
+    .build()
+    .map(|_| ())
+    .map_err(|e| {
+        lock(&host).unbind(&label);
+        e.to_string()
+    })
+}
+
+/// Advances a paused simulation by `ticks` (single-step for the umpire; white-cell windows only).
+#[tauri::command]
+#[specta::specta]
+fn step_ticks(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    ticks: u32,
+) -> Result<(), String> {
+    lock(&host).step(window.label(), u64::from(ticks))
 }
 
 #[tauri::command]
 #[specta::specta]
 fn order_route(
+    window: WebviewWindow,
     host: State<'_, SharedHost>,
     unit: UnitId,
     waypoints: Vec<GeoPoint>,
 ) -> Result<(), String> {
     lock(&host)
-        .order_route(unit, waypoints)
+        .order_route(window.label(), unit, waypoints)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
-fn order_speed(host: State<'_, SharedHost>, unit: UnitId, speed_mps: f64) -> Result<(), String> {
+fn order_speed(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    speed_mps: f64,
+) -> Result<(), String> {
     lock(&host)
-        .order_speed(unit, speed_mps)
+        .order_speed(window.label(), unit, speed_mps)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
@@ -280,12 +406,13 @@ fn order_speed(host: State<'_, SharedHost>, unit: UnitId, speed_mps: f64) -> Res
 #[tauri::command]
 #[specta::specta]
 fn order_doctrine(
+    window: WebviewWindow,
     host: State<'_, SharedHost>,
     unit: UnitId,
     doctrine: Doctrine,
 ) -> Result<(), String> {
     lock(&host)
-        .order_doctrine(unit, doctrine)
+        .order_doctrine(window.label(), unit, doctrine)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
@@ -294,6 +421,7 @@ fn order_doctrine(
 #[tauri::command]
 #[specta::specta]
 fn order_engage(
+    window: WebviewWindow,
     host: State<'_, SharedHost>,
     shooter: UnitId,
     contact: u32,
@@ -301,7 +429,7 @@ fn order_engage(
     rounds: u32,
 ) -> Result<(), String> {
     lock(&host)
-        .order_engage(shooter, contact, weapon, rounds)
+        .order_engage(window.label(), shooter, contact, weapon, rounds)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
@@ -310,12 +438,13 @@ fn order_engage(
 #[tauri::command]
 #[specta::specta]
 fn order_mission(
+    window: WebviewWindow,
     host: State<'_, SharedHost>,
     unit: UnitId,
     mission: Option<Mission>,
 ) -> Result<(), String> {
     lock(&host)
-        .order_mission(unit, mission)
+        .order_mission(window.label(), unit, mission)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
@@ -324,12 +453,13 @@ fn order_mission(
 #[tauri::command]
 #[specta::specta]
 fn order_adjudicate(
+    window: WebviewWindow,
     host: State<'_, SharedHost>,
     reason: String,
     action: Adjudication,
 ) -> Result<(), String> {
     lock(&host)
-        .order_adjudicate(reason, action)
+        .order_adjudicate(window.label(), reason, action)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
@@ -338,9 +468,13 @@ fn order_adjudicate(
 /// only).
 #[tauri::command]
 #[specta::specta]
-fn order_facilitate(host: State<'_, SharedHost>, action: Facilitation) -> Result<(), String> {
+fn order_facilitate(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    action: Facilitation,
+) -> Result<(), String> {
     lock(&host)
-        .order_facilitate(action)
+        .order_facilitate(window.label(), action)
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
@@ -355,7 +489,10 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             db_issues,
             set_paused,
             set_time_compression,
-            set_viewer,
+            set_seat,
+            add_seat,
+            remove_seat,
+            open_seat_window,
             step_ticks,
             order_route,
             order_speed,
@@ -393,17 +530,30 @@ fn spawn_runner(app: tauri::AppHandle, host: SharedHost) {
                 let now = std::time::Instant::now();
                 let elapsed = now - last;
                 last = now;
-                let frame = {
+                let frames: Vec<(String, FrameEvent)> = {
                     let mut h = lock(&host);
                     h.advance(elapsed, MAX_MODE_BUDGET);
-                    FrameEvent {
-                        clock: h.clock(),
-                        update: h.update(),
-                    }
+                    let clock = h.clock();
+                    h.updates()
+                        .into_iter()
+                        .map(|(label, update)| {
+                            (
+                                label,
+                                FrameEvent {
+                                    clock: clock.clone(),
+                                    update,
+                                },
+                            )
+                        })
+                        .collect()
                 };
-                if frame.emit(&app).is_err() {
-                    // The window has gone; stop the runner.
+                if app.get_webview_window(MAIN_WINDOW).is_none() {
+                    // The main window has gone; stop the runner.
                     break;
+                }
+                for (label, frame) in frames {
+                    // Each window receives only its own seat's picture.
+                    let _ = frame.emit_to(&app, EventTarget::webview_window(label));
                 }
             }
         })
@@ -449,6 +599,11 @@ pub fn run() {
     let result = tauri::Builder::default()
         .invoke_handler(builder.invoke_handler())
         .manage(host.clone())
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                lock(window.state::<SharedHost>().inner()).unbind(window.label());
+            }
+        })
         .setup(move |app| {
             builder.mount_events(app);
             spawn_runner(
