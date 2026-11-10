@@ -6,6 +6,7 @@ import { bearing, distance, gameTime, knots, latLon, MPS_PER_KNOT, project } fro
 import { frameSvg, symbolUrl } from "./symbols";
 import {
   buildLayers,
+  circleRing,
   contactAffiliation,
   contactAge,
   contactKind,
@@ -134,6 +135,13 @@ describe("map layers", () => {
     expect(contactAffiliation(c)).toBe("unknown");
     expect(contactAffiliation({ ...c, affiliation: "unfriendly" })).toBe("hostile");
     expect(contactAffiliation({ ...c, affiliation: "neutral" })).toBe("neutral");
+  });
+
+  it("draws a minefield ring at its radius", () => {
+    const ring = circleRing({ lat_deg: 0, lon_deg: 0 }, 2_000, 4);
+    expect(ring).toHaveLength(5);
+    expect(ring[0]?.[1]).toBeCloseTo(2_000 / 111_194.93, 6);
+    expect(ring[4]).toEqual(ring[0]);
   });
 
   it("formats contact age from the last detection", () => {

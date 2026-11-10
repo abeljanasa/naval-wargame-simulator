@@ -6,8 +6,8 @@
 use serde::{Deserialize, Serialize};
 use sim_core::{
     BearingView, Command, CommandPayload, ContactView, Doctrine, DoctrineScope, Environment,
-    GeoPoint, Issuer, Mission, SimError, SimEventKind, Simulation, Snapshot, Tick, UnitId,
-    UnitView, Viewer, WeaponView,
+    GeoPoint, Issuer, Minefield, Mission, SimError, SimEventKind, Simulation, Snapshot, Tick,
+    UnitId, UnitView, Viewer, WeaponView,
 };
 use sim_scenario::Scenario;
 use std::time::{Duration, Instant};
@@ -61,6 +61,8 @@ pub struct SnapshotUpdate {
     pub weapons: Vec<WeaponView>,
     /// Why orders from this seat were refused since the last frame.
     pub refusals: Vec<String>,
+    /// The viewer's minefields (own side; every field for the white cell).
+    pub minefields: Vec<Minefield>,
 }
 
 /// Clock status sent with every frame.
@@ -252,6 +254,7 @@ impl Host {
                     bearings: snap.bearings.clone(),
                     weapons: snap.weapons.clone(),
                     refusals: refusals.clone(),
+                    minefields: snap.minefields.clone(),
                 }
             }
             _ => SnapshotUpdate {
@@ -266,6 +269,7 @@ impl Host {
                 bearings: snap.bearings.clone(),
                 weapons: snap.weapons.clone(),
                 refusals,
+                minefields: snap.minefields.clone(),
             },
         };
         self.last_sent = Some(snap);

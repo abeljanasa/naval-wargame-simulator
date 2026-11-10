@@ -11,6 +11,7 @@ import {
   type Environment,
   type FrameEvent,
   type GeoPoint,
+  type Minefield,
   type Mission,
   type SessionInfo,
   type TimeCompression,
@@ -41,6 +42,8 @@ class SimSession {
   bearings = $state<BearingView[]>([]);
   /** The seat's missiles and torpedoes in flight. */
   weapons = $state<WeaponView[]>([]);
+  /** The seat's minefields. */
+  minefields = $state<Minefield[]>([]);
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */
@@ -76,6 +79,7 @@ class SimSession {
     this.environment = u.environment;
     this.bearings = u.bearings;
     this.weapons = u.weapons;
+    this.minefields = u.minefields;
     if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 

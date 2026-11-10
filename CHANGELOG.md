@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added (Phase 2, slice 11: basic mines)
+
+- **Minefields** (`docs/models/weapons-damage.md` §Mines, DL-0020):
+  - Created by the scenario or white cell, or laid from a ship's stores.
+  - Ships and submarines of other sides moving through a field run the simple-initial-threat risk P = 1 − exp(−ρWd) every 10 s. An encounter rolls the mine's Ph and damage.
+  - The owning side is immune and sees its fields; the desktop draws them.
+- Duel test: 200 transits match the hand-calculated 0.471 encounter rate.
+
+### Changed
+
+- Save format 12 (older saves still load). Golden hash is now `1f07e67a956cb372`.
+
 ### Added (Phase 2, slice 10: basic missions)
 
 - **`sim-ai` crate and AI system** (`docs/models/missions.md`, DL-0019):

@@ -228,6 +228,7 @@ const frame = (): FrameEvent => {
       },
       bearings,
       weapons: [],
+      minefields: [],
       refusals: sent,
     },
   };

@@ -298,6 +298,18 @@ export type GeoPoint = {
 	lon_deg: number | null,
 };
 
+/**  A circular minefield. */
+export type Minefield = {
+	id: number,
+	side: SideId,
+	centre: GeoPoint,
+	radius_m: number | null,
+	/**  Mines left. */
+	mines: number,
+	/**  Mine type (platform database weapon id). */
+	weapon: string,
+};
+
 /**  What a unit has been told to do. */
 export type Mission = 
 /**  Steam between random points in a circular area. */
@@ -377,6 +389,8 @@ export type SnapshotUpdate_Deserialize = {
 	weapons: WeaponView[],
 	/**  Why orders from this seat were refused since the last frame. */
 	refusals: string[],
+	/**  The viewer's minefields (own side; every field for the white cell). */
+	minefields: Minefield[],
 };
 
 /**
@@ -399,6 +413,8 @@ export type SnapshotUpdate_Serialize = {
 	weapons: WeaponView[],
 	/**  Why orders from this seat were refused since the last frame. */
 	refusals: string[],
+	/**  The viewer's minefields (own side; every field for the white cell). */
+	minefields: Minefield[],
 };
 
 /**  What a unit can still do. */

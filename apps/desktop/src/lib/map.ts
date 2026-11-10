@@ -10,7 +10,15 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { MapboxOverlay } from "@deck.gl/mapbox";
 import { IconLayer, LineLayer, PathLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 import type { Layer, PickingInfo } from "@deck.gl/core";
-import type { BearingView, ContactView, GeoPoint, UnitView, Viewer, WeaponView } from "./bindings";
+import type {
+  BearingView,
+  ContactView,
+  GeoPoint,
+  Minefield,
+  UnitView,
+  Viewer,
+  WeaponView,
+} from "./bindings";
 import { n, project } from "./format";
 import { AFFILIATION_COLOUR, symbolUrl, type Affiliation } from "./symbols";
 
@@ -125,6 +133,8 @@ export interface SceneInput {
   bearings?: BearingView[];
   /** Missiles and torpedoes in flight that the viewer may see. */
   weapons?: WeaponView[];
+  /** Minefields the viewer may see. */
+  minefields?: Minefield[];
   gameTimeS: number;
   viewer: Viewer;
   selected: number | null;
@@ -178,6 +188,15 @@ export function contactAffiliation(c: ContactView): Affiliation {
     default:
       return "unknown";
   }
+}
+
+/** A closed lon/lat ring of `radius_m` round `centre`. */
+export function circleRing(centre: GeoPoint, radius_m: number, points = 64): LonLat[] {
+  const ring: LonLat[] = [];
+  for (let i = 0; i <= points; i++) {
+    ring.push(project(n(centre.lat_deg), n(centre.lon_deg), (360 * i) / points, radius_m));
+  }
+  return ring;
 }
 
 /** What the side knows about a contact: its class, else category, else domain, else unknown. */
@@ -305,6 +324,28 @@ export function buildLayers(s: SceneInput): Layer[] {
     // until postures exist (sim-c2). No ground-truth identity is available to draw.
     // ESM bearing lines: from the intercepting ship along the measured bearing. They fade as
     // they age (60 s at most).
+    // Minefields: a dashed-looking ring (many short segments) with the mines left.
+    new PathLayer<Minefield>({
+      id: "minefields",
+      data: s.minefields ?? [],
+      getPath: (f) => circleRing(f.centre, n(f.radius_m)),
+      getColor: [230, 120, 220, 200],
+      getWidth: 2,
+      widthUnits: "pixels",
+    }),
+    new TextLayer<Minefield>({
+      id: "minefield-labels",
+      data: s.minefields ?? [],
+      getPosition: (f) => pt(f.centre),
+      getText: (f) => `M${f.id} · ${f.mines} mines`,
+      getSize: 12,
+      getColor: [230, 120, 220, 255],
+      fontFamily: "system-ui, sans-serif",
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
     // Weapons in flight: a short line along the heading, brighter once the seeker has locked on.
     new LineLayer<WeaponView>({
       id: "weapons",

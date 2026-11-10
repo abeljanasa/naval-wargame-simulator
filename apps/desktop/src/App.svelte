@@ -112,6 +112,7 @@
         contacts: sim.contacts,
         bearings: sim.bearings,
         weapons: sim.weapons,
+        minefields: sim.minefields,
         gameTimeS: n(clock?.game_time_s ?? 0),
         viewer: sim.session?.viewer ?? { kind: "white_cell" },
         selected: sim.selected,
