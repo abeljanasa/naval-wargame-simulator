@@ -27,8 +27,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS is paused (2026-11-10): add macos-15 back here to re-enable it.
-        os: [ubuntu-24.04, windows-2022]
+        # macOS re-enabled for Gate 3 (2026-11-11).
+        os: [ubuntu-24.04, windows-2022, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -74,8 +74,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS is paused (2026-11-10): add macos-15 back here to re-enable it.
-        os: [ubuntu-24.04, windows-2022]
+        # macOS re-enabled for Gate 3 (2026-11-11).
+        os: [ubuntu-24.04, windows-2022, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

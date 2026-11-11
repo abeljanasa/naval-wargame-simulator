@@ -19,8 +19,8 @@ jobs:
       fail-fast: false
       matrix:
         # Ubuntu 22.04 keeps the AppImage's glibc floor low enough for older target systems.
-        # macOS is paused (2026-11-10): add macos-15 back here to re-enable it.
-        os: [windows-2022, ubuntu-22.04]
+        # macOS re-enabled for Gate 3 (2026-11-11).
+        os: [windows-2022, ubuntu-22.04, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

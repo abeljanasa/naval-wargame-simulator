@@ -24,6 +24,13 @@ Each slice: behaviour spec, design-log entry, tests, docs, CHANGELOG, green CI (
 | 6 ✅ | **Replay and AAR** | Replay scrubber from the command log, event timeline, loss tables, weapons expended vs effective, detection timeline, CSV export | — |
 | 7 ✅ | **Scenario editor** | Units, sides, postures, missions, minefields, reference points, events; validation on save | 2 |
 | 8 ✅ | **Planning layer (§7.1)** | Command posts, refuelling points, sheltering ports, anchorages, choke points with sense and engage zones (per-zone ROE/WCS), surface action groups | 2, 7 |
-| 9 | **Gate 3 pack** | User and white-cell manuals, scripting reference, signed installers (with the client's certificates), macOS re-enabled, TTX pilot plan | all |
+| 9 ✅ | **Gate 3 pack** | User and white-cell manuals, scripting reference, signed installers (with the client's certificates), macOS re-enabled, TTX pilot plan | all |
+
+**After slice 9** ([Gate 3 review pack](../gate3/README.md)), three conditions remain open:
+- signing, which needs the client's certificates as Actions secrets;
+- the air-gapped run of the signed release build;
+- the navy TTX pilot ([plan](../gate3/ttx-pilot-plan.md)).
+
+The P1 features of §7 and §7.1 that are still partial are listed in the pack and the backlog, for the panel to accept or schedule.
 
 Out of phase (backlog): Monte Carlo batch statistics, SVP acoustics, weather zones, air operations (Phase 4); networked multiplayer (Phase 5).

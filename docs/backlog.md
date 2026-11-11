@@ -6,6 +6,19 @@ Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md); Phase 3 in [plan/
 
 ## Phase 3, deferred from slices
 
+P1 gaps found at the Gate 3 review ([docs/gate3/README.md](gate3/README.md)), for the panel to accept or schedule:
+
+- [ ] Comms links and their disruption (jamming, relays), including jamming a command post.
+- [ ] Support, mining, mine-clearing and cargo missions; barrier-patrol and denial missions on a choke point.
+- [ ] Anchorages with polygon areas, depth and holding limits; units holding there between missions.
+- [ ] Sense-zone layers by sensor type, and coverage and gaps drawn on the map.
+- [ ] Coordinated air defence and one shared mission object for a surface action group.
+- [ ] Satellite imagery layers and day/night shading on the map.
+- [ ] Code-signing certificates from the client (Windows PFX; Apple Developer ID and notarisation).
+- [ ] Air-gapped run of the signed release build on all three OSes.
+- [ ] The navy TTX pilot ([plan](gate3/ttx-pilot-plan.md)).
+
+
 - [x] Repair restores sensors and speed lost to earlier criticals: full repair at a facility restores the loadout (DL-0028).
 - [ ] Fuel and endurance for ships, so refuelling points refuel (with air operations, Phase 4).
 - [ ] Desktop white-cell control of the planning layer during an exercise (the `SetPlanning` command already allows it).

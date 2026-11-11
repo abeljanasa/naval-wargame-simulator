@@ -28,6 +28,8 @@ Set these in the repository's (or organisation's) Actions secrets.
 | `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: <Org> (<TEAMID>)` |
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarisation (app-specific password) |
 
+macOS builds are back in the CI and release matrices (Gate 3, 2026-11-11). Without the Apple secrets the `.dmg` is unsigned and not notarised; Gatekeeper will then block it until the user allows it in System Settings.
+
 Linux packages are not signed by default. Distribute their SHA-256 sums alongside, or sign them with the organisation's GPG key in the accredited pipeline.
 
 ## Local build

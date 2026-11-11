@@ -104,6 +104,16 @@
   - Alerts, repairs and rearming in the AAR timeline.
 - **New demonstrator:** `data/scenarios/phase3-planning-demo.json`, with its golden replay. Existing golden hashes are unchanged.
 
+### Added (Phase 3, slice 9: Gate 3 pack)
+
+- **Manuals** (`docs/manuals/`):
+  - user manual;
+  - white-cell manual;
+  - scripting reference for scenario authors. Its JSON examples are checked against the engine types by `sim-scenario/tests/docs.rs`.
+- **Gate 3 review pack** (`docs/gate3/README.md`): the definition of done mapped to evidence, with the P1 and §7.1 gaps listed for the panel.
+- **TTX pilot plan** (`docs/gate3/ttx-pilot-plan.md`).
+- **macOS** is back in the CI (lint, test, determinism) and release matrices.
+
 ### Changed
 
 - Save format 15 (events, injects, messages, seats).
