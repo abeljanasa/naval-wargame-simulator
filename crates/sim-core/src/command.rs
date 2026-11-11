@@ -234,6 +234,12 @@ pub enum CommandPayload {
         unit: UnitId,
         mission: Option<Mission>,
     },
+    /// Replaces the planning layer: facilities and sense/engage zones
+    /// (`docs/models/planning-layer.md`). Scenario and white cell only.
+    SetPlanning {
+        facilities: Vec<crate::planning::Facility>,
+        zones: Vec<crate::planning::Zone>,
+    },
 }
 
 impl CommandPayload {
@@ -260,6 +266,7 @@ impl CommandPayload {
             | CommandPayload::SetEvents { .. }
             | CommandPayload::Facilitate { .. }
             | CommandPayload::SetSeats { .. }
+            | CommandPayload::SetPlanning { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -361,6 +368,9 @@ impl CommandPayload {
             }
             CommandPayload::Facilitate { action } => action.validate(),
             CommandPayload::SetSeats { seats } => crate::seats::validate_seats(seats),
+            CommandPayload::SetPlanning { facilities, zones } => {
+                crate::planning::validate_planning(facilities, zones)
+            }
             CommandPayload::SetEvents {
                 events,
                 reserves,

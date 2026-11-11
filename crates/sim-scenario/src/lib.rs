@@ -11,6 +11,8 @@
 //! * v3: `events`, and `reserve` units held off the board until an event brings them in. v1 and
 //!   v2 files still load.
 //! * v4: `reference_points` (named map points for planning and briefing). Older files still load.
+//! * v5: the planning layer: `facilities`, `zones` and surface `action_groups`
+//!   (`docs/models/planning-layer.md`). Older files still load.
 
 #![forbid(unsafe_code)]
 
@@ -19,16 +21,16 @@ pub mod synthetic;
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
-    Environment, GeoPoint, Guidance, Inject, Issuer, JammerSpec, Mission, Posture, ScenarioEvent,
-    Seat, SeatRole, SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId, UnitSpawn,
-    WeaponKind, WeaponSpec,
+    Environment, Facility, GeoPoint, Guidance, Inject, Issuer, JammerSpec, Mission, Posture,
+    ScenarioEvent, Seat, SeatRole, SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId,
+    UnitSpawn, WeaponKind, WeaponSpec, Zone,
 };
 use sim_db::PlatformDb;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 pub const SCENARIO_FORMAT: &str = "nws-scenario";
-pub const SCENARIO_FORMAT_VERSION: u32 = 4;
+pub const SCENARIO_FORMAT_VERSION: u32 = 5;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioError {
@@ -180,6 +182,38 @@ pub struct Scenario {
     /// Named map points for planning and briefing (format 4).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reference_points: Vec<ReferencePoint>,
+    /// Planning layer: command posts, refuelling points, sheltering ports, anchorages (format 5).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub facilities: Vec<Facility>,
+    /// Planning layer: sense and engage zones, e.g. at choke points (format 5).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub zones: Vec<Zone>,
+    /// Surface action groups: members keep station on the leader (format 5).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub action_groups: Vec<ActionGroup>,
+}
+
+/// A surface action group: its members keep station on the leader, so ordering the leader moves
+/// the group. Built as escort missions on the leader.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(deny_unknown_fields)]
+pub struct ActionGroup {
+    pub name: String,
+    pub side: SideId,
+    pub leader: UnitId,
+    pub members: Vec<GroupStation>,
+}
+
+/// One member's station in a surface action group.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(deny_unknown_fields)]
+pub struct GroupStation {
+    pub unit: UnitId,
+    /// Relative to the leader's heading, degrees.
+    pub bearing_deg: f64,
+    pub range_m: f64,
 }
 
 /// A named point on the map (a rendezvous, a waypoint name, a briefing mark). It has no effect
@@ -363,8 +397,76 @@ impl Scenario {
                 ));
             }
         }
+        if let Err(e) = sim_core::validate_planning(&self.facilities, &self.zones) {
+            out.push(e);
+        }
+        for f in &self.facilities {
+            if !sides.contains(&f.side) {
+                out.push(format!(
+                    "facility {:?} is on undeclared side {}",
+                    f.name, f.side
+                ));
+            }
+        }
+        for z in &self.zones {
+            if !sides.contains(&z.side) {
+                out.push(format!(
+                    "zone {:?} is on undeclared side {}",
+                    z.name, z.side
+                ));
+            }
+        }
+        out.extend(self.action_group_issues());
         if self.duration_s == 0 {
             out.push("duration_s must be > 0".into());
+        }
+        out
+    }
+
+    /// Action groups: named, leader and members units of the group's side, each member in one
+    /// group only and without a mission of its own, stations finite with a range > 0.
+    fn action_group_issues(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        let side_of: BTreeMap<UnitId, SideId> = self.units.iter().map(|u| (u.id, u.side)).collect();
+        let mut names = BTreeSet::new();
+        let mut placed = BTreeSet::new();
+        for g in &self.action_groups {
+            if g.name.trim().is_empty() || !names.insert(g.name.trim()) {
+                out.push(format!("action group {:?} needs a unique name", g.name));
+            }
+            if side_of.get(&g.leader) != Some(&g.side) {
+                out.push(format!(
+                    "action group {:?}: leader {} is not a unit of side {}",
+                    g.name, g.leader, g.side
+                ));
+            }
+            for m in &g.members {
+                if m.unit == g.leader || side_of.get(&m.unit) != Some(&g.side) {
+                    out.push(format!(
+                        "action group {:?}: member {} must be another unit of side {}",
+                        g.name, m.unit, g.side
+                    ));
+                }
+                if !placed.insert(m.unit) {
+                    out.push(format!("unit {} is in more than one action group", m.unit));
+                }
+                if self
+                    .units
+                    .iter()
+                    .any(|u| u.id == m.unit && u.mission.is_some())
+                {
+                    out.push(format!(
+                        "unit {} has its own mission, so it cannot keep station in {:?}",
+                        m.unit, g.name
+                    ));
+                }
+                if !(m.bearing_deg.is_finite() && m.range_m.is_finite() && m.range_m > 0.0) {
+                    out.push(format!(
+                        "action group {:?}: member {} needs a finite bearing and a range > 0",
+                        g.name, m.unit
+                    ));
+                }
+            }
         }
         out
     }
@@ -625,6 +727,12 @@ impl Scenario {
                 weapon: m.weapon.clone(),
             });
         }
+        if !self.facilities.is_empty() || !self.zones.is_empty() {
+            c2.push(CommandPayload::SetPlanning {
+                facilities: self.facilities.clone(),
+                zones: self.zones.clone(),
+            });
+        }
         if !self.seats.is_empty() {
             c2.push(CommandPayload::SetSeats {
                 seats: self.seats.clone(),
@@ -639,7 +747,26 @@ impl Scenario {
             })?;
         }
         let mut reserves = Vec::new();
-        for (s, u) in spawns.into_iter().zip(&self.units) {
+        let stations: BTreeMap<UnitId, Mission> = self
+            .action_groups
+            .iter()
+            .flat_map(|g| {
+                g.members.iter().map(move |m| {
+                    (
+                        m.unit,
+                        Mission::Escort {
+                            escorted: g.leader.0,
+                            bearing_deg: m.bearing_deg,
+                            range_m: m.range_m,
+                        },
+                    )
+                })
+            })
+            .collect();
+        for (mut s, u) in spawns.into_iter().zip(&self.units) {
+            if let Some(m) = stations.get(&u.id) {
+                s.mission = Some(m.clone());
+            }
             if u.reserve {
                 reserves.push(s);
                 continue;
@@ -1271,5 +1398,108 @@ mod tests {
                 "{to}"
             );
         }
+    }
+
+    const PLANNED: &str = r#"{
+        "format": "nws-scenario", "format_version": 5, "name": "t", "seed": 1, "duration_s": 600,
+        "sides": [{"id": 1, "name": "Blue"}, {"id": 2, "name": "Red"}],
+        "units": [
+            {"id": 1, "name": "Lead", "side": 1, "platform": "GEN-FFG",
+             "position": {"lat_deg": -39.0, "lon_deg": 146.0}, "heading_deg": 90.0},
+            {"id": 2, "name": "Wing", "side": 1, "platform": "GEN-FFG",
+             "position": {"lat_deg": -39.05, "lon_deg": 146.0}},
+            {"id": 3, "name": "Red", "side": 2, "platform": "GEN-FFG",
+             "position": {"lat_deg": -39.0, "lon_deg": 147.0}}
+        ],
+        "facilities": [
+            {"id": 1, "name": "Blue HQ", "side": 1, "kind": "command_post",
+             "position": {"lat_deg": -39.0, "lon_deg": 146.0}, "radius_m": 500.0,
+             "range_m": 200000.0},
+            {"id": 2, "name": "Haven", "side": 1, "kind": "sheltering_port",
+             "position": {"lat_deg": -38.9, "lon_deg": 146.0}, "radius_m": 2000.0,
+             "berths": 2, "services": {"repair": true, "rearm": true}}
+        ],
+        "zones": [
+            {"id": 1, "name": "Narrows watch", "side": 1, "kind": "sense",
+             "area": {"shape": "circle", "centre": {"lat_deg": -39.0, "lon_deg": 146.8},
+                      "radius_m": 20000.0},
+             "choke_point": "Narrows"},
+            {"id": 2, "name": "Narrows kill box", "side": 1, "kind": "engage",
+             "area": {"shape": "circle", "centre": {"lat_deg": -39.0, "lon_deg": 146.8},
+                      "radius_m": 8000.0},
+             "doctrine": {"wcs": "free"}, "choke_point": "Narrows"}
+        ],
+        "action_groups": [
+            {"name": "SAG 1", "side": 1, "leader": 1,
+             "members": [{"unit": 2, "bearing_deg": 180.0, "range_m": 3000.0}]}
+        ]
+    }"#;
+
+    #[test]
+    fn planning_layer_and_action_groups_load_build_and_hold_station() {
+        let s = Scenario::from_json(PLANNED).unwrap();
+        assert_eq!(s.facilities.len(), 2);
+        assert_eq!(s.zones.len(), 2);
+        let back = Scenario::from_json(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(back.facilities, s.facilities);
+        assert_eq!(back.action_groups, s.action_groups);
+        let mut sim = s.build(None, &db()).unwrap();
+        sim.run_until(Tick(600));
+        let save = sim.save();
+        assert_eq!(save.planning.facilities.len(), 2);
+        assert_eq!(save.planning.zones.len(), 2);
+        // The member was given an escort mission on the leader and has closed on its station,
+        // 3 km astern of it.
+        let wing = save.units.iter().find(|u| u.unit.id == UnitId(2)).unwrap();
+        assert!(matches!(
+            wing.mission.mission,
+            Some(Mission::Escort { escorted: 1, .. })
+        ));
+        let lead = save.units.iter().find(|u| u.unit.id == UnitId(1)).unwrap();
+        let gap = sim_geo::inverse(lead.position.point, wing.position.point).distance_m;
+        assert!((1_000.0..6_000.0).contains(&gap), "{gap}");
+        let checked = s.check(&db());
+        assert!(
+            checked.iter().all(|i| i.severity == Severity::Warning),
+            "{checked:?}"
+        );
+    }
+
+    #[test]
+    fn bad_planning_layers_and_action_groups_are_rejected() {
+        for (from, to) in [
+            // A member in the other side's group, a leader of another side.
+            (r#""leader": 1"#, r#""leader": 3"#),
+            (r#""unit": 2, "bearing_deg""#, r#""unit": 3, "bearing_deg""#),
+            (r#""unit": 2, "bearing_deg""#, r#""unit": 1, "bearing_deg""#),
+            (r#""range_m": 3000.0"#, r#""range_m": 0.0"#),
+            // Facilities and zones on undeclared sides, duplicate ids, a zone without a size.
+            (
+                r#""name": "Haven", "side": 1"#,
+                r#""name": "Haven", "side": 9"#,
+            ),
+            (r#""id": 2, "name": "Haven""#, r#""id": 1, "name": "Haven""#),
+            (r#""radius_m": 8000.0"#, r#""radius_m": 0.0"#),
+            (
+                r#""name": "Narrows watch", "side": 1"#,
+                r#""name": "Narrows watch", "side": 4"#,
+            ),
+        ] {
+            let bad = PLANNED.replacen(from, to, 1);
+            assert!(
+                matches!(Scenario::from_json(&bad), Err(ScenarioError::Invalid(_))),
+                "{to}"
+            );
+        }
+        // A member with its own mission cannot also keep station.
+        let own = PLANNED.replacen(
+            r#""name": "Wing", "side": 1,"#,
+            r#""name": "Wing", "side": 1, "mission": {"kind": "ferry", "destination": {"lat_deg": -38.0, "lon_deg": 146.0}},"#,
+            1,
+        );
+        assert!(matches!(
+            Scenario::from_json(&own),
+            Err(ScenarioError::Invalid(m)) if m.contains("own mission")
+        ));
     }
 }

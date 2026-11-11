@@ -49,7 +49,8 @@ impl Area {
         }
     }
 
-    fn validate(&self) -> Result<(), String> {
+    /// Checks the shape: a finite radius > 0, or at least three valid polygon points.
+    pub fn validate(&self) -> Result<(), String> {
         match self {
             Area::Circle { centre, radius_m } => {
                 if centre.is_valid() && radius_m.is_finite() && *radius_m > 0.0 {

@@ -326,6 +326,11 @@ impl<'a> Builder<'a> {
             }
             CommandPayload::Facilitate { action } => self.facilitation(action),
             CommandPayload::SetSeats { seats } => format!("set {} seats", seats.len()),
+            CommandPayload::SetPlanning { facilities, zones } => format!(
+                "set the planning layer ({} facilities, {} zones)",
+                facilities.len(),
+                zones.len()
+            ),
             CommandPayload::CreateMinefield {
                 side,
                 mines,
@@ -739,6 +744,37 @@ impl<'a> Builder<'a> {
                     TimelineKind::Mine,
                     self.unit_side(*unit),
                     format!("{name} struck a mine"),
+                );
+            }
+            SimEventKind::ZoneAlert {
+                side,
+                zone,
+                contact,
+            } => {
+                let name = self.side_name(*side);
+                self.note(
+                    t,
+                    TimelineKind::Contact,
+                    Some(*side),
+                    format!("{name} alert: C{contact} in sense zone {zone}"),
+                );
+            }
+            SimEventKind::UnitRepaired { unit, facility } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} repaired at facility {facility}"),
+                );
+            }
+            SimEventKind::UnitRearmed { unit, facility } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} rearmed at facility {facility}"),
                 );
             }
             SimEventKind::ScenarioEventFired { event } => {

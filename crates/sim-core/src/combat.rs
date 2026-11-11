@@ -226,7 +226,9 @@ pub(crate) fn engage(
     // Weapons control status and ROE. The white cell may override (adjudication).
     if !cmd.issuer.is_privileged() {
         let c2 = world.resource::<C2State>();
-        let doctrine = c2.doctrine_for(&unit);
+        let doctrine = world
+            .resource::<crate::planning::PlanningLayer>()
+            .engage_doctrine(c2, &unit, from.point, estimate.position);
         let target_side = entity_of(world, track.target)
             .and_then(|e| world.get::<Unit>(e))
             .map(|u| u.side);
@@ -327,7 +329,14 @@ pub(crate) fn apply_hit_roll(
         .get::<crate::detection::Jammer>(e)
         .is_some_and(|j| j.0.is_some())
         && world.get::<Unit>(e).is_some_and(|u| {
-            world.resource::<C2State>().doctrine_for(u).emcon == sim_c2::Emcon::Active
+            let at = world
+                .get::<Position>(e)
+                .map_or(GeoPoint::new(0.0, 0.0), |p| p.point);
+            world
+                .resource::<crate::planning::PlanningLayer>()
+                .doctrine_for(world.resource::<C2State>(), u, at)
+                .emcon
+                == sim_c2::Emcon::Active
         });
     let countermeasures = countermeasure_modifier(spec.guidance, decoy_effect, jamming);
     let p = ph(spec.base_ph, size, manoeuvre, sea) * countermeasures;

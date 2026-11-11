@@ -20,6 +20,7 @@ use crate::hash::StateHash;
 use crate::ids::{SideId, UnitId};
 use crate::mines::{lay_mines, mine_system, Minefields};
 use crate::movement::movement_system;
+use crate::planning::{check_command_post, planning_system, Loadout, PlanningLayer};
 use crate::point_defence::{point_defence_system, PointDefence};
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
@@ -128,6 +129,7 @@ impl Simulation {
         world.insert_resource(EventEngine::default());
         world.insert_resource(MessageLog::default());
         world.insert_resource(Seats::default());
+        world.insert_resource(PlanningLayer::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
         Self {
@@ -245,10 +247,11 @@ impl Simulation {
             &Magazine,
             &Health,
             &MissionState,
+            Option<&Loadout>,
         )>();
         let mut v: Vec<UnitRecord> = q
             .iter(&self.world)
-            .map(|(u, p, k, r, s, sig, j, m, hl, ms)| UnitRecord {
+            .map(|(u, p, k, r, s, sig, j, m, hl, ms, lo)| UnitRecord {
                 unit: u.clone(),
                 position: *p,
                 kinematics: *k,
@@ -259,6 +262,7 @@ impl Simulation {
                 magazine: m.clone(),
                 health: Some(hl.clone()),
                 mission: ms.clone(),
+                loadout: lo.cloned(),
             })
             .collect();
         v.sort_by_key(|r| r.unit.id);
@@ -269,6 +273,7 @@ impl Simulation {
     pub fn snapshot(&mut self, viewer: Viewer) -> Snapshot {
         let tick = self.tick();
         let c2 = self.world.resource::<C2State>().clone();
+        let planning = self.world.resource::<PlanningLayer>().clone();
         let records = self.unit_records();
         let side_of: BTreeMap<UnitId, SideId> =
             records.iter().map(|r| (r.unit.id, r.unit.side)).collect();
@@ -284,7 +289,7 @@ impl Simulation {
                     next: r.route.next as u32,
                     waypoints: r.route.waypoints,
                 });
-                let doctrine = c2.doctrine_for(&r.unit);
+                let doctrine = planning.doctrine_for(&c2, &r.unit, r.position.point);
                 UnitView {
                     doctrine,
                     doctrine_set: r.unit.doctrine,
@@ -575,6 +580,7 @@ impl Simulation {
                 crate::seats::SeatRole::Side { side } => h.u16(side.0),
             }
         }
+        self.world.resource::<PlanningLayer>().hash(&mut h);
         let msgs = self.world.resource::<MessageLog>();
         h.u64(msgs.0.len() as u64);
         for m in &msgs.0 {
@@ -736,6 +742,7 @@ impl Simulation {
             events_engine: self.world.resource::<EventEngine>().clone(),
             messages: self.world.resource::<MessageLog>().clone(),
             seats: self.world.resource::<Seats>().clone(),
+            planning: self.world.resource::<PlanningLayer>().clone(),
         }
     }
 
@@ -773,6 +780,7 @@ impl Simulation {
         sim.world.insert_resource(save.events_engine);
         sim.world.insert_resource(save.messages);
         sim.world.insert_resource(save.seats);
+        sim.world.insert_resource(save.planning);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -789,6 +797,12 @@ impl Simulation {
             let health = r
                 .health
                 .unwrap_or_else(|| Health::new(default_damage_profile(r.unit.domain)));
+            // Saves before format 17 have no loadout: take what the unit has now.
+            let loadout = r.loadout.unwrap_or_else(|| Loadout {
+                sensors: r.sensors.0.clone(),
+                max_speed_mps: r.kinematics.max_speed_mps,
+                stores: r.magazine.0.clone(),
+            });
             let e = sim
                 .world
                 .spawn((
@@ -802,6 +816,7 @@ impl Simulation {
                     health,
                     r.magazine,
                     r.mission,
+                    loadout,
                 ))
                 .id();
             if index.insert(id, e).is_some() {
@@ -864,6 +879,7 @@ fn build_schedule() -> Schedule {
             damage_control_system,
             detection_system,
             ai_system,
+            planning_system,
             scenario_events_system,
             advance_clock_system,
         )
@@ -881,7 +897,10 @@ fn apply_commands_system(world: &mut World) {
     let tick = world.resource::<SimClock>().tick;
     let due = world.resource::<CommandLog>().due(tick);
     for (seq, cmd) in due {
-        let checked = world.resource::<Seats>().check(&cmd);
+        let checked = world
+            .resource::<Seats>()
+            .check(&cmd)
+            .and_then(|()| check_command_post(world, &cmd));
         let kind = match checked.and_then(|()| apply_command(world, &cmd)) {
             Ok(()) => SimEventKind::CommandApplied { seq },
             Err(reason) => SimEventKind::CommandRejected { seq, reason },
@@ -985,6 +1004,15 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             Issuer::WhiteCell { umpire } => adjudicate(world, umpire, reason, action),
             _ => Err("only the white cell may adjudicate".into()),
         },
+        CommandPayload::SetPlanning { facilities, zones } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set the planning layer".into());
+            }
+            world
+                .resource_mut::<PlanningLayer>()
+                .set(facilities.clone(), zones.clone());
+            Ok(())
+        }
         CommandPayload::SetSeats { seats } => {
             if !cmd.issuer.is_privileged() {
                 return Err("only the scenario or white cell may set seats".into());
@@ -1169,6 +1197,11 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             },
             Jammer(s.jammer),
             Magazine(s.stores.clone()),
+            Loadout {
+                sensors: s.sensors.clone(),
+                max_speed_mps: s.max_speed_mps,
+                stores: s.stores.clone(),
+            },
             MissionState {
                 mission: s.mission.clone(),
                 complete: false,

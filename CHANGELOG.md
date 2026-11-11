@@ -83,6 +83,22 @@
 - **Validation by the engine:** `Scenario::check` lists every error and warning at once. Errors block Save and Play.
 - **Scenario format 4:** `reference_points`, shown on the map to the seats that may see them.
 
+### Added (Phase 3, slice 8: operational planning layer)
+
+- **Planning layer** (`docs/models/planning-layer.md`, DL-0028):
+  - **Command posts:** a player's order reaches only units in range of one of the side's posts.
+  - **Sheltering ports, anchorages and refuelling points:** repair, rearm and berths for units alongside. A full repair restores the sensors and speed lost to critical hits.
+  - **Sense zones:** doctrine for own units inside, and alerts on new contacts.
+  - **Engage zones:** per-zone WCS and ROE for targets inside.
+  - **Choke points:** a sense zone round an engage zone.
+  - **Surface action groups:** members keep station on the leader.
+- **Scenario format 5** (`facilities`, `zones`, `action_groups`); **save format 17** (planning layer, unit loadouts).
+- **Desktop:**
+  - The planning layer is drawn on the map for each seat.
+  - Planning tab in the scenario editor.
+  - Alerts, repairs and rearming in the AAR timeline.
+- **New demonstrator:** `data/scenarios/phase3-planning-demo.json`, with its golden replay. Existing golden hashes are unchanged.
+
 ### Changed
 
 - Save format 15 (events, injects, messages, seats).

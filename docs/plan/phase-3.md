@@ -23,7 +23,7 @@ Each slice: behaviour spec, design-log entry, tests, docs, CHANGELOG, green CI (
 | 5 ✅ | **Multi-seat play** | Seats per side; white-cell control of time for all seats; seat management | — |
 | 6 ✅ | **Replay and AAR** | Replay scrubber from the command log, event timeline, loss tables, weapons expended vs effective, detection timeline, CSV export | — |
 | 7 ✅ | **Scenario editor** | Units, sides, postures, missions, minefields, reference points, events; validation on save | 2 |
-| 8 | **Planning layer (§7.1)** | Command posts, refuelling points, sheltering ports, anchorages, choke points with sense and engage zones (per-zone ROE/WCS), surface action groups | 2, 7 |
+| 8 ✅ | **Planning layer (§7.1)** | Command posts, refuelling points, sheltering ports, anchorages, choke points with sense and engage zones (per-zone ROE/WCS), surface action groups | 2, 7 |
 | 9 | **Gate 3 pack** | User and white-cell manuals, scripting reference, signed installers (with the client's certificates), macOS re-enabled, TTX pilot plan | all |
 
 Out of phase (backlog): Monte Carlo batch statistics, SVP acoustics, weather zones, air operations (Phase 4); networked multiplayer (Phase 5).

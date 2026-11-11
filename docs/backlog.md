@@ -6,7 +6,11 @@ Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md); Phase 3 in [plan/
 
 ## Phase 3, deferred from slices
 
-- [ ] Repair restores sensors and speed lost to earlier criticals (keep the originals on the unit).
+- [x] Repair restores sensors and speed lost to earlier criticals: full repair at a facility restores the loadout (DL-0028).
+- [ ] Fuel and endurance for ships, so refuelling points refuel (with air operations, Phase 4).
+- [ ] Desktop white-cell control of the planning layer during an exercise (the `SetPlanning` command already allows it).
+- [ ] Polygon zones drawn in the scenario editor (circles only today).
+- [ ] Forms for event triggers, conditions and actions in the scenario editor (JSON with templates today).
 
 ## Phase 2, deferred from slices
 
@@ -25,7 +29,7 @@ Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md); Phase 3 in [plan/
 - [x] Scenarios reference database platforms (`"platform": "GEN-FFG"`) (DL-0007).
 - [x] In-app database browser: search, record detail with source citation, confidence and marking, and validation feedback (DL-0009).
 - [ ] In-app database *editing* (record diff, citation entry, live validation while typing). It writes the JSON source (ADR-0004). Phase 2; until then records are edited in `data/db/open/` and checked with `sim-db validate`.
-- [ ] Planning-layer facility attributes for airbases and ports (runways, berths, draft limit, repair/rearm), needed by §7.1 in Phase 3.
+- [ ] Planning-layer facility attributes still to do: runways (air operations) and draft limits (bathymetry). Berths, repair and rearm are done (DL-0028).
 - [x] Release scan (`sim-db scan`), run in the release workflow.
 - [x] Installers, signed when secrets are configured, plus SBOMs and a `cargo deny` licence audit (docs/build/releasing.md).
 - [x] Air-gapped vendored build, with the engine verified offline (docs/build/air-gapped.md).

@@ -1081,3 +1081,384 @@ fn damage_repair_destroy_remove_move_and_stores_are_logged_overrides() {
         .iter()
         .any(|e| matches!(e.kind, SimEventKind::UnitDestroyed { unit: UnitId(2) })));
 }
+
+// ---- Planning layer (docs/models/planning-layer.md) ----
+
+fn circle(centre: GeoPoint, radius_m: f64) -> Area {
+    Area::Circle { centre, radius_m }
+}
+
+fn zone(id: u32, kind: ZoneKind, area: Area, doctrine: Doctrine) -> Zone {
+    Zone {
+        id,
+        name: format!("Z{id}"),
+        side: SideId(1),
+        kind,
+        area,
+        doctrine,
+        choke_point: None,
+    }
+}
+
+fn facility(
+    id: u32,
+    kind: FacilityKind,
+    at: GeoPoint,
+    services: Services,
+    berths: u32,
+) -> Facility {
+    Facility {
+        id,
+        name: format!("F{id}"),
+        side: SideId(1),
+        kind,
+        position: at,
+        radius_m: 2_000.0,
+        range_m: None,
+        berths,
+        services,
+    }
+}
+
+fn planning(facilities: Vec<Facility>, zones: Vec<Zone>) -> Command {
+    cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetPlanning { facilities, zones },
+    )
+}
+
+/// `scene`, with a planning layer in force from tick 0.
+fn planned_scene(range_m: f64, facilities: Vec<Facility>, zones: Vec<Zone>) -> Simulation {
+    let mut sim = Simulation::new(1);
+    sim.submit(planning(facilities, zones)).unwrap();
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![asm(), gun(), sam()],
+        },
+    ))
+    .unwrap();
+    sim.submit(unit(
+        1,
+        1,
+        ORIGIN,
+        vec![radar()],
+        &[("T-ASM", 2), ("T-GUN", 100), ("T-SAM", 4)],
+        None,
+    ))
+    .unwrap();
+    sim.submit(unit(
+        2,
+        2,
+        direct(ORIGIN, 90.0, range_m).point,
+        vec![],
+        &[],
+        None,
+    ))
+    .unwrap();
+    sim.run_ticks(1);
+    sim
+}
+
+fn wcs(w: Wcs) -> Doctrine {
+    Doctrine {
+        wcs: Some(w),
+        ..Doctrine::default()
+    }
+}
+
+#[test]
+fn an_engage_zone_sets_the_rules_for_targets_inside_it() {
+    let red = direct(ORIGIN, 90.0, 30_000.0).point;
+    // Weapons tight (the default): refused. An engage zone round the target, weapons free:
+    // accepted.
+    let mut sim = planned_scene(30_000.0, vec![], vec![]);
+    sim.submit(engage(1, "T-ASM", 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim)[0].contains("weapons control status"));
+    let free_box = zone(1, ZoneKind::Engage, circle(red, 5_000.0), wcs(Wcs::Free));
+    let mut sim = planned_scene(30_000.0, vec![], vec![free_box.clone()]);
+    sim.submit(engage(1, "T-ASM", 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim).is_empty(), "{:?}", rejected(&sim));
+    // A zone elsewhere does nothing.
+    let elsewhere = zone(1, ZoneKind::Engage, circle(ORIGIN, 5_000.0), wcs(Wcs::Free));
+    let mut sim = planned_scene(30_000.0, vec![], vec![elsewhere]);
+    sim.submit(engage(1, "T-ASM", 1)).unwrap();
+    sim.step();
+    assert_eq!(rejected(&sim).len(), 1);
+    // A weapons-safe zone holds fire even when the unit itself is weapons free.
+    let safe_box = zone(1, ZoneKind::Engage, circle(red, 5_000.0), wcs(Wcs::Safe));
+    let mut sim = planned_scene(30_000.0, vec![], vec![safe_box]);
+    sim.submit(weapons_free(1)).unwrap();
+    sim.submit(engage(1, "T-ASM", 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim)[0].contains("weapons control status"));
+}
+
+#[test]
+fn a_sense_zone_sets_emcon_for_own_units_and_alerts_on_new_contacts() {
+    let red = direct(ORIGIN, 90.0, 30_000.0).point;
+    // A sense zone round the red ship: Blue's first contact there raises an alert.
+    let watch = zone(
+        1,
+        ZoneKind::Sense,
+        circle(red, 5_000.0),
+        Doctrine::default(),
+    );
+    let mut sim = planned_scene(30_000.0, vec![], vec![watch]);
+    sim.run_ticks(10);
+    let alerts: Vec<_> = sim
+        .events()
+        .iter()
+        .filter(|e| {
+            matches!(
+                e.kind,
+                SimEventKind::ZoneAlert {
+                    zone: 1,
+                    contact: 1,
+                    ..
+                }
+            )
+        })
+        .collect();
+    assert_eq!(alerts.len(), 1);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert!(blue.messages.iter().any(|m| m.text == "C1 detected in Z1"));
+    assert!(sim
+        .snapshot(Viewer::Side { side: SideId(2) })
+        .messages
+        .iter()
+        .all(|m| !m.text.contains("Z1")));
+    // A silent sense zone round Blue: its radar is off, so nothing is detected.
+    let quiet = zone(
+        1,
+        ZoneKind::Sense,
+        circle(ORIGIN, 5_000.0),
+        Doctrine {
+            emcon: Some(Emcon::Silent),
+            ..Doctrine::default()
+        },
+    );
+    let mut sim = planned_scene(30_000.0, vec![], vec![quiet]);
+    sim.run_ticks(10);
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) });
+    assert_eq!(blue.units[0].doctrine.emcon, Emcon::Silent);
+    assert!(blue.contacts.is_empty());
+}
+
+#[test]
+fn command_posts_limit_player_orders_to_units_in_range() {
+    let speed = |issuer: Issuer, side: Option<u16>| {
+        cmd(
+            1,
+            issuer,
+            side,
+            CommandPayload::SetSpeed {
+                unit: UnitId(1),
+                speed_mps: 3.0,
+            },
+        )
+    };
+    let mut near = facility(1, FacilityKind::CommandPost, ORIGIN, Services::default(), 0);
+    near.range_m = Some(10_000.0);
+    let mut sim = planned_scene(30_000.0, vec![near], vec![]);
+    sim.submit(speed(Issuer::Player { seat: 1 }, Some(1)))
+        .unwrap();
+    sim.step();
+    assert!(rejected(&sim).is_empty());
+
+    let far_at = direct(ORIGIN, 0.0, 200_000.0).point;
+    let mut far = facility(1, FacilityKind::CommandPost, far_at, Services::default(), 0);
+    far.range_m = Some(50_000.0);
+    let mut sim = planned_scene(30_000.0, vec![far], vec![]);
+    sim.submit(speed(Issuer::Player { seat: 1 }, Some(1)))
+        .unwrap();
+    sim.submit(speed(umpire(), None)).unwrap();
+    sim.step();
+    let r = rejected(&sim);
+    assert_eq!(r.len(), 1, "the white cell is not limited: {r:?}");
+    assert!(r[0].contains("out of range of every command post"));
+}
+
+#[test]
+fn ports_repair_and_rearm_units_alongside_up_to_their_berths() {
+    let port = facility(
+        1,
+        FacilityKind::ShelteringPort,
+        ORIGIN,
+        Services {
+            repair: true,
+            rearm: true,
+            refuel: true,
+        },
+        1,
+    );
+    let mut sim = planned_scene(30_000.0, vec![port], vec![]);
+    // A second Blue ship alongside too: only one berth.
+    let mut second = unit(
+        3,
+        1,
+        direct(ORIGIN, 0.0, 500.0).point,
+        vec![],
+        &[("T-GUN", 10)],
+        None,
+    );
+    second.tick = Tick(1);
+    sim.submit(second).unwrap();
+    for (u, damage) in [(1, 120.0), (3, 60.0)] {
+        sim.submit(cmd(
+            1,
+            umpire(),
+            None,
+            CommandPayload::Adjudicate {
+                reason: "test damage".into(),
+                action: Adjudication::SetDamage {
+                    unit: UnitId(u),
+                    damage_dp: damage,
+                    clear_effects: false,
+                },
+            },
+        ))
+        .unwrap();
+    }
+    sim.submit(cmd(
+        1,
+        umpire(),
+        None,
+        CommandPayload::Adjudicate {
+            reason: "test stores".into(),
+            action: Adjudication::SetStores {
+                unit: UnitId(1),
+                weapon: "T-ASM".into(),
+                count: 0,
+            },
+        },
+    ))
+    .unwrap();
+    // A sensors critical knocked out the radar (as a hit would).
+    sim.run_ticks(2);
+    let mut save = sim.save();
+    let rec = save
+        .units
+        .iter_mut()
+        .find(|r| r.unit.id == UnitId(1))
+        .unwrap();
+    rec.health.as_mut().unwrap().criticals = vec![System::Sensors];
+    rec.sensors.0.clear();
+    let mut sim = Simulation::from_save(save).unwrap();
+
+    let damage = |sim: &mut Simulation, id: u64| {
+        sim.snapshot(Viewer::WhiteCell)
+            .units
+            .iter()
+            .find(|u| u.id == UnitId(id))
+            .map(|u| u.damage_fraction)
+            .unwrap()
+    };
+    sim.run_until(Tick(20 * 60));
+    // 2 % of 300 DP a minute: 120 DP takes 20 minutes.
+    assert!(damage(&mut sim, 1) < 0.1, "{}", damage(&mut sim, 1));
+    assert!(
+        (damage(&mut sim, 3) - 0.2).abs() < 1e-9,
+        "unit 3 waits for a berth"
+    );
+    sim.run_until(Tick(31 * 60));
+    let blue = sim.snapshot(Viewer::WhiteCell);
+    let u1 = blue.units.iter().find(|u| u.id == UnitId(1)).unwrap();
+    assert_eq!(u1.damage_fraction, 0.0);
+    assert!(u1.criticals.is_empty());
+    assert!(u1
+        .stores
+        .iter()
+        .any(|s| s.weapon == "T-ASM" && s.count == 2));
+    let ev = sim.events();
+    assert!(ev.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::UnitRepaired {
+            unit: UnitId(1),
+            facility: 1
+        }
+    )));
+    assert!(ev.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::UnitRearmed {
+            unit: UnitId(1),
+            facility: 1
+        }
+    )));
+    // The radar is back.
+    let save = sim.save();
+    assert!(!save.units[0].sensors.0.is_empty());
+    // Service state survives save and resume exactly.
+    let mut resumed = Simulation::from_save(save).unwrap();
+    sim.run_ticks(600);
+    resumed.run_ticks(600);
+    assert_eq!(sim.state_hash(), resumed.state_hash());
+}
+
+#[test]
+fn only_privileged_issuers_set_the_planning_layer_and_bad_layers_are_refused() {
+    let mut sim = Simulation::new(1);
+    sim.submit(cmd(
+        0,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        CommandPayload::SetPlanning {
+            facilities: vec![],
+            zones: vec![zone(
+                1,
+                ZoneKind::Sense,
+                circle(ORIGIN, 1_000.0),
+                Doctrine::default(),
+            )],
+        },
+    ))
+    .unwrap();
+    sim.step();
+    assert!(rejected(&sim)[0].contains("planning layer"));
+    for bad in [
+        planning(
+            vec![],
+            vec![zone(
+                1,
+                ZoneKind::Sense,
+                circle(ORIGIN, 0.0),
+                Doctrine::default(),
+            )],
+        ),
+        planning(
+            vec![],
+            vec![
+                zone(
+                    1,
+                    ZoneKind::Sense,
+                    circle(ORIGIN, 10.0),
+                    Doctrine::default(),
+                ),
+                zone(
+                    1,
+                    ZoneKind::Engage,
+                    circle(ORIGIN, 10.0),
+                    Doctrine::default(),
+                ),
+            ],
+        ),
+        planning(
+            vec![facility(
+                1,
+                FacilityKind::Anchorage,
+                GeoPoint::new(95.0, 0.0),
+                Services::default(),
+                0,
+            )],
+            vec![],
+        ),
+    ] {
+        assert!(Simulation::new(1).submit(bad).is_err());
+    }
+}

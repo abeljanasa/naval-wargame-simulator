@@ -87,11 +87,13 @@ pub(crate) fn point_defence_system(world: &mut World) {
 
     // Defenders: operational units with a radiating radar, in unit-id order.
     let c2 = world.resource::<C2State>().clone();
+    let planning = world.resource::<crate::planning::PlanningLayer>().clone();
     let mut defenders: Vec<Defender> = world
         .query::<(Entity, &Unit, &Position, &SensorSuite, &Health)>()
         .iter(world)
-        .filter(|(_, u, _, _, h)| {
-            h.status == Status::Operational && c2.doctrine_for(u).emcon == Emcon::Active
+        .filter(|(_, u, p, _, h)| {
+            h.status == Status::Operational
+                && planning.doctrine_for(&c2, u, p.point).emcon == Emcon::Active
         })
         .filter_map(|(e, u, p, s, _)| {
             let radars: Vec<(f64, f64)> =

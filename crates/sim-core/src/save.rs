@@ -54,7 +54,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   Older saves load with neither.
 /// * 15: adds the seat table. Older saves load with none (no seat checks).
 /// * 16: hit rolls record the firing unit and side. Older saves load with neither.
-pub const SAVE_FORMAT_VERSION: u32 = 16;
+/// * 17: adds the planning layer (facilities, zones, units being served) and unit loadouts.
+///   Older saves load with no planning layer, and each unit's loadout taken from its state.
+pub const SAVE_FORMAT_VERSION: u32 = 17;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +79,9 @@ pub struct UnitRecord {
     pub health: Option<Health>,
     #[serde(default)]
     pub mission: MissionState,
+    /// `None` in saves before format 17.
+    #[serde(default)]
+    pub loadout: Option<crate::planning::Loadout>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +125,8 @@ pub struct SaveGame {
     pub messages: MessageLog,
     #[serde(default)]
     pub seats: Seats,
+    #[serde(default)]
+    pub planning: crate::planning::PlanningLayer,
 }
 
 impl SaveGame {
@@ -144,7 +151,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=15 | SAVE_FORMAT_VERSION => {
+            1..=16 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

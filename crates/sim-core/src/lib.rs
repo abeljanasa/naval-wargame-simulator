@@ -20,6 +20,7 @@ mod ids;
 mod mines;
 mod movement;
 mod optical;
+mod planning;
 mod point_defence;
 mod rng;
 mod save;
@@ -58,6 +59,11 @@ pub use hash::StateHash;
 pub use ids::{SideId, UnitId};
 pub use mines::{Minefield, Minefields, MINE_CHECK_PERIOD_TICKS};
 pub use optical::default_length_m;
+pub use planning::{
+    validate_planning, Facility, FacilityKind, Loadout, PlanningLayer, ServiceState, Services,
+    Zone, ZoneKind, ALONGSIDE_SPEED_MPS, REARM_TICKS, REPAIR_FRACTION_PER_MIN,
+    SERVICE_PERIOD_TICKS,
+};
 pub use point_defence::{PointDefence, Shot};
 pub use rng::{RngStreams, StreamId};
 pub use save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};

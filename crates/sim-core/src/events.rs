@@ -308,6 +308,22 @@ pub enum SimEventKind {
         number: u32,
         target: UnitId,
     },
+    /// `side` gained contact `contact` inside its sense zone `zone` (planning layer).
+    ZoneAlert {
+        side: SideId,
+        zone: u32,
+        contact: u32,
+    },
+    /// A unit alongside facility `facility` is fully repaired; its systems are restored.
+    UnitRepaired {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// A unit alongside facility `facility` has been rearmed to its loadout.
+    UnitRearmed {
+        unit: UnitId,
+        facility: u32,
+    },
 }
 
 #[derive(Debug, Clone, Default, Resource, Serialize, Deserialize)]
