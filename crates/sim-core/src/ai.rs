@@ -38,7 +38,7 @@ pub struct MissionState {
     pub complete: bool,
 }
 
-fn set_route(world: &mut World, e: Entity, unit: UnitId, to: GeoPoint, tick: Tick) {
+pub(crate) fn set_route(world: &mut World, e: Entity, unit: UnitId, to: GeoPoint, tick: Tick) {
     let (domain, from) = match (world.get::<Unit>(e), world.get::<Position>(e)) {
         (Some(u), Some(p)) => (u.domain, p.point),
         _ => return,
@@ -56,7 +56,7 @@ fn set_route(world: &mut World, e: Entity, unit: UnitId, to: GeoPoint, tick: Tic
     }
 }
 
-fn ensure_moving(world: &mut World, e: Entity, fraction: f64) {
+pub(crate) fn ensure_moving(world: &mut World, e: Entity, fraction: f64) {
     if let Some(mut k) = world.get_mut::<Kinematics>(e) {
         if k.ordered_speed_mps == 0.0 {
             k.ordered_speed_mps = fraction * k.max_speed_mps;
@@ -212,6 +212,31 @@ fn auto_engage(
     if candidates.is_empty() {
         return;
     }
+    for contact in nearest_first(candidates) {
+        if let Some(weapon) = engage_first_weapon(world, id, e, side, contact, tick) {
+            world.resource_mut::<EventLog>().push(
+                tick,
+                SimEventKind::MissionEngage {
+                    unit: id,
+                    contact,
+                    weapon,
+                },
+            );
+            return;
+        }
+    }
+}
+
+/// Fires one round at `contact` with the first carried weapon (weapon-id order) that passes
+/// every `Engage` check, release rule included, as the AI. Returns the weapon fired.
+pub(crate) fn engage_first_weapon(
+    world: &mut World,
+    id: UnitId,
+    e: Entity,
+    side: crate::ids::SideId,
+    contact: u32,
+    tick: Tick,
+) -> Option<String> {
     let catalog = world.resource::<crate::combat::WeaponCatalog>().0.clone();
     let weapons: Vec<String> = world
         .get::<Magazine>(e)
@@ -227,30 +252,21 @@ fn auto_engage(
                 .collect()
         })
         .unwrap_or_default();
-    for contact in nearest_first(candidates) {
-        for weapon in &weapons {
-            let cmd = Command {
-                tick,
-                issuer: Issuer::Ai,
-                side: Some(side),
-                payload: CommandPayload::Engage {
-                    shooter: id,
-                    contact,
-                    weapon: weapon.clone(),
-                    rounds: 1,
-                },
-            };
-            if engage(world, &cmd, id, contact, weapon, 1, e).is_ok() {
-                world.resource_mut::<EventLog>().push(
-                    tick,
-                    SimEventKind::MissionEngage {
-                        unit: id,
-                        contact,
-                        weapon: weapon.clone(),
-                    },
-                );
-                return;
-            }
+    for weapon in weapons {
+        let cmd = Command {
+            tick,
+            issuer: Issuer::Ai,
+            side: Some(side),
+            payload: CommandPayload::Engage {
+                shooter: id,
+                contact,
+                weapon: weapon.clone(),
+                rounds: 1,
+            },
+        };
+        if engage(world, &cmd, id, contact, &weapon, 1, e).is_ok() {
+            return Some(weapon);
         }
     }
+    None
 }

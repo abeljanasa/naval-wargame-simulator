@@ -777,6 +777,68 @@ impl<'a> Builder<'a> {
                     format!("{name} rearmed at facility {facility}"),
                 );
             }
+            SimEventKind::CommandPostDown { facility } => self.note(
+                t,
+                TimelineKind::Event,
+                None,
+                format!("command post {facility} is down"),
+            ),
+            SimEventKind::ZoneEngage {
+                zone,
+                unit,
+                contact,
+                weapon,
+            } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Launch,
+                    self.unit_side(*unit),
+                    format!("{name} engaged C{contact} with {weapon} in engage zone {zone}"),
+                );
+            }
+            SimEventKind::ChokePointTransit { choke_point, unit } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} entered choke point {choke_point}"),
+                );
+            }
+            SimEventKind::DivertedToPort { unit, facility } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} diverted to facility {facility} for repair"),
+                );
+            }
+            SimEventKind::QueuedOrderApplied { seq } => {
+                if let Some(c) = self.commands.get(seq).copied() {
+                    let who = self.issuer(&c.command.issuer);
+                    let what = self.describe(&c.command.payload);
+                    self.note(
+                        t,
+                        TimelineKind::Order,
+                        c.command.side,
+                        format!("{who}: {what} (released by the alternate command post)"),
+                    );
+                }
+            }
+            SimEventKind::QueuedOrderDropped { seq, reason } => {
+                if let Some(c) = self.commands.get(seq).copied() {
+                    let who = self.issuer(&c.command.issuer);
+                    let what = self.describe(&c.command.payload);
+                    self.note(
+                        t,
+                        TimelineKind::Refused,
+                        c.command.side,
+                        format!("{who}: {what} (queued order dropped: {reason})"),
+                    );
+                }
+            }
             SimEventKind::ScenarioEventFired { event } => {
                 self.note(t, TimelineKind::Event, None, format!("event {event} fired"));
             }

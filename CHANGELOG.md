@@ -86,7 +86,12 @@
 ### Added (Phase 3, slice 8: operational planning layer)
 
 - **Planning layer** (`docs/models/planning-layer.md`, DL-0028):
-  - **Command posts:** a player's order reaches only units in range of one of the side's posts.
+  - **Command posts** ashore or carried by a unit, with subordinates and range. When a post's unit is lost, an alternate takes over after a handover delay, and orders in the gap are lost or queued.
+  - **Damaged units divert:** mission-killed units on a mission go to the nearest repair port, and resume the mission when repaired.
+  - **Engage-zone shooters** engage contacts inside the zone on their own.
+  - **Choke-point transits** are logged.
+  - **Action-group doctrine.**
+  - **White-cell per-zone weapons control override.**
   - **Sheltering ports, anchorages and refuelling points:** repair, rearm and berths for units alongside. A full repair restores the sensors and speed lost to critical hits.
   - **Sense zones:** doctrine for own units inside, and alerts on new contacts.
   - **Engage zones:** per-zone WCS and ROE for targets inside.

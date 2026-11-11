@@ -20,7 +20,9 @@ use crate::hash::StateHash;
 use crate::ids::{SideId, UnitId};
 use crate::mines::{lay_mines, mine_system, Minefields};
 use crate::movement::movement_system;
-use crate::planning::{check_command_post, planning_system, Loadout, PlanningLayer};
+use crate::planning::{
+    command_authority, planning_system, Authority, Loadout, PlanningLayer, QueuedOrder,
+};
 use crate::point_defence::{point_defence_system, PointDefence};
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
@@ -897,10 +899,24 @@ fn apply_commands_system(world: &mut World) {
     let tick = world.resource::<SimClock>().tick;
     let due = world.resource::<CommandLog>().due(tick);
     for (seq, cmd) in due {
-        let checked = world
-            .resource::<Seats>()
-            .check(&cmd)
-            .and_then(|()| check_command_post(world, &cmd));
+        let checked = world.resource::<Seats>().check(&cmd).and_then(|()| {
+            match command_authority(world, &cmd) {
+                Authority::Ok => Ok(()),
+                Authority::Refused(reason) => Err(reason),
+                // Held for the alternate command post; logged as refused for now, with why.
+                Authority::Queued { release, reason } => {
+                    world
+                        .resource_mut::<PlanningLayer>()
+                        .queued
+                        .push(QueuedOrder {
+                            release,
+                            seq,
+                            command: cmd.clone(),
+                        });
+                    Err(format!("queued: {reason}"))
+                }
+            }
+        });
         let kind = match checked.and_then(|()| apply_command(world, &cmd)) {
             Ok(()) => SimEventKind::CommandApplied { seq },
             Err(reason) => SimEventKind::CommandRejected { seq, reason },

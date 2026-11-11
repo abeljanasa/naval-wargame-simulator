@@ -1,29 +1,37 @@
 //! Operational planning layer (master prompt §7.1; `docs/models/planning-layer.md`).
 //!
-//! - **Facilities** of a side: command posts (orders reach only units within range of one),
-//!   refuelling points, sheltering ports and anchorages (repair and rearm for units stopped
-//!   alongside, berth limits).
+//! - **Facilities** of a side:
+//!   - command posts, ashore or carried by a unit, with subordinates and an alternate that takes
+//!     over after a handover delay when the post is lost (orders in the gap are lost or queued);
+//!   - refuelling points, sheltering ports and anchorages: repair and rearm for units stopped
+//!     alongside, with berth limits; mission-killed units on a mission divert to the nearest port
+//!     that repairs, and resume the mission when repaired.
 //! - **Zones** of a side, often in pairs at a choke point:
-//!   - a *sense* zone sets the doctrine of the side's own units inside it (EMCON, weapons
-//!     control) and raises an alert when the side gains a contact inside it;
-//!   - an *engage* zone sets the weapons control and ROE for engaging targets inside it.
+//!   - a *sense* zone sets the doctrine of the side's own units inside it and raises an alert
+//!     when the side gains a contact inside it;
+//!   - an *engage* zone sets the weapons control and ROE for engaging targets inside it, and its
+//!     assigned shooters engage contacts inside it;
+//!   - other sides' units entering a choke point are logged.
 
+use crate::ai::{engage_first_weapon, ensure_moving, set_route, MissionState};
 use crate::c2::C2State;
-use crate::combat::{Health, Magazine};
-use crate::command::Command;
-use crate::components::{Kinematics, Position, Unit};
-use crate::detection::SensorSuite;
+use crate::combat::{Health, Magazine, WeaponsInFlight};
+use crate::command::{Command, Issuer};
+use crate::components::{Kinematics, Position, Route, Unit};
+use crate::detection::{ContactTable, SensorSuite};
 use crate::events::{EventLog, SimEventKind};
 use crate::hash::StateHash;
 use crate::ids::{SideId, UnitId};
 use crate::scenario_events::{Message, MessageLog};
-use crate::sim::UnitIndex;
+use crate::sim::{apply_command, UnitIndex};
 use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
+use sim_ai::{Mission, AI_PERIOD_TICKS};
 use sim_c2::{Doctrine, ResolvedDoctrine};
 use sim_events::{Area, Audience};
 use sim_geo::GeoPoint;
+use sim_weapons::Status;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// How often facilities serve the units alongside.
@@ -34,6 +42,8 @@ pub const ALONGSIDE_SPEED_MPS: f64 = 0.5;
 pub const REPAIR_FRACTION_PER_MIN: f64 = 0.02;
 /// Time alongside before a unit is rearmed.
 pub const REARM_TICKS: u64 = 1_800;
+/// Default delay before an alternate command post takes over, seconds.
+pub const DEFAULT_HANDOVER_S: f64 = 300.0;
 
 /// What a facility is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -44,6 +54,19 @@ pub enum FacilityKind {
     RefuellingPoint,
     ShelteringPort,
     Anchorage,
+}
+
+/// What happens to a player's order issued while a command post is down and its alternate has
+/// not yet taken over.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum GapPolicy {
+    /// Refused.
+    #[default]
+    Lose,
+    /// Held, and carried out when the alternate takes over (if the unit is then in its range).
+    Queue,
 }
 
 /// What a facility does for units of its side stopped within its radius.
@@ -61,6 +84,10 @@ pub struct Services {
     pub refuel: bool,
 }
 
+fn default_handover() -> f64 {
+    DEFAULT_HANDOVER_S
+}
+
 /// A planning-layer facility.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -69,10 +96,12 @@ pub struct Facility {
     pub name: String,
     pub side: SideId,
     pub kind: FacilityKind,
+    /// Where it is (for a command post carried by a unit: where it starts; it then moves with
+    /// the unit).
     pub position: GeoPoint,
     /// Units within this distance are alongside (ports, anchorages) or at the post.
     pub radius_m: f64,
-    /// Command posts: orders reach the side's units within this range.
+    /// Command posts: orders reach subordinates within this range (default: `radius_m`).
     #[serde(default)]
     pub range_m: Option<f64>,
     /// Units served at once (in unit-id order); 0 = no limit.
@@ -80,6 +109,22 @@ pub struct Facility {
     pub berths: u32,
     #[serde(default)]
     pub services: Services,
+    /// Command posts: the unit carrying the post (a flagship, an aircraft, a land unit). The
+    /// post is down once the unit is lost.
+    #[serde(default)]
+    pub unit: Option<UnitId>,
+    /// Command posts: the units it commands; empty = every unit of its side.
+    #[serde(default)]
+    pub subordinates: Vec<UnitId>,
+    /// Command posts: the post that takes over this post's subordinates when it is down.
+    #[serde(default)]
+    pub alternate: Option<u32>,
+    /// Command posts: seconds from going down to the alternate taking over.
+    #[serde(default = "default_handover")]
+    pub handover_s: f64,
+    /// Command posts: orders issued in the gap are lost or queued.
+    #[serde(default)]
+    pub orders_in_gap: GapPolicy,
 }
 
 /// What a zone governs.
@@ -105,9 +150,13 @@ pub struct Zone {
     /// Fields set here override the unit's own, its group's and its side's.
     #[serde(default)]
     pub doctrine: Doctrine,
-    /// The choke point this zone belongs to, if any (for display and grouping).
+    /// The choke point this zone belongs to, if any.
     #[serde(default)]
     pub choke_point: Option<String>,
+    /// Engage zones: units that engage contacts inside the zone on their own (one round per
+    /// contact per AI period, under the zone's rules).
+    #[serde(default)]
+    pub shooters: Vec<UnitId>,
 }
 
 /// A unit being served at a facility.
@@ -116,6 +165,21 @@ pub struct ServiceState {
     pub facility: u32,
     pub since: Tick,
     pub rearmed: bool,
+}
+
+/// A mission-killed unit sent to a port, with the mission it resumes once repaired.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Diversion {
+    pub facility: u32,
+    pub mission: Option<Mission>,
+}
+
+/// A player's order held while its command post is down.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct QueuedOrder {
+    pub release: Tick,
+    pub seq: u64,
+    pub command: Command,
 }
 
 /// A unit's systems and weapons as it entered the exercise: what repair and rearming restore.
@@ -138,6 +202,21 @@ pub struct PlanningLayer {
     /// Units alongside a facility.
     #[serde(default)]
     pub service: BTreeMap<UnitId, ServiceState>,
+    /// Command posts that are down, and since when.
+    #[serde(default)]
+    pub down: BTreeMap<u32, Tick>,
+    /// Command posts carried by a unit that has been in play (only those can be lost).
+    #[serde(default)]
+    pub manned: BTreeSet<u32>,
+    /// Orders held for a command post's alternate.
+    #[serde(default)]
+    pub queued: Vec<QueuedOrder>,
+    /// Units on their way to (or at) a port for repair.
+    #[serde(default)]
+    pub diverted: BTreeMap<UnitId, Diversion>,
+    /// (choke point, unit): other sides' units inside a choke point now.
+    #[serde(default)]
+    pub inside: BTreeSet<(String, UnitId)>,
 }
 
 /// Checks a planning layer before it is set.
@@ -159,6 +238,25 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         if f.range_m.is_some_and(|r| !(r.is_finite() && r > 0.0)) {
             return Err(format!("facility {:?} has a range that is not > 0", f.name));
         }
+        if !(f.handover_s.is_finite() && f.handover_s >= 0.0) {
+            return Err(format!(
+                "facility {:?} has a negative handover delay",
+                f.name
+            ));
+        }
+    }
+    for f in facilities {
+        if let Some(a) = f.alternate {
+            let ok = facilities.iter().any(|g| {
+                g.id == a && g.id != f.id && g.side == f.side && g.kind == FacilityKind::CommandPost
+            });
+            if f.kind != FacilityKind::CommandPost || !ok {
+                return Err(format!(
+                    "facility {:?}: an alternate must be another command post of the same side",
+                    f.name
+                ));
+            }
+        }
     }
     let mut ids = BTreeSet::new();
     for z in zones {
@@ -171,18 +269,27 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         z.area
             .validate()
             .map_err(|e| format!("zone {:?}: {e}", z.name))?;
+        if z.kind == ZoneKind::Sense && !z.shooters.is_empty() {
+            return Err(format!(
+                "zone {:?}: only engage zones have shooters",
+                z.name
+            ));
+        }
     }
     Ok(())
 }
 
 impl PlanningLayer {
-    /// Replaces the facilities and zones (sorted by id). Service in progress at facilities that
-    /// still exist carries on.
+    /// Replaces the facilities and zones (sorted by id). Service, diversions and queued orders
+    /// at facilities that still exist carry on.
     pub fn set(&mut self, mut facilities: Vec<Facility>, mut zones: Vec<Zone>) {
         facilities.sort_by_key(|f| f.id);
         zones.sort_by_key(|z| z.id);
         let kept: BTreeSet<u32> = facilities.iter().map(|f| f.id).collect();
         self.service.retain(|_, s| kept.contains(&s.facility));
+        self.diverted.retain(|_, d| kept.contains(&d.facility));
+        self.down.retain(|f, _| kept.contains(f));
+        self.manned.retain(|f| kept.contains(f));
         self.facilities = facilities;
         self.zones = zones;
     }
@@ -222,10 +329,14 @@ impl PlanningLayer {
         }
     }
 
+    fn facility(&self, id: u32) -> Option<&Facility> {
+        self.facilities.iter().find(|f| f.id == id)
+    }
+
     /// Adds the layer to the state hash (nothing when empty, so scenarios without one keep
     /// their hashes).
     pub(crate) fn hash(&self, h: &mut StateHash) {
-        if self.facilities.is_empty() && self.zones.is_empty() && self.service.is_empty() {
+        if *self == Self::default() {
             return;
         }
         // Serialised form: every field, in a fixed order.
@@ -238,53 +349,202 @@ impl PlanningLayer {
     }
 }
 
-/// Refuses a player's order to a unit beyond the range of every command post of its side
-/// (only when the side has command posts).
-pub(crate) fn check_command_post(world: &World, cmd: &Command) -> Result<(), String> {
-    if !matches!(cmd.issuer, crate::command::Issuer::Player { .. }) {
-        return Ok(());
-    }
-    let (Some(side), Some(unit)) = (cmd.side, cmd.payload.target_unit()) else {
-        return Ok(());
-    };
-    let layer = world.resource::<PlanningLayer>();
-    let mut posts = layer
-        .facilities
-        .iter()
-        .filter(|f| f.side == side && f.kind == FacilityKind::CommandPost)
-        .peekable();
-    if posts.peek().is_none() {
-        return Ok(());
-    }
-    let Some(at) = world
+fn position_of(world: &World, unit: UnitId) -> Option<GeoPoint> {
+    world
         .resource::<UnitIndex>()
         .0
         .get(&unit)
         .and_then(|e| world.get::<Position>(*e))
         .map(|p| p.point)
-    else {
-        return Ok(()); // the order itself reports the unknown unit
-    };
-    if posts.any(|f| sim_geo::inverse(f.position, at).distance_m <= f.range_m.unwrap_or(f.radius_m))
-    {
-        Ok(())
-    } else {
-        Err(format!("{unit} is out of range of every command post"))
+}
+
+/// Where a command post is now (`None`: carried by a unit that has been lost).
+fn post_position(world: &World, f: &Facility) -> Option<GeoPoint> {
+    match f.unit {
+        Some(u) => position_of(world, u),
+        None => Some(f.position),
     }
 }
 
-/// Each tick: alerts for contacts gained in sense zones; every [`SERVICE_PERIOD_TICKS`]:
-/// repair and rearming at facilities.
-pub(crate) fn planning_system(world: &mut World) {
-    if world.resource::<PlanningLayer>().facilities.is_empty()
-        && world.resource::<PlanningLayer>().zones.is_empty()
+/// When the post went down (`None`: it is up).
+fn down_since(world: &World, layer: &PlanningLayer, f: &Facility, now: Tick) -> Option<Tick> {
+    if let Some(t) = layer.down.get(&f.id) {
+        return Some(*t);
+    }
+    (post_position(world, f).is_none()).then_some(now)
+}
+
+fn clock(t: Tick) -> String {
+    let s = t.0;
+    format!("{:02}:{:02}:{:02}", s / 3600, (s / 60) % 60, s % 60)
+}
+
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn handover_tick(since: Tick, f: &Facility) -> Tick {
+    // `handover_s` is checked finite and ≥ 0.
+    Tick(since.0 + f.handover_s.ceil() as u64)
+}
+
+/// Whether a command may go ahead under the side's command posts.
+pub(crate) enum Authority {
+    Ok,
+    Refused(String),
+    Queued { release: Tick, reason: String },
+}
+
+/// Command-post authority for a player's order to a unit: it must be within range of a post
+/// that commands it and is up, or of that post's alternate once the handover delay has passed.
+/// Sides without command posts, and orders not from a player, are not limited.
+pub(crate) fn command_authority(world: &World, cmd: &Command) -> Authority {
+    if !matches!(cmd.issuer, Issuer::Player { .. }) {
+        return Authority::Ok;
+    }
+    let (Some(side), Some(unit)) = (cmd.side, cmd.payload.target_unit()) else {
+        return Authority::Ok;
+    };
+    let layer = world.resource::<PlanningLayer>();
+    let posts: Vec<&Facility> = layer
+        .facilities
+        .iter()
+        .filter(|f| f.side == side && f.kind == FacilityKind::CommandPost)
+        .collect();
+    if posts.is_empty() {
+        return Authority::Ok;
+    }
+    let Some(at) = position_of(world, unit) else {
+        return Authority::Ok; // the order itself reports the unknown unit
+    };
+    let now = world.resource::<SimClock>().tick;
+    let in_range = |f: &Facility| {
+        post_position(world, f)
+            .is_some_and(|p| sim_geo::inverse(p, at).distance_m <= f.range_m.unwrap_or(f.radius_m))
+    };
+    let commanding: Vec<&Facility> = posts
+        .iter()
+        .copied()
+        .filter(|f| f.subordinates.is_empty() || f.subordinates.contains(&unit))
+        .collect();
+    if commanding.is_empty() {
+        return Authority::Refused(format!("{unit} is not assigned to a command post"));
+    }
+    let mut pending: Option<(Tick, &Facility, &Facility)> = None;
+    for p in &commanding {
+        match down_since(world, layer, p, now) {
+            None => {
+                if in_range(p) {
+                    return Authority::Ok;
+                }
+            }
+            Some(since) => {
+                let Some(alt) = p.alternate.and_then(|a| layer.facility(a)) else {
+                    continue;
+                };
+                if down_since(world, layer, alt, now).is_some() {
+                    continue;
+                }
+                let at_tick = handover_tick(since, p);
+                if now >= at_tick {
+                    if in_range(alt) {
+                        return Authority::Ok;
+                    }
+                } else if pending.is_none_or(|(t, _, _)| at_tick < t) {
+                    pending = Some((at_tick, p, alt));
+                }
+            }
+        }
+    }
+    if let Some((release, p, alt)) = pending {
+        let reason = format!(
+            "{} is down; command passes to {} at {}",
+            p.name,
+            alt.name,
+            clock(release)
+        );
+        return match p.orders_in_gap {
+            GapPolicy::Queue => Authority::Queued { release, reason },
+            GapPolicy::Lose => Authority::Refused(reason),
+        };
+    }
+    if commanding
+        .iter()
+        .all(|p| down_since(world, layer, p, now).is_some())
     {
-        return;
+        return Authority::Refused(format!("{unit}'s command posts are down"));
+    }
+    Authority::Refused(format!("{unit} is out of range of every command post"))
+}
+
+/// Each tick: command posts lost with their units, queued orders, and alerts for contacts gained
+/// in sense zones. Every AI period: engage-zone shooters and choke-point transits. Every
+/// [`SERVICE_PERIOD_TICKS`]: diversions to port, repair and rearming.
+pub(crate) fn planning_system(world: &mut World) {
+    {
+        let layer = world.resource::<PlanningLayer>();
+        if layer.facilities.is_empty() && layer.zones.is_empty() && layer.queued.is_empty() {
+            return;
+        }
     }
     let tick = world.resource::<SimClock>().tick;
+    posts_down(world, tick);
+    release_queued(world, tick);
     sense_alerts(world, tick);
+    if tick.0.is_multiple_of(AI_PERIOD_TICKS) {
+        zone_shooters(world, tick);
+        choke_transits(world, tick);
+    }
     if tick.0.is_multiple_of(SERVICE_PERIOD_TICKS) {
+        divert(world, tick);
         serve(world, tick);
+    }
+}
+
+fn posts_down(world: &mut World, tick: Tick) {
+    let (manned, lost): (Vec<u32>, Vec<u32>) = {
+        let layer = world.resource::<PlanningLayer>();
+        let carried = layer
+            .facilities
+            .iter()
+            .filter(|f| f.kind == FacilityKind::CommandPost && f.unit.is_some());
+        let manned = carried
+            .clone()
+            .filter(|f| !layer.manned.contains(&f.id) && post_position(world, f).is_some())
+            .map(|f| f.id)
+            .collect();
+        let lost = carried
+            .filter(|f| layer.manned.contains(&f.id) && !layer.down.contains_key(&f.id))
+            .filter(|f| post_position(world, f).is_none())
+            .map(|f| f.id)
+            .collect();
+        (manned, lost)
+    };
+    world.resource_mut::<PlanningLayer>().manned.extend(manned);
+    for id in lost {
+        world.resource_mut::<PlanningLayer>().down.insert(id, tick);
+        world
+            .resource_mut::<EventLog>()
+            .push(tick, SimEventKind::CommandPostDown { facility: id });
+    }
+}
+
+fn release_queued(world: &mut World, tick: Tick) {
+    let due: Vec<QueuedOrder> = {
+        let mut layer = world.resource_mut::<PlanningLayer>();
+        let (due, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut layer.queued)
+            .into_iter()
+            .partition(|q| q.release <= tick);
+        layer.queued = keep;
+        due
+    };
+    for q in due {
+        let outcome = match command_authority(world, &q.command) {
+            Authority::Ok => apply_command(world, &q.command),
+            Authority::Refused(r) | Authority::Queued { reason: r, .. } => Err(r),
+        };
+        let kind = match outcome {
+            Ok(()) => SimEventKind::QueuedOrderApplied { seq: q.seq },
+            Err(reason) => SimEventKind::QueuedOrderDropped { seq: q.seq, reason },
+        };
+        world.resource_mut::<EventLog>().push(tick, kind);
     }
 }
 
@@ -305,13 +565,7 @@ fn sense_alerts(world: &mut World, tick: Tick) {
         })
         .collect();
     for (side, number, target) in gained.into_iter().rev() {
-        let Some(at) = world
-            .resource::<UnitIndex>()
-            .0
-            .get(&target)
-            .and_then(|e| world.get::<Position>(*e))
-            .map(|p| p.point)
-        else {
+        let Some(at) = position_of(world, target) else {
             continue;
         };
         let Some((zone, name)) = world
@@ -337,6 +591,193 @@ fn sense_alerts(world: &mut World, tick: Tick) {
                 contact: number,
             },
         );
+    }
+}
+
+/// Engage-zone shooters: for each engage zone (id order), each of its side's contacts believed
+/// inside and not already under attack (contact-number order) is engaged by the first assigned
+/// shooter that can, one round, at most once per shooter per period.
+fn zone_shooters(world: &mut World, tick: Tick) {
+    let zones: Vec<Zone> = world
+        .resource::<PlanningLayer>()
+        .zones
+        .iter()
+        .filter(|z| z.kind == ZoneKind::Engage && !z.shooters.is_empty())
+        .cloned()
+        .collect();
+    let mut fired: BTreeSet<UnitId> = BTreeSet::new();
+    for z in zones {
+        let under_attack: BTreeSet<u32> = world
+            .resource::<WeaponsInFlight>()
+            .list
+            .iter()
+            .filter(|w| w.side == z.side)
+            .map(|w| w.contact)
+            .collect();
+        let mut contacts: Vec<u32> = world
+            .resource::<ContactTable>()
+            .iter()
+            .filter(|(s, c)| {
+                *s == z.side
+                    && !under_attack.contains(&c.number)
+                    && z.area.contains(c.estimate_at(tick).position)
+            })
+            .map(|(_, c)| c.number)
+            .collect();
+        contacts.sort_unstable();
+        for contact in contacts {
+            for &shooter in &z.shooters {
+                if fired.contains(&shooter) {
+                    continue;
+                }
+                let Some(e) = world.resource::<UnitIndex>().0.get(&shooter).copied() else {
+                    continue;
+                };
+                let ready = world.get::<Unit>(e).is_some_and(|u| u.side == z.side)
+                    && world
+                        .get::<Health>(e)
+                        .is_some_and(|h| h.status == Status::Operational);
+                if !ready {
+                    continue;
+                }
+                if let Some(weapon) = engage_first_weapon(world, shooter, e, z.side, contact, tick)
+                {
+                    fired.insert(shooter);
+                    world.resource_mut::<EventLog>().push(
+                        tick,
+                        SimEventKind::ZoneEngage {
+                            zone: z.id,
+                            unit: shooter,
+                            contact,
+                            weapon,
+                        },
+                    );
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/// Logs other sides' units entering a choke point (any zone carrying its name).
+fn choke_transits(world: &mut World, tick: Tick) {
+    let mut chokes: BTreeMap<String, (SideId, Vec<Area>)> = BTreeMap::new();
+    for z in &world.resource::<PlanningLayer>().zones {
+        if let Some(name) = &z.choke_point {
+            chokes
+                .entry(name.clone())
+                .or_insert_with(|| (z.side, Vec::new()))
+                .1
+                .push(z.area.clone());
+        }
+    }
+    if chokes.is_empty() {
+        return;
+    }
+    let mut units: Vec<(UnitId, SideId, GeoPoint)> = world
+        .query::<(&Unit, &Position)>()
+        .iter(world)
+        .map(|(u, p)| (u.id, u.side, p.point))
+        .collect();
+    units.sort_by_key(|u| u.0);
+    let mut now_inside = BTreeSet::new();
+    for (name, (owner, areas)) in &chokes {
+        for &(id, side, at) in &units {
+            if side != *owner && areas.iter().any(|a| a.contains(at)) {
+                now_inside.insert((name.clone(), id));
+            }
+        }
+    }
+    let entered: Vec<(String, UnitId)> = {
+        let layer = world.resource::<PlanningLayer>();
+        now_inside.difference(&layer.inside).cloned().collect()
+    };
+    world.resource_mut::<PlanningLayer>().inside = now_inside;
+    for (choke_point, unit) in entered {
+        world
+            .resource_mut::<EventLog>()
+            .push(tick, SimEventKind::ChokePointTransit { choke_point, unit });
+    }
+}
+
+/// Mission-killed units on a mission go to the nearest port of their side that repairs; they
+/// stop there, and resume their mission once fully repaired.
+fn divert(world: &mut World, tick: Tick) {
+    let ports: Vec<Facility> = world
+        .resource::<PlanningLayer>()
+        .facilities
+        .iter()
+        .filter(|f| f.kind != FacilityKind::CommandPost && f.services.repair)
+        .cloned()
+        .collect();
+    if ports.is_empty() {
+        return;
+    }
+    let mut candidates: Vec<(UnitId, Entity, SideId, GeoPoint)> = world
+        .query::<(Entity, &Unit, &Position, &Health, &MissionState)>()
+        .iter(world)
+        .filter(|(_, _, _, h, m)| h.status == Status::MissionKilled && m.mission.is_some())
+        .map(|(e, u, p, _, _)| (u.id, e, u.side, p.point))
+        .collect();
+    candidates.sort_by_key(|c| c.0);
+    for (id, e, side, at) in candidates {
+        if world.resource::<PlanningLayer>().diverted.contains_key(&id) {
+            continue;
+        }
+        let Some(port) = ports
+            .iter()
+            .filter(|f| f.side == side)
+            .min_by(|a, b| {
+                let da = sim_geo::inverse(at, a.position).distance_m;
+                let db = sim_geo::inverse(at, b.position).distance_m;
+                da.total_cmp(&db).then(a.id.cmp(&b.id))
+            })
+            .cloned()
+        else {
+            continue;
+        };
+        let mission = world
+            .get_mut::<MissionState>(e)
+            .and_then(|mut m| m.mission.take());
+        world.resource_mut::<PlanningLayer>().diverted.insert(
+            id,
+            Diversion {
+                facility: port.id,
+                mission,
+            },
+        );
+        set_route(world, e, id, port.position, tick);
+        ensure_moving(world, e, 0.5);
+        world.resource_mut::<EventLog>().push(
+            tick,
+            SimEventKind::DivertedToPort {
+                unit: id,
+                facility: port.id,
+            },
+        );
+    }
+    // Diverted units that have arrived stop alongside.
+    let arrived: Vec<(UnitId, Entity)> = {
+        let layer = world.resource::<PlanningLayer>();
+        layer
+            .diverted
+            .iter()
+            .filter_map(|(id, d)| {
+                let f = layer.facility(d.facility)?;
+                let e = *world.resource::<UnitIndex>().0.get(id)?;
+                let at = world.get::<Position>(e)?.point;
+                (sim_geo::inverse(at, f.position).distance_m <= f.radius_m).then_some((*id, e))
+            })
+            .collect()
+    };
+    for (_, e) in arrived {
+        if let Some(mut k) = world.get_mut::<Kinematics>(e) {
+            k.ordered_speed_mps = 0.0;
+        }
+        if let Some(mut r) = world.get_mut::<Route>(e) {
+            r.waypoints.clear();
+            r.next = 0;
+        }
     }
 }
 
@@ -433,7 +874,7 @@ fn repair(world: &mut World, id: UnitId, e: Entity, facility: u32, tick: Tick) {
     if complete {
         h.criticals.clear();
     }
-    h.status = sim_weapons::Status::assess(&h.profile, h.damage, &h.criticals);
+    h.status = Status::assess(&h.profile, h.damage, &h.criticals);
     if !complete {
         return;
     }
@@ -449,4 +890,12 @@ fn repair(world: &mut World, id: UnitId, e: Entity, facility: u32, tick: Tick) {
     world
         .resource_mut::<EventLog>()
         .push(tick, SimEventKind::UnitRepaired { unit: id, facility });
+    // A unit sent here for repair takes up its mission again.
+    let resumed = world.resource_mut::<PlanningLayer>().diverted.remove(&id);
+    if let Some(mission) = resumed.and_then(|d| d.mission) {
+        if let Some(mut m) = world.get_mut::<MissionState>(e) {
+            m.mission = Some(mission);
+            m.complete = false;
+        }
+    }
 }

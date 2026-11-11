@@ -2,7 +2,7 @@
   "format": "nws-scenario",
   "format_version": 5,
   "name": "Phase 3 — Choke point planning",
-  "description": "Planning-layer demonstrator. Blue holds a choke point east of Wilsons Promontory with a sense zone (alerts, radars on) and an inner engage zone (weapons free against unfriendly contacts). A surface action group patrols the western approach while a corvette holds the passage. Two Red corvettes transit west through it. Blue has a command post ashore, a sheltering port with repair and rearm, an anchorage and a refuelling point. Postures are unfriendly, so outside the engage zone weapons stay tight. All platforms are generic database classes with no real-world values.",
+  "description": "Planning-layer demonstrator. Blue holds a choke point east of Wilsons Promontory with a sense zone (alerts, radars on) and an inner engage zone (weapons free against unfriendly contacts). A surface action group patrols the western approach while a corvette holds the passage. Two Red corvettes transit west through it. Blue commands from the destroyer, with its maritime HQ ashore as the alternate (5-minute handover, orders queued in the gap); the corvette in the passage is the engage zone's assigned shooter. Blue has a sheltering port with repair and rearm, an anchorage and a refuelling point. Postures are unfriendly, so outside the engage zone weapons stay tight. All platforms are generic database classes with no real-world values.",
   "seed": 20261112,
   "duration_s": 10800,
   "environment": {
@@ -193,6 +193,22 @@
       },
       "radius_m": 1000,
       "range_m": 400000
+    },
+    {
+      "id": 6,
+      "name": "Blue flagship command",
+      "side": 1,
+      "kind": "command_post",
+      "position": {
+        "lat_deg": -39.6,
+        "lon_deg": 146.4
+      },
+      "radius_m": 500,
+      "range_m": 150000,
+      "unit": 1,
+      "alternate": 1,
+      "handover_s": 300,
+      "orders_in_gap": "queue"
     }
   ],
   "zones": [
@@ -231,7 +247,10 @@
         "wcs": "free",
         "engage_unfriendly": true
       },
-      "choke_point": "Kent passage"
+      "choke_point": "Kent passage",
+      "shooters": [
+        3
+      ]
     }
   ],
   "action_groups": [
@@ -245,7 +264,10 @@
           "bearing_deg": 180.0,
           "range_m": 3000
         }
-      ]
+      ],
+      "doctrine": {
+        "emcon": "active"
+      }
     }
   ],
   "reference_points": [

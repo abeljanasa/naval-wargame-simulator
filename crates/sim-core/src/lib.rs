@@ -60,9 +60,9 @@ pub use ids::{SideId, UnitId};
 pub use mines::{Minefield, Minefields, MINE_CHECK_PERIOD_TICKS};
 pub use optical::default_length_m;
 pub use planning::{
-    validate_planning, Facility, FacilityKind, Loadout, PlanningLayer, ServiceState, Services,
-    Zone, ZoneKind, ALONGSIDE_SPEED_MPS, REARM_TICKS, REPAIR_FRACTION_PER_MIN,
-    SERVICE_PERIOD_TICKS,
+    validate_planning, Diversion, Facility, FacilityKind, GapPolicy, Loadout, PlanningLayer,
+    QueuedOrder, ServiceState, Services, Zone, ZoneKind, ALONGSIDE_SPEED_MPS, DEFAULT_HANDOVER_S,
+    REARM_TICKS, REPAIR_FRACTION_PER_MIN, SERVICE_PERIOD_TICKS,
 };
 pub use point_defence::{PointDefence, Shot};
 pub use rng::{RngStreams, StreamId};

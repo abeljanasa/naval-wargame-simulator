@@ -25,6 +25,11 @@
 
   These are planning-level rates for a TTX, not dockyard engineering. They are constants in one place, ready for database-driven facility attributes later.
 - **A loadout component** (sensors, maximum speed, stores at spawn) makes repair and rearming restore what the unit started with. It also resolves the backlog item *"Repair restores sensors and speed lost to earlier criticals"*. It is derived from the spawn command, so it is not hashed.
+- **Command authority, not a comms network.** A post commands its subordinates within a range. A post carried by a unit is lost with it, and an alternate takes over after a configurable delay. Orders in the gap are lost or queued per the post's setting. This is the §7.1 behaviour a facilitator can see and exploit. Comms links, relays and jamming of posts are left for the comms model.
+- **Queued orders live in the planning layer, not the command log.** Re-inserting them into the log would put them in exercise records twice, and a replay would apply them twice. They are state (saved and hashed), released by the planning system.
+- **Only units on a mission divert for repair.** An AI-run unit that is mission-killed is useless where it is. A player's unit is the player's decision.
+- **Engage-zone shooters reuse the AI's weapon choice** (`engage_first_weapon`): the same release rule and checks as any engagement, under the zone's doctrine.
+- **Per-zone ROE override is a logged `SetPlanning`** from the umpire seat, so the override is attributable, replays exactly, and appears in the AAR.
 - **Action groups are a scenario construct.** Members become escort missions on the leader at build time, reusing the mission AI that already keeps station. The core needs no group entity.
 - **Hashed only when present.** The planning layer is hashed when it has content, so every existing golden hash is unchanged. The new demonstrator has its own golden.
 
@@ -33,7 +38,12 @@
 - **Scenario format 5:** `facilities`, `zones`, `action_groups`.
 - **Save format 17:** planning layer and loadouts; older saves load.
 - **New command:** `SetPlanning`.
-- **New events:** `ZoneAlert`, `UnitRepaired`, `UnitRearmed`.
+- **New events:**
+  - `ZoneAlert`, `ZoneEngage`, `ChokePointTransit`;
+  - `UnitRepaired`, `UnitRearmed`, `DivertedToPort`;
+  - `CommandPostDown`, `QueuedOrderApplied`, `QueuedOrderDropped`.
 - **`sim-events`:** `Area::validate` is now public.
-- **Desktop:** `SessionInfo` gains `facilities`, `zones` and `action_groups`, filtered by seat.
+- **Desktop:**
+  - `SessionInfo` gains `facilities`, `zones` and `action_groups`, filtered by seat.
+  - New command: `order_zone_doctrine`.
 - **New demonstrator:** `phase3-planning-demo.json`, with its golden hash; the existing golden hashes are unchanged.

@@ -324,6 +324,37 @@ pub enum SimEventKind {
         unit: UnitId,
         facility: u32,
     },
+    /// A command post was lost with the unit carrying it.
+    CommandPostDown {
+        facility: u32,
+    },
+    /// An order held while its command post was down was carried out.
+    QueuedOrderApplied {
+        seq: u64,
+    },
+    /// An order held while its command post was down could not be carried out.
+    QueuedOrderDropped {
+        seq: u64,
+        reason: String,
+    },
+    /// An engage zone's assigned shooter engaged a contact inside it (the launch or hit roll
+    /// follows).
+    ZoneEngage {
+        zone: u32,
+        unit: UnitId,
+        contact: u32,
+        weapon: String,
+    },
+    /// Another side's unit entered a choke point.
+    ChokePointTransit {
+        choke_point: String,
+        unit: UnitId,
+    },
+    /// A mission-killed unit was sent to a port for repair.
+    DivertedToPort {
+        unit: UnitId,
+        facility: u32,
+    },
 }
 
 #[derive(Debug, Clone, Default, Resource, Serialize, Deserialize)]

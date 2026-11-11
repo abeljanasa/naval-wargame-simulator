@@ -1097,6 +1097,7 @@ fn zone(id: u32, kind: ZoneKind, area: Area, doctrine: Doctrine) -> Zone {
         area,
         doctrine,
         choke_point: None,
+        shooters: vec![],
     }
 }
 
@@ -1117,6 +1118,11 @@ fn facility(
         range_m: None,
         berths,
         services,
+        unit: None,
+        subordinates: vec![],
+        alternate: None,
+        handover_s: DEFAULT_HANDOVER_S,
+        orders_in_gap: GapPolicy::Lose,
     }
 }
 
@@ -1461,4 +1467,231 @@ fn only_privileged_issuers_set_the_planning_layer_and_bad_layers_are_refused() {
     ] {
         assert!(Simulation::new(1).submit(bad).is_err());
     }
+}
+
+fn speed_order(tick: u64, unit: u64) -> Command {
+    cmd(
+        tick,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        CommandPayload::SetSpeed {
+            unit: UnitId(unit),
+            speed_mps: 3.0,
+        },
+    )
+}
+
+fn destroy(tick: u64, unit: u64) -> Command {
+    cmd(
+        tick,
+        umpire(),
+        None,
+        CommandPayload::Adjudicate {
+            reason: "test".into(),
+            action: Adjudication::DestroyUnit { unit: UnitId(unit) },
+        },
+    )
+}
+
+fn ordered_speed(sim: &mut Simulation, unit: u64) -> f64 {
+    sim.snapshot(Viewer::WhiteCell)
+        .units
+        .iter()
+        .find(|u| u.id == UnitId(unit))
+        .map(|u| u.ordered_speed_mps)
+        .unwrap()
+}
+
+/// Blue unit 1 at the origin, a flagship (unit 3) carrying Blue's command post 20 km north,
+/// and an alternate post ashore 50 km west, taking over after 120 s.
+fn command_scene(gap: GapPolicy) -> Simulation {
+    let mut afloat = facility(1, FacilityKind::CommandPost, ORIGIN, Services::default(), 0);
+    afloat.unit = Some(UnitId(3));
+    afloat.range_m = Some(100_000.0);
+    afloat.alternate = Some(2);
+    afloat.handover_s = 120.0;
+    afloat.orders_in_gap = gap;
+    let mut ashore = facility(
+        2,
+        FacilityKind::CommandPost,
+        direct(ORIGIN, 270.0, 50_000.0).point,
+        Services::default(),
+        0,
+    );
+    ashore.range_m = Some(100_000.0);
+    // The alternate commands only unit 1 until it takes over the flagship's subordinates.
+    ashore.subordinates = vec![UnitId(99)];
+    let mut sim = planned_scene(30_000.0, vec![afloat, ashore], vec![]);
+    let mut flagship = unit(3, 1, direct(ORIGIN, 0.0, 20_000.0).point, vec![], &[], None);
+    flagship.tick = Tick(1);
+    sim.submit(flagship).unwrap();
+    sim.step();
+    sim
+}
+
+#[test]
+fn a_lost_command_post_hands_over_to_its_alternate_after_the_delay() {
+    let mut sim = command_scene(GapPolicy::Lose);
+    sim.submit(speed_order(2, 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim).is_empty(), "the flagship's post is up");
+    sim.submit(destroy(3, 3)).unwrap();
+    sim.run_ticks(2);
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::CommandPostDown { facility: 1 })));
+    sim.submit(speed_order(5, 1)).unwrap();
+    sim.step();
+    let r = rejected(&sim);
+    assert!(
+        r.last()
+            .unwrap()
+            .contains("is down; command passes to F2 at 00:02:03"),
+        "{r:?}"
+    );
+    // After the handover the alternate commands the flagship's subordinates.
+    sim.run_until(Tick(124));
+    sim.submit(speed_order(124, 1)).unwrap();
+    sim.step();
+    assert_eq!(rejected(&sim).len(), r.len(), "accepted after the handover");
+    assert!((ordered_speed(&mut sim, 1) - 3.0).abs() < 1e-9);
+}
+
+#[test]
+fn orders_in_the_gap_can_be_queued_for_the_alternate() {
+    let mut sim = command_scene(GapPolicy::Queue);
+    sim.submit(destroy(2, 3)).unwrap();
+    sim.run_ticks(2);
+    sim.submit(speed_order(4, 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim)
+        .last()
+        .unwrap()
+        .starts_with("queued: F1 is down"));
+    assert!(ordered_speed(&mut sim, 1) < 1e-9);
+    sim.run_until(Tick(125));
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::QueuedOrderApplied { .. })));
+    assert!((ordered_speed(&mut sim, 1) - 3.0).abs() < 1e-9);
+    // The run replays exactly from its command log.
+    let mut replay = Simulation::new(1);
+    for c in sim.command_log() {
+        replay.submit(c.command).unwrap();
+    }
+    replay.run_until(sim.tick());
+    assert_eq!(replay.state_hash(), sim.state_hash());
+}
+
+#[test]
+fn a_command_post_commands_only_its_subordinates() {
+    let mut post = facility(1, FacilityKind::CommandPost, ORIGIN, Services::default(), 0);
+    post.range_m = Some(100_000.0);
+    post.subordinates = vec![UnitId(7)];
+    let mut sim = planned_scene(30_000.0, vec![post], vec![]);
+    sim.submit(speed_order(1, 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim)[0].contains("not assigned to a command post"));
+}
+
+#[test]
+fn engage_zone_shooters_engage_contacts_inside_on_their_own() {
+    let red = direct(ORIGIN, 90.0, 30_000.0).point;
+    let mut kill_box = zone(
+        1,
+        ZoneKind::Engage,
+        circle(red, 5_000.0),
+        Doctrine {
+            wcs: Some(Wcs::Free),
+            ..Doctrine::default()
+        },
+    );
+    kill_box.shooters = vec![UnitId(1)];
+    kill_box.choke_point = Some("Narrows".into());
+    let mut sim = planned_scene(30_000.0, vec![], vec![kill_box]);
+    sim.run_until(Tick(30));
+    let ev = sim.events();
+    assert!(ev.iter().any(|e| matches!(
+        &e.kind,
+        SimEventKind::ZoneEngage { zone: 1, unit: UnitId(1), contact: 1, weapon } if weapon == "T-ASM"
+    )));
+    assert!(ev
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::WeaponLaunched { .. })));
+    // The red ship inside the choke point is logged once.
+    let transits: Vec<_> = ev
+        .iter()
+        .filter(|e| matches!(&e.kind, SimEventKind::ChokePointTransit { unit: UnitId(2), choke_point } if choke_point == "Narrows"))
+        .collect();
+    assert_eq!(transits.len(), 1);
+}
+
+#[test]
+fn a_mission_killed_unit_diverts_to_port_is_repaired_and_resumes_its_mission() {
+    let port_at = direct(ORIGIN, 0.0, 8_000.0).point;
+    let port = facility(
+        1,
+        FacilityKind::ShelteringPort,
+        port_at,
+        Services {
+            repair: true,
+            rearm: false,
+            refuel: false,
+        },
+        0,
+    );
+    let mut sim = planned_scene(80_000.0, vec![port], vec![]);
+    let patrol = Mission::Patrol {
+        centre: ORIGIN,
+        radius_m: 5_000.0,
+    };
+    for c in [
+        cmd(
+            1,
+            Issuer::Scenario,
+            None,
+            CommandPayload::AssignMission {
+                unit: UnitId(1),
+                mission: Some(patrol.clone()),
+            },
+        ),
+        cmd(
+            1,
+            umpire(),
+            None,
+            CommandPayload::Adjudicate {
+                reason: "test".into(),
+                action: Adjudication::SetDamage {
+                    unit: UnitId(1),
+                    damage_dp: 150.0,
+                    clear_effects: false,
+                },
+            },
+        ),
+    ] {
+        sim.submit(c).unwrap();
+    }
+    sim.run_until(Tick(61));
+    assert!(sim.events().iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::DivertedToPort {
+            unit: UnitId(1),
+            facility: 1
+        }
+    )));
+    sim.run_until(Tick(4 * 3600));
+    let ev = sim.events();
+    assert!(ev.iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::UnitRepaired {
+            unit: UnitId(1),
+            facility: 1
+        }
+    )));
+    let save = sim.save();
+    let u1 = save.units.iter().find(|r| r.unit.id == UnitId(1)).unwrap();
+    assert_eq!(u1.mission.mission, Some(patrol));
+    assert!(save.planning.diverted.is_empty());
 }

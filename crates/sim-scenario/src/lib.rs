@@ -203,6 +203,9 @@ pub struct ActionGroup {
     pub side: SideId,
     pub leader: UnitId,
     pub members: Vec<GroupStation>,
+    /// Group doctrine for the leader and members (they are put in a group of this name).
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub doctrine: Doctrine,
 }
 
 /// One member's station in a surface action group.
@@ -433,6 +436,29 @@ impl Scenario {
         for g in &self.action_groups {
             if g.name.trim().is_empty() || !names.insert(g.name.trim()) {
                 out.push(format!("action group {:?} needs a unique name", g.name));
+            }
+            if self
+                .groups
+                .iter()
+                .any(|d| d.side == g.side && d.name == g.name)
+            {
+                out.push(format!(
+                    "action group {:?} has the name of a declared group",
+                    g.name
+                ));
+            }
+            for id in std::iter::once(g.leader).chain(g.members.iter().map(|m| m.unit)) {
+                if let Some(other) = self
+                    .units
+                    .iter()
+                    .find(|u| u.id == id)
+                    .and_then(|u| u.group.as_ref())
+                {
+                    out.push(format!(
+                        "unit {id} is in group {other:?}, so it cannot join action group {:?}",
+                        g.name
+                    ));
+                }
             }
             if side_of.get(&g.leader) != Some(&g.side) {
                 out.push(format!(
@@ -763,9 +789,37 @@ impl Scenario {
                 })
             })
             .collect();
+        let in_group: BTreeMap<UnitId, String> = self
+            .action_groups
+            .iter()
+            .flat_map(|g| {
+                std::iter::once(g.leader)
+                    .chain(g.members.iter().map(|m| m.unit))
+                    .map(move |u| (u, g.name.clone()))
+            })
+            .collect();
+        for g in &self.action_groups {
+            if g.doctrine != Doctrine::default() {
+                sim.submit(Command {
+                    tick: Tick(0),
+                    issuer: Issuer::Scenario,
+                    side: None,
+                    payload: CommandPayload::SetDoctrine {
+                        scope: DoctrineScope::Group {
+                            side: g.side,
+                            group: g.name.clone(),
+                        },
+                        doctrine: g.doctrine,
+                    },
+                })?;
+            }
+        }
         for (mut s, u) in spawns.into_iter().zip(&self.units) {
             if let Some(m) = stations.get(&u.id) {
                 s.mission = Some(m.clone());
+            }
+            if let Some(name) = in_group.get(&u.id) {
+                s.group = Some(name.clone());
             }
             if u.reserve {
                 reserves.push(s);
@@ -1431,7 +1485,8 @@ mod tests {
         ],
         "action_groups": [
             {"name": "SAG 1", "side": 1, "leader": 1,
-             "members": [{"unit": 2, "bearing_deg": 180.0, "range_m": 3000.0}]}
+             "members": [{"unit": 2, "bearing_deg": 180.0, "range_m": 3000.0}],
+             "doctrine": {"emcon": "silent"}}
         ]
     }"#;
 
@@ -1458,6 +1513,15 @@ mod tests {
         let lead = save.units.iter().find(|u| u.unit.id == UnitId(1)).unwrap();
         let gap = sim_geo::inverse(lead.position.point, wing.position.point).distance_m;
         assert!((1_000.0..6_000.0).contains(&gap), "{gap}");
+        // Both ships are in the group, under its doctrine.
+        assert_eq!(wing.unit.group.as_deref(), Some("SAG 1"));
+        assert_eq!(lead.unit.group.as_deref(), Some("SAG 1"));
+        let blue = sim.snapshot(sim_core::Viewer::Side { side: SideId(1) });
+        assert!(blue
+            .units
+            .iter()
+            .filter(|u| u.id.0 <= 2)
+            .all(|u| u.doctrine.emcon == sim_core::Emcon::Silent));
         let checked = s.check(&db());
         assert!(
             checked.iter().all(|i| i.severity == Severity::Warning),
