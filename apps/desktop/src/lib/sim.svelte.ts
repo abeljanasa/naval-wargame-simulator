@@ -261,6 +261,16 @@ class SimSession {
   }
 
   /** A white-cell facilitation action: inject, message, fire or switch an event. */
+  /** White cell: changes one zone's rules (weapons control, ROE, emissions). */
+  async setZoneDoctrine(zone: number, doctrine: Doctrine) {
+    const res = await commands.orderZoneDoctrine(zone, doctrine);
+    if (res.status === "error") this.error = res.error;
+    else {
+      this.session = res.data;
+      this.error = null;
+    }
+  }
+
   async facilitate(action: Facilitation) {
     if (action.kind === "send_message" && !action.text.trim()) {
       this.error = "Write the message first";

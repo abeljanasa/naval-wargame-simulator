@@ -107,6 +107,22 @@ const scenarioEvents = [
   { id: "e01-startex", name: "Exercise control", enabled: true, repeatable: false, fired: 1 },
 ];
 
+const zones = [
+  {
+    id: 1,
+    name: "Narrows engage zone",
+    side: 1,
+    kind: "engage" as const,
+    area: {
+      shape: "circle" as const,
+      centre: { lat_deg: -39.3, lon_deg: 146.4 },
+      radius_m: 15000,
+    },
+    doctrine: { wcs: "free" as const, emcon: null, engage_unfriendly: true },
+    choke_point: "Narrows",
+    shooters: [],
+  },
+];
 const session = (): SessionInfo => ({
   scenario_name: "E2E — mock scenario",
   description: "",
@@ -121,7 +137,7 @@ const session = (): SessionInfo => ({
   controls_time: true,
   reference_points: [{ name: "RV Alpha", position: { lat_deg: -39.2, lon_deg: 145.8 } }],
   facilities: [],
-  zones: [],
+  zones: viewer.kind === "white_cell" ? zones : [],
   action_groups: [],
 });
 
@@ -240,6 +256,12 @@ mockIPC(
       }
       case "open_seat_window":
         return null;
+      case "order_zone_doctrine": {
+        const a = args as { zone: number; doctrine: (typeof zones)[number]["doctrine"] };
+        const z = zones.find((x) => x.id === a.zone);
+        if (z) z.doctrine = a.doctrine;
+        return session();
+      }
       case "db_weapons":
         return [
           { id: "WPN-MINE-MOORED", name: "Generic moored mine", kind: "mine" },

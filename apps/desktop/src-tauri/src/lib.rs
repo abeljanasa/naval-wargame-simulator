@@ -284,7 +284,6 @@ fn session_info(h: &Host, label: &str) -> Result<SessionInfo, String> {
             .cloned()
             .collect(),
         zones: h
-            .scenario
             .zones
             .iter()
             .filter(|z| sees(h.viewer(label), z.side))
@@ -563,6 +562,20 @@ fn aar_csv(
     lock(&host).aar_csv(window.label(), table)
 }
 
+/// Changes one zone's doctrine (white cell only): a per-zone ROE/WCS override.
+#[tauri::command]
+#[specta::specta]
+fn order_zone_doctrine(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    zone: u32,
+    doctrine: Doctrine,
+) -> Result<SessionInfo, String> {
+    let mut h = lock(&host);
+    h.order_zone_doctrine(window.label(), zone, doctrine)?;
+    session_info(&h, window.label())
+}
+
 /// Advances a paused simulation by `ticks` (single-step for the umpire; white-cell windows only).
 #[tauri::command]
 #[specta::specta]
@@ -701,6 +714,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_mission,
             order_adjudicate,
             order_facilitate,
+            order_zone_doctrine,
             db_weapons,
             editor_check,
             editor_current,

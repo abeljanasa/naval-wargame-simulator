@@ -71,6 +71,12 @@ export interface DraftFacility {
   range_m?: number | null;
   berths?: number;
   services?: DraftServices;
+  /** Command posts: the unit carrying the post. */
+  unit?: number | null;
+  subordinates?: number[];
+  alternate?: number | null;
+  handover_s?: number;
+  orders_in_gap?: "lose" | "queue";
 }
 
 export interface DraftDoctrine {
@@ -91,6 +97,8 @@ export interface DraftZone {
   area: DraftArea;
   doctrine?: DraftDoctrine;
   choke_point?: string | null;
+  /** Engage zones: units that engage contacts inside on their own. */
+  shooters?: number[];
 }
 
 export interface DraftStation {
@@ -251,7 +259,7 @@ export function addFacility(
       kind,
       position,
       radius_m: kind === "command_post" ? 1_000 : 3_000,
-      ...(kind === "command_post" ? { range_m: 200_000 } : {}),
+      ...(kind === "command_post" ? { range_m: 200_000, orders_in_gap: "lose" as const } : {}),
       services: defaultServices(kind),
     },
   ];

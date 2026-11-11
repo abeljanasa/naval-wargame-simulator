@@ -53,6 +53,8 @@ export const commands = {
 	 *  only).
 	 */
 	orderFacilitate: (action: Facilitation) => typedError<null, string>(__TAURI_INVOKE("order_facilitate", { action })),
+	/**  Changes one zone's doctrine (white cell only): a per-zone ROE/WCS override. */
+	orderZoneDoctrine: (zone: number, doctrine: Doctrine_Deserialize) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_zone_doctrine", { zone, doctrine })),
 	/**  Every weapon type, sorted by id. */
 	dbWeapons: () => typedError<DbWeaponRow[], string>(__TAURI_INVOKE("db_weapons")),
 	/**
@@ -145,11 +147,32 @@ export type AarView_Serialize = {
  *  A surface action group: its members keep station on the leader, so ordering the leader moves
  *  the group. Built as escort missions on the leader.
  */
-export type ActionGroup = {
+export type ActionGroup = ActionGroup_Serialize | ActionGroup_Deserialize;
+
+/**
+ *  A surface action group: its members keep station on the leader, so ordering the leader moves
+ *  the group. Built as escort missions on the leader.
+ */
+export type ActionGroup_Deserialize = {
 	name: string,
 	side: SideId,
 	leader: UnitId,
 	members: GroupStation[],
+	/**  Group doctrine for the leader and members (they are put in a group of this name). */
+	doctrine?: Doctrine_Deserialize,
+};
+
+/**
+ *  A surface action group: its members keep station on the leader, so ordering the leader moves
+ *  the group. Built as escort missions on the leader.
+ */
+export type ActionGroup_Serialize = {
+	name: string,
+	side: SideId,
+	leader: UnitId,
+	members: GroupStation[],
+	/**  Group doctrine for the leader and members (they are put in a group of this name). */
+	doctrine?: Doctrine_Serialize,
 };
 
 /**  One override. */
@@ -668,14 +691,31 @@ export type Facility_Deserialize = {
 	name: string,
 	side: SideId,
 	kind: FacilityKind,
+	/**
+	 *  Where it is (for a command post carried by a unit: where it starts; it then moves with
+	 *  the unit).
+	 */
 	position: GeoPoint,
 	/**  Units within this distance are alongside (ports, anchorages) or at the post. */
 	radius_m: number | null,
-	/**  Command posts: orders reach the side's units within this range. */
+	/**  Command posts: orders reach subordinates within this range (default: `radius_m`). */
 	range_m?: number | null,
 	/**  Units served at once (in unit-id order); 0 = no limit. */
 	berths?: number,
 	services?: Services_Deserialize,
+	/**
+	 *  Command posts: the unit carrying the post (a flagship, an aircraft, a land unit). The
+	 *  post is down once the unit is lost.
+	 */
+	unit?: UnitId | null,
+	/**  Command posts: the units it commands; empty = every unit of its side. */
+	subordinates?: UnitId[],
+	/**  Command posts: the post that takes over this post's subordinates when it is down. */
+	alternate?: number | null,
+	/**  Command posts: seconds from going down to the alternate taking over. */
+	handover_s?: number | null,
+	/**  Command posts: orders issued in the gap are lost or queued. */
+	orders_in_gap?: GapPolicy,
 };
 
 /**  A planning-layer facility. */
@@ -684,14 +724,31 @@ export type Facility_Serialize = {
 	name: string,
 	side: SideId,
 	kind: FacilityKind,
+	/**
+	 *  Where it is (for a command post carried by a unit: where it starts; it then moves with
+	 *  the unit).
+	 */
 	position: GeoPoint,
 	/**  Units within this distance are alongside (ports, anchorages) or at the post. */
 	radius_m: number | null,
-	/**  Command posts: orders reach the side's units within this range. */
+	/**  Command posts: orders reach subordinates within this range (default: `radius_m`). */
 	range_m: number | null,
 	/**  Units served at once (in unit-id order); 0 = no limit. */
 	berths: number,
 	services: Services_Serialize,
+	/**
+	 *  Command posts: the unit carrying the post (a flagship, an aircraft, a land unit). The
+	 *  post is down once the unit is lost.
+	 */
+	unit: UnitId | null,
+	/**  Command posts: the units it commands; empty = every unit of its side. */
+	subordinates: UnitId[],
+	/**  Command posts: the post that takes over this post's subordinates when it is down. */
+	alternate: number | null,
+	/**  Command posts: seconds from going down to the alternate taking over. */
+	handover_s: number | null,
+	/**  Command posts: orders issued in the gap are lost or queued. */
+	orders_in_gap: GapPolicy,
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */
@@ -708,6 +765,16 @@ export type FrameEvent_Serialize = {
 	clock: ClockStatus_Serialize,
 	update: SnapshotUpdate_Serialize,
 };
+
+/**
+ *  What happens to a player's order issued while a command post is down and its alternate has
+ *  not yet taken over.
+ */
+export type GapPolicy = 
+/**  Refused. */
+"lose" | 
+/**  Held, and carried out when the alternate takes over (if the unit is then in its range). */
+"queue";
 
 /**
  *  A point on the WGS-84 ellipsoid, in decimal degrees.
@@ -1098,7 +1165,7 @@ export type Scenario_Deserialize = {
 	/**  Planning layer: sense and engage zones, e.g. at choke points (format 5). */
 	zones?: Zone_Deserialize[],
 	/**  Surface action groups: members keep station on the leader (format 5). */
-	action_groups?: ActionGroup[],
+	action_groups?: ActionGroup_Deserialize[],
 };
 
 export type Scenario_Serialize = {
@@ -1133,7 +1200,7 @@ export type Scenario_Serialize = {
 	/**  Planning layer: sense and engage zones, e.g. at choke points (format 5). */
 	zones?: Zone_Serialize[],
 	/**  Surface action groups: members keep station on the leader (format 5). */
-	action_groups?: ActionGroup[],
+	action_groups?: ActionGroup_Serialize[],
 };
 
 /**  A player position. */
@@ -1195,7 +1262,7 @@ export type SessionInfo_Deserialize = {
 	/**  Planning-layer zones this window's seat may see. */
 	zones: Zone_Deserialize[],
 	/**  Surface action groups this window's seat may see. */
-	action_groups: ActionGroup[],
+	action_groups: ActionGroup_Deserialize[],
 };
 
 export type SessionInfo_Serialize = {
@@ -1218,7 +1285,7 @@ export type SessionInfo_Serialize = {
 	/**  Planning-layer zones this window's seat may see. */
 	zones: Zone_Serialize[],
 	/**  Surface action groups this window's seat may see. */
-	action_groups: ActionGroup[],
+	action_groups: ActionGroup_Serialize[],
 };
 
 /**  How serious a scenario problem is. */
@@ -1596,8 +1663,13 @@ export type Zone_Deserialize = {
 	area: Area,
 	/**  Fields set here override the unit's own, its group's and its side's. */
 	doctrine?: Doctrine_Deserialize,
-	/**  The choke point this zone belongs to, if any (for display and grouping). */
+	/**  The choke point this zone belongs to, if any. */
 	choke_point?: string | null,
+	/**
+	 *  Engage zones: units that engage contacts inside the zone on their own (one round per
+	 *  contact per AI period, under the zone's rules).
+	 */
+	shooters?: UnitId[],
 };
 
 /**  A sense or engage zone of one side. */
@@ -1609,8 +1681,13 @@ export type Zone_Serialize = {
 	area: Area,
 	/**  Fields set here override the unit's own, its group's and its side's. */
 	doctrine: Doctrine_Serialize,
-	/**  The choke point this zone belongs to, if any (for display and grouping). */
+	/**  The choke point this zone belongs to, if any. */
 	choke_point: string | null,
+	/**
+	 *  Engage zones: units that engage contacts inside the zone on their own (one round per
+	 *  contact per AI period, under the zone's rules).
+	 */
+	shooters: UnitId[],
 };
 
 /* Tauri Specta runtime */

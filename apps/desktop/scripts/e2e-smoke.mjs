@@ -188,6 +188,17 @@ try {
     "white cell sends an inject from the library; it appears in the message log, counted",
   );
 
+  // Per-zone ROE override from the white-cell console.
+  await page.getByLabel("Weapons control in Narrows engage zone").selectOption("tight");
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some(
+      (c) =>
+        c.cmd === "order_zone_doctrine" && c.args.zone === 1 && c.args.doctrine.wcs === "tight",
+    ),
+    "the white cell overrides a zone's weapons control",
+  );
+
   // Seat management: add a seat for Blue's executive officer and open a window for it.
   await page.getByLabel("New seat", { exact: true }).fill("Blue XO");
   await page.getByLabel("New seat plays").selectOption({ label: "Blue" });

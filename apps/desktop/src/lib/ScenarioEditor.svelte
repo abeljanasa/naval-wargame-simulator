@@ -749,6 +749,57 @@
                   }}
                 />
               </label>
+              <label>
+                Carried by
+                <select
+                  value={f.unit ?? ""}
+                  onchange={(e) => {
+                    const v = e.currentTarget.value;
+                    f.unit = v === "" ? null : Number(v);
+                    changed();
+                  }}
+                >
+                  <option value="">nothing (fixed, ashore)</option>
+                  {#each d.units.filter((u) => u.side === f.side) as u (u.id)}
+                    <option value={u.id}>{u.name}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>
+                Alternate
+                <select
+                  value={f.alternate ?? ""}
+                  onchange={(e) => {
+                    const v = e.currentTarget.value;
+                    f.alternate = v === "" ? null : Number(v);
+                    changed();
+                  }}
+                >
+                  <option value="">none</option>
+                  {#each (d.facilities ?? []).filter((g) => g.id !== f.id && g.side === f.side && g.kind === "command_post") as g (g.id)}
+                    <option value={g.id}>{g.name}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>
+                Handover (min)
+                <input
+                  type="number"
+                  min="0"
+                  value={(f.handover_s ?? 300) / 60}
+                  onchange={(e) => {
+                    f.handover_s = Math.max(0, num(e.currentTarget.value, 5)) * 60;
+                    changed();
+                  }}
+                />
+              </label>
+              <label>
+                Orders in the gap
+                <select bind:value={f.orders_in_gap} onchange={changed}>
+                  <option value="lose">lost</option>
+                  <option value="queue">queued for the alternate</option>
+                </select>
+              </label>
             {:else}
               <label>
                 Berths (0: no limit)
@@ -890,6 +941,27 @@
               </select>
             </label>
           </div>
+          {#if z.kind === "engage"}
+            <div class="row" role="group" aria-label={`Shooters for ${z.name}`}>
+              <span class="dim">Shooters:</span>
+              {#each d.units.filter((u) => u.side === z.side) as u (u.id)}
+                <label class="inline">
+                  <input
+                    type="checkbox"
+                    checked={(z.shooters ?? []).includes(u.id)}
+                    onchange={(e) => {
+                      const rest = (z.shooters ?? []).filter((x) => x !== u.id);
+                      z.shooters = e.currentTarget.checked
+                        ? [...rest, u.id].sort((a, b) => a - b)
+                        : rest;
+                      changed();
+                    }}
+                  />
+                  {u.name}
+                </label>
+              {/each}
+            </div>
+          {/if}
           <div class="row">
             {#if z.area.shape === "circle"}
               {@const a = z.area}

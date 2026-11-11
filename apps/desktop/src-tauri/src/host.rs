@@ -165,6 +165,8 @@ pub struct Host {
     windows_opened: u32,
     /// Set while reviewing: windows show the replay, and orders are refused.
     replay: Option<Replay>,
+    /// The planning layer in force: the scenario's, with the white cell's zone changes.
+    pub zones: Vec<sim_core::Zone>,
 }
 
 const IN_REVIEW: &str = "reviewing a replay: return to the live exercise first";
@@ -208,6 +210,7 @@ impl Host {
         platforms: sim_db::PlatformDb,
     ) -> Result<Self, sim_scenario::ScenarioError> {
         let (sim, seats, first) = start(&scenario, &platforms)?;
+        let zones = scenario.zones.clone();
         Ok(Self {
             scenario,
             platforms,
@@ -220,6 +223,7 @@ impl Host {
             stations: BTreeMap::from([(MAIN_WINDOW.to_owned(), Station::new(first, false, 0))]),
             windows_opened: 0,
             replay: None,
+            zones,
         })
     }
 
@@ -233,6 +237,7 @@ impl Host {
         self.sim = sim;
         self.seats = seats;
         self.replay = None;
+        self.zones = self.scenario.zones.clone();
         let closing: Vec<String> = self
             .stations
             .keys()
@@ -786,6 +791,34 @@ impl Host {
 
     /// A white-cell facilitation action: send an inject or a message, fire an event, or turn
     /// one on or off. Only a white-cell seat may (the core refuses others).
+    /// A white-cell change to one zone's doctrine (per-zone ROE/WCS override), sent as the
+    /// logged `SetPlanning` command with the whole layer.
+    pub fn order_zone_doctrine(
+        &mut self,
+        label: &str,
+        zone: u32,
+        doctrine: Doctrine,
+    ) -> Result<u64, String> {
+        if self.seat_of(label)?.role != SeatRole::WhiteCell {
+            return Err("only the white cell changes zone rules".into());
+        }
+        let mut zones = self.zones.clone();
+        let z = zones
+            .iter_mut()
+            .find(|z| z.id == zone)
+            .ok_or_else(|| format!("no zone {zone}"))?;
+        z.doctrine = doctrine;
+        let seq = self.order(
+            label,
+            CommandPayload::SetPlanning {
+                facilities: self.scenario.facilities.clone(),
+                zones: zones.clone(),
+            },
+        )?;
+        self.zones = zones;
+        Ok(seq)
+    }
+
     pub fn order_facilitate(&mut self, label: &str, action: Facilitation) -> Result<u64, String> {
         self.order(label, CommandPayload::Facilitate { action })
     }
@@ -1259,5 +1292,33 @@ mod tests {
         assert_eq!(r.end_s, 120.0);
         // A saved review saves the same record again.
         assert_eq!(other.record_bytes(M).unwrap(), bytes);
+    }
+
+    #[test]
+    fn the_white_cell_changes_a_zone_and_sides_cannot() {
+        let mut s = Scenario::from_json(include_str!(
+            "../../../../data/scenarios/phase3-planning-demo.json"
+        ))
+        .unwrap();
+        s.seats.clear();
+        let mut h = Host::new(s, sim_db::embedded::open_platform_db().unwrap()).unwrap();
+        let free = Doctrine {
+            wcs: Some(sim_core::Wcs::Safe),
+            ..Doctrine::default()
+        };
+        assert!(
+            h.order_zone_doctrine(M, 2, free).is_err(),
+            "main starts at Blue"
+        );
+        h.set_seat(M, seat_named(&h, "White cell")).unwrap();
+        assert!(h.order_zone_doctrine(M, 99, free).is_err());
+        h.order_zone_doctrine(M, 2, free).unwrap();
+        h.step(M, 1).unwrap();
+        assert_eq!(h.zones[1].doctrine.wcs, Some(sim_core::Wcs::Safe));
+        assert!(h.update(M).unwrap().refusals.is_empty());
+        assert_eq!(
+            h.sim.save().planning.zones[1].doctrine.wcs,
+            Some(sim_core::Wcs::Safe)
+        );
     }
 }

@@ -681,6 +681,33 @@
           />
           <button type="submit">Send</button>
         </form>
+        {#if (sim.session?.zones ?? []).length > 0}
+          <h3>Zone rules</h3>
+          <ul class="zones" aria-label="Zone rules">
+            {#each sim.session?.zones ?? [] as z (z.id)}
+              <li>
+                <span>{z.name} <span class="dim">({z.kind})</span></span>
+                <select
+                  aria-label={`Weapons control in ${z.name}`}
+                  value={z.doctrine?.wcs ?? ""}
+                  onchange={(e) => {
+                    const v = e.currentTarget.value;
+                    void sim.setZoneDoctrine(z.id, {
+                      ...z.doctrine,
+                      wcs: v === "" ? null : (v as Wcs),
+                    });
+                  }}
+                >
+                  <option value="">WCS not set</option>
+                  <option value="safe">safe</option>
+                  <option value="tight">tight</option>
+                  <option value="free">free</option>
+                </select>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+
         <h3>Seats</h3>
         <ul class="units" aria-label="Seats">
           {#each sim.session?.seats ?? [] as s (s.id)}
@@ -910,6 +937,18 @@
   .umpire {
     border-top: 1px solid var(--border);
     padding-top: 12px;
+  }
+  .zones {
+    list-style: none;
+    margin: 4px 0;
+    padding: 0;
+  }
+  .zones li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    margin: 3px 0;
   }
   .umpire input[type="text"] {
     width: 100%;
