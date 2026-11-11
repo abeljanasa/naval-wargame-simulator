@@ -3,6 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  addChokePoint,
+  addFacility,
   addSide,
   addUnit,
   blankScenario,
@@ -101,5 +103,43 @@ describe("scenario drafts", () => {
     const events = [{ id: "a" }, { id: "a-2" }];
     expect(uniqueEventId(events, "b")).toBe("b");
     expect(uniqueEventId(events, "a")).toBe("a-3");
+  });
+
+  it("adds facilities with their kind's defaults and choke points as zone pairs", () => {
+    const s = blankScenario();
+    expect(addFacility(s, 1, "sheltering_port", here)).toBe(1);
+    expect(addFacility(s, 1, "command_post", here)).toBe(2);
+    expect(s.facilities?.[0]?.services).toEqual({ repair: true, rearm: true, refuel: true });
+    expect(s.facilities?.[1]?.range_m).toBe(200_000);
+    expect(addChokePoint(s, 1, here, "Narrows")).toEqual([1, 2]);
+    expect(addChokePoint(s, 2, here, "Gap")).toEqual([3, 4]);
+    const [sense, engage] = s.zones ?? [];
+    expect(sense?.kind).toBe("sense");
+    expect(engage?.doctrine).toEqual({ wcs: "free", engage_unfriendly: true });
+    expect(engage?.choke_point).toBe("Narrows");
+    removeSide(s, 2);
+    expect(s.zones?.map((z) => z.id)).toEqual([1, 2]);
+  });
+
+  it("removing a unit takes it out of its action group; removing a leader dissolves it", () => {
+    const s = blankScenario();
+    addUnit(s, 1, here, undefined);
+    addUnit(s, 1, here, undefined);
+    addUnit(s, 1, here, undefined);
+    s.action_groups = [
+      {
+        name: "SAG",
+        side: 1,
+        leader: 1,
+        members: [
+          { unit: 2, bearing_deg: 90, range_m: 3000 },
+          { unit: 3, bearing_deg: 270, range_m: 3000 },
+        ],
+      },
+    ];
+    removeUnit(s, 2);
+    expect(s.action_groups?.[0]?.members.map((m) => m.unit)).toEqual([3]);
+    removeUnit(s, 1);
+    expect(s.action_groups).toEqual([]);
   });
 });

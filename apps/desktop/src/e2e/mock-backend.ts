@@ -120,6 +120,9 @@ const session = (): SessionInfo => ({
   locked: false,
   controls_time: true,
   reference_points: [{ name: "RV Alpha", position: { lat_deg: -39.2, lon_deg: 145.8 } }],
+  facilities: [],
+  zones: [],
+  action_groups: [],
 });
 
 const platforms = [

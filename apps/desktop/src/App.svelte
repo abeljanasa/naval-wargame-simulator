@@ -6,6 +6,7 @@
     createMap,
     buildLayers,
     editorLayers,
+    planningLayers,
     referenceLayers,
     contactAge,
     contactKind,
@@ -131,19 +132,23 @@
       // The editor draws the draft instead of the live picture.
       const d = editor.draft;
       overlay.setProps({
-        layers: editorLayers({
-          units: d.units,
-          minefields: d.minefields ?? [],
-          points: d.reference_points ?? [],
-          sides: d.sides.map((x) => x.id),
-          selected: editor.selectedUnit,
-          onPickUnit: (id) => (editor.selectedUnit = id),
-        }),
+        layers: [
+          ...planningLayers(d.facilities ?? [], d.zones ?? [], "editor-planning"),
+          ...editorLayers({
+            units: d.units,
+            minefields: d.minefields ?? [],
+            points: d.reference_points ?? [],
+            sides: d.sides.map((x) => x.id),
+            selected: editor.selectedUnit,
+            onPickUnit: (id) => (editor.selectedUnit = id),
+          }),
+        ],
       });
       return;
     }
     overlay.setProps({
       layers: [
+        ...planningLayers(sim.session?.facilities ?? [], sim.session?.zones ?? []),
         ...buildLayers({
           units: sim.units,
           contacts: sim.contacts,

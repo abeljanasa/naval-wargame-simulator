@@ -260,6 +260,13 @@ try {
     (await ed.getByRole("list", { name: "Scenario units" }).getByRole("button").count()) === 1,
     "clicking the map places the new unit in the draft",
   );
+  await ed.getByRole("tab", { name: "Planning" }).click();
+  await ed.getByRole("button", { name: "Add choke point on the map" }).click();
+  {
+    const box = await page.locator("main.map").boundingBox();
+    if (box) await page.mouse.click(box.x + box.width / 3, box.y + box.height / 3);
+  }
+  await ed.getByText("Choke point 1 engage zone · Choke point 1").waitFor({ timeout: 5_000 });
   await ed.getByRole("tab", { name: "Events" }).click();
   await ed.getByLabel("Add an event from a template").selectOption({ index: 1 });
   await ed.getByRole("button", { name: "Play" }).click();
@@ -272,8 +279,10 @@ try {
         last.units.length === 1 &&
         last.units[0].side === 1 &&
         last.events.length === 1 &&
-        last.format_version === 4,
-      "Play sends the checked draft (its unit and event) to load_scenario",
+        last.zones.length === 2 &&
+        last.zones[1].kind === "engage" &&
+        last.format_version === 5,
+      "Play sends the checked draft (its unit, event and choke-point zones) to load_scenario",
     );
   }
   check(

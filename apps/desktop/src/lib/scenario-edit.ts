@@ -2,12 +2,12 @@
 // scenario JSON as plain data; the engine checks it (`editor_check`) and is the only judge of
 // what is valid. Nothing here talks to the backend.
 
-import type { GeoPoint, Mission, Posture } from "./bindings";
+import type { Emcon, FacilityKind, GeoPoint, Mission, Posture, Wcs, ZoneKind } from "./bindings";
 import templates from "./event-templates.json";
 import { n } from "./format";
 
 export const SCENARIO_FORMAT = "nws-scenario";
-export const SCENARIO_FORMAT_VERSION = 4;
+export const SCENARIO_FORMAT_VERSION = 5;
 
 export interface DraftPosture {
   toward: number;
@@ -55,6 +55,57 @@ export interface DraftReferencePoint {
   side?: number;
 }
 
+export interface DraftServices {
+  repair?: boolean;
+  rearm?: boolean;
+  refuel?: boolean;
+}
+
+export interface DraftFacility {
+  id: number;
+  name: string;
+  side: number;
+  kind: FacilityKind;
+  position: GeoPoint;
+  radius_m: number;
+  range_m?: number | null;
+  berths?: number;
+  services?: DraftServices;
+}
+
+export interface DraftDoctrine {
+  wcs?: Wcs | null;
+  emcon?: Emcon | null;
+  engage_unfriendly?: boolean | null;
+}
+
+export type DraftArea =
+  | { shape: "circle"; centre: GeoPoint; radius_m: number }
+  | { shape: "polygon"; points: GeoPoint[] };
+
+export interface DraftZone {
+  id: number;
+  name: string;
+  side: number;
+  kind: ZoneKind;
+  area: DraftArea;
+  doctrine?: DraftDoctrine;
+  choke_point?: string | null;
+}
+
+export interface DraftStation {
+  unit: number;
+  bearing_deg: number;
+  range_m: number;
+}
+
+export interface DraftActionGroup {
+  name: string;
+  side: number;
+  leader: number;
+  members: DraftStation[];
+}
+
 export interface DraftEnvironment {
   sea_state?: number;
   weather_loss_db?: number;
@@ -80,6 +131,9 @@ export interface DraftScenario {
   injects?: unknown[];
   seats?: unknown[];
   reference_points?: DraftReferencePoint[];
+  facilities?: DraftFacility[];
+  zones?: DraftZone[];
+  action_groups?: DraftActionGroup[];
   [other: string]: unknown;
 }
 
@@ -156,6 +210,86 @@ export function duplicateUnit(s: DraftScenario, id: number): number | null {
 
 export function removeUnit(s: DraftScenario, id: number): void {
   s.units = s.units.filter((u) => u.id !== id);
+  // A group loses the unit; a group whose leader goes is dissolved.
+  s.action_groups = (s.action_groups ?? [])
+    .filter((g) => g.leader !== id)
+    .map((g) => ({ ...g, members: g.members.filter((m) => m.unit !== id) }));
+}
+
+/** The default services of a new facility of `kind`. */
+export function defaultServices(kind: FacilityKind): DraftServices {
+  switch (kind) {
+    case "sheltering_port":
+      return { repair: true, rearm: true, refuel: true };
+    case "refuelling_point":
+      return { refuel: true };
+    default:
+      return {};
+  }
+}
+
+/** Adds a facility of `side` at `position` and returns its id. */
+export function addFacility(
+  s: DraftScenario,
+  side: number,
+  kind: FacilityKind,
+  position: GeoPoint,
+): number {
+  const id = (s.facilities ?? []).reduce((m, f) => Math.max(m, f.id), 0) + 1;
+  const names: Record<FacilityKind, string> = {
+    command_post: "Command post",
+    refuelling_point: "Refuelling point",
+    sheltering_port: "Port",
+    anchorage: "Anchorage",
+  };
+  s.facilities = [
+    ...(s.facilities ?? []),
+    {
+      id,
+      name: `${names[kind]} ${id}`,
+      side,
+      kind,
+      position,
+      radius_m: kind === "command_post" ? 1_000 : 3_000,
+      ...(kind === "command_post" ? { range_m: 200_000 } : {}),
+      services: defaultServices(kind),
+    },
+  ];
+  return id;
+}
+
+/** A choke point: a sense zone (radius `senseM`, an alert ring) round an engage zone (radius
+ * `engageM`, weapons free against unfriendly contacts), both of `side`. Returns their ids. */
+export function addChokePoint(
+  s: DraftScenario,
+  side: number,
+  centre: GeoPoint,
+  name: string,
+  senseM = 40_000,
+  engageM = 15_000,
+): [number, number] {
+  const next = (s.zones ?? []).reduce((m, z) => Math.max(m, z.id), 0) + 1;
+  s.zones = [
+    ...(s.zones ?? []),
+    {
+      id: next,
+      name: `${name} sense zone`,
+      side,
+      kind: "sense",
+      area: { shape: "circle", centre, radius_m: senseM },
+      choke_point: name,
+    },
+    {
+      id: next + 1,
+      name: `${name} engage zone`,
+      side,
+      kind: "engage",
+      area: { shape: "circle", centre, radius_m: engageM },
+      doctrine: { wcs: "free", engage_unfriendly: true },
+      choke_point: name,
+    },
+  ];
+  return [next, next + 1];
 }
 
 export function addSide(s: DraftScenario, name: string): number {
@@ -173,6 +307,9 @@ export function removeSide(s: DraftScenario, id: number): number {
   s.units = s.units.filter((u) => u.side !== id);
   s.minefields = (s.minefields ?? []).filter((m) => m.side !== id);
   s.reference_points = (s.reference_points ?? []).filter((r) => r.side !== id);
+  s.facilities = (s.facilities ?? []).filter((f) => f.side !== id);
+  s.zones = (s.zones ?? []).filter((z) => z.side !== id);
+  s.action_groups = (s.action_groups ?? []).filter((g) => g.side !== id);
   return before - s.units.length;
 }
 

@@ -559,3 +559,97 @@ export function editorLayers(e: EditorScene): Layer[] {
     ...referenceLayers(e.points, "editor-points"),
   ];
 }
+
+/** A planning-layer facility as drawn: kind, name and place. */
+export interface MapFacility {
+  name: string;
+  kind: string;
+  position: GeoPoint;
+  radius_m: number | null;
+}
+
+/** A sense or engage zone as drawn. */
+export interface MapZone {
+  name: string;
+  kind: string;
+  area:
+    | { shape: "circle"; centre: GeoPoint; radius_m: number | null }
+    | { shape: "polygon"; points: GeoPoint[] };
+}
+
+const FACILITY_CODE: Record<string, string> = {
+  command_post: "CP",
+  refuelling_point: "RAS",
+  sheltering_port: "PORT",
+  anchorage: "ANCH",
+};
+
+/** Outline of a zone, closed. */
+export function zoneRing(z: MapZone): LonLat[] {
+  if (z.area.shape === "circle") return circleRing(z.area.centre, n(z.area.radius_m));
+  const ring = z.area.points.map(pt);
+  return ring.length ? [...ring, ring[0] as LonLat] : ring;
+}
+
+/** Where a zone's label goes: the circle's centre, or the polygon's first point. */
+function zoneAnchor(z: MapZone): LonLat {
+  if (z.area.shape === "circle") return pt(z.area.centre);
+  return z.area.points[0] ? pt(z.area.points[0]) : [0, 0];
+}
+
+const SENSE_COLOUR: RGBA = [110, 190, 255, 200];
+const ENGAGE_COLOUR: RGBA = [255, 110, 100, 220];
+const FACILITY_COLOUR: RGBA = [230, 230, 160, 255];
+
+/** The planning layer: zones as outlines (sense blue, engage red) and facilities as labelled
+ * marks with their radius. */
+export function planningLayers(
+  facilities: MapFacility[],
+  zones: MapZone[],
+  id = "planning",
+): Layer[] {
+  const label = {
+    fontFamily: "system-ui, sans-serif",
+    outlineWidth: 2,
+    outlineColor: [11, 27, 43, 255] as RGBA,
+    fontSettings: { sdf: true },
+    characterSet: LABEL_CHARSET,
+  };
+  return [
+    new PathLayer<MapZone>({
+      id: `${id}-zones`,
+      data: zones,
+      getPath: zoneRing,
+      getColor: (z) => (z.kind === "engage" ? ENGAGE_COLOUR : SENSE_COLOUR),
+      getWidth: (z) => (z.kind === "engage" ? 2 : 1.5),
+      widthUnits: "pixels",
+    }),
+    new TextLayer<MapZone>({
+      id: `${id}-zone-labels`,
+      data: zones,
+      getPosition: zoneAnchor,
+      getText: (z) => z.name,
+      getSize: 11,
+      getColor: (z) => (z.kind === "engage" ? ENGAGE_COLOUR : SENSE_COLOUR),
+      getPixelOffset: (z) => [0, z.kind === "engage" ? 14 : -14],
+      ...label,
+    }),
+    new PathLayer<MapFacility>({
+      id: `${id}-facility-rings`,
+      data: facilities,
+      getPath: (f) => circleRing(f.position, n(f.radius_m)),
+      getColor: FACILITY_COLOUR,
+      getWidth: 1,
+      widthUnits: "pixels",
+    }),
+    new TextLayer<MapFacility>({
+      id: `${id}-facilities`,
+      data: facilities,
+      getPosition: (f) => pt(f.position),
+      getText: (f) => `${FACILITY_CODE[f.kind] ?? "?"} ${f.name}`,
+      getSize: 12,
+      getColor: FACILITY_COLOUR,
+      ...label,
+    }),
+  ];
+}

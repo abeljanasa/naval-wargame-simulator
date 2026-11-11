@@ -63,6 +63,12 @@ pub struct SessionInfo {
     pub controls_time: bool,
     /// The scenario's reference points this window's seat may see.
     pub reference_points: Vec<ReferencePoint>,
+    /// Planning-layer facilities this window's seat may see (its side's; all for the white cell).
+    pub facilities: Vec<sim_core::Facility>,
+    /// Planning-layer zones this window's seat may see.
+    pub zones: Vec<sim_core::Zone>,
+    /// Surface action groups this window's seat may see.
+    pub action_groups: Vec<sim_scenario::ActionGroup>,
 }
 
 #[tauri::command]
@@ -270,7 +276,36 @@ fn session_info(h: &Host, label: &str) -> Result<SessionInfo, String> {
             })
             .cloned()
             .collect(),
+        facilities: h
+            .scenario
+            .facilities
+            .iter()
+            .filter(|f| sees(h.viewer(label), f.side))
+            .cloned()
+            .collect(),
+        zones: h
+            .scenario
+            .zones
+            .iter()
+            .filter(|z| sees(h.viewer(label), z.side))
+            .cloned()
+            .collect(),
+        action_groups: h
+            .scenario
+            .action_groups
+            .iter()
+            .filter(|g| sees(h.viewer(label), g.side))
+            .cloned()
+            .collect(),
     })
+}
+
+/// May a viewer see planning data belonging to `side`?
+fn sees(viewer: Viewer, side: SideId) -> bool {
+    match viewer {
+        Viewer::WhiteCell => true,
+        Viewer::Side { side: own } => own == side,
+    }
 }
 
 /// A weapon type in the platform database (for the scenario editor's pickers).

@@ -1,11 +1,13 @@
 <script lang="ts">
   // Scenario editor drawer (docs/models/scenario-editor.md). Forms for the overview, sides and
-  // postures, units and missions, minefields and reference points; JSON for events, injects,
-  // seats and groups. The engine checks the draft; errors block Save and Play.
-  import type { Mission, Posture } from "./bindings";
+  // postures, units and missions, minefields, reference points and the planning layer
+  // (facilities, zones, action groups); JSON for events, injects, seats and groups. The engine checks the draft; errors block Save and Play.
+  import type { Emcon, FacilityKind, Mission, Posture, Wcs } from "./bindings";
   import { editor } from "./editor.svelte";
   import { MPS_PER_KNOT, n } from "./format";
   import {
+    addChokePoint,
+    addFacility,
     addSide,
     addUnit,
     duplicateUnit,
@@ -19,16 +21,26 @@
     type DraftUnit,
   } from "./scenario-edit";
 
-  type Tab = "overview" | "sides" | "units" | "minefields" | "points" | "events";
+  type Tab = "overview" | "sides" | "units" | "minefields" | "points" | "planning" | "events";
   const TABS: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "sides", label: "Sides" },
     { key: "units", label: "Units" },
     { key: "minefields", label: "Mines" },
     { key: "points", label: "Points" },
+    { key: "planning", label: "Planning" },
     { key: "events", label: "Events" },
   ];
   const POSTURES: Posture[] = ["friendly", "neutral", "unfriendly", "hostile"];
+  const FACILITY_KINDS: { key: FacilityKind; label: string }[] = [
+    { key: "command_post", label: "Command post" },
+    { key: "sheltering_port", label: "Sheltering port" },
+    { key: "anchorage", label: "Anchorage" },
+    { key: "refuelling_point", label: "Refuelling point" },
+  ];
+  const SERVICES = ["repair", "rearm", "refuel"] as const;
+  let planSide = $state(1);
+  let newKind = $state<FacilityKind>("sheltering_port");
   const JSON_FIELDS = ["events", "injects", "seats", "groups"] as const;
   type JsonField = (typeof JSON_FIELDS)[number];
 
@@ -660,6 +672,332 @@
             ];
           })}>Add point on the map</button
       >
+    {:else if tab === "planning"}
+      <p class="dim">
+        The operational planning layer (docs/models/planning-layer.md): facilities, sense and engage
+        zones, and surface action groups.
+      </p>
+      <div class="row">
+        <label class="inline">
+          Side
+          <select bind:value={planSide}>
+            {#each d.sides as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+          </select>
+        </label>
+        <label class="inline">
+          New facility
+          <select bind:value={newKind}>
+            {#each FACILITY_KINDS as k (k.key)}<option value={k.key}>{k.label}</option>{/each}
+          </select>
+        </label>
+        <button
+          onclick={() =>
+            editor.pick("Click the map to place the facility", (p) =>
+              addFacility(editor.draft, planSide, newKind, p),
+            )}>Add facility on the map</button
+        >
+        <button
+          onclick={() =>
+            editor.pick("Click the centre of the choke point", (p) => {
+              const k = new Set((editor.draft.zones ?? []).map((z) => z.choke_point)).size + 1;
+              addChokePoint(editor.draft, planSide, p, `Choke point ${k}`);
+            })}>Add choke point on the map</button
+        >
+      </div>
+
+      <h3>Facilities</h3>
+      {#each editor.draft.facilities ?? [] as f, i (f.id)}
+        <fieldset>
+          <legend>{f.name}</legend>
+          <div class="grid2">
+            <label>Name <input bind:value={f.name} oninput={changed} /></label>
+            <label>
+              Kind
+              <select bind:value={f.kind} onchange={changed}>
+                {#each FACILITY_KINDS as k (k.key)}<option value={k.key}>{k.label}</option>{/each}
+              </select>
+            </label>
+            <label>
+              Side
+              <select bind:value={f.side} onchange={changed}>
+                {#each d.sides as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+              </select>
+            </label>
+            <label>
+              Radius (km)
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={n(f.radius_m) / 1000}
+                onchange={(e) => {
+                  f.radius_m = num(e.currentTarget.value, 1) * 1000;
+                  changed();
+                }}
+              />
+            </label>
+            {#if f.kind === "command_post"}
+              <label>
+                Command range (km)
+                <input
+                  type="number"
+                  min="1"
+                  value={n(f.range_m ?? f.radius_m) / 1000}
+                  onchange={(e) => {
+                    f.range_m = num(e.currentTarget.value, 100) * 1000;
+                    changed();
+                  }}
+                />
+              </label>
+            {:else}
+              <label>
+                Berths (0: no limit)
+                <input
+                  type="number"
+                  min="0"
+                  value={f.berths ?? 0}
+                  onchange={(e) => {
+                    f.berths = Math.max(0, Math.round(num(e.currentTarget.value)));
+                    changed();
+                  }}
+                />
+              </label>
+            {/if}
+          </div>
+          {#if f.kind !== "command_post"}
+            <div class="row">
+              {#each SERVICES as sv (sv)}
+                <label class="inline">
+                  <input
+                    type="checkbox"
+                    checked={f.services?.[sv] ?? false}
+                    onchange={(e) => {
+                      f.services = { ...f.services, [sv]: e.currentTarget.checked };
+                      changed();
+                    }}
+                  />
+                  {sv}
+                </label>
+              {/each}
+            </div>
+          {/if}
+          <div class="row">
+            <button
+              onclick={() => editor.pick(`Click the map for ${f.name}`, (p) => (f.position = p))}
+            >
+              Move on the map
+            </button>
+            <button
+              class="danger"
+              onclick={() => {
+                editor.draft.facilities = (editor.draft.facilities ?? []).filter((_, j) => j !== i);
+                changed();
+              }}>Remove</button
+            >
+          </div>
+        </fieldset>
+      {:else}
+        <p class="dim">No facilities.</p>
+      {/each}
+
+      <h3>Zones</h3>
+      {#each editor.draft.zones ?? [] as z, i (z.id)}
+        <fieldset>
+          <legend>{z.name}{z.choke_point ? ` · ${z.choke_point}` : ""}</legend>
+          <div class="grid2">
+            <label>Name <input bind:value={z.name} oninput={changed} /></label>
+            <label>
+              Kind
+              <select bind:value={z.kind} onchange={changed}>
+                <option value="sense">sense (own units, alerts)</option>
+                <option value="engage">engage (targets inside)</option>
+              </select>
+            </label>
+            <label>
+              Side
+              <select bind:value={z.side} onchange={changed}>
+                {#each d.sides as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+              </select>
+            </label>
+            {#if z.area.shape === "circle"}
+              {@const a = z.area}
+              <label>
+                Radius (km)
+                <input
+                  type="number"
+                  min="0.1"
+                  value={n(a.radius_m) / 1000}
+                  onchange={(e) => {
+                    a.radius_m = num(e.currentTarget.value, 10) * 1000;
+                    changed();
+                  }}
+                />
+              </label>
+            {:else}
+              <p class="dim">
+                Polygon ({z.area.points.length} points): edit the file to change it.
+              </p>
+            {/if}
+            <label>
+              Weapons control
+              <select
+                value={z.doctrine?.wcs ?? ""}
+                onchange={(e) => {
+                  const v = e.currentTarget.value;
+                  z.doctrine = { ...z.doctrine, wcs: v === "" ? null : (v as Wcs) };
+                  changed();
+                }}
+              >
+                <option value="">not set</option>
+                <option value="safe">safe</option>
+                <option value="tight">tight</option>
+                <option value="free">free</option>
+              </select>
+            </label>
+            <label>
+              Emissions
+              <select
+                value={z.doctrine?.emcon ?? ""}
+                onchange={(e) => {
+                  const v = e.currentTarget.value;
+                  z.doctrine = { ...z.doctrine, emcon: v === "" ? null : (v as Emcon) };
+                  changed();
+                }}
+              >
+                <option value="">not set</option>
+                <option value="active">active</option>
+                <option value="silent">silent</option>
+              </select>
+            </label>
+            <label>
+              Engage unfriendly
+              <select
+                value={z.doctrine?.engage_unfriendly == null
+                  ? ""
+                  : String(z.doctrine.engage_unfriendly)}
+                onchange={(e) => {
+                  const v = e.currentTarget.value;
+                  z.doctrine = {
+                    ...z.doctrine,
+                    engage_unfriendly: v === "" ? null : v === "true",
+                  };
+                  changed();
+                }}
+              >
+                <option value="">not set</option>
+                <option value="true">yes</option>
+                <option value="false">no</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            {#if z.area.shape === "circle"}
+              {@const a = z.area}
+              <button
+                onclick={() => editor.pick(`Click the centre of ${z.name}`, (p) => (a.centre = p))}
+              >
+                Centre on the map
+              </button>
+            {/if}
+            <button
+              class="danger"
+              onclick={() => {
+                editor.draft.zones = (editor.draft.zones ?? []).filter((_, j) => j !== i);
+                changed();
+              }}>Remove</button
+            >
+          </div>
+        </fieldset>
+      {:else}
+        <p class="dim">No zones.</p>
+      {/each}
+
+      <h3>Surface action groups</h3>
+      {#each editor.draft.action_groups ?? [] as g, i (i)}
+        {@const sideUnits = d.units.filter((u) => u.side === g.side)}
+        <fieldset>
+          <legend>{g.name}</legend>
+          <div class="grid2">
+            <label>Name <input bind:value={g.name} oninput={changed} /></label>
+            <label>
+              Leader
+              <select bind:value={g.leader} onchange={changed}>
+                {#each sideUnits as u (u.id)}<option value={u.id}>{u.name}</option>{/each}
+              </select>
+            </label>
+          </div>
+          {#each g.members as m, k (k)}
+            <div class="row">
+              <select aria-label="Member" bind:value={m.unit} onchange={changed}>
+                {#each sideUnits.filter((u) => u.id !== g.leader) as u (u.id)}
+                  <option value={u.id}>{u.name}</option>
+                {/each}
+              </select>
+              <label class="inline">
+                Bearing
+                <input class="short" type="number" bind:value={m.bearing_deg} onchange={changed} />
+              </label>
+              <label class="inline">
+                km
+                <input
+                  class="short"
+                  type="number"
+                  min="0.1"
+                  value={n(m.range_m) / 1000}
+                  onchange={(e) => {
+                    m.range_m = num(e.currentTarget.value, 3) * 1000;
+                    changed();
+                  }}
+                />
+              </label>
+              <button
+                aria-label="Remove member"
+                onclick={() => {
+                  g.members = g.members.filter((_, j) => j !== k);
+                  changed();
+                }}>×</button
+              >
+            </div>
+          {/each}
+          <div class="row">
+            <button
+              onclick={() => {
+                const free = sideUnits.find(
+                  (u) => u.id !== g.leader && !g.members.some((m) => m.unit === u.id),
+                );
+                if (free) {
+                  g.members = [...g.members, { unit: free.id, bearing_deg: 90, range_m: 3_000 }];
+                  changed();
+                }
+              }}>Add member</button
+            >
+            <button
+              class="danger"
+              onclick={() => {
+                editor.draft.action_groups = (editor.draft.action_groups ?? []).filter(
+                  (_, j) => j !== i,
+                );
+                changed();
+              }}>Remove group</button
+            >
+          </div>
+        </fieldset>
+      {/each}
+      <button
+        onclick={() => {
+          const lead = d.units.find((u) => u.side === planSide);
+          if (!lead) {
+            editor.error = "That side has no units to lead a group.";
+            return;
+          }
+          const k = (editor.draft.action_groups ?? []).length + 1;
+          editor.draft.action_groups = [
+            ...(editor.draft.action_groups ?? []),
+            { name: `SAG ${k}`, side: planSide, leader: lead.id, members: [] },
+          ];
+          changed();
+        }}>Add action group</button
+      >
     {:else}
       <p class="dim">
         Events, injects, seats and groups are edited as JSON (docs/models/events.md). Changes apply
@@ -822,6 +1160,14 @@
   .list button.selected {
     border-color: var(--accent);
     background: var(--surface-3);
+  }
+  h3 {
+    margin: 12px 0 4px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  input.short {
+    width: 5em;
   }
   textarea.json {
     font-family: var(--mono);

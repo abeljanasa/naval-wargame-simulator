@@ -141,6 +141,17 @@ export type AarView_Serialize = {
 	replaying: boolean,
 };
 
+/**
+ *  A surface action group: its members keep station on the leader, so ordering the leader moves
+ *  the group. Built as escort missions on the leader.
+ */
+export type ActionGroup = {
+	name: string,
+	side: SideId,
+	leader: UnitId,
+	members: GroupStation[],
+};
+
 /**  One override. */
 export type Adjudication = Adjudication_Serialize | Adjudication_Deserialize;
 
@@ -645,6 +656,44 @@ export type Facilitation =
 /**  Turns an event on or off. */
 ({ kind: "set_event_enabled"; event: string; enabled: boolean }) & { inject?: never };
 
+/**  A planning-layer facility. */
+export type Facility = Facility_Serialize | Facility_Deserialize;
+
+/**  What a facility is. */
+export type FacilityKind = "command_post" | "refuelling_point" | "sheltering_port" | "anchorage";
+
+/**  A planning-layer facility. */
+export type Facility_Deserialize = {
+	id: number,
+	name: string,
+	side: SideId,
+	kind: FacilityKind,
+	position: GeoPoint,
+	/**  Units within this distance are alongside (ports, anchorages) or at the post. */
+	radius_m: number | null,
+	/**  Command posts: orders reach the side's units within this range. */
+	range_m?: number | null,
+	/**  Units served at once (in unit-id order); 0 = no limit. */
+	berths?: number,
+	services?: Services_Deserialize,
+};
+
+/**  A planning-layer facility. */
+export type Facility_Serialize = {
+	id: number,
+	name: string,
+	side: SideId,
+	kind: FacilityKind,
+	position: GeoPoint,
+	/**  Units within this distance are alongside (ports, anchorages) or at the post. */
+	radius_m: number | null,
+	/**  Command posts: orders reach the side's units within this range. */
+	range_m: number | null,
+	/**  Units served at once (in unit-id order); 0 = no limit. */
+	berths: number,
+	services: Services_Serialize,
+};
+
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent = FrameEvent_Serialize | FrameEvent_Deserialize;
 
@@ -685,6 +734,14 @@ export type GroupDef_Serialize = {
 	side: SideId,
 	name: string,
 	doctrine: Doctrine_Serialize,
+};
+
+/**  One member's station in a surface action group. */
+export type GroupStation = {
+	unit: UnitId,
+	/**  Relative to the leader's heading, degrees. */
+	bearing_deg: number | null,
+	range_m: number | null,
 };
 
 /**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */
@@ -1036,6 +1093,12 @@ export type Scenario_Deserialize = {
 	seats?: Seat[],
 	/**  Named map points for planning and briefing (format 4). */
 	reference_points?: ReferencePoint_Deserialize[],
+	/**  Planning layer: command posts, refuelling points, sheltering ports, anchorages (format 5). */
+	facilities?: Facility_Deserialize[],
+	/**  Planning layer: sense and engage zones, e.g. at choke points (format 5). */
+	zones?: Zone_Deserialize[],
+	/**  Surface action groups: members keep station on the leader (format 5). */
+	action_groups?: ActionGroup[],
 };
 
 export type Scenario_Serialize = {
@@ -1065,6 +1128,12 @@ export type Scenario_Serialize = {
 	seats?: Seat[],
 	/**  Named map points for planning and briefing (format 4). */
 	reference_points?: ReferencePoint_Serialize[],
+	/**  Planning layer: command posts, refuelling points, sheltering ports, anchorages (format 5). */
+	facilities?: Facility_Serialize[],
+	/**  Planning layer: sense and engage zones, e.g. at choke points (format 5). */
+	zones?: Zone_Serialize[],
+	/**  Surface action groups: members keep station on the leader (format 5). */
+	action_groups?: ActionGroup[],
 };
 
 /**  A player position. */
@@ -1080,6 +1149,29 @@ export type SeatRole =
 { role: "white_cell" } | 
 /**  One side's picture and units. */
 { role: "side"; side: SideId };
+
+/**  What a facility does for units of its side stopped within its radius. */
+export type Services = Services_Serialize | Services_Deserialize;
+
+/**  What a facility does for units of its side stopped within its radius. */
+export type Services_Deserialize = {
+	/**  Puts out fires, stops flooding and removes damage; a full repair restores systems. */
+	repair?: boolean,
+	/**  Restores the unit's weapons to its loadout after [`REARM_TICKS`] alongside. */
+	rearm?: boolean,
+	/**  Refuelling (recorded; fuel is not modelled until air operations, Phase 4). */
+	refuel?: boolean,
+};
+
+/**  What a facility does for units of its side stopped within its radius. */
+export type Services_Serialize = {
+	/**  Puts out fires, stops flooding and removes damage; a full repair restores systems. */
+	repair: boolean,
+	/**  Restores the unit's weapons to its loadout after [`REARM_TICKS`] alongside. */
+	rearm: boolean,
+	/**  Refuelling (recorded; fuel is not modelled until air operations, Phase 4). */
+	refuel: boolean,
+};
 
 export type SessionInfo = SessionInfo_Serialize | SessionInfo_Deserialize;
 
@@ -1098,6 +1190,12 @@ export type SessionInfo_Deserialize = {
 	controls_time: boolean,
 	/**  The scenario's reference points this window's seat may see. */
 	reference_points: ReferencePoint_Deserialize[],
+	/**  Planning-layer facilities this window's seat may see (its side's; all for the white cell). */
+	facilities: Facility_Deserialize[],
+	/**  Planning-layer zones this window's seat may see. */
+	zones: Zone_Deserialize[],
+	/**  Surface action groups this window's seat may see. */
+	action_groups: ActionGroup[],
 };
 
 export type SessionInfo_Serialize = {
@@ -1115,6 +1213,12 @@ export type SessionInfo_Serialize = {
 	controls_time: boolean,
 	/**  The scenario's reference points this window's seat may see. */
 	reference_points: ReferencePoint_Serialize[],
+	/**  Planning-layer facilities this window's seat may see (its side's; all for the white cell). */
+	facilities: Facility_Serialize[],
+	/**  Planning-layer zones this window's seat may see. */
+	zones: Zone_Serialize[],
+	/**  Surface action groups this window's seat may see. */
+	action_groups: ActionGroup[],
 };
 
 /**  How serious a scenario problem is. */
@@ -1471,6 +1575,42 @@ export type WeaponView = {
 	heading_deg: number | null,
 	/**  The seeker has acquired its target. */
 	homing: boolean,
+};
+
+/**  A sense or engage zone of one side. */
+export type Zone = Zone_Serialize | Zone_Deserialize;
+
+/**  What a zone governs. */
+export type ZoneKind = 
+/**  Own units inside take the zone's doctrine; contacts gained inside raise an alert. */
+"sense" | 
+/**  Targets inside are engaged under the zone's weapons control and ROE. */
+"engage";
+
+/**  A sense or engage zone of one side. */
+export type Zone_Deserialize = {
+	id: number,
+	name: string,
+	side: SideId,
+	kind: ZoneKind,
+	area: Area,
+	/**  Fields set here override the unit's own, its group's and its side's. */
+	doctrine?: Doctrine_Deserialize,
+	/**  The choke point this zone belongs to, if any (for display and grouping). */
+	choke_point?: string | null,
+};
+
+/**  A sense or engage zone of one side. */
+export type Zone_Serialize = {
+	id: number,
+	name: string,
+	side: SideId,
+	kind: ZoneKind,
+	area: Area,
+	/**  Fields set here override the unit's own, its group's and its side's. */
+	doctrine: Doctrine_Serialize,
+	/**  The choke point this zone belongs to, if any (for display and grouping). */
+	choke_point: string | null,
 };
 
 /* Tauri Specta runtime */
