@@ -22,6 +22,14 @@
 - **The review scrubber ran past the panel's edge** and added a horizontal scrollbar.
 - **Typing in a text area triggered keyboard shortcuts.** A space paused or ran the clock, a digit changed the compression, and the character was lost. That affected Lua scripts, event JSON and more. Shortcuts now ignore every text entry. Found while testing the record editor.
 
+### Decided (Phase 4, ADR-0007)
+
+- **Region of interest:** the whole Philippine Area of Responsibility. Full-resolution data covers 3°N–27°N, 111°E–137°E, including the Kalayaan Island Group.
+- **Imagery:** client-licensed offline tile pack, imported by the app; none in the repository.
+- **Gate 4 engagements** (proposals for the client's subject-matter experts to confirm): Operation Praying Mantis (1988) and *Hangor* vs *Khukri* (1971), with the *Samuel B. Roberts* mine strike (1988) as the alternate.
+- **Data packs:** a coarse global layer in the installer, and a full-resolution regional pack installed separately with a SHA-256 check.
+- **Still open:** the measures of effectiveness.
+
 ### Added (database editing)
 
 - **Edit a platform record in the app** (**View › Platform database… › Edit record**, DL-0037). It covers:

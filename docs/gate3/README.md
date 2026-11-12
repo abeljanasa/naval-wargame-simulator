@@ -100,4 +100,7 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
    - air operations.
 2. Provide the code-signing certificates (Windows PFX; Apple Developer ID and notarisation account) as Actions secrets.
 3. Name the navy staff and dates for the pilot ([ttx-pilot-plan.md](ttx-pilot-plan.md)).
-4. Review the draft [Phase 4 plan](../plan/phase-4.md), and make its decisions: the primary region of interest, the imagery source, and the historical engagements for Gate 4.
+4. Phase 4 plan: the region (the Philippine Area of Responsibility), the imagery source, the Gate 4 engagements and the data pack policy were decided on 2026-11-12 ([ADR-0007](../adr/0007-phase-4-region-and-data.md)). Still open:
+   - the measures of effectiveness;
+   - the subject-matter experts who confirm and build the Gate 4 engagements;
+   - procuring the imagery licence.

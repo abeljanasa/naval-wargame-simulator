@@ -16,6 +16,7 @@
   - terrain elevation and bathymetry (GEBCO/SRTM), and what depends on them: terrain masking, depths and shipping lanes for choke points, shallow-water routing;
   - airbases and air operations: aircraft fuel, tanking, loadout choice, runways.
 - **Branch:** `phase-4/analysis`, from `main` after the Gate 3 merge.
+- **Region:** the Philippine Area of Responsibility ([ADR-0007](../adr/0007-phase-4-region-and-data.md)).
 - **Gate 4 (§12, §13):** historical replays. SME-built scenarios of historical engagements are run and compared against the recorded outcomes, and the differences are documented.
 
 ## 1. Definition of done (Gate 4)
@@ -29,15 +30,17 @@
 - The terrain, bathymetry and imagery data ships in the installers, or as separate offline packs, and still runs air-gapped.
 - All CI checks green, including the determinism matrix with the data packs loaded.
 
-## 2. Decisions needed from the client
+## 2. Client decisions
 
-| # | Decision | Why it matters | Recommendation |
-|---|---|---|---|
-| 1 | **Primary region of interest** (§0, still the default) | Drives the regional database, and where terrain and bathymetry are bundled at full resolution | Name it before Phase 4 starts. Until then, slices 1–2 use Bass Strait, the area of the shipped scenarios |
-| 2 | **Imagery source and licence** | No open global imagery is licensed for redistribution in an offline installer | The client supplies licensed imagery as an offline tile pack, imported by the app. No imagery is committed to this repository |
-| 3 | **Historical engagements for Gate 4**, and SME time | Gate 4 is judged on them; each needs an SME-built scenario and a documented record | Choose two: one surface-missile engagement and one ASW or mine engagement, so detection, weapons and acoustics are all exercised |
-| 4 | **Data pack size against resolution** | GEBCO's global grid is several gigabytes uncompressed | A coarse global layer in the installer, plus full-resolution regional packs installed separately and verified by SHA-256 |
-| 5 | **Measures of effectiveness** | The batch statistics report what scenarios define | Scenario-defined MOEs (§4 slice 1). The client names the first set from its own TTX questions |
+Decisions 1–4 were made on 2026-11-12 and are recorded in [ADR-0007](../adr/0007-phase-4-region-and-data.md). Decision 5 is still open.
+
+| # | Decision | Status |
+|---|---|---|
+| 1 | **Primary region of interest** | **Decided:** the whole Philippine Area of Responsibility (PAR). Full-resolution data covers 3°N–27°N, 111°E–137°E: the PAR with a margin, including the Kalayaan Island Group. The regional database covers the navies and coast guards operating there. Phase 4 demonstrators move to this region |
+| 2 | **Imagery source and licence** | **Decided:** the client procures licensed imagery of the PAR for offline use and delivers it as a tile pack, which the app imports (slice 6). No imagery is committed to the repository |
+| 3 | **Historical engagements for Gate 4** | **Decided:** one surface-missile and one submarine/ASW engagement. Proposed: Operation Praying Mantis (18 April 1988) and *Hangor* vs *Khukri* (9 December 1971), with the *Samuel B. Roberts* mine strike (14 April 1988) as the alternate. **The client's subject-matter experts confirm them** and build the scenarios |
+| 4 | **Data pack size against resolution** | **Decided:** a coarse global layer (about 2 arc-minutes) in the installer, plus a full-resolution PAR pack installed separately and verified by SHA-256. Slice 2 measures the sizes |
+| 5 | **Measures of effectiveness** | **Open.** The client names the first set from its own TTX questions. Slice 1 needs them |
 
 **Data licences:**
 - GEBCO and SRTM are published for free use. Their exact terms (attribution, redistribution) are checked and recorded in the data dictionary before any file is bundled, as for every source (§2, §3).
@@ -71,18 +74,18 @@ Each slice: behaviour spec, design-log entry, tests, docs, CHANGELOG, green CI (
 | # | Slice | Delivers | Depends on |
 |---|---|---|---|
 | 1 | **Monte Carlo batch** | `nws-batch mc`: N replications across seeds, in parallel (one simulation per thread, so each run stays deterministic). Scenario-defined MOEs, such as units lost by side, time to first detection, weapons to kill, tonnage delivered or a choke-point transit outcome. Results in Arrow/Parquet and CSV, plus a summary: mean, SD, 95 % confidence intervals, histograms. Scaling benchmark with a CI budget | — |
-| 2 | **Terrain and bathymetry packs** | Offline elevation and depth grids from GEBCO (sea) and SRTM (land), tiled and compressed: a coarse global layer, plus regional packs at full resolution. Sampled with integer grids and `libm` bilinear interpolation, so results match on every OS. Pack identity in the state hash. Map layers for depth shading, contours and hillshade. Air-gapped install and SHA-256 check | Decision 4 |
+| 2 | **Terrain and bathymetry packs** | Offline elevation and depth grids from GEBCO (sea) and SRTM (land), tiled and compressed: a coarse global layer in the installer, plus the PAR pack at full resolution, built first. Sampled with integer grids and `libm` bilinear interpolation, so results match on every OS. Pack identity in the state hash. Map layers for depth shading, contours and hillshade. Air-gapped install and SHA-256 check | — |
 | 3 | **Shallow water and depths** | A navigable-water routing graph that honours each unit's draft, plus depth along the route. Ports, anchorages and choke points take their depth from the bathymetry, and the planner can still override it. Grounding risk off the graph | 2 |
 | 4 | **Terrain masking** | Radar, ESM, EO/IR and comms line of sight blocked by terrain along the path, with a sampled profile and 4/3 earth. Land clutter for low air targets over land (Phase 2 backlog). Coverage on the map (slice 14 of Phase 3) uses it | 2 |
 | 5 | **Choke points inherit depth and lanes** | A choke point drawn or selected on the map takes its depth profile and shipping lanes. Planner-drawn lanes always work; lanes derived from open traffic data only where a licensed source exists. Traffic density raises transit risk in the AAR | 2, 3 |
-| 6 | **Imagery layer** | Import of a licensed offline tile pack (MBTiles/PMTiles) as a base layer, with no network access. Its attribution is shown. Nothing is fetched at run time | Decision 2 |
+| 6 | **Imagery layer** | Import of a licensed offline tile pack (MBTiles/PMTiles) as a base layer, with no network access. Its attribution is shown. Nothing is fetched at run time | The client's licensed tile pack (decision 2) |
 | 7 | **Weather zones** | Polygon weather zones with sea state, wind, visibility, rain and cloud, changed by events and the white cell. Per-zone effects on radar (rain loss, clutter), EO/IR and visual, weapon Ph, sheltering and speed penalties. Replaces the single scenario-wide sea state, and older scenarios load as one global zone | — |
 | 8 | **Acoustics** | Sound-velocity profiles by region and season, entered or imported. Mixed-layer depth with cross-layer loss, convergence zones, bottom bounce (using the bathymetry) and depth dependence. Reverberation for active sonar. Acoustic figures as database fields (a migration). Sonobuoy laying and towed-array streaming states. Duel tests against hand-calculated TL | 2 for bottom bounce |
 | 9 | **Airbases and runways** | Airbase and carrier facilities with runways or decks, aprons and parking capacity, and aircraft based at a facility. Readiness states: ready, alert 15, alert 60, maintenance | — |
 | 10 | **Sorties and loadouts** | Loadout choice per mission from the database. Turnaround time by loadout. Sortie generation limited by deck and runway capacity. Strike, patrol (CAP, ASW) and AEW missions launched as sorties | 9 |
 | 11 | **Aircraft fuel and tanking** | Aircraft fuel by phase of flight, bingo and return to base, tanker missions, and air-to-air refuelling queues. Aviation fuel at depots and on ships (the Phase 3 fuel model gains a fuel type) | 9, 10 |
 | 12 | **Automatic sense-zone tasking** | The engine places and tasks the side's sensors to keep each sense zone's coverage above a planner-set level, as §7.1 asks for in the analysis phase. It uses the Phase 3 coverage model, and every tasking decision is logged | 4, 8 |
-| 13 | **Regional database** | Open-source regional platforms, sensors and weapons for the region in decision 1, each with a citation, confidence and an `UNCLASSIFIED` marking. In-app database editing (record diff, citation entry, live validation), carried over from Phase 2. ECM equipment as database records | Decision 1 |
+| 13 | **Regional database** | Open-source platforms, sensors and weapons of the navies and coast guards operating in the PAR (decision 1), each with a citation, confidence and an `UNCLASSIFIED` marking. In-app editing of sensors and weapons (platform records are editable already, DL-0037). ECM equipment as database records | — |
 | 14 | **Model validation and Gate 4** | Historical replay scenarios built with SMEs (decision 3), run through slice 1. Comparison against the record, with a validation report per engagement. Duel tests extended to the new models. Gate 4 review pack | 1, 13, and the models the engagements use |
 
 ## 5. Carried over

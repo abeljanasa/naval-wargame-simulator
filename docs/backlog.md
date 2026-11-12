@@ -29,7 +29,7 @@ Gate 3 conditions still open:
 
 ## Phase 4, deferred by the client (2026-11-12)
 
-The client chose to close the in-phase P1 gaps and move these to Phase 4, because they need outside data or a Phase 4 subsystem. The [Phase 4 plan](plan/phase-4.md) (draft) schedules them:
+The client chose to close the in-phase P1 gaps and move these to Phase 4, because they need outside data or a Phase 4 subsystem. The [Phase 4 plan](plan/phase-4.md) schedules them. The region (the Philippine Area of Responsibility), imagery and data-pack decisions are in [ADR-0007](adr/0007-phase-4-region-and-data.md):
 
 - [ ] Satellite imagery layers (needs a licensed imagery source).
 - [ ] Terrain elevation and bathymetry packs (GEBCO/SRTM), then:
