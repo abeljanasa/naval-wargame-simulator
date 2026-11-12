@@ -576,6 +576,18 @@ fn order_zone_doctrine(
     session_info(&h, window.label())
 }
 
+/// Coverage and gaps of a sense zone by its side's sensors now (the window's own side's zones;
+/// any zone for the white cell).
+#[tauri::command]
+#[specta::specta]
+fn zone_coverage(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    zone: u32,
+) -> Result<Option<sim_core::ZoneCoverage>, String> {
+    lock(&host).zone_coverage(window.label(), zone)
+}
+
 /// Advances a paused simulation by `ticks` (single-step for the umpire; white-cell windows only).
 #[tauri::command]
 #[specta::specta]
@@ -715,6 +727,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_adjudicate,
             order_facilitate,
             order_zone_doctrine,
+            zone_coverage,
             db_weapons,
             editor_check,
             editor_current,

@@ -88,6 +88,29 @@ Each zone belongs to one side, has an `area` (a circle or polygon, as in event t
 
 A **choke point** is a sense zone round an engage zone, sharing a `choke_point` name. Every AI period, another side's unit entering any zone of the choke point is logged (`ChokePointTransit`): the transit record for the AAR. The editor's **Add choke point on the map** makes a 40 km sense zone round a 15 km weapons-free engage zone (engage unfriendly: yes).
 
+**Layers** (slice 14, [DL-0033](../design-log/DL-0033-coverage.md)): a zone may carry a `layer` (`outer`, `middle`, `inner`), shown on the map. A sense zone may list the sensor types it is for (`sensors`, for example `["radar", "esm"]` for an outer layer, `["sonar_hull", "sonar_towed"]` for an inner one). Typical layout: sense far out, engage only in the inner layers.
+
+### Coverage
+
+For any sense zone, the side (or the white cell) can ask for its **coverage** now. This is a query: it changes nothing, draws nothing, and is not hashed. In this TTX release players task the sensors themselves; automatic sensor tasking is Phase 4.
+- **Grid:** the zone's bounding box is cut into 24 × 24 cells, and the cells whose centre is inside the zone are kept.
+- **Covered:** a cell is covered when some unit of the zone's side has a working sensor of one of the zone's types (every type when it lists none) whose **nominal range** reaches the cell's centre. Otherwise the cell is a **gap**.
+
+| Sensor | Nominal range (capped at the sensor's maximum range) |
+|---|---|
+| Radar, EMCON active | R₅₀ against a 1 000 m² ship, with sea clutter and weather loss ([radar.md](radar.md)), within the radar horizon to a 10 m target |
+| ESM | the radar horizon to a 15 m emitter |
+| Visual, EO, IR | optical R₅₀ against a 100 m ship in the light at the sensor, within visibility and the horizon to a 10 m target ([optical-mad.md](optical-mad.md)) |
+| Hull, towed, dipping sonar (usable) | passive R₅₀ (signal excess 0) against a 115 dB submarine at 5 kn ([sonar.md](sonar.md)) |
+| MAD | MAD R₅₀ |
+| Sonobuoys | none: they are not laid yet |
+
+The ranges are nominal: where a typical contact can be expected, not a guarantee. Detection itself stays the probabilistic models.
+
+**Worked example:** a frigate with a 25 m radar, 30 km west of the centre of a 20 km radar layer. The radar horizon to a 10 m ship is 4.12 × (√25 + √10) = 33.6 km, nearer than the radar's R₅₀. So the zone is covered out to 33.6 km from the frigate, and the far side of the layer is a gap (about 55 % covered in the test).
+
+**Desktop:** **Sense coverage** lists the seat's sense zones. Ticking one draws its cells on the map, covered in green and gaps in red, with the percentage covered, refreshed every 3 s.
+
 ## Surface action groups
 
 ```json
@@ -129,4 +152,4 @@ A **choke point** is a sense zone round an engage zone, sharing a `choke_point` 
 - Facilities are not targets: they cannot be attacked or destroyed. Fixed command posts can be jammed ([comms.md](comms.md)) but not attacked.
 - Weather is one scenario-wide sea state; weather zones are Phase 4.
 - From the desktop, the white cell changes zone weapons control only. Other changes to the layer need the `SetPlanning` command (scenario scripts, batch).
-- Sense-zone coverage and gaps are not drawn. Assigned shooters engage, but there is no coordinated air defence across a group.
+- Coverage uses nominal ranges against reference targets, from a scenario-wide sea state; it does not model terrain masking (Phase 4) or tasking. Assigned shooters engage, but there is no coordinated air defence across a group.

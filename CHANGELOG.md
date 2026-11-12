@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 14: sense-zone layers and coverage)
+
+- **Zone layers** (`outer`, `middle`, `inner`), and sensor types for sense zones (`docs/models/planning-layer.md` §Coverage, DL-0033).
+- **Coverage query** (`Simulation::zone_coverage`): a 24 × 24 grid over a sense zone. It shows which cells the side's working sensors of the zone's types reach at nominal range against reference targets. It is a query: nothing changes and nothing is hashed.
+- **Desktop:**
+  - **Sense coverage:** tick a zone to draw covered and gap cells on the map (green and red), with the percentage covered, refreshed every 3 s.
+  - The scenario editor sets each zone's layer and sensor types.
+  - Map labels show the layer.
+- **Command:** `zone_coverage`. A side's seat sees only its own zones.
+
+### Changed (slice 14)
+
+- **Save format 22.**
+
 ### Added (Phase 3, slice 13: anchorages and weather)
 
 - **Facility water and limits** (`docs/models/planning-layer.md`, DL-0032):

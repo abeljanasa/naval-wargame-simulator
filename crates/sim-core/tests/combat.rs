@@ -1100,6 +1100,8 @@ fn zone(id: u32, kind: ZoneKind, area: Area, doctrine: Doctrine) -> Zone {
         doctrine,
         choke_point: None,
         shooters: vec![],
+        layer: None,
+        sensors: vec![],
     }
 }
 
@@ -2487,4 +2489,74 @@ fn facility_areas_and_limits_are_checked() {
     assert_eq!(weather_limit(40.0), 5);
     assert_eq!(weather_limit(90.0), 7);
     assert_eq!(weather_limit(135.0), 8);
+}
+
+// ---- Sense-zone layers and coverage (Phase 3 slice 14) ----
+
+#[test]
+fn sense_zone_coverage_follows_the_radar_horizon_and_emcon() {
+    // A 20 km sense zone centred 30 km east of unit 1 (25 m radar). Against the 10 m reference
+    // ship the horizon is 4.12 km × (√25 + √10) = 33.6 km; the radar's R50 against 1 000 m² is
+    // far beyond it, so the horizon is the edge of coverage.
+    let centre = direct(ORIGIN, 90.0, 30_000.0).point;
+    let mut z = zone(
+        1,
+        ZoneKind::Sense,
+        circle(centre, 20_000.0),
+        Doctrine::default(),
+    );
+    z.layer = Some(ZoneLayer::Outer);
+    z.sensors = vec![SensorKind::Radar];
+    let mut sim = planned_scene(80_000.0, vec![], vec![z.clone()]);
+    let cov = sim.zone_coverage(1).unwrap();
+    let horizon = sim_geo::radar_horizon_m(25.0, 10.0);
+    assert!(cov.cells.len() > 300, "{} cells", cov.cells.len());
+    for c in &cov.cells {
+        let d = sim_geo::inverse(ORIGIN, c.centre).distance_m;
+        assert_eq!(c.covered, d <= horizon, "cell {d:.0} m out");
+        assert!(z.area.contains(c.centre));
+    }
+    assert!(cov.fraction > 0.1 && cov.fraction < 0.6, "{}", cov.fraction);
+    let hash = sim.state_hash();
+
+    // A query changes nothing.
+    assert_eq!(sim.state_hash(), hash);
+    // The side's radars silent: no coverage.
+    let mut sim2 = planned_scene(80_000.0, vec![], vec![z.clone()]);
+    sim2.submit(cmd(
+        1,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Side { side: SideId(1) },
+            doctrine: Doctrine {
+                emcon: Some(Emcon::Silent),
+                ..Doctrine::default()
+            },
+        },
+    ))
+    .unwrap();
+    sim2.step();
+    assert_eq!(sim2.zone_coverage(1).unwrap().fraction, 0.0);
+
+    // A sonar layer: the frigate has no sonar.
+    let mut sonar = z;
+    sonar.sensors = vec![SensorKind::SonarHull, SensorKind::SonarTowed];
+    let mut sim3 = planned_scene(80_000.0, vec![], vec![sonar]);
+    assert_eq!(sim3.zone_coverage(1).unwrap().fraction, 0.0);
+
+    // Engage zones have no coverage, and only sense zones list sensors.
+    let engage = zone(
+        2,
+        ZoneKind::Engage,
+        circle(centre, 5_000.0),
+        Doctrine::default(),
+    );
+    let mut sim4 = planned_scene(80_000.0, vec![], vec![engage.clone()]);
+    assert!(sim4.zone_coverage(2).is_none());
+    let mut bad = engage;
+    bad.sensors = vec![SensorKind::Radar];
+    assert!(Simulation::new(1)
+        .submit(planning(vec![], vec![bad]))
+        .is_err());
 }

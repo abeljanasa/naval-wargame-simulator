@@ -23,6 +23,7 @@ import {
   type Minefield,
   type Mission,
   type PostView,
+  type ZoneCoverage,
   type SessionInfo,
   type TimeCompression,
   type UnitView,
@@ -67,6 +68,28 @@ class SimSession {
   comms = $state<CommsView[]>([]);
   /** The seat's command posts and whether each is up. */
   posts = $state<PostView[]>([]);
+  /** Sense zones whose coverage is drawn, and their latest coverage. */
+  coverageShown = $state<number[]>([]);
+  coverage = $state<ZoneCoverage[]>([]);
+
+  /** Shows or hides one sense zone's coverage. */
+  async toggleCoverage(zone: number) {
+    this.coverageShown = this.coverageShown.includes(zone)
+      ? this.coverageShown.filter((z) => z !== zone)
+      : [...this.coverageShown, zone];
+    await this.refreshCoverage();
+  }
+
+  /** Asks the engine for the shown zones' coverage now. */
+  async refreshCoverage() {
+    const out: ZoneCoverage[] = [];
+    for (const zone of this.coverageShown) {
+      const res = await commands.zoneCoverage(zone);
+      if (res.status === "ok" && res.data) out.push(res.data);
+      else if (res.status === "error") this.error = res.error;
+    }
+    this.coverage = out;
+  }
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */

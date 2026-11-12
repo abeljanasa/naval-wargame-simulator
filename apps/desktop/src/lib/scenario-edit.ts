@@ -119,6 +119,10 @@ export interface DraftZone {
   choke_point?: string | null;
   /** Engage zones: units that engage contacts inside on their own. */
   shooters?: number[];
+  /** The zone's layer in a choke point's defence. */
+  layer?: "outer" | "middle" | "inner" | null;
+  /** Sense zones: the sensor types the layer is for (coverage counts these). */
+  sensors?: string[];
 }
 
 export interface DraftStation {

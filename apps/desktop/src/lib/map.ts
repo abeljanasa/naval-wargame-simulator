@@ -8,7 +8,14 @@ import "maplibre-gl/dist/maplibre-gl.css";
 // ship it as a static asset and point MapLibre at it explicitly.
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { MapboxOverlay } from "@deck.gl/mapbox";
-import { IconLayer, LineLayer, PathLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
+import {
+  IconLayer,
+  LineLayer,
+  PathLayer,
+  PolygonLayer,
+  ScatterplotLayer,
+  TextLayer,
+} from "@deck.gl/layers";
 import type { Layer, PickingInfo } from "@deck.gl/core";
 import type {
   BearingView,
@@ -574,6 +581,7 @@ export interface MapFacility {
 export interface MapZone {
   name: string;
   kind: string;
+  layer?: string | null;
   area:
     | { shape: "circle"; centre: GeoPoint; radius_m: number | null }
     | { shape: "polygon"; points: GeoPoint[] };
@@ -585,6 +593,48 @@ const FACILITY_CODE: Record<string, string> = {
   sheltering_port: "PORT",
   anchorage: "ANCH",
 };
+
+/** One sense zone's coverage, as the engine samples it. */
+export interface MapCoverage {
+  cells: { centre: GeoPoint; covered: boolean }[];
+  half_lat_deg: number | null;
+  half_lon_deg: number | null;
+}
+
+const COVERED_FILL: RGBA = [90, 200, 120, 70];
+const GAP_FILL: RGBA = [235, 80, 70, 90];
+
+/** Sense-zone coverage: covered cells green, gaps red. */
+export function coverageLayers(coverage: MapCoverage[]): Layer[] {
+  type Cell = { ring: LonLat[]; covered: boolean };
+  const cells: Cell[] = coverage.flatMap((c) => {
+    const h = n(c.half_lat_deg);
+    const w = n(c.half_lon_deg);
+    return c.cells.map((cell) => {
+      const lat = n(cell.centre.lat_deg);
+      const lon = n(cell.centre.lon_deg);
+      return {
+        covered: cell.covered,
+        ring: [
+          [lon - w, lat - h],
+          [lon + w, lat - h],
+          [lon + w, lat + h],
+          [lon - w, lat + h],
+        ] as LonLat[],
+      };
+    });
+  });
+  return [
+    new PolygonLayer<Cell>({
+      id: "coverage",
+      data: cells,
+      getPolygon: (c) => c.ring,
+      getFillColor: (c) => (c.covered ? COVERED_FILL : GAP_FILL),
+      stroked: false,
+      filled: true,
+    }),
+  ];
+}
 
 /** Outline of a zone, closed. */
 export function zoneRing(z: MapZone): LonLat[] {
@@ -630,7 +680,7 @@ export function planningLayers(
       id: `${id}-zone-labels`,
       data: zones,
       getPosition: zoneAnchor,
-      getText: (z) => z.name,
+      getText: (z) => (z.layer ? `${z.name} (${z.layer})` : z.name),
       getSize: 11,
       getColor: (z) => (z.kind === "engage" ? ENGAGE_COLOUR : SENSE_COLOUR),
       getPixelOffset: (z) => [0, z.kind === "engage" ? 14 : -14],

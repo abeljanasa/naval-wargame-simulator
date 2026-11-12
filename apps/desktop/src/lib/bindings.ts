@@ -55,6 +55,11 @@ export const commands = {
 	orderFacilitate: (action: Facilitation) => typedError<null, string>(__TAURI_INVOKE("order_facilitate", { action })),
 	/**  Changes one zone's doctrine (white cell only): a per-zone ROE/WCS override. */
 	orderZoneDoctrine: (zone: number, doctrine: Doctrine_Deserialize) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_zone_doctrine", { zone, doctrine })),
+	/**
+	 *  Coverage and gaps of a sense zone by its side's sensors now (the window's own side's zones;
+	 *  any zone for the white cell).
+	 */
+	zoneCoverage: (zone: number) => typedError<ZoneCoverage | null, string>(__TAURI_INVOKE("zone_coverage", { zone })),
 	/**  Every weapon type, sorted by id. */
 	dbWeapons: () => typedError<DbWeaponRow[], string>(__TAURI_INVOKE("db_weapons")),
 	/**
@@ -451,6 +456,12 @@ export type ContactView_Serialize = {
 	/**  Own unit whose sensor last detected it. */
 	detected_by: UnitId,
 	sensor_id: string,
+};
+
+/**  One sampled cell. */
+export type CoverageCell = {
+	centre: GeoPoint,
+	covered: boolean,
 };
 
 /**  A validation finding on the platform database. */
@@ -1396,6 +1407,9 @@ export type SeatRole =
 /**  One side's picture and units. */
 { role: "side"; side: SideId };
 
+/**  Sensor kinds, matching the platform database `sensors.kind` values. */
+export type SensorKind = "radar" | "sonar_hull" | "sonar_towed" | "sonar_dipping" | "sonobuoy" | "esm" | "ir" | "eo" | "visual" | "mad";
+
 /**  What a facility does for units of its side stopped within its radius. */
 export type Services = Services_Serialize | Services_Deserialize;
 
@@ -1838,12 +1852,29 @@ export type WeaponView = {
 /**  A sense or engage zone of one side. */
 export type Zone = Zone_Serialize | Zone_Deserialize;
 
+/**  A sense zone's coverage by its side's sensors, now. */
+export type ZoneCoverage = {
+	zone: number,
+	/**  The sensor types counted (the zone's list, or every type). */
+	sensors: SensorKind[],
+	/**  Cells inside the zone, row by row from the south-west. */
+	cells: CoverageCell[],
+	/**  Half a cell's height and width, degrees (to draw the cells). */
+	half_lat_deg: number | null,
+	half_lon_deg: number | null,
+	/**  Covered cells over cells inside the zone (0 when it has none). */
+	fraction: number | null,
+};
+
 /**  What a zone governs. */
 export type ZoneKind = 
 /**  Own units inside take the zone's doctrine; contacts gained inside raise an alert. */
 "sense" | 
 /**  Targets inside are engaged under the zone's weapons control and ROE. */
 "engage";
+
+/**  A zone's layer in a choke point's defence: sense far out, engage in the inner layers. */
+export type ZoneLayer = "outer" | "middle" | "inner";
 
 /**  A sense or engage zone of one side. */
 export type Zone_Deserialize = {
@@ -1861,6 +1892,10 @@ export type Zone_Deserialize = {
 	 *  contact per AI period, under the zone's rules).
 	 */
 	shooters?: UnitId[],
+	/**  The zone's layer in a choke point's defence (outer, middle, inner). */
+	layer?: ZoneLayer | null,
+	/**  Sense zones: the sensor types this layer is for; coverage counts only these (empty: all). */
+	sensors?: SensorKind[],
 };
 
 /**  A sense or engage zone of one side. */
@@ -1879,6 +1914,10 @@ export type Zone_Serialize = {
 	 *  contact per AI period, under the zone's rules).
 	 */
 	shooters: UnitId[],
+	/**  The zone's layer in a choke point's defence (outer, middle, inner). */
+	layer: ZoneLayer | null,
+	/**  Sense zones: the sensor types this layer is for; coverage counts only these (empty: all). */
+	sensors: SensorKind[],
 };
 
 /* Tauri Specta runtime */

@@ -143,6 +143,18 @@
     changed();
   }
 
+  const SENSOR_KINDS = [
+    { key: "radar", label: "radar" },
+    { key: "esm", label: "ESM" },
+    { key: "visual", label: "visual" },
+    { key: "eo", label: "EO" },
+    { key: "ir", label: "IR" },
+    { key: "sonar_hull", label: "hull sonar" },
+    { key: "sonar_towed", label: "towed array" },
+    { key: "sonar_dipping", label: "dipping sonar" },
+    { key: "mad", label: "MAD" },
+  ];
+
   /** Choke-point names used by the draft's zones. */
   function chokePoints(): string[] {
     return [
@@ -1205,7 +1217,30 @@
       <h3>Zones</h3>
       {#each editor.draft.zones ?? [] as z, i (z.id)}
         <fieldset>
-          <legend>{z.name}{z.choke_point ? ` · ${z.choke_point}` : ""}</legend>
+          <legend
+            >{z.name}{z.choke_point ? ` · ${z.choke_point}` : ""}{z.layer
+              ? ` · ${z.layer}`
+              : ""}</legend
+          >
+          {#if z.kind === "sense"}
+            <div class="row" aria-label={`Sensor types for ${z.name}`}>
+              <span class="dim">Sensors (none ticked: all):</span>
+              {#each SENSOR_KINDS as k (k.key)}
+                <label class="inline">
+                  <input
+                    type="checkbox"
+                    checked={(z.sensors ?? []).includes(k.key)}
+                    onchange={(e) => {
+                      const rest = (z.sensors ?? []).filter((x) => x !== k.key);
+                      z.sensors = e.currentTarget.checked ? [...rest, k.key] : rest;
+                      changed();
+                    }}
+                  />
+                  {k.label}
+                </label>
+              {/each}
+            </div>
+          {/if}
           <div class="grid2">
             <label>Name <input bind:value={z.name} oninput={changed} /></label>
             <label>
@@ -1219,6 +1254,22 @@
               Side
               <select bind:value={z.side} onchange={changed}>
                 {#each d.sides as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+              </select>
+            </label>
+            <label>
+              Layer
+              <select
+                value={z.layer ?? ""}
+                onchange={(e) => {
+                  const v = e.currentTarget.value;
+                  z.layer = v === "" ? null : (v as "outer" | "middle" | "inner");
+                  changed();
+                }}
+              >
+                <option value="">none</option>
+                <option value="outer">outer</option>
+                <option value="middle">middle</option>
+                <option value="inner">inner</option>
               </select>
             </label>
             {#if z.area.shape === "circle"}

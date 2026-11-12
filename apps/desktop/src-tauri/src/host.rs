@@ -17,7 +17,7 @@ use sim_core::{
     Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, CommsView, ContactView,
     Doctrine, DoctrineScope, Environment, EventStatus, Facilitation, GeoPoint, InjectStatus,
     Issuer, Message, Minefield, Mission, PostView, Seat, SeatRole, SideId, SimEventKind,
-    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponView,
+    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponView, ZoneCoverage,
 };
 use sim_scenario::Scenario;
 use std::collections::{BTreeMap, BTreeSet};
@@ -821,6 +821,21 @@ impl Host {
         )?;
         self.zones = zones;
         Ok(seq)
+    }
+
+    /// Coverage of a sense zone of the window's side (any zone for the white cell).
+    pub fn zone_coverage(
+        &mut self,
+        label: &str,
+        zone: u32,
+    ) -> Result<Option<ZoneCoverage>, String> {
+        let owner = self.sim.zone_side(zone);
+        match self.viewer(label) {
+            Viewer::Side { side } if owner.is_some_and(|o| o != side) => {
+                Err("that zone belongs to another side".into())
+            }
+            _ => Ok(self.sim.zone_coverage(zone)),
+        }
     }
 
     pub fn order_facilitate(&mut self, label: &str, action: Facilitation) -> Result<u64, String> {

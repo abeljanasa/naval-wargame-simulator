@@ -5,6 +5,7 @@
   import {
     createMap,
     buildLayers,
+    coverageLayers,
     editorLayers,
     planningLayers,
     referenceLayers,
@@ -54,6 +55,22 @@
   });
 
   const clock = $derived(sim.clock);
+
+  /** Sense zones the seat may see coverage for: its side's, or every one for the white cell. */
+  const senseZones = $derived(
+    (sim.session?.zones ?? []).filter(
+      (z) =>
+        z.kind === "sense" &&
+        (sim.session?.viewer.kind !== "side" || z.side === sim.session.viewer.side),
+    ),
+  );
+
+  // Coverage moves with the sensors: refresh the shown zones every 3 s.
+  $effect(() => {
+    if (sim.coverageShown.length === 0) return;
+    const timer = setInterval(() => void sim.refreshCoverage(), 3000);
+    return () => clearInterval(timer);
+  });
 
   function missionText(m: Mission): string {
     switch (m.kind) {
@@ -170,6 +187,7 @@
     }
     overlay.setProps({
       layers: [
+        ...coverageLayers(sim.coverage),
         ...planningLayers(sim.session?.facilities ?? [], sim.session?.zones ?? []),
         ...buildLayers({
           units: sim.units,
@@ -363,6 +381,28 @@
         {/each}
       </ul>
     </section>
+
+    {#if senseZones.length > 0}
+      <section>
+        <h2>Sense coverage</h2>
+        <ul class="zones" aria-label="Sense coverage">
+          {#each senseZones as z (z.id)}
+            {@const cov = sim.coverage.find((c) => c.zone === z.id)}
+            <li>
+              <label class="inline">
+                <input
+                  type="checkbox"
+                  checked={sim.coverageShown.includes(z.id)}
+                  onchange={() => void sim.toggleCoverage(z.id)}
+                />
+                {z.name}{z.layer ? ` (${z.layer})` : ""}
+              </label>
+              {#if cov}<span>{Math.round(n(cov.fraction) * 100)} % covered</span>{/if}
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
 
     {#if sim.session?.viewer.kind === "side"}
       <section>

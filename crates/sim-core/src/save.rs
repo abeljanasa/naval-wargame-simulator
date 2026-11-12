@@ -64,7 +64,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   mission's progress (phase and start tick). Older saves load at phase 0.
 /// * 21: facility areas, depth, holding limits and staging; unit draft; weather and staging
 ///   diversions. Older saves load without them.
-pub const SAVE_FORMAT_VERSION: u32 = 21;
+/// * 22: zones gain a layer and sensor types. Older saves load without them.
+pub const SAVE_FORMAT_VERSION: u32 = 22;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -225,6 +225,24 @@ impl Simulation {
         &self.world.resource::<WeaponsInFlight>().list
     }
 
+    /// Coverage and gaps of sense zone `zone` by its side's sensors now
+    /// (`docs/models/planning-layer.md` §Coverage). A query: it changes nothing. `None`: no such
+    /// sense zone.
+    pub fn zone_coverage(&mut self, zone: u32) -> Option<crate::coverage::ZoneCoverage> {
+        crate::coverage::zone_coverage(&mut self.world, zone)
+    }
+
+    /// The side a zone belongs to, if it exists.
+    #[must_use]
+    pub fn zone_side(&self, zone: u32) -> Option<SideId> {
+        self.world
+            .resource::<PlanningLayer>()
+            .zones
+            .iter()
+            .find(|z| z.id == zone)
+            .map(|z| z.side)
+    }
+
     /// Rebuilds a run from a seed and a command log, then advances to `until`.
     pub fn replay(seed: u64, log: &[LoggedCommand], until: Tick) -> Result<Self, SimError> {
         let mut sim = Self::new(seed);

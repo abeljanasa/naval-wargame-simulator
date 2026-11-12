@@ -197,6 +197,22 @@ pub struct Zone {
     /// contact per AI period, under the zone's rules).
     #[serde(default)]
     pub shooters: Vec<UnitId>,
+    /// The zone's layer in a choke point's defence (outer, middle, inner).
+    #[serde(default)]
+    pub layer: Option<ZoneLayer>,
+    /// Sense zones: the sensor types this layer is for; coverage counts only these (empty: all).
+    #[serde(default)]
+    pub sensors: Vec<crate::detection::SensorKind>,
+}
+
+/// A zone's layer in a choke point's defence: sense far out, engage in the inner layers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum ZoneLayer {
+    Outer,
+    Middle,
+    Inner,
 }
 
 /// A unit being served at a facility.
@@ -381,6 +397,12 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         z.area
             .validate()
             .map_err(|e| format!("zone {:?}: {e}", z.name))?;
+        if z.kind == ZoneKind::Engage && !z.sensors.is_empty() {
+            return Err(format!(
+                "zone {:?}: only sense zones list sensor types",
+                z.name
+            ));
+        }
         if z.kind == ZoneKind::Sense && !z.shooters.is_empty() {
             return Err(format!(
                 "zone {:?}: only engage zones have shooters",
