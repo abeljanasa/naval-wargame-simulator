@@ -12,8 +12,9 @@
 // The W3C WebDriver protocol is spoken directly over fetch, so the test adds no dependencies.
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { Buffer } from "node:buffer";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -33,6 +34,16 @@ if (process.env.NATIVE_DRIVER) driverArgs.push("--native-driver", process.env.NA
 const driver = spawn(process.env.TAURI_DRIVER ?? "tauri-driver", driverArgs, {
   stdio: ["ignore", "inherit", "inherit"],
 });
+
+// E2E_SHOTS=<folder>: save a screenshot at each rehearsal step, for review.
+const shots = process.env.E2E_SHOTS ? resolve(process.env.E2E_SHOTS) : null;
+if (shots) mkdirSync(shots, { recursive: true });
+let session;
+async function shot(name) {
+  if (!shots || !session) return;
+  const png = await wd("GET", `/session/${session}/screenshot`);
+  writeFileSync(join(shots, `${name}.png`), Buffer.from(png, "base64"));
+}
 
 const failures = [];
 const check = (ok, what) => {
@@ -67,7 +78,6 @@ async function until(what, fn, ms = 30_000) {
   throw new Error(`timed out waiting for ${what} (last: ${last})`);
 }
 
-let session;
 try {
   await until("tauri-driver", async () => (await fetch(`${base}/status`)).ok, 20_000);
   session = (
@@ -140,6 +150,101 @@ try {
   );
   check(true, "white-cell seat shows the other side's units");
 
+  // 4a. Rehearsal of the white-cell run sheet (docs/gate3/pilot-kit/white-cell-run-sheet.md),
+  //     before STARTEX.
+  const tabBtn = (name) =>
+    find("xpath", `//button[@role="tab"][normalize-space()=${JSON.stringify(name)}]`);
+  const all = async (css) =>
+    (await wd("POST", `${s}/elements`, { using: "css selector", value: css })).map(
+      (e) => Object.values(e)[0],
+    );
+  const typeInto = async (id, value) => {
+    await wd("POST", `${s}/element/${id}/clear`, {});
+    await wd("POST", `${s}/element/${id}/value`, { text: value });
+  };
+  const unread = async () => {
+    const t = await text(
+      await find("xpath", '//button[@role="tab"][starts-with(normalize-space(),"Messages")]'),
+    );
+    return Number(/Messages\s*(\d+)/.exec(t)?.[1] ?? 0);
+  };
+  await shot("01-white-cell-loaded");
+
+  const tabs = [];
+  for (const name of ["Unit", "Injects", "Events", "Planning", "Seats", "Log", "Review"]) {
+    if (await tabBtn(name).catch(() => null)) tabs.push(name);
+  }
+  check(tabs.length === 7, `white-cell console tabs present (${tabs.join(", ")})`);
+
+  await click(await tabBtn("Events"));
+  const events = await until("the events list", async () => {
+    const n = (await all('[aria-label="Scenario events"] > li')).length;
+    return n || false;
+  });
+  check(events === 8, `Events tab lists the scenario's 8 events (${events})`);
+
+  await click(await tabBtn("Injects"));
+  const injects = (await all('[aria-label="Injects"] > li')).length;
+  check(injects === 4, `Injects tab lists the 4 injects (${injects})`);
+  const before = await unread();
+  await click(await el('[aria-label="Send Jamming warning"]'));
+  const after = await until("the inject to arrive", async () => {
+    const n = await unread();
+    return n > before ? n : false;
+  });
+  check(after > before, `sending an inject delivers it (unread ${before} → ${after})`);
+  await shot("02-inject-sent");
+
+  await click(await tabBtn("Planning"));
+  const posts = await text(await el('[aria-label="Command posts"]'));
+  check(
+    posts.includes("Blue flagship command") &&
+      posts.includes("Blue maritime HQ") &&
+      !/down/.test(posts),
+    "Planning tab shows both Blue command posts up",
+  );
+  await shot("03-planning");
+
+  // A seat window opens, locked to its seat, showing only its side.
+  await click(await tabBtn("Seats"));
+  const main = await wd("GET", `${s}/window`);
+  await click(await el('[aria-label="Open a window for Blue command"]'));
+  const blue = await until("the Blue seat window", async () => {
+    const handles = await wd("GET", `${s}/window/handles`);
+    return handles.find((h) => h !== main) ?? false;
+  });
+  await wd("POST", `${s}/window`, { handle: blue });
+  const blueText = await until("Blue units in the seat window", async () => {
+    const b = await bodyText();
+    return b.includes("Blue destroyer (DDG) — Anvil") ? b : false;
+  });
+  check(
+    !blueText.includes("Red corvette (FFL) — Cinder") && blueText.includes("Blue command"),
+    "Blue seat window is locked to Blue and hides Red units",
+  );
+  await sleep(3000); // let the seat window's map finish loading its coastline
+  await shot("04-blue-seat-window");
+  await wd("DELETE", `${s}/window`);
+  await wd("POST", `${s}/window`, { handle: main });
+
+  // An override needs a reason, and is logged with it.
+  await typeInto(await el("#umpire-reason"), "rehearsal: test override");
+  await click(
+    await find(
+      "xpath",
+      '//button[.//span[@class="name" and text()="Red patrol boat (PGG) — Flint"]]',
+    ),
+  );
+  await click(await tabBtn("Unit"));
+  await click(await byText("button", "Destroy"));
+  await click(await tabBtn("Log"));
+  const log = await until("the override in the log", async () => {
+    const t = await bodyText();
+    return t.includes("rehearsal: test override") ? t : false;
+  });
+  check(/destroy unit/.test(log), "override is logged with the umpire's reason");
+  await shot("05-override-log");
+
   // 5. The engine runs: at Max the clock moves on, and the scenario's events send messages.
   await click(await byText("button", "Max"));
   await click(await el(".toolbar .play"));
@@ -157,6 +262,19 @@ try {
     await find("xpath", '//button[@role="tab"][starts-with(normalize-space(),"Messages")]'),
   );
   check(/Messages\s*\d+/.test(tab), `scenario events sent messages (tab reads "${tab}")`);
+  await shot("06-after-run");
+
+  // 6. Hot wash: the review replays the exercise so far and verifies it, then back to live.
+  await click(await tabBtn("Review"));
+  await click(await byText("button", "Replay"));
+  await until("the verified replay", async () =>
+    (await bodyText()).includes("Replay: matches the recorded run"),
+  );
+  check(true, "review replays the exercise and verifies it against the record");
+  await shot("07-review");
+  await click(await byText("button", "Back to live"));
+  await until("live again", async () => !(await bodyText()).includes("REPLAY"));
+  check(true, "back to live after the review");
 } catch (e) {
   check(false, String(e.message ?? e));
 } finally {

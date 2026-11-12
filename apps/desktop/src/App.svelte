@@ -209,6 +209,26 @@
     return () => map?.remove();
   });
 
+  // Frame the map on the units a seat sees when its first picture of a scenario arrives, so the
+  // action is not a cluster of overlapping labels at a fixed zoom. Once per scenario and seat;
+  // the user's own view is kept after that.
+  let framed = "";
+  $effect(() => {
+    const name = sim.session?.scenario_name ?? "";
+    const key = `${name}|${sim.session?.seat.id ?? ""}`;
+    if (!map || !name || key === framed || sim.units.length === 0) return;
+    framed = key;
+    const lats = sim.units.map((u) => n(u.position.lat_deg));
+    const lons = sim.units.map((u) => n(u.position.lon_deg));
+    map.fitBounds(
+      [
+        [Math.min(...lons), Math.min(...lats)],
+        [Math.max(...lons), Math.max(...lats)],
+      ],
+      { padding: 80, maxZoom: 9, duration: 0 },
+    );
+  });
+
   // Redraw the dynamic layers whenever the frame, the selection or the draft changes.
   $effect(() => {
     if (!overlay) return;

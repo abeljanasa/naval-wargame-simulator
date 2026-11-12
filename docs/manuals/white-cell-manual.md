@@ -24,7 +24,9 @@ The default seats are **White cell**, plus one seat per side, named after it. Ad
 
 ### Rehearse
 
-Run the scenario at **Max** once, alone, to see where the decision points fall. Then load it again. A scenario restarts from the beginning every time it is loaded. It opens paused at `D+0 00:00:01`: the first second has run, so every unit is on the map and the time-zero events (such as STARTEX) have fired.
+Run the scenario at **Max** once, alone, to see where the decision points fall. Then load it again. A scenario restarts from the beginning every time it is loaded. It opens paused at `D+0 00:00:01`: the first second has run, so every unit is on the map and the time-zero events (such as STARTEX) have fired. The map frames the units your seat sees.
+
+**While paused**, anything the white cell does (an inject, a message, an override, a planning or zone change) takes effect at once: the clock runs one second to apply it. Players' orders wait until the clock runs, and show as refused or done then.
 
 ## 2. Running the clock
 

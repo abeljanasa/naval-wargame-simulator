@@ -50,7 +50,10 @@ On Windows the first `tauri build` downloads the WiX and NSIS toolsets. For air-
 - the database opens from the menu bar;
 - the pilot scenario loads from a file;
 - the white-cell seat sees both sides;
-- the engine runs at Max and the scenario events send messages.
+- the engine runs at Max and the scenario events send messages;
+- the white-cell run sheet works: console tabs, events, sending an inject, command posts, a locked seat window, a logged override, and a verified replay.
+
+Set `E2E_SHOTS=<folder>` to save a screenshot at each rehearsal step.
 
 CI runs it on Windows (job *Packaged app end to end*). macOS has no WebDriver for its webview.
 

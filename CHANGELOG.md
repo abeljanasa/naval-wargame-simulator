@@ -18,9 +18,16 @@
   - Found by the new packaged-app test.
 - **A window that started slowly could miss its starting picture** and show no units until something moved. The window now starts listening for frames before it asks for its session, and asking makes the backend send a full picture next. Loading a scenario or a record asks again, so a full picture that arrives before the load reply is not lost. Found by the packaged-app test on Linux CI.
 
+- **White-cell actions sent while paused did nothing until the clock ran.** That covered injects, messages, overrides, and planning and zone edits, which the run sheet uses during pauses for decisions. The host now runs one second when the white cell acts while paused, so the action shows at once. Player orders still wait for the clock. Found by rehearsing the run sheet.
+- **The review scrubber ran past the panel's edge** and added a horizontal scrollbar.
+
+### Changed (map)
+
+- **The map frames the units a seat sees** when a scenario's first picture arrives, and again when the seat changes. It used to open at a fixed zoom, where the pilot's units were an unreadable cluster of labels.
+
 ### Added (packaged-app test)
 
-- **`npm run e2e:app`** drives the built app over WebDriver (tauri-driver), with no new dependencies. It covers the real engine, database, map, scenario loading, the white-cell seat and running at Max. CI runs it on Windows (*Packaged app end to end*); see `docs/build/releasing.md`.
+- **`npm run e2e:app`** drives the built app over WebDriver (tauri-driver), with no new dependencies. It covers the real engine, database, map, scenario loading, the white-cell seat and running at Max. It also rehearses the white-cell run sheet: console tabs, events, sending an inject, command posts, a locked seat window, a logged override and a verified replay. `E2E_SHOTS=<folder>` saves a screenshot at each step. CI runs it on Windows (*Packaged app end to end*); see `docs/build/releasing.md`.
 
 ### Added (Phase 3, slice 20: pilot kit)
 

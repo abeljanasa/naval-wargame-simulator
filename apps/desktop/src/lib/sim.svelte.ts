@@ -223,8 +223,15 @@ class SimSession {
     this.cancelPlan();
     this.selected = null;
     const res = await commands.setSeat(seat);
-    if (res.status === "error") this.error = res.error;
-    else this.session = res.data;
+    if (res.status === "error") {
+      this.error = res.error;
+      return;
+    }
+    this.session = res.data;
+    // Drop the old seat's picture and ask for the new seat's in full.
+    this.units = [];
+    this.allContacts = [];
+    await this.resync();
   }
 
   /** Adds a seat for a side, or a white-cell seat when `side` is null. */

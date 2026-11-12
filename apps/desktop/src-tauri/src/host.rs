@@ -757,6 +757,7 @@ impl Host {
             return Err(IN_REVIEW.into());
         }
         let seat = self.seat_of(label)?.clone();
+        let white_cell = matches!(seat.role, SeatRole::WhiteCell);
         let (issuer, side) = match seat.role {
             SeatRole::WhiteCell => (Issuer::WhiteCell { umpire: seat.name }, None),
             SeatRole::Side { side } => (Issuer::Player { seat: seat.id }, Some(side)),
@@ -772,6 +773,13 @@ impl Host {
             .map_err(|e| e.to_string())?;
         if let Some(st) = self.stations.get_mut(label) {
             st.pending.insert(seq);
+        }
+        // A command takes effect when its tick runs. The white cell acts during pauses (an
+        // inject for a decision brief, a ruling), so run that one second now: the players see
+        // it at once. It is the next tick of the run, so records and replays are unchanged.
+        // Player orders wait for the clock, as in any paused wargame.
+        if white_cell && self.paused {
+            self.sim.step();
         }
         Ok(seq)
     }
@@ -1107,6 +1115,33 @@ mod tests {
             .unwrap()
             .iter()
             .all(|i| i.severity == sim_db::Severity::Warning));
+    }
+
+    #[test]
+    fn white_cell_actions_take_effect_while_paused_and_player_orders_wait() {
+        let mut h = host();
+        let t0 = h.clock().tick;
+        assert!(h.clock().paused);
+        // A side seat's order waits for the clock.
+        h.order_speed(M, UnitId(1), 3.0).unwrap();
+        assert_eq!(h.clock().tick, t0);
+        // A white-cell override applies at once (one second runs).
+        let wc = seat_named(&h, "White cell");
+        h.set_seat(M, wc).unwrap();
+        h.order_adjudicate(
+            M,
+            "test".into(),
+            Adjudication::RemoveUnit { unit: UnitId(2) },
+        )
+        .unwrap();
+        assert_eq!(h.clock().tick, Tick(t0.0 + 1));
+        assert!(h.clock().paused);
+        assert!(h
+            .sim
+            .snapshot(Viewer::WhiteCell)
+            .units
+            .iter()
+            .all(|u| u.id != UnitId(2)));
     }
 
     #[test]

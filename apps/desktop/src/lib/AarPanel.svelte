@@ -255,7 +255,11 @@
     margin: 6px 0;
   }
   #scrubber {
+    /* Fill the panel without the global input padding pushing it past the edge. */
     width: 100%;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 4px 0;
   }
   .badge {
     margin: 4px 0;
