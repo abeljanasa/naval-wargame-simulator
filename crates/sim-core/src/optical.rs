@@ -95,6 +95,7 @@ pub(crate) fn optical_pass(
     log: &mut EventLog,
     bearings: &mut BearingTable,
     fresh: &mut FreshBearings,
+    terrain: Option<&sim_geo::terrain::Terrain>,
 ) {
     let mut by_lat: Vec<(f64, usize)> = all
         .iter()
@@ -137,6 +138,17 @@ pub(crate) fn optical_pass(
                     let inv = inverse(obs.position.point, tgt.position.point);
                     let range = inv.distance_m;
                     if range < s.min_range_m || range > bound {
+                        continue;
+                    }
+                    // Terrain masking: land between the sensor and the target.
+                    if crate::detection::terrain_masks(
+                        terrain,
+                        obs.position.point,
+                        h_s + obs.ground_m,
+                        tgt.position.point,
+                        h_t + tgt.ground_m,
+                        range,
+                    ) {
                         continue;
                     }
                     let size = size_factor(s.kind, tgt.domain == Domain::Air, tgt.length_m);

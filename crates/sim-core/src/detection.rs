@@ -34,6 +34,7 @@ use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use sim_c2::Emcon;
+use sim_geo::terrain::Terrain;
 use sim_geo::{chord_m, ecef_surface, inverse, radar_horizon_m, GeoPoint};
 use sim_sensors::{
     clutter_loss_db, detection_range_with_loss_m, gaussian_pair, in_main_beam, jamming_to_noise,
@@ -166,13 +167,15 @@ pub fn domain_speed_bound_mps(domain: Option<Domain>) -> f64 {
     }
 }
 
-/// What a radar sees a target against: low targets compete with sea or land clutter.
-/// Low air targets are treated as over the sea (no land mask lookup yet).
+/// What a radar sees a target against: low targets compete with sea or land clutter. A low air
+/// target over land (on the terrain packs) competes with land clutter; `altitude_m` is its height
+/// above the ground or sea below it.
 #[must_use]
-pub fn clutter_background(domain: Domain, altitude_m: f64) -> ClutterBackground {
+pub fn clutter_background(domain: Domain, altitude_m: f64, over_land: bool) -> ClutterBackground {
     match domain {
         Domain::Land => ClutterBackground::Land,
         Domain::Surface | Domain::Subsurface => ClutterBackground::Sea,
+        Domain::Air if altitude_m <= CLUTTER_CEILING_M && over_land => ClutterBackground::Land,
         Domain::Air if altitude_m <= CLUTTER_CEILING_M => ClutterBackground::Sea,
         Domain::Air => ClutterBackground::None,
     }
@@ -422,6 +425,27 @@ impl ContactTable {
     }
 }
 
+/// Ground height under a point on the terrain packs, metres above sea level (0 at sea or with
+/// no packs).
+pub(crate) fn ground_m(terrain: Option<&Terrain>, p: GeoPoint) -> f64 {
+    terrain
+        .and_then(|t| t.height_m(p))
+        .map_or(0.0, |h| h.max(0.0))
+}
+
+/// Whether terrain blocks the line of sight between two points, heights above sea level
+/// (`docs/models/terrain-masking.md`). Never without terrain packs.
+pub(crate) fn terrain_masks(
+    terrain: Option<&Terrain>,
+    a: GeoPoint,
+    h_a: f64,
+    b: GeoPoint,
+    h_b: f64,
+    distance_m: f64,
+) -> bool {
+    terrain.is_some_and(|t| t.masks(a, h_a, b, h_b, distance_m))
+}
+
 pub(crate) struct Observed<'a> {
     pub(crate) id: UnitId,
     pub(crate) side: SideId,
@@ -438,6 +462,9 @@ pub(crate) struct Observed<'a> {
     pub(crate) platform: Option<&'a str>,
     pub(crate) category: Option<&'a str>,
     pub(crate) length_m: f64,
+    /// The ground under a land unit (terrain packs), added to its heights for terrain masking:
+    /// a site's mast stands on its hill. 0 for every other domain.
+    pub(crate) ground_m: f64,
 }
 
 // A bevy system takes its world access as parameters; grouping them would only hide that.
@@ -452,6 +479,7 @@ pub(crate) fn detection_system(
     env: Res<EnvState>,
     mut bearings: ResMut<BearingTable>,
     library: Res<EmitterLibrary>,
+    terrain: Res<crate::sim::TerrainRes>,
     units: Query<(
         &Unit,
         &Position,
@@ -466,6 +494,7 @@ pub(crate) fn detection_system(
     if !tick.is_multiple_of(SENSOR_PERIOD_TICKS) {
         return;
     }
+    let terrain = terrain.0.as_deref();
     let mut all: Vec<Observed<'_>> = units
         .iter()
         .map(|(u, p, s, sig, j, k)| Observed {
@@ -486,6 +515,11 @@ pub(crate) fn detection_system(
             length_m: sig
                 .length_m
                 .unwrap_or_else(|| crate::optical::default_length_m(u.domain)),
+            ground_m: if u.domain == Domain::Land {
+                ground_m(terrain, p.point)
+            } else {
+                0.0
+            },
         })
         .collect();
     all.sort_by_key(|o| o.id);
@@ -593,8 +627,28 @@ pub(crate) fn detection_system(
                 if range > horizon {
                     continue;
                 }
+                // Terrain masking (terrain packs): land between the radar and the target.
+                if terrain_masks(
+                    terrain,
+                    obs.position.point,
+                    h_s + obs.ground_m,
+                    tgt.position.point,
+                    h_t + tgt.ground_m,
+                    range,
+                ) {
+                    continue;
+                }
+                let ground_below = if tgt.domain == Domain::Air {
+                    ground_m(terrain, tgt.position.point)
+                } else {
+                    0.0
+                };
                 let clutter_db = clutter_loss_db(
-                    clutter_background(tgt.domain, tgt.position.altitude_m),
+                    clutter_background(
+                        tgt.domain,
+                        tgt.position.altitude_m - ground_below,
+                        ground_below > 0.0,
+                    ),
                     env.sea_state,
                     clutter_per_step,
                 );
@@ -690,6 +744,7 @@ pub(crate) fn detection_system(
         &mut bearings,
         &library,
         &mut fresh,
+        terrain,
     );
     sonar_pass(
         &all,
@@ -712,6 +767,7 @@ pub(crate) fn detection_system(
         &mut log,
         &mut bearings,
         &mut fresh,
+        terrain,
     );
     resolve_bearings(fresh, &all, tick, &mut contacts, &mut log, &mut bearings);
     for (side, number, target) in contacts.expire(tick) {

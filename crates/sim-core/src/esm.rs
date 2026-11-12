@@ -169,6 +169,7 @@ pub(crate) fn esm_pass(
     bearings: &mut BearingTable,
     library: &EmitterLibrary,
     fresh: &mut FreshBearings,
+    terrain: Option<&sim_geo::terrain::Terrain>,
 ) {
     // Radiating emitters: radars and jammers of units whose EMCON is active.
     let mut emitters: Vec<Emitter> = Vec::new();
@@ -256,6 +257,17 @@ pub(crate) fn esm_pass(
                     };
                     let range = inv.distance_m;
                     if range < esm.min_range_m || range > esm.max_range_m || range > horizon {
+                        continue;
+                    }
+                    // Terrain masking: land between the emitter and the receiver.
+                    if crate::detection::terrain_masks(
+                        terrain,
+                        obs.position.point,
+                        h + obs.ground_m,
+                        tgt.position.point,
+                        em.height_m + tgt.ground_m,
+                        range,
+                    ) {
                         continue;
                     }
                     let r_int = intercept_range_m(em.ref_range_m, esm.max_range_m);

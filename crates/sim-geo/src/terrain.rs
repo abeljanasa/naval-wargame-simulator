@@ -35,6 +35,13 @@ pub const UNITS_PER_DEGREE: i64 = 36_000;
 pub const PACK_EXTENSION: &str = "nwsterrain";
 /// A grid cell with no height (in [`Terrain::sample_grid`]).
 pub const NO_DATA: i16 = i16::MIN;
+/// Effective earth radius for radio and radar paths: 4/3 of the mean radius (standard
+/// atmospheric refraction), metres.
+pub const EFFECTIVE_EARTH_RADIUS_M: f64 = 4.0 / 3.0 * 6_371_000.0;
+/// Longest spacing between terrain samples along a line of sight, metres.
+pub const MASK_STEP_M: f64 = 500.0;
+/// Most terrain samples along one line of sight.
+pub const MASK_MAX_SAMPLES: u32 = 256;
 
 const FULL_CIRCLE: i64 = 360 * UNITS_PER_DEGREE;
 /// Largest grid a pack may hold (cells), so a corrupt header cannot exhaust memory.
@@ -397,6 +404,49 @@ impl Terrain {
         self.packs.iter().find_map(|k| k.height_m(p))
     }
 
+    /// Whether land rises into the straight path from `a`, `h_a` metres above sea level, to `b`,
+    /// `h_b` metres above sea level, `distance_m` apart along the surface, on a 4/3 earth
+    /// (`docs/models/terrain-masking.md`).
+    ///
+    /// The path is sampled every [`MASK_STEP_M`] (at most [`MASK_MAX_SAMPLES`] points),
+    /// interpolated in latitude and longitude, which is close enough at line-of-sight ranges.
+    /// At distance `x` the ray is `h_a + (h_b − h_a)·x/d − x·(d − x)/(2·R')`. Only land above sea
+    /// level blocks (the sea surface is the horizon's business), and points no pack covers never
+    /// block. Plain arithmetic only, so the answer is the same on every OS.
+    #[must_use]
+    pub fn masks(&self, a: GeoPoint, h_a: f64, b: GeoPoint, h_b: f64, distance_m: f64) -> bool {
+        if distance_m.is_nan() || distance_m <= 0.0 {
+            return false;
+        }
+        let n = libm::ceil(distance_m / MASK_STEP_M).clamp(2.0, f64::from(MASK_MAX_SAMPLES));
+        let mut dlon = b.lon_deg - a.lon_deg;
+        if dlon > 180.0 {
+            dlon -= 360.0;
+        } else if dlon < -180.0 {
+            dlon += 360.0;
+        }
+        let dlat = b.lat_deg - a.lat_deg;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let steps = n as u32;
+        for i in 1..steps {
+            let t = f64::from(i) / n;
+            let p = GeoPoint::new(a.lat_deg + t * dlat, a.lon_deg + t * dlon);
+            let Some(ground) = self.height_m(p) else {
+                continue;
+            };
+            if ground <= 0.0 {
+                continue;
+            }
+            let x = t * distance_m;
+            let ray =
+                h_a + (h_b - h_a) * t - x * (distance_m - x) / (2.0 * EFFECTIVE_EARTH_RADIUS_M);
+            if ground > ray {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Water depth at `p` in metres (0 on land).
     #[must_use]
     pub fn depth_m(&self, p: GeoPoint) -> Option<f64> {
@@ -545,6 +595,67 @@ mod tests {
             fold, 0xb702_9321_00e9_7803,
             "sampling changed: {fold:#018x}"
         );
+    }
+
+    /// A 1° × 1° island at 10–11°N, 120–121°E, rising to `peak` m along 120.5°E, in deep water.
+    fn ridge(peak: i16) -> Terrain {
+        // 0.1° cells from 9°N/119°E, 31 × 31.
+        let (rows, cols) = (31u32, 31u32);
+        let heights: Vec<i16> = (0..rows * cols)
+            .map(|i| {
+                let lat = 9.0 + 0.1 * f64::from(i / cols);
+                let lon = 119.0 + 0.1 * f64::from(i % cols);
+                if (10.0..=11.0).contains(&lat) && (120.0..=121.0).contains(&lon) {
+                    if (lon - 120.5).abs() < 0.05 {
+                        peak
+                    } else {
+                        50
+                    }
+                } else {
+                    -1000
+                }
+            })
+            .collect();
+        let h = PackHeader {
+            name: "ridge".into(),
+            ..header(9 * DEG, 119 * DEG, (DEG / 10) as u32, rows, cols)
+        };
+        Terrain::new(vec![Arc::new(
+            TerrainPack::decode(&encode(&h, &heights).unwrap()).unwrap(),
+        )])
+        .unwrap()
+    }
+
+    #[test]
+    fn a_ridge_masks_low_paths_but_not_high_ones() {
+        let t = ridge(800);
+        let (a, b) = (GeoPoint::new(10.5, 119.8), GeoPoint::new(10.5, 121.2));
+        let d = crate::inverse(a, b).distance_m;
+        // Two ships' masts across the island: blocked by the 800 m ridge.
+        assert!(t.masks(a, 20.0, b, 20.0, d));
+        // An aircraft at 6 km sees over it.
+        assert!(!t.masks(a, 20.0, b, 6_000.0, d));
+        // The order of the ends does not matter.
+        assert_eq!(t.masks(b, 20.0, a, 20.0, d), t.masks(a, 20.0, b, 20.0, d));
+        // A path over open water alone is never masked, however low.
+        let (c, e) = (GeoPoint::new(9.3, 119.2), GeoPoint::new(9.3, 121.8));
+        assert!(!t.masks(c, 0.0, e, 0.0, crate::inverse(c, e).distance_m));
+        // Off every pack: nothing to block.
+        let (f, g) = (GeoPoint::new(40.0, 10.0), GeoPoint::new(40.0, 11.0));
+        assert!(!t.masks(f, 1.0, g, 1.0, crate::inverse(f, g).distance_m));
+    }
+
+    #[test]
+    fn the_earth_bulge_counts_on_a_4_3_earth() {
+        // Low land (50 m) between two 60 m antennas 100 km apart: the bulge at mid-path is
+        // 50 000² / (2 × 8 495 km) ≈ 147 m, so the ray dips to about −87 m there and the island
+        // shows over it. Raised to 300 m each, the ray clears 50 m everywhere.
+        let t = ridge(50);
+        let (a, b) = (GeoPoint::new(10.5, 120.05), GeoPoint::new(10.5, 120.95));
+        let d = crate::inverse(a, b).distance_m;
+        assert!(t.masks(a, 60.0, b, 60.0, d));
+        assert!(!t.masks(a, 300.0, b, 300.0, d));
+        assert!(!t.masks(a, 60.0, a, 60.0, 0.0));
     }
 
     #[test]

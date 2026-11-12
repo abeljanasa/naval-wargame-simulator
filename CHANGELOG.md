@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 4: terrain masking)
+
+- **Terrain masking** (terrain packs): land between the two ends of a line of sight blocks radar, ESM and optical detection, line-of-sight radio links, and sense coverage.
+  - The test is one 4/3-earth path profile, sampled every 500 m.
+  - Land sites and posts ashore stand on the ground, so a radar on a hill sees over lower land.
+- **Land clutter** for aircraft at or below 150 m above land; they were treated as over the sea before.
+- **Unchanged:** without packs nothing changes, and the golden replays are unchanged.
+
 ### Added (release: world terrain layer from its online source)
 
 - **The installers carry the 4′ world terrain layer**, built by each release from GEBCO on NOAA ERDDAP (`scripts/terrain/world-layer.sh`, the new `terrain` job in the release workflow), so the map stays current.

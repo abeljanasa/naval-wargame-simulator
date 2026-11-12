@@ -26,7 +26,7 @@ A hop from a transmitter to a receiver is up when all of these hold, checked in 
 
 **Antenna heights:** a post ashore uses `antenna_m` (default 30 m); a post carried by a unit, and every unit, uses its own: ship 25 m, land unit 10 m, aircraft its altitude, submarine 2 m (mast raised, at 20 m or shallower).
 
-**Radio horizon:** the 4/3-earth horizon used for radar, 4.12 km × (√h₁ + √h₂), with heights in metres. Posts default to beyond line of sight (HF or satellite), which has no horizon limit. An airborne post gains range from its altitude.
+**Radio horizon:** the 4/3-earth horizon used for radar, 4.12 km × (√h₁ + √h₂), with heights in metres. With terrain packs, land between the two ends also cuts a line-of-sight hop ([terrain masking](terrain-masking.md)). Posts default to beyond line of sight (HF or satellite), which has no horizon limit. An airborne post gains range from its altitude.
 
 ## Jamming
 

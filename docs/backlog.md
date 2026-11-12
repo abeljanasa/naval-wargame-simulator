@@ -33,7 +33,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 
 - [ ] Satellite imagery layers (needs a licensed imagery source).
 - [ ] Terrain elevation and bathymetry packs (GEBCO/SRTM), then:
-  - radar terrain masking;
+  - ~~radar terrain masking~~ (Phase 4 slice 4, DL-0040);
   - ~~depths for ports and anchorages from bathymetry~~ (Phase 4 slice 3, DL-0039);
   - choke points that inherit depth and shipping lanes;
   - ~~shallow-water routing~~ (Phase 4 slice 3, DL-0039).
@@ -42,8 +42,8 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 
 ## Phase 2, deferred from slices
 
-- [ ] Radar terrain masking (needs bundled elevation data, with GEBCO/SRTM in Phase 4).
-- [ ] Low air targets over land should see land clutter (needs a land-mask lookup in detection).
+- [x] Radar terrain masking, also for ESM, optical, comms and coverage (Phase 4 slice 4, [DL-0040](design-log/DL-0040-terrain-masking.md)).
+- [x] Low air targets over land see land clutter (Phase 4 slice 4, DL-0040).
 - [ ] ECM equipment (jammers) in the platform database, with soft kill in slice 9; until then jammers are given per unit in scenarios.
 - [ ] Track velocity estimation and association errors (tracks model limitations).
 - [ ] Acoustic figures (radiated noise, sonar frequency, DI, DT, source level) as platform-database fields; generic defaults in code until then.

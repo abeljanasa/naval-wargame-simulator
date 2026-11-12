@@ -90,6 +90,9 @@ const ALL_KINDS: [SensorKind; 10] = [
 struct Reach {
     at: GeoPoint,
     range_m: f64,
+    /// Sensor height above sea level and the reference target's height, for terrain masking;
+    /// `None` for sensors terrain does not mask (sonar, MAD).
+    heights: Option<(f64, f64)>,
 }
 
 /// Passive sonar R₅₀ (signal excess 0) against the reference submarine, by bisection on range:
@@ -137,7 +140,7 @@ fn nominal_range_m(
                 return 0.0;
             };
             let clutter = clutter_loss_db(
-                clutter_background(Domain::Surface, 0.0),
+                clutter_background(Domain::Surface, 0.0, false),
                 env.sea_state,
                 s.clutter_db_per_sea_state
                     .unwrap_or(DEFAULT_CLUTTER_DB_PER_SEA_STATE),
@@ -215,6 +218,7 @@ pub(crate) fn zone_coverage(world: &mut World, zone: u32) -> Option<ZoneCoverage
         z.sensors.clone()
     };
     let env = world.resource::<EnvState>().0;
+    let terrain = world.resource::<crate::sim::TerrainRes>().0.clone();
     let tick = world.resource::<SimClock>().tick;
     #[allow(clippy::cast_precision_loss)]
     let unix_s = env.start_unix_s as f64 + tick.seconds();
@@ -238,9 +242,26 @@ pub(crate) fn zone_coverage(world: &mut World, zone: u32) -> Option<ZoneCoverage
         for s in suite.0.iter().filter(|s| kinds.contains(&s.kind)) {
             let range_m = nominal_range_m(s, (u, p, k.speed_mps), emits, env, unix_s);
             if range_m > 0.0 {
+                let reference = match s.kind {
+                    SensorKind::Radar | SensorKind::Visual | SensorKind::Eo | SensorKind::Ir => {
+                        Some(REFERENCE_SHIP_HEIGHT_M)
+                    }
+                    SensorKind::Esm => Some(REFERENCE_EMITTER_HEIGHT_M),
+                    _ => None,
+                };
+                let ground = if u.domain == Domain::Land {
+                    crate::detection::ground_m(terrain.as_deref(), p.point)
+                } else {
+                    0.0
+                };
+                let heights = reference.and_then(|r| {
+                    sensor_height_m(s.mount_height_m, u.domain, p.altitude_m)
+                        .map(|h| (h + ground, r))
+                });
                 reaches.push(Reach {
                     at: p.point,
                     range_m,
+                    heights,
                 });
             }
         }
@@ -258,9 +279,20 @@ pub(crate) fn zone_coverage(world: &mut World, zone: u32) -> Option<ZoneCoverage
             if !z.area.contains(centre) {
                 continue;
             }
-            let covered = reaches
-                .iter()
-                .any(|r| inverse(r.at, centre).distance_m <= r.range_m);
+            let covered = reaches.iter().any(|r| {
+                let d = inverse(r.at, centre).distance_m;
+                d <= r.range_m
+                    && !r.heights.is_some_and(|(h_s, h_t)| {
+                        crate::detection::terrain_masks(
+                            terrain.as_deref(),
+                            r.at,
+                            h_s,
+                            centre,
+                            h_t,
+                            d,
+                        )
+                    })
+            });
             cells.push(CoverageCell { centre, covered });
         }
     }
