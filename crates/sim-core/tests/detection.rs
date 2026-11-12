@@ -66,6 +66,8 @@ fn spawn(
             stores: Default::default(),
             damage_profile: None,
             mission: None,
+            fuel: None,
+            draft_m: None,
         }),
     }
 }

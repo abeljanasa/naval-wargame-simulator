@@ -1,0 +1,307 @@
+{
+  "format": "nws-scenario",
+  "format_version": 5,
+  "name": "Phase 3 — Choke point planning",
+  "description": "Planning-layer demonstrator. Blue holds a choke point east of Wilsons Promontory with a sense zone (alerts, radars on) and an inner engage zone (weapons free against unfriendly contacts). A surface action group patrols the western approach while a corvette holds the passage. Two Red corvettes transit west through it. Blue commands from the destroyer, with its maritime HQ ashore as the alternate (5-minute handover, orders queued in the gap); the corvette in the passage is the engage zone's assigned shooter. Blue has a sheltering port with repair and rearm, an anchorage and a refuelling point. Postures are unfriendly, so outside the engage zone weapons stay tight. All platforms are generic database classes with no real-world values.",
+  "seed": 20261112,
+  "duration_s": 10800,
+  "environment": {
+    "sea_state": 2,
+    "start_unix_s": 1794268800
+  },
+  "sides": [
+    {
+      "id": 1,
+      "name": "Blue",
+      "postures": [
+        {
+          "toward": 2,
+          "posture": "unfriendly"
+        }
+      ],
+      "doctrine": {
+        "wcs": "tight",
+        "emcon": "active",
+        "engage_unfriendly": false
+      }
+    },
+    {
+      "id": 2,
+      "name": "Red",
+      "postures": [
+        {
+          "toward": 1,
+          "posture": "unfriendly"
+        }
+      ],
+      "doctrine": {
+        "wcs": "tight",
+        "emcon": "active"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": 1,
+      "name": "Blue destroyer (DDG) — Anvil",
+      "side": 1,
+      "platform": "GEN-DDG",
+      "position": {
+        "lat_deg": -39.6,
+        "lon_deg": 146.4
+      },
+      "heading_deg": 90.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": -39.6,
+          "lon_deg": 146.65
+        },
+        "radius_m": 8000
+      }
+    },
+    {
+      "id": 2,
+      "name": "Blue frigate (FFG) — Bastion",
+      "side": 1,
+      "platform": "GEN-FFG",
+      "position": {
+        "lat_deg": -39.63,
+        "lon_deg": 146.4
+      },
+      "heading_deg": 90.0
+    },
+    {
+      "id": 3,
+      "name": "Blue corvette (FFL) — Coral",
+      "side": 1,
+      "platform": "GEN-FFL",
+      "position": {
+        "lat_deg": -39.6,
+        "lon_deg": 147.0
+      },
+      "heading_deg": 0.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": -39.6,
+          "lon_deg": 147.0
+        },
+        "radius_m": 5000
+      }
+    },
+    {
+      "id": 4,
+      "name": "Red corvette (FFL) — Cinder",
+      "side": 2,
+      "platform": "GEN-FFL",
+      "position": {
+        "lat_deg": -39.55,
+        "lon_deg": 147.6
+      },
+      "heading_deg": 270.0,
+      "mission": {
+        "kind": "ferry",
+        "destination": {
+          "lat_deg": -39.6,
+          "lon_deg": 146.2
+        }
+      }
+    },
+    {
+      "id": 5,
+      "name": "Red corvette (FFL) — Dross",
+      "side": 2,
+      "platform": "GEN-FFL",
+      "position": {
+        "lat_deg": -39.62,
+        "lon_deg": 147.7
+      },
+      "heading_deg": 270.0,
+      "mission": {
+        "kind": "ferry",
+        "destination": {
+          "lat_deg": -39.65,
+          "lon_deg": 146.2
+        }
+      }
+    }
+  ],
+  "facilities": [
+    {
+      "id": 1,
+      "name": "Blue maritime HQ",
+      "side": 1,
+      "kind": "command_post",
+      "position": {
+        "lat_deg": -38.6,
+        "lon_deg": 146.3
+      },
+      "radius_m": 1000,
+      "range_m": 300000
+    },
+    {
+      "id": 2,
+      "name": "Refuge Cove",
+      "side": 1,
+      "kind": "sheltering_port",
+      "position": {
+        "lat_deg": -39.05,
+        "lon_deg": 146.55
+      },
+      "radius_m": 3000,
+      "berths": 2,
+      "services": {
+        "repair": true,
+        "rearm": true,
+        "refuel": true
+      }
+    },
+    {
+      "id": 3,
+      "name": "Waterloo Bay anchorage",
+      "side": 1,
+      "kind": "anchorage",
+      "position": {
+        "lat_deg": -39.1,
+        "lon_deg": 146.7
+      },
+      "radius_m": 4000
+    },
+    {
+      "id": 4,
+      "name": "Replenishment area Echo",
+      "side": 1,
+      "kind": "refuelling_point",
+      "position": {
+        "lat_deg": -39.4,
+        "lon_deg": 146.2
+      },
+      "radius_m": 5000,
+      "services": {
+        "refuel": true
+      }
+    },
+    {
+      "id": 5,
+      "name": "Red forward HQ",
+      "side": 2,
+      "kind": "command_post",
+      "position": {
+        "lat_deg": -40.0,
+        "lon_deg": 148.3
+      },
+      "radius_m": 1000,
+      "range_m": 400000
+    },
+    {
+      "id": 6,
+      "name": "Blue flagship command",
+      "side": 1,
+      "kind": "command_post",
+      "position": {
+        "lat_deg": -39.6,
+        "lon_deg": 146.4
+      },
+      "radius_m": 500,
+      "range_m": 150000,
+      "unit": 1,
+      "alternate": 1,
+      "handover_s": 300,
+      "orders_in_gap": "queue"
+    }
+  ],
+  "zones": [
+    {
+      "id": 1,
+      "name": "Passage sense zone",
+      "side": 1,
+      "kind": "sense",
+      "area": {
+        "shape": "circle",
+        "centre": {
+          "lat_deg": -39.6,
+          "lon_deg": 147.0
+        },
+        "radius_m": 45000
+      },
+      "doctrine": {
+        "emcon": "active"
+      },
+      "choke_point": "Kent passage"
+    },
+    {
+      "id": 2,
+      "name": "Passage engage zone",
+      "side": 1,
+      "kind": "engage",
+      "area": {
+        "shape": "circle",
+        "centre": {
+          "lat_deg": -39.6,
+          "lon_deg": 147.0
+        },
+        "radius_m": 15000
+      },
+      "doctrine": {
+        "wcs": "free",
+        "engage_unfriendly": true
+      },
+      "choke_point": "Kent passage",
+      "shooters": [
+        3
+      ]
+    }
+  ],
+  "action_groups": [
+    {
+      "name": "SAG 1",
+      "side": 1,
+      "leader": 1,
+      "members": [
+        {
+          "unit": 2,
+          "bearing_deg": 180.0,
+          "range_m": 3000
+        }
+      ],
+      "doctrine": {
+        "emcon": "active"
+      }
+    }
+  ],
+  "reference_points": [
+    {
+      "name": "Kent passage",
+      "position": {
+        "lat_deg": -39.6,
+        "lon_deg": 147.0
+      }
+    },
+    {
+      "name": "RV Bravo",
+      "position": {
+        "lat_deg": -39.5,
+        "lon_deg": 146.5
+      },
+      "side": 1
+    }
+  ],
+  "events": [
+    {
+      "id": "e01-startex",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "time",
+        "at_s": 0
+      },
+      "actions": [
+        {
+          "type": "message",
+          "to": "all",
+          "text": "STARTEX. Postures unfriendly. Blue: hold the passage; weapons free inside the engage zone only."
+        }
+      ]
+    }
+  ]
+}

@@ -37,4 +37,5 @@ The open database, demo scenario, offline coastline and help content need no net
   - `HTTP_PROXY`/`HTTPS_PROXY` pointed at a dead port, so any network attempt would fail
   - WiX and NSIS taken from the pre-staged Tauri tool cache
 - The same run found one procedural trap: **re-vendor after every `Cargo.lock` change**. A vendored tree made before a dependency was added fails offline with `no matching package named …`.
-- Still to do: a run on a physically disconnected machine, and the macOS and Linux bundles offline.
+- On 2026-11-12 the **signed release** (from `ff0b3e0`, run 43231583236) was installed and run on a **physically disconnected Windows machine**. It followed the installation check: checksums OK, pilot scenario loaded and run, record saved, replay verified.
+- Not done, by the client's decision (2026-11-12): the macOS bundle on a disconnected Mac, and checking the Windows installer's publisher name. The Gate 3 panel decides whether Windows alone meets the criterion. Use the [installation check](../gate3/pilot-kit/installation-check.md). It covers installing the release artefacts from removable media with their SHA-256 sums, on Windows and macOS.

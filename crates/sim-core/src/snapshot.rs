@@ -4,10 +4,13 @@
 //! estimated position, an error ellipse, a classification and an age. Ground truth for all sides
 //! is only ever sent to the white cell.
 
+use crate::adjudication::AdjudicationRecord;
 use crate::components::Domain;
 use crate::esm::BearingView;
 use crate::ids::{SideId, UnitId};
 use crate::mines::Minefield;
+use crate::scenario_events::{EventStatus, InjectStatus, Message};
+use crate::seats::Seat;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_ai::Mission;
@@ -66,6 +69,8 @@ pub struct UnitView {
     pub stores: Vec<StoreView>,
     pub mission: Option<Mission>,
     pub mission_complete: bool,
+    /// Fraction of fuel left, for units with a fuel model.
+    pub fuel_fraction: Option<f64>,
 }
 
 /// Rounds of one weapon carried.
@@ -149,4 +154,28 @@ pub struct Snapshot {
     pub weapons: Vec<WeaponView>,
     /// Side viewer: its own minefields. White cell: every minefield.
     pub minefields: Vec<Minefield>,
+    /// White cell only: the most recent overrides, newest last.
+    pub adjudications: Vec<AdjudicationRecord>,
+    /// The viewer's message log (the latest 100, oldest first). The white cell sees every
+    /// message.
+    pub messages: Vec<Message>,
+    /// The seat table: every seat for the white cell, the side's own seats for a side.
+    pub seats: Vec<Seat>,
+    /// White cell only: the inject library with send counts.
+    pub injects: Vec<InjectStatus>,
+    /// White cell only: every scenario event's state.
+    pub scenario_events: Vec<EventStatus>,
+    /// Side viewer: the comms link of each of its units, when it has command posts. White cell:
+    /// every side's.
+    pub comms: Vec<crate::comms::CommsView>,
+    /// Side viewer: its command posts and whether each is up. White cell: every side's.
+    pub posts: Vec<crate::comms::PostView>,
+    /// Side viewer: its tracks on other sides' missiles and torpedoes. White cell: every side's.
+    pub weapon_tracks: Vec<crate::weapon_tracks::WeaponTrackView>,
+    /// Side viewer: its surface action groups. White cell: every side's.
+    pub action_groups: Vec<crate::planning::ActionGroup>,
+    /// Weapon outcomes (hit, miss, shot down) of the last minute that this viewer may know:
+    /// all for the white cell; a side's own shots (without the target's identity) and attacks
+    /// on its own units (without the shooter's).
+    pub outcomes: Vec<crate::outcomes::Outcome>,
 }

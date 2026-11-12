@@ -14,7 +14,8 @@
     "licenses": "node scripts/check-licenses.mjs",
     "bench:map": "node scripts/map-fps.mjs",
     "test": "vitest run",
-    "e2e": "node scripts/e2e-smoke.mjs"
+    "e2e": "node scripts/e2e-smoke.mjs",
+    "e2e:app": "node scripts/e2e-app.mjs"
   },
   "dependencies": {
     "@deck.gl/core": "^9.4.1",

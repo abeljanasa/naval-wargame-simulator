@@ -12,10 +12,15 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
 
+# No job runs on Linux (ADR-0006). Windows runners run the tooling jobs too, in bash, as written.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   fmt:
     name: Format
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
@@ -27,19 +32,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS is paused (2026-11-10): add macos-15 back here to re-enable it.
-        os: [ubuntu-24.04, windows-2022]
+        # The application targets Windows and macOS only (ADR-0006).
+        os: [windows-2022, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
         with: { components: clippy }
       - uses: Swatinem/rust-cache@v2
-      - name: Linux system deps for Tauri
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Front-end dist placeholder (tauri::generate_context! needs it to exist)
         shell: bash
         run: mkdir -p apps/desktop/dist
@@ -56,7 +56,7 @@ jobs:
   # Platform database validation suite (master prompt §9, ADR-0004).
   database:
     name: Platform database validation
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
@@ -74,8 +74,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS is paused (2026-11-10): add macos-15 back here to re-enable it.
-        os: [ubuntu-24.04, windows-2022]
+        # The application's platforms (ADR-0006).
+        os: [windows-2022, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -94,7 +94,7 @@ jobs:
   determinism-compare:
     name: Determinism matrix agrees
     needs: determinism
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/download-artifact@v4
         with: { pattern: hashes-*, path: hashes }
@@ -115,19 +115,20 @@ jobs:
   # Dependency licences (no GPL/AGPL/LGPL), sources and security advisories (deny.toml).
   dependencies:
     name: Dependency audit (cargo deny)
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          command: check
+      # The cargo-deny action runs in a Linux container, so install the tool instead.
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - run: cargo install cargo-deny --locked
+      - run: cargo deny check
 
   # Performance budgets (master prompt §12). The budgets are defined for the reference laptop; the
   # CI gate checks the 1,000-unit budget, which has ~3x headroom on a developer machine, and records
   # the 10,000-unit figure for trend review. See docs/build/performance.md.
   performance:
     name: Performance budget
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
@@ -147,7 +148,7 @@ jobs:
   bench-regression:
     name: Benchmark regression (> 15 % fails)
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
         with:
@@ -168,12 +169,12 @@ jobs:
           if [ -d target/criterion ]; then
             cargo bench -p sim-scenario --bench engine -- --baseline base
           fi
-          python3 scripts/check_bench_regression.py target/criterion --threshold 0.15
+          python scripts/check_bench_regression.py target/criterion --threshold 0.15
 
   # Air-gapped build path: every dependency vendored, then built with no network.
   offline-build:
     name: Air-gapped build (vendored, offline)
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
@@ -183,14 +184,15 @@ jobs:
           cargo vendor --locked vendor > .cargo/config.toml
       - name: Build and test engine crates with the network disabled
         run: |
-          cargo build --offline --locked -p sim-core -p sim-geo -p sim-sensors -p sim-c2 -p sim-weapons -p sim-ai -p sim-db -p sim-scenario -p nws-batch
-          cargo test --offline --locked -p sim-core -p sim-geo -p sim-sensors -p sim-c2 -p sim-weapons -p sim-ai -p sim-db -p sim-scenario
+          cargo build --offline --locked -p sim-core -p sim-geo -p sim-sensors -p sim-c2 -p sim-weapons -p sim-ai -p sim-events -p sim-db -p sim-scenario -p nws-batch
+          cargo test --offline --locked -p sim-core -p sim-geo -p sim-sensors -p sim-c2 -p sim-weapons -p sim-ai -p sim-events -p sim-db -p sim-scenario
 
   frontend:
     name: Front end (typecheck, lint, build)
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     defaults:
       run:
+        shell: bash
         working-directory: apps/desktop
     steps:
       - uses: actions/checkout@v4
@@ -210,4 +212,38 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           npm run e2e
-      - run: npm run build
+
+  packaged-app:
+    # The real binary, engine, database and map, driven over WebDriver (tauri-driver).
+    # Windows only: macOS has no WebDriver for its webview (WKWebView).
+    name: Packaged app end to end (windows-2022)
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: msedgedriver matching the runner's WebView2
+        shell: pwsh
+        run: |
+          $v = (Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}").pv
+          Write-Output "WebView2 $v"
+          $zip = Join-Path $env:RUNNER_TEMP "edgedriver.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "edgedriver"
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$v/edgedriver_win64.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath $dir -Force
+          "NATIVE_DRIVER=$dir\msedgedriver.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - run: cargo install tauri-driver --locked
+      - run: npm ci
+      - name: Build the app (release, no installer)
+        run: npx tauri build --no-bundle
+      - name: Packaged-app test
+        run: npm run e2e:app

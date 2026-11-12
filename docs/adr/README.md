@@ -7,5 +7,8 @@
 | [0003](0003-determinism-strategy.md) | Determinism strategy | Accepted |
 | [0004](0004-platform-database-format.md) | Platform database: JSON source of truth, SQLite build artefact | Accepted |
 | [0005](0005-model-crates.md) | Model crates hold pure functions; sim-core runs them | Accepted |
+| [0006](0006-target-platforms.md) | Target platforms are Windows and macOS | Accepted |
+| [0007](0007-phase-4-region-and-data.md) | Phase 4 region (Philippine AOR), imagery, Gate 4 engagements, data packs | Accepted |
+| [0008](0008-self-signed-code-signing.md) | Self-signed Windows code signing and ad-hoc macOS signing | Accepted (panel to confirm for Gate 3) |
 
 A new ADR gets the next number. ADRs are never deleted. To change one, write a new ADR that supersedes it.

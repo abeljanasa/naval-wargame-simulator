@@ -48,4 +48,18 @@ impl C2State {
         let side = self.side_doctrine.get(&unit.side).unwrap_or(&none);
         resolve(&[&unit.doctrine, group, side])
     }
+
+    /// The doctrine for a unit with `over` (a zone's rules) above its own, its group's and its
+    /// side's.
+    #[must_use]
+    pub fn doctrine_over(&self, unit: &Unit, over: &sim_c2::Doctrine) -> ResolvedDoctrine {
+        let none = sim_c2::Doctrine::default();
+        let group = unit
+            .group
+            .as_ref()
+            .and_then(|g| self.group_doctrine.get(&(unit.side, g.clone())))
+            .unwrap_or(&none);
+        let side = self.side_doctrine.get(&unit.side).unwrap_or(&none);
+        resolve(&[over, &unit.doctrine, group, side])
+    }
 }

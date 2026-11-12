@@ -127,6 +127,23 @@ pub struct WeaponsInFlight {
     pub list: Vec<WeaponInFlight>,
 }
 
+/// A weapon in flight that missed, for the outcome feed (where the weapon was).
+pub(crate) fn note_miss(world: &mut World, w: &WeaponInFlight, tick: Tick, reason: &str) {
+    crate::outcomes::note(
+        world,
+        crate::outcomes::Note {
+            tick,
+            weapon: w.weapon.clone(),
+            result: crate::outcomes::OutcomeKind::Miss,
+            position: Some(w.position),
+            shooter: Some(w.shooter),
+            shooter_side: Some(w.side),
+            target: Some(w.target),
+            reason: Some(reason.to_owned()),
+        },
+    );
+}
+
 fn entity_of(world: &World, unit: UnitId) -> Option<Entity> {
     world.resource::<UnitIndex>().0.get(&unit).copied()
 }
@@ -226,7 +243,9 @@ pub(crate) fn engage(
     // Weapons control status and ROE. The white cell may override (adjudication).
     if !cmd.issuer.is_privileged() {
         let c2 = world.resource::<C2State>();
-        let doctrine = c2.doctrine_for(&unit);
+        let doctrine = world
+            .resource::<crate::planning::PlanningLayer>()
+            .engage_doctrine(c2, &unit, from.point, estimate.position);
         let target_side = entity_of(world, track.target)
             .and_then(|e| world.get::<Unit>(e))
             .map(|u| u.side);
@@ -284,7 +303,15 @@ pub(crate) fn engage(
             );
         } else {
             // Guns, CIWS, bombs, depth charges, ASW rockets: resolved at once.
-            apply_hit_roll(world, &spec, None, None, track.target, tick);
+            apply_hit_roll(
+                world,
+                &spec,
+                None,
+                None,
+                (Some(shooter), Some(side)),
+                track.target,
+                tick,
+            );
         }
     }
     Ok(())
@@ -296,6 +323,7 @@ pub(crate) fn apply_hit_roll(
     spec: &WeaponSpec,
     weapon_id: Option<u64>,
     decoy_effect: Option<f64>,
+    (shooter, by_side): (Option<UnitId>, Option<SideId>),
     target: UnitId,
     tick: Tick,
 ) {
@@ -318,7 +346,14 @@ pub(crate) fn apply_hit_roll(
         .get::<crate::detection::Jammer>(e)
         .is_some_and(|j| j.0.is_some())
         && world.get::<Unit>(e).is_some_and(|u| {
-            world.resource::<C2State>().doctrine_for(u).emcon == sim_c2::Emcon::Active
+            let at = world
+                .get::<Position>(e)
+                .map_or(GeoPoint::new(0.0, 0.0), |p| p.point);
+            world
+                .resource::<crate::planning::PlanningLayer>()
+                .doctrine_for(world.resource::<C2State>(), u, at)
+                .emcon
+                == sim_c2::Emcon::Active
         });
     let countermeasures = countermeasure_modifier(spec.guidance, decoy_effect, jamming);
     let p = ph(spec.base_ph, size, manoeuvre, sea) * countermeasures;
@@ -331,6 +366,8 @@ pub(crate) fn apply_hit_roll(
         SimEventKind::HitRoll {
             weapon_id,
             weapon: spec.id.clone(),
+            shooter,
+            side: by_side,
             target,
             base_ph: spec.base_ph,
             size_modifier: size,
@@ -340,6 +377,24 @@ pub(crate) fn apply_hit_roll(
             ph: p,
             draw,
             hit,
+        },
+    );
+    // Before the hit is applied: a destroyed target leaves the world.
+    crate::outcomes::note(
+        world,
+        crate::outcomes::Note {
+            tick,
+            weapon: spec.id.clone(),
+            result: if hit {
+                crate::outcomes::OutcomeKind::Hit
+            } else {
+                crate::outcomes::OutcomeKind::Miss
+            },
+            position: None,
+            shooter,
+            shooter_side: by_side,
+            target: Some(target),
+            reason: None,
         },
     );
     if hit {
@@ -441,7 +496,7 @@ fn apply_critical(world: &mut World, e: Entity, critical: Option<System>) {
     }
 }
 
-fn destroy(world: &mut World, unit: UnitId, e: Entity, tick: Tick) {
+pub(crate) fn destroy(world: &mut World, unit: UnitId, e: Entity, tick: Tick) {
     world.despawn(e);
     world.resource_mut::<UnitIndex>().0.remove(&unit);
     world
@@ -526,7 +581,15 @@ pub(crate) fn weapons_system(world: &mut World) {
             };
             match miss {
                 None => {
-                    apply_hit_roll(world, &spec, Some(w.id), w.decoy_effect, w.target, tick);
+                    apply_hit_roll(
+                        world,
+                        &spec,
+                        Some(w.id),
+                        w.decoy_effect,
+                        (Some(w.shooter), Some(w.side)),
+                        w.target,
+                        tick,
+                    );
                     continue;
                 }
                 Some("") => {}
@@ -538,6 +601,7 @@ pub(crate) fn weapons_system(world: &mut World) {
                             reason: reason.to_owned(),
                         },
                     );
+                    note_miss(world, &w, tick, reason);
                     continue;
                 }
             }
@@ -559,6 +623,7 @@ pub(crate) fn weapons_system(world: &mut World) {
                     reason: "out of fuel".into(),
                 },
             );
+            note_miss(world, &w, tick, "out of fuel");
             continue;
         }
         keep.push(w);

@@ -1,12 +1,16 @@
 //! Commands: the only way anything outside the core changes simulation state.
 
+use crate::adjudication::Adjudication;
 use crate::components::Domain;
 use crate::detection::SensorSpec;
 use crate::ids::{SideId, UnitId};
+use crate::scenario_events::Facilitation;
+use crate::seats::Seat;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_ai::Mission;
 use sim_c2::{Doctrine, Posture};
+use sim_events::{Inject, ScenarioEvent};
 use sim_geo::GeoPoint;
 use sim_sensors::{Carrier, Environment, JammerSpec};
 use sim_weapons::{DamageProfile, WeaponSpec};
@@ -34,10 +38,14 @@ pub enum Issuer {
 }
 
 impl Issuer {
-    /// Issuers allowed to act on units of any side.
+    /// Issuers allowed to act on units of any side. Scenario events and scripts are written by
+    /// the scenario author, so they have the scenario's authority.
     #[must_use]
     pub fn is_privileged(&self) -> bool {
-        matches!(self, Issuer::Scenario | Issuer::WhiteCell { .. })
+        matches!(
+            self,
+            Issuer::Scenario | Issuer::WhiteCell { .. } | Issuer::Script
+        )
     }
 }
 
@@ -112,6 +120,12 @@ pub struct UnitSpawn {
     /// Mission at start, if any.
     #[serde(default)]
     pub mission: Option<Mission>,
+    /// Fuel, for ships and submarines in scenarios with the fuel model (`docs/models/fuel.md`).
+    #[serde(default)]
+    pub fuel: Option<crate::fuel::FuelSpec>,
+    /// Draft, metres (from the platform database), for facility depth limits.
+    #[serde(default)]
+    pub draft_m: Option<f64>,
 }
 
 /// One emitter type and the platform classes known to carry it.
@@ -183,6 +197,30 @@ pub enum CommandPayload {
         weapon: String,
         rounds: u32,
     },
+    /// A white-cell override of the simulation, logged with the umpire and the reason.
+    Adjudicate {
+        reason: String,
+        action: Adjudication,
+    },
+    /// Replaces the scenario events and the reserve units they can bring in. Scenario and white
+    /// cell only.
+    SetEvents {
+        events: Vec<ScenarioEvent>,
+        #[serde(default)]
+        reserves: Vec<UnitSpawn>,
+        /// The inject library.
+        #[serde(default)]
+        injects: Vec<Inject>,
+    },
+    /// A white-cell facilitation action: send an inject or a message, fire an event, or turn one
+    /// on or off. White cell only.
+    Facilitate {
+        action: Facilitation,
+    },
+    /// Replaces the seat table (`docs/models/multi-seat.md`). Scenario and white cell only.
+    SetSeats {
+        seats: Vec<Seat>,
+    },
     /// Creates a minefield. Scenario and white cell only.
     CreateMinefield {
         side: SideId,
@@ -202,6 +240,31 @@ pub enum CommandPayload {
         unit: UnitId,
         mission: Option<Mission>,
     },
+    /// Replaces the planning layer: facilities and sense/engage zones
+    /// (`docs/models/planning-layer.md`). Scenario and white cell only.
+    SetPlanning {
+        facilities: Vec<crate::planning::Facility>,
+        zones: Vec<crate::planning::Zone>,
+        /// Surface action groups (omitted: the groups in play are kept).
+        #[serde(default)]
+        action_groups: Option<Vec<crate::planning::ActionGroup>>,
+    },
+    /// Gives an action group its one mission, run by its leader (`None` clears it).
+    AssignGroupMission {
+        group: String,
+        mission: Option<Mission>,
+    },
+    /// Takes a unit out of its action group (a leader is succeeded by the first member).
+    DetachFromGroup {
+        unit: UnitId,
+    },
+    /// Puts a unit into an action group at a station on the leader.
+    JoinGroup {
+        unit: UnitId,
+        group: String,
+        bearing_deg: f64,
+        range_m: f64,
+    },
 }
 
 impl CommandPayload {
@@ -217,13 +280,21 @@ impl CommandPayload {
             }
             | CommandPayload::Engage { shooter: unit, .. }
             | CommandPayload::AssignMission { unit, .. }
-            | CommandPayload::LayMines { unit, .. } => Some(*unit),
+            | CommandPayload::LayMines { unit, .. }
+            | CommandPayload::DetachFromGroup { unit }
+            | CommandPayload::JoinGroup { unit, .. } => Some(*unit),
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
             | CommandPayload::SetEnvironment { .. }
             | CommandPayload::SetEmitterLibrary { .. }
             | CommandPayload::SetWeaponCatalog { .. }
             | CommandPayload::CreateMinefield { .. }
+            | CommandPayload::Adjudicate { .. }
+            | CommandPayload::SetEvents { .. }
+            | CommandPayload::Facilitate { .. }
+            | CommandPayload::SetSeats { .. }
+            | CommandPayload::SetPlanning { .. }
+            | CommandPayload::AssignGroupMission { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -266,6 +337,12 @@ impl CommandPayload {
                 }
                 if let Some(m) = &s.mission {
                     m.validate()?;
+                }
+                if let Some(f) = &s.fuel {
+                    f.validate()?;
+                }
+                if s.draft_m.is_some_and(|d| !(d.is_finite() && d >= 0.0)) {
+                    return Err("draft_m must be finite and >= 0".into());
                 }
                 if s.length_m.is_some_and(|l| !(l.is_finite() && l >= 0.0)) {
                     return Err("length_m must be finite and >= 0".into());
@@ -321,6 +398,56 @@ impl CommandPayload {
                     Err("minefield needs a mine type".into())
                 } else {
                     Ok(())
+                }
+            }
+            CommandPayload::Facilitate { action } => action.validate(),
+            CommandPayload::SetSeats { seats } => crate::seats::validate_seats(seats),
+            CommandPayload::SetPlanning {
+                facilities,
+                zones,
+                action_groups,
+            } => {
+                crate::planning::validate_planning(facilities, zones)?;
+                action_groups
+                    .as_deref()
+                    .map_or(Ok(()), crate::planning::validate_groups)
+            }
+            CommandPayload::AssignGroupMission { mission, .. } => {
+                mission.as_ref().map_or(Ok(()), Mission::validate)
+            }
+            CommandPayload::DetachFromGroup { .. } => Ok(()),
+            CommandPayload::JoinGroup {
+                group,
+                bearing_deg,
+                range_m,
+                ..
+            } => {
+                if group.trim().is_empty()
+                    || !(bearing_deg.is_finite() && range_m.is_finite() && *range_m > 0.0)
+                {
+                    Err("joining needs a group, a finite bearing and a range > 0".into())
+                } else {
+                    Ok(())
+                }
+            }
+            CommandPayload::SetEvents {
+                events,
+                reserves,
+                injects,
+            } => {
+                sim_events::validate_events(events, injects)?;
+                for r in reserves {
+                    CommandPayload::SpawnUnit(r.clone())
+                        .validate()
+                        .map_err(|e| format!("reserve {}: {e}", r.id))?;
+                }
+                Ok(())
+            }
+            CommandPayload::Adjudicate { reason, action } => {
+                if reason.trim().is_empty() {
+                    Err("an override needs a reason".into())
+                } else {
+                    action.validate()
                 }
             }
             CommandPayload::LayMines {

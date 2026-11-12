@@ -7,9 +7,17 @@
 //! * **Ferry:** steer to the destination; complete within 1 km.
 //! * **Escort:** steer to the station on the escorted unit; full speed when off station.
 //! * **Strike:** steer to the side's estimate of the contact.
+//! * **Support:** hold within the station's radius.
+//! * **Mining:** go to the centre, lay the field, complete.
+//! * **Mine clearing:** patrol the area at 8 kn; `mine_system` sweeps (`docs/models/missions.md`).
+//! * **Cargo:** origin, load 30 min, destination, unload 30 min, complete.
+//! * **Barrier patrol:** back and forth between two points.
+//! * **Denial:** patrol inside the side's zones of a choke point.
 //!
-//! Then **automated engagement**: the nearest of the side's contacts (only the strike target on a
-//! strike) that is not already under attack by a weapon of the side, with the first carried
+//! Then **automated engagement** (patrol, ferry, escort, strike, barrier patrol, denial): the
+//! nearest of the side's contacts (only the strike target on a strike; only contacts believed
+//! inside the choke point on denial) that is not already under attack by a weapon of the side,
+//! with the first carried
 //! weapon (weapon-id order) that passes every `Engage` check, release rule included. One round,
 //! at most one engagement per unit per AI tick.
 
@@ -18,15 +26,17 @@ use crate::command::{Command, CommandPayload, Issuer};
 use crate::components::{Kinematics, Position, Route, Unit};
 use crate::detection::ContactTable;
 use crate::events::{EventLog, SimEventKind};
-use crate::ids::UnitId;
+use crate::ids::{SideId, UnitId};
 use crate::rng::{RngStreams, StreamId};
 use crate::sim::{plan_sea_route, UnitIndex};
 use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use sim_ai::{
-    escort_station, nearest_first, patrol_point, station_speed, Mission, AI_PERIOD_TICKS, ARRIVAL_M,
+    escort_station, nearest_first, patrol_point, station_speed, Mission, AI_PERIOD_TICKS,
+    ARRIVAL_M, CARGO_HANDLING_TICKS, MCM_SPEED_MPS,
 };
+use sim_events::Area;
 use sim_geo::{inverse, GeoPoint};
 use sim_weapons::{Status, WeaponKind};
 use std::collections::BTreeSet;
@@ -36,9 +46,15 @@ use std::collections::BTreeSet;
 pub struct MissionState {
     pub mission: Option<Mission>,
     pub complete: bool,
+    /// Progress through a multi-step mission (barrier leg, cargo phase); 0 at the start.
+    #[serde(default)]
+    pub phase: u8,
+    /// When the current phase's timed step began (loading, unloading).
+    #[serde(default)]
+    pub since: Option<Tick>,
 }
 
-fn set_route(world: &mut World, e: Entity, unit: UnitId, to: GeoPoint, tick: Tick) {
+pub(crate) fn set_route(world: &mut World, e: Entity, unit: UnitId, to: GeoPoint, tick: Tick) {
     let (domain, from) = match (world.get::<Unit>(e), world.get::<Position>(e)) {
         (Some(u), Some(p)) => (u.domain, p.point),
         _ => return,
@@ -56,7 +72,7 @@ fn set_route(world: &mut World, e: Entity, unit: UnitId, to: GeoPoint, tick: Tic
     }
 }
 
-fn ensure_moving(world: &mut World, e: Entity, fraction: f64) {
+pub(crate) fn ensure_moving(world: &mut World, e: Entity, fraction: f64) {
     if let Some(mut k) = world.get_mut::<Kinematics>(e) {
         if k.ordered_speed_mps == 0.0 {
             k.ordered_speed_mps = fraction * k.max_speed_mps;
@@ -172,11 +188,272 @@ pub(crate) fn ai_system(world: &mut World) {
                     }
                 }
             }
+            Mission::Support { station, radius_m } => {
+                if inverse(pos.point, *station).distance_m > *radius_m {
+                    if route_done(world, e) {
+                        set_route(world, e, id, *station, tick);
+                        ensure_moving(world, e, 0.7);
+                    }
+                } else {
+                    hold(world, e);
+                }
+            }
+            Mission::Mining {
+                centre,
+                radius_m,
+                mines,
+            } => {
+                if inverse(pos.point, *centre).distance_m <= ARRIVAL_M {
+                    hold(world, e);
+                    let carried = mines_carried(world, e);
+                    let kind = if carried == 0 {
+                        SimEventKind::MissionFailed {
+                            unit: id,
+                            reason: "carries no mines".into(),
+                        }
+                    } else {
+                        let n = (*mines).min(carried);
+                        match crate::mines::lay_mines(world, id, e, n, *radius_m) {
+                            Ok(field) => SimEventKind::MissionMinesLaid {
+                                unit: id,
+                                field,
+                                mines: n,
+                            },
+                            Err(reason) => SimEventKind::MissionFailed { unit: id, reason },
+                        }
+                    };
+                    world.resource_mut::<EventLog>().push(tick, kind);
+                    complete(world, e, id, tick);
+                    continue;
+                }
+                if route_done(world, e) {
+                    set_route(world, e, id, *centre, tick);
+                    ensure_moving(world, e, 0.7);
+                }
+            }
+            Mission::MineClearing { centre, radius_m } => {
+                if inverse(pos.point, *centre).distance_m > *radius_m {
+                    if route_done(world, e) {
+                        set_route(world, e, id, *centre, tick);
+                    }
+                } else if route_done(world, e) {
+                    let (u1, u2) = {
+                        let mut rng = world.resource_mut::<RngStreams>();
+                        (rng.uniform(StreamId::Ai), rng.uniform(StreamId::Ai))
+                    };
+                    let point = patrol_point(*centre, *radius_m, u1, u2);
+                    world.resource_mut::<EventLog>().push(
+                        tick,
+                        SimEventKind::MissionWaypoint {
+                            unit: id,
+                            point,
+                            draws: [u1, u2],
+                        },
+                    );
+                    set_route(world, e, id, point, tick);
+                }
+                if let Some(mut k) = world.get_mut::<Kinematics>(e) {
+                    k.ordered_speed_mps = MCM_SPEED_MPS.min(k.max_speed_mps);
+                }
+            }
+            Mission::Cargo {
+                origin,
+                destination,
+                tonnes,
+            } => {
+                if cargo_step(
+                    world,
+                    (id, e),
+                    pos.point,
+                    (*origin, *destination, *tonnes),
+                    tick,
+                ) {
+                    continue;
+                }
+            }
+            Mission::BarrierPatrol { start, end } => {
+                let phase = world.get::<MissionState>(e).map_or(0, |m| m.phase);
+                let target = if phase == 0 { *start } else { *end };
+                if inverse(pos.point, target).distance_m <= ARRIVAL_M {
+                    let next = 1 - phase.min(1);
+                    if let Some(mut m) = world.get_mut::<MissionState>(e) {
+                        m.phase = next;
+                    }
+                    let to = if next == 0 { *start } else { *end };
+                    set_route(world, e, id, to, tick);
+                    ensure_moving(world, e, 0.5);
+                } else if route_done(world, e) {
+                    set_route(world, e, id, target, tick);
+                    ensure_moving(world, e, 0.5);
+                }
+            }
+            Mission::Denial { choke_point } => {
+                let areas = choke_areas(world, unit.side, choke_point);
+                if route_done(world, e) && !areas.is_empty() {
+                    let (u1, u2) = {
+                        let mut rng = world.resource_mut::<RngStreams>();
+                        (rng.uniform(StreamId::Ai), rng.uniform(StreamId::Ai))
+                    };
+                    if let Some(point) = area_point(&areas, u1, u2) {
+                        world.resource_mut::<EventLog>().push(
+                            tick,
+                            SimEventKind::MissionWaypoint {
+                                unit: id,
+                                point,
+                                draws: [u1, u2],
+                            },
+                        );
+                        set_route(world, e, id, point, tick);
+                        ensure_moving(world, e, 0.5);
+                    }
+                }
+            }
         }
-        auto_engage(world, id, e, &unit, &mission, pos.point, tick);
+        if mission.engages() {
+            let inside = match &mission {
+                Mission::Denial { choke_point } => Some(choke_areas(world, unit.side, choke_point)),
+                _ => None,
+            };
+            auto_engage(
+                world,
+                id,
+                e,
+                &unit,
+                &mission,
+                pos.point,
+                inside.as_deref(),
+                tick,
+            );
+        }
     }
 }
 
+/// Stops a unit where it is.
+pub(crate) fn hold(world: &mut World, e: Entity) {
+    if let Some(mut k) = world.get_mut::<Kinematics>(e) {
+        k.ordered_speed_mps = 0.0;
+    }
+    if let Some(mut r) = world.get_mut::<Route>(e) {
+        r.waypoints.clear();
+        r.next = 0;
+    }
+}
+
+fn complete(world: &mut World, e: Entity, id: UnitId, tick: Tick) {
+    if let Some(mut m) = world.get_mut::<MissionState>(e) {
+        m.complete = true;
+    }
+    world
+        .resource_mut::<EventLog>()
+        .push(tick, SimEventKind::MissionComplete { unit: id });
+}
+
+/// Rounds of the first mine type the unit carries (weapon-id order), as `lay_mines` picks it.
+fn mines_carried(world: &World, e: Entity) -> u32 {
+    let catalog = &world.resource::<crate::combat::WeaponCatalog>().0;
+    world
+        .get::<Magazine>(e)
+        .and_then(|m| {
+            m.0.iter()
+                .find(|(w, n)| {
+                    **n > 0 && catalog.get(*w).is_some_and(|s| s.kind == WeaponKind::Mine)
+                })
+                .map(|(_, n)| *n)
+        })
+        .unwrap_or(0)
+}
+
+/// Cargo: to the origin (if any), 30 minutes loading, to the destination, 30 minutes unloading,
+/// complete. Phases 0–3 on the mission state. Returns true when the mission completed.
+fn cargo_step(
+    world: &mut World,
+    (id, e): (UnitId, Entity),
+    at: GeoPoint,
+    (origin, destination, tonnes): (Option<GeoPoint>, GeoPoint, f64),
+    tick: Tick,
+) -> bool {
+    let (mut phase, since) = world
+        .get::<MissionState>(e)
+        .map_or((0, None), |m| (m.phase, m.since));
+    if phase == 0 && origin.is_none() {
+        phase = 2;
+    }
+    let set = |world: &mut World, phase: u8, since: Option<Tick>| {
+        if let Some(mut m) = world.get_mut::<MissionState>(e) {
+            m.phase = phase;
+            m.since = since;
+        }
+    };
+    let handled = |since: Option<Tick>| {
+        since.is_some_and(|s| tick.0.saturating_sub(s.0) >= CARGO_HANDLING_TICKS)
+    };
+    match phase {
+        0 | 2 => {
+            let to = if phase == 0 {
+                origin.unwrap_or(destination)
+            } else {
+                destination
+            };
+            if inverse(at, to).distance_m <= ARRIVAL_M {
+                hold(world, e);
+                set(world, phase + 1, Some(tick));
+            } else {
+                if route_done(world, e) {
+                    set_route(world, e, id, to, tick);
+                    ensure_moving(world, e, 0.7);
+                }
+                set(world, phase, None);
+            }
+        }
+        1 if handled(since) => {
+            world
+                .resource_mut::<EventLog>()
+                .push(tick, SimEventKind::CargoLoaded { unit: id, tonnes });
+            set(world, 2, None);
+        }
+        3 if handled(since) => {
+            world
+                .resource_mut::<EventLog>()
+                .push(tick, SimEventKind::CargoDelivered { unit: id, tonnes });
+            complete(world, e, id, tick);
+            return true;
+        }
+        _ => {}
+    }
+    false
+}
+
+/// The areas of `side`'s zones that belong to `choke_point`, in zone-id order.
+fn choke_areas(world: &World, side: SideId, choke_point: &str) -> Vec<Area> {
+    world
+        .resource::<crate::planning::PlanningLayer>()
+        .zones
+        .iter()
+        .filter(|z| z.side == side && z.choke_point.as_deref() == Some(choke_point))
+        .map(|z| z.area.clone())
+        .collect()
+}
+
+/// A random point in one of `areas`: u₁ picks the area (n·u₁) and its fraction is reused for the
+/// point, with u₂. `None` if a concave polygon's point falls outside it.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+fn area_point(areas: &[Area], u1: f64, u2: f64) -> Option<GeoPoint> {
+    let n = areas.len() as f64;
+    let i = ((u1 * n).floor() as usize).min(areas.len() - 1);
+    let frac = (u1 * n - i as f64).clamp(0.0, 1.0);
+    match &areas[i] {
+        Area::Circle { centre, radius_m } => Some(patrol_point(*centre, *radius_m, frac, u2)),
+        a @ Area::Polygon { points } => {
+            sim_ai::polygon_point(points, frac, u2).filter(|p| a.contains(*p))
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn auto_engage(
     world: &mut World,
     id: UnitId,
@@ -184,6 +461,7 @@ fn auto_engage(
     unit: &Unit,
     mission: &Mission,
     from: GeoPoint,
+    inside: Option<&[Area]>,
     tick: Tick,
 ) {
     let side = unit.side;
@@ -202,6 +480,12 @@ fn auto_engage(
             Mission::Strike { contact } => c.number == *contact,
             _ => true,
         })
+        .filter(|(_, c)| {
+            inside.is_none_or(|areas| {
+                let p = c.estimate_at(tick).position;
+                areas.iter().any(|a| a.contains(p))
+            })
+        })
         .map(|(_, c)| {
             (
                 c.number,
@@ -212,6 +496,31 @@ fn auto_engage(
     if candidates.is_empty() {
         return;
     }
+    for contact in nearest_first(candidates) {
+        if let Some(weapon) = engage_first_weapon(world, id, e, side, contact, tick) {
+            world.resource_mut::<EventLog>().push(
+                tick,
+                SimEventKind::MissionEngage {
+                    unit: id,
+                    contact,
+                    weapon,
+                },
+            );
+            return;
+        }
+    }
+}
+
+/// Fires one round at `contact` with the first carried weapon (weapon-id order) that passes
+/// every `Engage` check, release rule included, as the AI. Returns the weapon fired.
+pub(crate) fn engage_first_weapon(
+    world: &mut World,
+    id: UnitId,
+    e: Entity,
+    side: crate::ids::SideId,
+    contact: u32,
+    tick: Tick,
+) -> Option<String> {
     let catalog = world.resource::<crate::combat::WeaponCatalog>().0.clone();
     let weapons: Vec<String> = world
         .get::<Magazine>(e)
@@ -227,30 +536,21 @@ fn auto_engage(
                 .collect()
         })
         .unwrap_or_default();
-    for contact in nearest_first(candidates) {
-        for weapon in &weapons {
-            let cmd = Command {
-                tick,
-                issuer: Issuer::Ai,
-                side: Some(side),
-                payload: CommandPayload::Engage {
-                    shooter: id,
-                    contact,
-                    weapon: weapon.clone(),
-                    rounds: 1,
-                },
-            };
-            if engage(world, &cmd, id, contact, weapon, 1, e).is_ok() {
-                world.resource_mut::<EventLog>().push(
-                    tick,
-                    SimEventKind::MissionEngage {
-                        unit: id,
-                        contact,
-                        weapon: weapon.clone(),
-                    },
-                );
-                return;
-            }
+    for weapon in weapons {
+        let cmd = Command {
+            tick,
+            issuer: Issuer::Ai,
+            side: Some(side),
+            payload: CommandPayload::Engage {
+                shooter: id,
+                contact,
+                weapon: weapon.clone(),
+                rounds: 1,
+            },
+        };
+        if engage(world, &cmd, id, contact, &weapon, 1, e).is_ok() {
+            return Some(weapon);
         }
     }
+    None
 }

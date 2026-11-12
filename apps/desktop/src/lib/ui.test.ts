@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { bearing, distance, gameTime, knots, latLon, MPS_PER_KNOT, project } from "./format";
-import { frameSvg, symbolUrl } from "./symbols";
+import { frameSvg, functionCode, symbolUrl } from "./symbols";
+import { figureKind, figureShape, figureUrl, munitionKind } from "./silhouettes";
 import {
   buildLayers,
   circleRing,
@@ -13,6 +14,12 @@ import {
   CONTAINMENT_95,
   ellipseRing,
   LABEL_LIMIT,
+  ROUTE_STUB_M,
+  outcomeText,
+  declutter,
+  distanceM,
+  labelCandidates,
+  zoneAnchor,
 } from "./map";
 import type { ContactView, UnitView } from "./bindings";
 // @ts-expect-error: plain ES module without type declarations
@@ -82,6 +89,116 @@ describe("symbols", () => {
     expect(a.startsWith("data:image/svg+xml")).toBe(true);
     expect(a).not.toBe(symbolUrl("friend", true, "air"));
   });
+
+  it("puts a function code in the frame: by class, else category, else none", () => {
+    expect(functionCode("GEN-DDG")).toBe("DDG");
+    expect(functionCode("GEN-SSK-AIP")).toBe("SSK");
+    expect(functionCode("GEN-FTR-MR")).toBe("F");
+    // An unknown class falls back to its category; a contact classified to category shows it.
+    expect(functionCode("XYZ-1", "submarine")).toBe("SS");
+    expect(functionCode(null, "helicopter")).toBe("H");
+    // A surface combatant of unknown type, and an unclassified contact, show the frame alone.
+    expect(functionCode(null, "surface_combatant")).toBe("");
+    expect(functionCode(null, null)).toBe("");
+    const url = decodeURIComponent(symbolUrl("hostile", false, "subsurface", "SSK"));
+    expect(url).toContain(">SSK</text>");
+    expect(symbolUrl("hostile", false, "subsurface", "SSK")).not.toBe(
+      symbolUrl("hostile", false, "subsurface"),
+    );
+  });
+
+  it("draws a figure by class, else category, else domain; munitions by weapon id", () => {
+    expect(figureKind("GEN-FFG")).toBe("frigate");
+    expect(figureKind("GEN-SSK")).toBe("sub_diesel");
+    expect(figureKind("XYZ", "submarine")).toBe("sub");
+    expect(figureKind(null, null, "air")).toBe("aircraft");
+    expect(figureKind(null, null, null)).toBeNull();
+    // Ships, submarines and aircraft are plan views turned to the heading; land sites upright.
+    expect(figureShape("frigate")).toBe("topdown");
+    expect(figureShape("sub_diesel")).toBe("topdown");
+    expect(figureShape("fighter")).toBe("topdown");
+    expect(figureShape("radar_site")).toBe("icon");
+    expect(decodeURIComponent(figureUrl("frigate", "friend", false))).toContain(
+      'viewBox="0 0 64 64"',
+    );
+    expect(munitionKind("WPN-ASM-SUB")).toBe("anti_ship_missile");
+    expect(munitionKind("WPN-TORP-HW")).toBe("torpedo");
+    expect(munitionKind("WPN-GUN-76")).toBe("shell");
+  });
+
+  it("has a figure for every generic platform class and every weapon", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = join(process.cwd(), "../../data/db/open/platforms");
+    const ids = readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .flatMap((f) =>
+        (
+          JSON.parse(readFileSync(join(dir, f), "utf8")) as { platforms: { id: string }[] }
+        ).platforms.map((p) => p.id),
+      );
+    // A class's own figure, not just its domain's.
+    expect(ids.filter((id) => figureKind(id) === null)).toEqual([]);
+    const weapons = (
+      JSON.parse(readFileSync(join(process.cwd(), "../../data/db/open/weapons.json"), "utf8")) as {
+        weapons: { id: string; kind: string }[];
+      }
+    ).weapons;
+    for (const w of weapons) {
+      const k = munitionKind(w.id);
+      if (w.kind === "gun" || w.kind === "ciws") expect(k).toBe("shell");
+      else expect(k).not.toBe("shell");
+    }
+  });
+
+  it("words a weapon outcome for each viewer", () => {
+    const o = {
+      tick: 100,
+      weapon: "WPN-ASM-SUB",
+      result: "hit" as const,
+      position: { lat_deg: 0, lon_deg: 0 },
+      shooter: 2,
+      shooter_name: "Bastion",
+      shooter_side: 1,
+      target: 11,
+      target_name: "Cinder",
+      target_side: 2,
+      reason: null,
+    };
+    expect(outcomeText(o, null)).toBe("Anti-ship missile from Bastion hit Cinder");
+    expect(outcomeText({ ...o, target: null, target_name: null }, 1)).toBe(
+      "Our anti-ship missile from Bastion hit its target",
+    );
+    expect(outcomeText({ ...o, shooter: null, shooter_name: null }, 2)).toBe(
+      "Cinder was hit by an enemy anti-ship missile",
+    );
+    expect(outcomeText({ ...o, result: "miss", reason: "seeker did not acquire" }, null)).toBe(
+      "Anti-ship missile from Bastion missed Cinder (seeker did not acquire)",
+    );
+    const down = { ...o, result: "shot_down" as const, reason: "shot down by Cinder" };
+    expect(outcomeText(down, null)).toBe(
+      "Anti-ship missile from Bastion at Cinder was shot down by Cinder",
+    );
+    expect(outcomeText({ ...down, target: null, target_name: null }, 1)).toBe(
+      "Our anti-ship missile from Bastion was shot down",
+    );
+  });
+
+  it("has a function code for every generic platform class", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    // Tests run from apps/desktop.
+    const dir = join(process.cwd(), "../../data/db/open/platforms");
+    const ids = readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .flatMap((f) =>
+        (
+          JSON.parse(readFileSync(join(dir, f), "utf8")) as { platforms: { id: string }[] }
+        ).platforms.map((p) => p.id),
+      );
+    expect(ids.length).toBeGreaterThan(40);
+    expect(ids.filter((id) => functionCode(id) === "")).toEqual([]);
+  });
 });
 
 describe("map layers", () => {
@@ -102,6 +219,92 @@ describe("map layers", () => {
     const units = Array.from({ length: LABEL_LIMIT }, (_, i) => unit(i + 1));
     expect(layer(scene(units), "labels").props.data).toHaveLength(LABEL_LIMIT);
     expect(layer(scene(units), "leaders").props.data).toHaveLength(LABEL_LIMIT);
+  });
+
+  it("draws the selected unit's whole route and only a stub of the others", () => {
+    const routed = (id: number) =>
+      unit(id, {
+        route: {
+          waypoints: [
+            { lat_deg: -39.6, lon_deg: 146.0 },
+            { lat_deg: -39.6, lon_deg: 145.0 },
+          ],
+          next: 0,
+        },
+      } as Partial<UnitView>);
+    const layers = scene([routed(1), routed(2)], 1);
+    const routes = layer(layers, "routes").props.data as { id: number; path: number[][] }[];
+    expect(routes.find((r) => r.id === 1)?.path).toHaveLength(3);
+    const stub = routes.find((r) => r.id === 2)?.path ?? [];
+    expect(stub).toHaveLength(2);
+    const [a = [0, 0], b = [0, 0]] = stub;
+    const m = distanceM(
+      { lat_deg: a[1] ?? 0, lon_deg: a[0] ?? 0 },
+      { lat_deg: b[1] ?? 0, lon_deg: b[0] ?? 0 },
+    );
+    expect(m).toBeLessThanOrEqual(ROUTE_STUB_M * 1.01);
+    // Waypoint dots only for the selected unit.
+    expect(layer(layers, "waypoints").props.data).toHaveLength(2);
+  });
+
+  it("puts a zone's name at its northern edge; labels share one collision group", () => {
+    const circle = zoneAnchor({
+      name: "S",
+      kind: "sense",
+      area: { shape: "circle", centre: { lat_deg: 0, lon_deg: 0 }, radius_m: 111_195 },
+    } as never);
+    expect(circle[1]).toBeCloseTo(1, 2);
+    const poly = zoneAnchor({
+      name: "E",
+      kind: "engage",
+      area: {
+        shape: "polygon",
+        points: [
+          { lat_deg: 1, lon_deg: 1 },
+          { lat_deg: 3, lon_deg: 2 },
+          { lat_deg: 2, lon_deg: 3 },
+        ],
+      },
+    } as never);
+    expect(poly).toEqual([2, 3]);
+  });
+
+  it("declutters labels by priority in screen space", () => {
+    // Identity projection: lon/lat are pixels.
+    const at = (x: number, y: number): [number, number] => [x, y];
+    const c = (key: string, x: number, priority: number) => ({
+      key,
+      at: at(x, 100),
+      dy: 0,
+      size: 12,
+      text: "ten chars.",
+      priority,
+    });
+    // Two overlapping labels: the lower priority hides; a distant one stays.
+    const hidden = declutter(
+      [c("zone", 100, 200), c("unit", 110, 500), c("far", 400, 100)],
+      (p) => [p[0], p[1]],
+    );
+    expect([...hidden]).toEqual(["zone"]);
+    // The candidates cover every label kind the picture draws.
+    const keys = labelCandidates({
+      units: [unit(1)],
+      contacts: [],
+      minefields: [],
+      facilities: [
+        {
+          name: "Port",
+          kind: "sheltering_port",
+          position: { lat_deg: 0, lon_deg: 0 },
+          radius_m: 1,
+        },
+      ],
+      zones: [],
+      points: [{ name: "RV", position: { lat_deg: 0, lon_deg: 0 } }],
+      selected: 1,
+      gameTimeS: 0,
+    }).map((x) => `${x.key}:${x.priority}`);
+    expect(keys).toEqual(["u:1:1000", "f:Port:300", "p:RV:100"]);
   });
 
   it("labels only the selected unit above the limit, but draws every symbol", () => {
@@ -159,5 +362,26 @@ describe("npm licence policy", () => {
     expect(satisfiable("MIT AND GPL-3.0")).toBe(false);
     expect(satisfiable("AGPL-3.0")).toBe(false);
     expect(satisfiable("LGPL-2.1-only")).toBe(false);
+  });
+});
+
+describe("day/night shading", () => {
+  it("puts the sun where the engine's solar model does (hand values)", async () => {
+    const { subsolarPoint, nightPolygon } = await import("./map");
+    // 1970-01-01 00:00 UTC: midnight at Greenwich, so the sun is over 180°; day 0, so the
+    // declination is −23.44 × cos(360/365 × 10°) = −23.09°.
+    const s = subsolarPoint(0);
+    expect(s.lon).toBeCloseTo(180, 9);
+    expect(s.lat).toBeCloseTo(-23.09, 2);
+    // Six hours later the sun is over 90° E.
+    expect(subsolarPoint(6 * 3600).lon).toBeCloseTo(90, 9);
+    const ring = nightPolygon(0);
+    const at = (lon: number) => ring.find(([x]) => x === lon)?.[1];
+    // A quarter of the way round from the sun the terminator crosses the equator.
+    expect(at(90)).toBeCloseTo(0, 6);
+    // Under the sun it is at atan(−1 / tan(−23.09°)) = 66.9° N: the polar night beyond.
+    expect(at(180)).toBeCloseTo(66.9, 1);
+    // Southern summer: the night side holds the north pole.
+    expect(ring.at(-1)?.[1]).toBe(85);
   });
 });

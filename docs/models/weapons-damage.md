@@ -61,7 +61,10 @@ Countermeasures (slice 9) multiply in: × (1 − decoy effect) when the target f
 Every tick, before weapons move:
 
 1. **Interceptors in the air** that are due resolve with Ph = interceptor base Ph × the threat's manoeuvre modifier (air rules). A kill removes the threat (`InterceptRoll`, `WeaponMissed: shot down`).
-2. **Defenders** are operational units with a radiating radar (EMCON active), in unit-id order. Each detects an incoming enemy missile once it is inside both the radar horizon (to the missile's altitude) and the radar's R₅₀ against a **0.1 m²** missile. Detection here takes no draw.
+2. **Defenders** are operational units with sensors, in unit-id order. A defender sees an incoming enemy missile when either of these holds; detection here takes no draw:
+   - its **radiating radar** (EMCON active) has the missile inside both the radar horizon (to the missile's altitude) and the radar's R₅₀ against a **0.1 m²** missile;
+   - the side holds a **track** on the missile this tick from one of the defender's own sensors (below), so a radar-silent ship can still defend itself with IR, EO or visual sighting; or, in a surface action group, from any unit of the group (shared picture, [planning-layer.md](planning-layer.md)).
+   - In an action group, a defender does not fire a SAM at a threat that another member's SAM is already engaging (one area-defence shot per threat at a time across the group).
 3. **Firing:**
    - After the **reaction time** (SAM 8 s, gun 5 s, CIWS 3 s), with the threat inside the weapon's range, the defender fires one round per free **fire channel** (SAM 2, gun 1, CIWS 1), one engagement per threat at a time.
    - **SAMs defend the area**: any incoming enemy missile. **Guns and CIWS defend only their own ship.**
@@ -83,6 +86,29 @@ Every tick, before weapons move:
 | Chaff plus jamming against an active radar ASM (0.8) | 0.8 × 0.7 × 0.8 | Ph **0.448** |
 | 20 mines, 2 km radius, W 100 m, crossing the 4 km diameter | λ = 20/(π·2000²) × 100 × 4000 = 0.637 | P(encounter) **0.471**; × Ph 0.5 → hit 0.236 for the first encounter |
 | Same field, one 10 s step at 10 m/s | λ = 0.0159 | P **0.0158** |
+
+## Weapons as sensor targets (Phase 3 slice 15)
+
+Every tick, before point defence, each unit (unit-id order) looks with each sensor (mount order) at every other side's weapon in flight (weapon-id order). No draws ([DL-0034](../design-log/DL-0034-weapon-tracks.md)):
+
+| Sensor | Sees | When |
+|---|---|---|
+| Radar, EMCON active | missiles | within R₅₀ against 0.1 m², the radar horizon to the missile's height, and the radar's altitude cover |
+| IR | missiles | within the optical R₅₀ against the hot plume (full size, [optical-mad.md](optical-mad.md)), the visibility (× 1.5 for IR) and the horizon |
+| EO, visual | missiles | within the optical R₅₀ against a 5 m body, in the light at the sensor, the visibility and the horizon |
+| ESM | missiles whose active radar seeker is homing | within the horizon and the ESM's range |
+| Hull, towed or dipping sonar (usable) | torpedoes | within the passive range (signal excess 0) against a 150 dB torpedo |
+
+The side's **track** on a weapon records:
+- the first and last tick seen;
+- the weapon's latest position;
+- the unit and the sensor that saw it last (the highest unit id when several do).
+
+A new track is logged as `WeaponDetected`, and shows in the AAR timeline. A track is dropped 2 s after the last sighting, or when the weapon is gone. Tracks are saved (save format 23) and hashed when any exist.
+
+**In the picture:** a side sees its tracks on other sides' weapons (`weapon_tracks`), and the desktop draws them as rings: red for missiles, blue for torpedoes. The white cell sees every side's.
+
+**Worked example:** a radar-silent frigate with a 20 km IR sensor, at night. The R₅₀ against a missile's plume is 0.7 × 20 km = 14 km. A missile launched from 30 km is tracked at 14 km, and after the SAM's 8 s reaction time the frigate fires at about 11.8 km (270 m/s × 8 s nearer). Without IR, the silent frigate never sees the missile and does not fire.
 
 ## Damage (slice 8)
 
@@ -156,7 +182,7 @@ Logged: `WeaponLaunched`, `SeekerAcquisition`, `HitRoll`, `WeaponMissed` (with t
 
 ## Limitations
 
-- Incoming missiles are detected deterministically at a fixed 0.1 m² and engaged only by point defence; sides do not see enemy missiles in their picture. Torpedoes are countered only by decoys.
+- Incoming weapons are seen deterministically at nominal ranges (0.1 m² missile, 5 m body, 150 dB torpedo). Tracks carry no position error. Torpedoes are countered only by decoys: no hard-kill anti-torpedo weapons.
 - No salvo deconfliction, re-attack or retargeting; a seeker that misses does not search again.
 - Weapons fly great-circle legs at constant speed; no flight profiles, pop-ups or terminal manoeuvres.
 - Aircraft carry their first database loadout; loadout choice comes with air operations (Phase 4).

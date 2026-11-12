@@ -5,7 +5,7 @@
 
 ## Context
 
-The navy needs an engine it owns outright. It must run on Windows, macOS and Linux, work on air-gapped networks, give bit-identical results for analysis, and drive a map with 10,000+ moving symbols. One validated model must serve three clients: the desktop app, a headless batch runner, and (later) a multiplayer host.
+The navy needs an engine it owns outright. It must run on Windows and macOS (Linux was dropped on 2026-11-12, ADR-0006), work on air-gapped networks, give bit-identical results for analysis, and drive a map with 10,000+ moving symbols. One validated model must serve three clients: the desktop app, a headless batch runner, and (later) a multiplayer host.
 
 ## Decision
 

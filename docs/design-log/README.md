@@ -33,4 +33,21 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
 | [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
 | [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0037](DL-0037-db-editing-and-rehearsal.md) | Database record editing, symbol function codes, fixes from the pilot rehearsal | Project spec §9, §10 + ADR-0004 + original design |
+| [DL-0036](DL-0036-desktop-facilitation.md) | Event forms, polygon drawing, live planning edits, day/night shading | Project spec §10 + original design |
+| [DL-0035](DL-0035-action-groups.md) | Surface action groups in the core | Project spec §7.1 + original design |
+| [DL-0034](DL-0034-weapon-tracks.md) | Weapons in flight as sensor targets | Project spec §7, §8 + the detection models + original design |
+| [DL-0033](DL-0033-coverage.md) | Sense-zone layers, coverage and gaps | Project spec §7.1 + the detection models + original design |
+| [DL-0032](DL-0032-anchorages-weather.md) | Anchorage areas, depth and holding limits, staging, sheltering from weather | Project spec §7.1 + original design |
+| [DL-0031](DL-0031-missions.md) | Support, mining, mine-clearing, cargo, barrier and denial missions | Project spec §7, §7.1, §8 + textbook mine-warfare threat formula + original design |
+| [DL-0030](DL-0030-fuel.md) | Fuel and refuelling | Project spec §7, §7.1, §8 + propulsion cube law + platform database + original design |
+| [DL-0029](DL-0029-comms.md) | Comms links and their disruption | Project spec §7, §7.1, §8 + free-space propagation + original design |
+| [DL-0028](DL-0028-planning-layer.md) | Operational planning layer | Project spec §7.1 + original design |
+| [DL-0027](DL-0027-scenario-editor.md) | Scenario editor | Project spec §7, §13 + original design |
+| [DL-0026](DL-0026-replay-aar.md) | Replay and after-action review | Project spec §13 + RFC 4180 + original design |
+| [DL-0025](DL-0025-multi-seat.md) | Multi-seat play | Project spec §10, §13 + original design |
+| [DL-0024](DL-0024-lua.md) | Sandboxed Lua scripting | Project spec §7, §12 + mlua (MIT) + original design |
+| [DL-0023](DL-0023-injects.md) | Injects and white-cell facilitation | Project spec §10 + original design |
+| [DL-0022](DL-0022-events.md) | Scenario event engine | Project spec §7 + original design |
+| [DL-0021](DL-0021-adjudication.md) | White-cell adjudication overrides | Project spec §10 + original design |
 | [DL-0020](DL-0020-mines.md) | Basic mines: fields, laying, transit risk | Project spec §8 + textbook mine-warfare threat formula + platform database |

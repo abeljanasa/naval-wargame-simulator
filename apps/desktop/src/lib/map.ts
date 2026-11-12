@@ -8,19 +8,41 @@ import "maplibre-gl/dist/maplibre-gl.css";
 // ship it as a static asset and point MapLibre at it explicitly.
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 import { MapboxOverlay } from "@deck.gl/mapbox";
-import { IconLayer, LineLayer, PathLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
+import {
+  IconLayer,
+  LineLayer,
+  PathLayer,
+  PolygonLayer,
+  ScatterplotLayer,
+  TextLayer,
+} from "@deck.gl/layers";
 import type { Layer, PickingInfo } from "@deck.gl/core";
 import type {
   BearingView,
   ContactView,
   GeoPoint,
   Minefield,
+  Outcome,
   UnitView,
   Viewer,
+  WeaponTrackView,
   WeaponView,
 } from "./bindings";
 import { n, project } from "./format";
-import { AFFILIATION_COLOUR, symbolUrl, type Affiliation } from "./symbols";
+import { AFFILIATION_COLOUR, functionCode, symbolUrl, type Affiliation } from "./symbols";
+import {
+  MUNITION_LABEL,
+  figureCanvas,
+  figureKind,
+  figureShape,
+  figureUrl,
+  figureSizeM,
+  FIGURE_MIN_PX,
+  FIGURE_MAX_PX,
+  munitionKind,
+  munitionUrl,
+  type FigureKind,
+} from "./silhouettes";
 
 type LonLat = [number, number];
 
@@ -133,6 +155,8 @@ export interface SceneInput {
   bearings?: BearingView[];
   /** Missiles and torpedoes in flight that the viewer may see. */
   weapons?: WeaponView[];
+  /** The side's tracks on other sides' weapons in flight (side viewers). */
+  weaponTracks?: WeaponTrackView[];
   /** Minefields the viewer may see. */
   minefields?: Minefield[];
   gameTimeS: number;
@@ -140,6 +164,121 @@ export interface SceneInput {
   selected: number | null;
   draft: GeoPoint[] | null;
   onPickUnit: (id: number) => void;
+  /** Label keys hidden by `declutter` (none if absent). */
+  hiddenLabels?: Set<string>;
+  /** Unit figures (default) or APP-6 frames with a function code. */
+  symbolStyle?: SymbolStyle;
+}
+
+export type SymbolStyle = "figures" | "frames";
+
+/** How long an outcome marker stays on the map, and how long it is labelled, game seconds. */
+export const OUTCOME_SHOW_S = 60;
+export const OUTCOME_LABEL_S = 20;
+
+/**
+ * A one-line notice of a weapon outcome, worded for the viewer. `side` is the viewer's side
+ * (`null` for the white cell). Side viewers never learn more than the outcome feed gives them.
+ */
+export function outcomeText(o: Outcome, side: number | null): string {
+  const what = MUNITION_LABEL[munitionKind(o.weapon)];
+  const cap = what.charAt(0).toUpperCase() + what.slice(1);
+  const why = o.reason && o.result === "miss" ? ` (${o.reason})` : "";
+  // Point defence names the defender in the reason ("shot down by …").
+  const downBy = o.reason?.startsWith("shot down by ") ? ` was ${o.reason}` : " was shot down";
+  if (side === null) {
+    const from = o.shooter_name ? ` from ${o.shooter_name}` : "";
+    const target = o.target_name ?? "its target";
+    return o.result === "hit"
+      ? `${cap}${from} hit ${target}`
+      : o.result === "miss"
+        ? `${cap}${from} missed ${target}${why}`
+        : `${cap}${from} at ${target}${downBy}`;
+  }
+  if (o.shooter_side === side) {
+    const from = o.shooter_name ? ` from ${o.shooter_name}` : "";
+    const result =
+      o.result === "hit"
+        ? "hit its target"
+        : o.result === "miss"
+          ? `missed${why}`
+          : "was shot down";
+    return `Our ${what}${from} ${result}`;
+  }
+  const target = o.target_name ?? "One of our units";
+  return o.result === "hit"
+    ? `${target} was hit by an enemy ${what}`
+    : o.result === "miss"
+      ? `An enemy ${what} missed ${target}`
+      : `An enemy ${what} aimed at ${target}${downBy}`;
+}
+
+/** Markers where outcomes happened, fading over OUTCOME_SHOW_S: a filled burst for a hit, a
+ * pale ring for a miss, an amber ring for a weapon shot down; labelled for the first seconds. */
+export function outcomeLayers(outcomes: Outcome[], gameTimeS: number): Layer[] {
+  const live = outcomes.filter((o) => gameTimeS - n(o.tick) <= OUTCOME_SHOW_S);
+  const fade = (o: Outcome) =>
+    Math.round(255 * Math.max(0.15, 1 - (gameTimeS - n(o.tick)) / OUTCOME_SHOW_S));
+  const colour = (o: Outcome): [number, number, number] =>
+    o.result === "hit" ? [255, 90, 40] : o.result === "miss" ? [220, 230, 238] : [255, 200, 70];
+  return [
+    new ScatterplotLayer<Outcome>({
+      id: "outcomes",
+      data: live,
+      getPosition: (o) => pt(o.position),
+      getRadius: (o) => 9 + Math.min(10, (gameTimeS - n(o.tick)) / 3),
+      radiusUnits: "pixels",
+      stroked: true,
+      filled: true,
+      getFillColor: (o): RGBA =>
+        o.result === "hit" ? [...colour(o), Math.round(fade(o) * 0.6)] : [0, 0, 0, 0],
+      getLineColor: (o): RGBA => [...colour(o), fade(o)],
+      lineWidthUnits: "pixels",
+      getLineWidth: (o) => (o.result === "miss" ? 1.5 : 2.5),
+      updateTriggers: {
+        getRadius: [gameTimeS],
+        getFillColor: [gameTimeS],
+        getLineColor: [gameTimeS],
+      },
+    }),
+    new TextLayer<Outcome>({
+      id: "outcome-labels",
+      data: live.filter((o) => gameTimeS - n(o.tick) <= OUTCOME_LABEL_S),
+      getPosition: (o) => pt(o.position),
+      getText: (o) => (o.result === "hit" ? "HIT" : o.result === "miss" ? "MISS" : "SHOT DOWN"),
+      getSize: 13,
+      getColor: (o): RGBA => [...colour(o), 255],
+      getPixelOffset: [0, -24],
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: 700,
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
+  ];
+}
+
+/** A figure's size on the ground, metres (selected: a quarter larger); the layer clamps it on
+ * screen to FIGURE_MIN_PX–FIGURE_MAX_PX, so it shrinks as the map zooms out. */
+function figureSize(kind: FigureKind, selected: boolean): number {
+  return figureSizeM(kind) * (selected ? 1.25 : 1);
+}
+
+/** Figure icon for a unit or contact, drawn nose up; `getAngle` turns it to the heading. */
+function figureIcon(kind: FigureKind, aff: Affiliation, selected: boolean) {
+  const [width, height] = figureCanvas(kind);
+  return {
+    id: `fig-${kind}-${aff}-${selected}`,
+    url: figureUrl(kind, aff, selected),
+    width,
+    height,
+  };
+}
+
+/** Deck rotates icons counter-clockwise in degrees; headings are clockwise from north. */
+function iconAngle(kind: FigureKind | null, heading: number): number {
+  return kind && figureShape(kind) === "topdown" ? -heading : 0;
 }
 
 /** Phase 1 has no postures (Phase 2, sim-c2): own side is shown as friend and every other side as unknown. */
@@ -204,18 +343,184 @@ export function contactKind(c: ContactView): string {
   return c.platform ?? c.category?.replaceAll("_", " ") ?? c.domain ?? "unknown";
 }
 
-/** Length a bearing line is drawn on the map, metres. */
-export const BEARING_DRAW_M = 150_000;
+/** Length a bearing line is drawn on the map, metres: long enough to show the direction and to
+ * cross another ship's line, short enough not to cut across the whole picture. */
+export const BEARING_DRAW_M = 40_000;
+
+/** How far another unit's route is drawn (its next leg only); the selected unit shows all of it. */
+export const ROUTE_STUB_M = 15_000;
+
+/**
+ * Label decluttering: where two labels would overlap on screen, the lower priority is hidden
+ * until the user zooms in. Selected unit, then units, contacts, facilities, minefields, zones,
+ * reference points.
+ */
+export const LABEL_PRIORITY = {
+  selected: 1000,
+  unit: 500,
+  contact: 400,
+  facility: 300,
+  minefield: 250,
+  zone: 200,
+  point: 100,
+} as const;
+
+/** A label to place on screen: its key, anchor, pixel offset, font size, text and priority. */
+export interface LabelCandidate {
+  key: string;
+  at: LonLat;
+  dy: number;
+  size: number;
+  text: string;
+  priority: number;
+}
+
+/**
+ * Keeps labels in priority order and hides any whose box would overlap one already kept, in
+ * screen pixels. `project` maps a lon/lat to pixels (the map's projection). Box: about 0.58 em
+ * per character, plus a little padding. Returns the keys to hide.
+ */
+export function declutter(
+  candidates: LabelCandidate[],
+  project: (p: LonLat) => [number, number],
+): Set<string> {
+  const kept: [number, number, number, number][] = [];
+  const hidden = new Set<string>();
+  const order = [...candidates].sort((a, b) => b.priority - a.priority);
+  for (const c of order) {
+    const [x, y0] = project(c.at);
+    const y = y0 + c.dy;
+    const w = c.text.length * c.size * 0.58 + 6;
+    const h = c.size + 4;
+    const box: [number, number, number, number] = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
+    const clash = kept.some(
+      (k) => box[0] < k[2] && box[2] > k[0] && box[1] < k[3] && box[3] > k[1],
+    );
+    if (clash) hidden.add(c.key);
+    else kept.push(box);
+  }
+  return hidden;
+}
+
+export const unitLabel = (u: UnitView) => u.name;
+export const contactLabel = (c: ContactView, gameTimeS: number) =>
+  `C${c.number} · ${contactKind(c)} · ${contactAge(gameTimeS, c)}`;
+export const minefieldLabel = (f: Minefield) => `M${f.id} · ${f.mines} mines`;
+export const zoneLabel = (z: MapZone) => (z.layer ? `${z.name} (${z.layer})` : z.name);
+export const facilityLabel = (f: MapFacility) => `${FACILITY_CODE[f.kind] ?? "?"} ${f.name}`;
+
+/** Every label the picture would draw, as declutter candidates. */
+export function labelCandidates(s: {
+  units: UnitView[];
+  contacts: ContactView[];
+  minefields: Minefield[];
+  facilities: MapFacility[];
+  zones: MapZone[];
+  points: MapPoint[];
+  selected: number | null;
+  gameTimeS: number;
+}): LabelCandidate[] {
+  const P = LABEL_PRIORITY;
+  const unitsShown =
+    s.units.length <= LABEL_LIMIT ? s.units : s.units.filter((u) => u.id === s.selected);
+  return [
+    ...unitsShown.map((u) => ({
+      key: `u:${u.id}`,
+      at: pt(u.position),
+      dy: 24,
+      size: 12,
+      text: unitLabel(u),
+      priority: u.id === s.selected ? P.selected : P.unit,
+    })),
+    ...s.contacts.map((c) => ({
+      key: `c:${c.number}`,
+      at: pt(c.position),
+      dy: 20,
+      size: 12,
+      text: contactLabel(c, s.gameTimeS),
+      priority: P.contact,
+    })),
+    ...s.facilities.map((f) => ({
+      key: `f:${f.name}`,
+      at: pt(f.position),
+      dy: 0,
+      size: 12,
+      text: facilityLabel(f),
+      priority: P.facility,
+    })),
+    ...s.minefields.map((f) => ({
+      key: `m:${f.id}`,
+      at: pt(f.centre),
+      dy: 0,
+      size: 12,
+      text: minefieldLabel(f),
+      priority: P.minefield,
+    })),
+    ...s.zones.map((z) => ({
+      key: `z:${z.name}`,
+      at: zoneAnchor(z),
+      dy: -10,
+      size: 11,
+      text: zoneLabel(z),
+      priority: P.zone,
+    })),
+    ...s.points.map((q) => ({
+      key: `p:${q.name}`,
+      at: pt(q.position),
+      dy: -14,
+      size: 12,
+      text: q.name,
+      priority: P.point,
+    })),
+  ];
+}
+
+/** Great-circle distance, metres (spherical; for drawing only). */
+export function distanceM(a: GeoPoint, b: GeoPoint): number {
+  const r = 6_371_000;
+  const f1 = (n(a.lat_deg) * Math.PI) / 180;
+  const f2 = (n(b.lat_deg) * Math.PI) / 180;
+  const df = f2 - f1;
+  const dl = ((n(b.lon_deg) - n(a.lon_deg)) * Math.PI) / 180;
+  const h = Math.sin(df / 2) ** 2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl / 2) ** 2;
+  return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** At most `max_m` of the way from `a` toward `b` (straight in lon/lat; for drawing only). */
+function clip(a: GeoPoint, b: GeoPoint, max_m: number): LonLat {
+  const d = distanceM(a, b);
+  if (d <= max_m) return pt(b);
+  const t = max_m / d;
+  return [
+    n(a.lon_deg) + (n(b.lon_deg) - n(a.lon_deg)) * t,
+    n(a.lat_deg) + (n(b.lat_deg) - n(a.lat_deg)) * t,
+  ];
+}
 
 export function buildLayers(s: SceneInput): Layer[] {
+  const figures = (s.symbolStyle ?? "figures") === "figures";
+  // The selected unit's whole route; for the others only a short stub of the next leg, so long
+  // transits (a ferry 100 km away) do not draw lines across the whole picture.
   const routes = s.units
     .filter((u) => u.route && u.route.next < u.route.waypoints.length)
-    .map((u) => ({
-      id: u.id,
-      path: [pt(u.position), ...(u.route?.waypoints.slice(u.route.next) ?? []).map(pt)],
-      colour: AFFILIATION_COLOUR[affiliation(u, s.viewer)],
-    }));
-  const waypoints = routes.flatMap((r) => r.path.slice(1).map((p) => ({ p, colour: r.colour })));
+    .map((u) => {
+      const ahead = u.route?.waypoints.slice(u.route.next) ?? [];
+      const selected = u.id === s.selected;
+      const next = ahead[0];
+      return {
+        id: u.id,
+        selected,
+        path: selected
+          ? [pt(u.position), ...ahead.map(pt)]
+          : next
+            ? [pt(u.position), clip(u.position, next, ROUTE_STUB_M)]
+            : [],
+        colour: AFFILIATION_COLOUR[affiliation(u, s.viewer)],
+      };
+    });
+  const waypoints = routes
+    .filter((r) => r.selected)
+    .flatMap((r) => r.path.slice(1).map((p) => ({ p, colour: r.colour })));
   // Leader: where the unit will be in 6 minutes at its current speed and heading.
   // Decluttered like labels above LABEL_LIMIT units (selected unit only).
   const leaders = s.units
@@ -240,8 +545,8 @@ export function buildLayers(s: SceneInput): Layer[] {
       id: "routes",
       data: routes,
       getPath: (d) => d.path,
-      getColor: (d) => rgba(d.colour, 140),
-      getWidth: 2,
+      getColor: (d) => rgba(d.colour, d.selected ? 170 : 90),
+      getWidth: (d) => (d.selected ? 2 : 1.5),
       widthUnits: "pixels",
       getDashArray: [6, 4],
     }),
@@ -288,16 +593,31 @@ export function buildLayers(s: SceneInput): Layer[] {
       getIcon: (u) => {
         const aff = affiliation(u, s.viewer);
         const sel = u.id === s.selected;
+        const kind = figures ? figureKind(u.platform, null, u.domain) : null;
+        if (kind) return figureIcon(kind, aff, sel);
+        const code = functionCode(u.platform);
         return {
-          id: `${aff}-${u.domain}-${sel}`,
-          url: symbolUrl(aff, sel, u.domain),
+          id: `${aff}-${u.domain}-${sel}-${code}`,
+          url: symbolUrl(aff, sel, u.domain, code),
           width: 64,
           height: 64,
         };
       },
-      getSize: 28,
-      sizeUnits: "pixels",
-      updateTriggers: { getIcon: [s.selected, s.viewer] },
+      getSize: (u) => {
+        const kind = figures ? figureKind(u.platform, null, u.domain) : null;
+        // Frames: large enough to read the function code.
+        return kind ? figureSize(kind, u.id === s.selected) : 36;
+      },
+      getAngle: (u) =>
+        iconAngle(figures ? figureKind(u.platform, null, u.domain) : null, n(u.heading_deg)),
+      sizeUnits: figures ? "meters" : "pixels",
+      sizeMinPixels: figures ? FIGURE_MIN_PX : 0,
+      sizeMaxPixels: figures ? FIGURE_MAX_PX : Number.MAX_SAFE_INTEGER,
+      updateTriggers: {
+        getIcon: [s.selected, s.viewer, figures],
+        getSize: [s.selected, figures],
+        getAngle: [figures],
+      },
       onClick: (info: PickingInfo<UnitView>) => {
         if (info.object) s.onPickUnit(info.object.id);
         return true;
@@ -307,12 +627,15 @@ export function buildLayers(s: SceneInput): Layer[] {
       id: "labels",
       // Declutter: past LABEL_LIMIT units, labels overlap into noise and re-laying them out on every
       // snapshot costs the frame budget, so only the selected unit keeps its label.
-      data: s.units.length <= LABEL_LIMIT ? s.units : s.units.filter((u) => u.id === s.selected),
+      data: (s.units.length <= LABEL_LIMIT
+        ? s.units
+        : s.units.filter((u) => u.id === s.selected)
+      ).filter((u) => !s.hiddenLabels?.has(`u:${u.id}`)),
       getPosition: (u) => pt(u.position),
-      getText: (u) => u.name,
+      getText: unitLabel,
       getSize: 12,
       getColor: [220, 230, 238, 255],
-      getPixelOffset: [0, 22],
+      getPixelOffset: [0, 24],
       fontFamily: "system-ui, sans-serif",
       outlineWidth: 2,
       outlineColor: [11, 27, 43, 255],
@@ -335,9 +658,9 @@ export function buildLayers(s: SceneInput): Layer[] {
     }),
     new TextLayer<Minefield>({
       id: "minefield-labels",
-      data: s.minefields ?? [],
+      data: (s.minefields ?? []).filter((f) => !s.hiddenLabels?.has(`m:${f.id}`)),
       getPosition: (f) => pt(f.centre),
-      getText: (f) => `M${f.id} · ${f.mines} mines`,
+      getText: minefieldLabel,
       getSize: 12,
       getColor: [230, 120, 220, 255],
       fontFamily: "system-ui, sans-serif",
@@ -347,14 +670,42 @@ export function buildLayers(s: SceneInput): Layer[] {
       characterSet: LABEL_CHARSET,
     }),
     // Weapons in flight: a short line along the heading, brighter once the seeker has locked on.
-    new LineLayer<WeaponView>({
+    new IconLayer<WeaponView>({
       id: "weapons",
       data: s.weapons ?? [],
-      getSourcePosition: (w) => pt(w.position),
-      getTargetPosition: (w) =>
-        project(n(w.position.lat_deg), n(w.position.lon_deg), n(w.heading_deg), 1500),
-      getColor: (w) => (w.homing ? [255, 90, 60, 255] : [255, 200, 120, 220]),
-      getWidth: 3,
+      getPosition: (w) => pt(w.position),
+      getIcon: (w) => {
+        const kind = munitionKind(w.weapon);
+        const aff = affiliation({ side: w.side } as UnitView, s.viewer);
+        return {
+          id: `mun-${kind}-${aff}-${w.homing}`,
+          url: munitionUrl(kind, aff, w.homing),
+          width: 64,
+          height: 64,
+        };
+      },
+      getSize: (w) => (munitionKind(w.weapon) === "shell" ? 1200 : 2800),
+      getAngle: (w) => -n(w.heading_deg),
+      sizeUnits: "meters",
+      sizeMinPixels: 9,
+      sizeMaxPixels: 30,
+      updateTriggers: { getIcon: [s.viewer] },
+    }),
+    new IconLayer<WeaponTrackView>({
+      id: "weapon-tracks",
+      data: s.weaponTracks ?? [],
+      getPosition: (t) => pt(t.position),
+      getIcon: (t) => {
+        const kind = t.domain === "subsurface" ? "torpedo" : "anti_ship_missile";
+        return {
+          id: `track-${kind}`,
+          url: munitionUrl(kind, "hostile", false),
+          width: 64,
+          height: 64,
+        };
+      },
+      getSize: 22,
+      sizeUnits: "pixels",
     }),
     new PathLayer<BearingView>({
       id: "bearings",
@@ -389,21 +740,33 @@ export function buildLayers(s: SceneInput): Layer[] {
       getIcon: (c) => {
         const domain = c.domain ?? "surface";
         const aff = contactAffiliation(c);
+        // The figure (or code) shows only as far as the side has classified the contact; an
+        // unclassified contact keeps the APP-6 frame.
+        const kind = figures ? figureKind(c.platform, c.category, c.domain) : null;
+        if (kind) return figureIcon(kind, aff, false);
+        const code = functionCode(c.platform, c.category);
         return {
-          id: `contact-${aff}-${domain}`,
-          url: symbolUrl(aff, false, domain),
+          id: `contact-${aff}-${domain}-${code}`,
+          url: symbolUrl(aff, false, domain, code),
           width: 64,
           height: 64,
         };
       },
-      getSize: 24,
-      sizeUnits: "pixels",
+      getSize: (c) => {
+        const kind = figures ? figureKind(c.platform, c.category, c.domain) : null;
+        // North-up: a side does not know a contact's course.
+        return kind ? figureSize(kind, false) * 0.9 : 30;
+      },
+      sizeUnits: figures ? "meters" : "pixels",
+      sizeMinPixels: figures ? FIGURE_MIN_PX - 2 : 0,
+      sizeMaxPixels: figures ? FIGURE_MAX_PX - 8 : Number.MAX_SAFE_INTEGER,
+      updateTriggers: { getIcon: [figures], getSize: [figures] },
     }),
     new TextLayer<ContactView>({
       id: "contact-labels",
-      data: s.contacts,
+      data: s.contacts.filter((c) => !s.hiddenLabels?.has(`c:${c.number}`)),
       getPosition: (c) => pt(c.position),
-      getText: (c) => `C${c.number} · ${contactKind(c)} · ${contactAge(s.gameTimeS, c)}`,
+      getText: (c) => contactLabel(c, s.gameTimeS),
       getSize: 12,
       getColor: [255, 240, 150, 255],
       getPixelOffset: [0, 20],
@@ -421,4 +784,347 @@ export function buildLayers(s: SceneInput): Layer[] {
 export function contactAge(nowS: number, c: ContactView): string {
   const age = Math.max(0, Math.round(nowS - n(c.last_seen_s)));
   return age < 120 ? `${age} s` : `${Math.round(age / 60)} min`;
+}
+
+/** A named mark on the map: a scenario reference point. */
+export interface MapPoint {
+  name: string;
+  position: GeoPoint;
+}
+
+const POINT_COLOUR: RGBA = [120, 220, 160, 255];
+
+/** Reference points: a small ring and the name. */
+export function referenceLayers(
+  points: MapPoint[],
+  id = "reference-points",
+  hidden?: Set<string>,
+): Layer[] {
+  return [
+    new ScatterplotLayer<MapPoint>({
+      id,
+      data: points,
+      getPosition: (p) => pt(p.position),
+      getRadius: 5,
+      radiusUnits: "pixels",
+      stroked: true,
+      filled: false,
+      getLineColor: POINT_COLOUR,
+      getLineWidth: 2,
+      lineWidthUnits: "pixels",
+    }),
+    new TextLayer<MapPoint>({
+      id: `${id}-labels`,
+      data: points.filter((q) => !hidden?.has(`p:${q.name}`)),
+      getPosition: (p) => pt(p.position),
+      getText: (p) => p.name,
+      getSize: 12,
+      getColor: POINT_COLOUR,
+      getPixelOffset: [0, -14],
+      fontFamily: "system-ui, sans-serif",
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
+  ];
+}
+
+/** What the scenario editor draws: the draft's units, routes, patrol areas and minefields. */
+export interface EditorScene {
+  units: {
+    id: number;
+    name: string;
+    side: number;
+    position: GeoPoint;
+    route?: GeoPoint[];
+    mission?: { kind: string; centre?: GeoPoint; radius_m?: number | null; destination?: GeoPoint };
+    reserve?: boolean;
+  }[];
+  minefields: { centre: GeoPoint; radius_m: number; mines: number }[];
+  points: MapPoint[];
+  /** Side ids in order: the first side is drawn blue, the second red, others in turn. */
+  sides: number[];
+  selected: number | null;
+  onPickUnit: (id: number) => void;
+}
+
+const SIDE_COLOURS: [number, number, number][] = [
+  [90, 170, 255],
+  [255, 110, 100],
+  [250, 210, 90],
+  [180, 140, 255],
+  [120, 220, 160],
+];
+
+/** The scenario editor's layers (drawn instead of the live picture while it is open). */
+export function editorLayers(e: EditorScene): Layer[] {
+  const colour = (side: number, alpha = 255): RGBA =>
+    rgba(
+      SIDE_COLOURS[Math.max(0, e.sides.indexOf(side)) % SIDE_COLOURS.length] ?? [200, 200, 200],
+      alpha,
+    );
+  const routes = e.units
+    .filter((u) => (u.route ?? []).length > 0)
+    .map((u) => ({ side: u.side, path: [pt(u.position), ...(u.route ?? []).map(pt)] }));
+  const areas = e.units.flatMap((u) =>
+    u.mission?.kind === "patrol" && u.mission.centre
+      ? [{ side: u.side, path: circleRing(u.mission.centre, n(u.mission.radius_m ?? 0)) }]
+      : u.mission?.kind === "ferry" && u.mission.destination
+        ? [{ side: u.side, path: [pt(u.position), pt(u.mission.destination)] }]
+        : [],
+  );
+  return [
+    new PathLayer<{ side: number; path: LonLat[] }>({
+      id: "editor-routes",
+      data: [...routes, ...areas],
+      getPath: (r) => r.path,
+      getColor: (r) => colour(r.side, 170),
+      getWidth: 2,
+      widthUnits: "pixels",
+    }),
+    new PathLayer<EditorScene["minefields"][number]>({
+      id: "editor-minefields",
+      data: e.minefields,
+      getPath: (f) => circleRing(f.centre, n(f.radius_m)),
+      getColor: [230, 120, 220, 200],
+      getWidth: 2,
+      widthUnits: "pixels",
+    }),
+    new ScatterplotLayer<EditorScene["units"][number]>({
+      id: "editor-units",
+      data: e.units,
+      getPosition: (u) => pt(u.position),
+      getRadius: (u) => (u.id === e.selected ? 9 : 6),
+      radiusUnits: "pixels",
+      stroked: true,
+      getFillColor: (u) => colour(u.side, u.reserve ? 60 : 220),
+      getLineColor: (u) => (u.id === e.selected ? [255, 255, 255, 255] : [11, 27, 43, 255]),
+      getLineWidth: 2,
+      lineWidthUnits: "pixels",
+      pickable: true,
+      onClick: (info: PickingInfo<EditorScene["units"][number]>) => {
+        if (info.object) e.onPickUnit(info.object.id);
+        return true;
+      },
+      updateTriggers: { getRadius: [e.selected], getLineColor: [e.selected] },
+    }),
+    new TextLayer<EditorScene["units"][number]>({
+      id: "editor-unit-labels",
+      data: e.units,
+      getPosition: (u) => pt(u.position),
+      getText: (u) => (u.reserve ? `${u.name} (reserve)` : u.name),
+      getSize: 12,
+      getColor: (u) => colour(u.side),
+      getPixelOffset: [0, 16],
+      fontFamily: "system-ui, sans-serif",
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
+    ...referenceLayers(e.points, "editor-points"),
+  ];
+}
+
+/** A planning-layer facility as drawn: kind, name and place. */
+export interface MapFacility {
+  name: string;
+  kind: string;
+  position: GeoPoint;
+  radius_m: number | null;
+  /** The facility's water, drawn instead of its radius. */
+  area?: MapZone["area"] | null;
+}
+
+/** A sense or engage zone as drawn. */
+export interface MapZone {
+  name: string;
+  kind: string;
+  layer?: string | null;
+  area:
+    | { shape: "circle"; centre: GeoPoint; radius_m: number | null }
+    | { shape: "polygon"; points: GeoPoint[] };
+}
+
+const FACILITY_CODE: Record<string, string> = {
+  command_post: "CP",
+  refuelling_point: "RAS",
+  sheltering_port: "PORT",
+  anchorage: "ANCH",
+};
+
+/** One sense zone's coverage, as the engine samples it. */
+export interface MapCoverage {
+  cells: { centre: GeoPoint; covered: boolean }[];
+  half_lat_deg: number | null;
+  half_lon_deg: number | null;
+}
+
+const COVERED_FILL: RGBA = [90, 200, 120, 70];
+const GAP_FILL: RGBA = [235, 80, 70, 90];
+
+/** Sense-zone coverage: covered cells green, gaps red. */
+export function coverageLayers(coverage: MapCoverage[]): Layer[] {
+  type Cell = { ring: LonLat[]; covered: boolean };
+  const cells: Cell[] = coverage.flatMap((c) => {
+    const h = n(c.half_lat_deg);
+    const w = n(c.half_lon_deg);
+    return c.cells.map((cell) => {
+      const lat = n(cell.centre.lat_deg);
+      const lon = n(cell.centre.lon_deg);
+      return {
+        covered: cell.covered,
+        ring: [
+          [lon - w, lat - h],
+          [lon + w, lat - h],
+          [lon + w, lat + h],
+          [lon - w, lat + h],
+        ] as LonLat[],
+      };
+    });
+  });
+  return [
+    new PolygonLayer<Cell>({
+      id: "coverage",
+      data: cells,
+      getPolygon: (c) => c.ring,
+      getFillColor: (c) => (c.covered ? COVERED_FILL : GAP_FILL),
+      stroked: false,
+      filled: true,
+    }),
+  ];
+}
+
+/**
+ * The sun's subsolar point at `unixS`, by the engine's own simplified solar position
+ * (`sim_sensors::sun_elevation_deg`): declination −23.44° · cos(360°/365 · (N + 10)) with N the
+ * day count, and the subsolar longitude from mean solar time.
+ */
+export function subsolarPoint(unixS: number): { lat: number; lon: number } {
+  const n = (((unixS / 86_400) % 365.2422) + 365.2422) % 365.2422;
+  const dec = -23.44 * Math.cos(((360 / 365) * (n + 10) * Math.PI) / 180);
+  const utcHours = (((unixS % 86_400) + 86_400) % 86_400) / 3600;
+  let lon = 15 * (12 - utcHours);
+  if (lon > 180) lon -= 360;
+  if (lon <= -180) lon += 360;
+  return { lat: dec, lon };
+}
+
+/** The night side of the earth at `unixS` (sun below the horizon), as a polygon in [lon, lat]. */
+export function nightPolygon(unixS: number): LonLat[] {
+  const { lat: dec, lon: lon0 } = subsolarPoint(unixS);
+  const rad = Math.PI / 180;
+  // Avoid the equinox singularity: the terminator is then a meridian pair.
+  const d = Math.abs(dec) < 0.01 ? (dec < 0 ? -0.01 : 0.01) : dec;
+  const line: LonLat[] = [];
+  for (let lon = -180; lon <= 180; lon += 2) {
+    const h = (lon - lon0) * rad;
+    const lat = Math.atan(-Math.cos(h) / Math.tan(d * rad)) / rad;
+    line.push([lon, Math.max(-85, Math.min(85, lat))]);
+  }
+  // The pole away from the sun is in the night.
+  const pole = d > 0 ? -85 : 85;
+  return [...line, [180, pole], [-180, pole]];
+}
+
+const NIGHT_FILL: RGBA = [0, 0, 30, 70];
+
+/** Night shading for the map at game time `unixS`. */
+export function nightLayers(unixS: number): Layer[] {
+  return [
+    new PolygonLayer<{ ring: LonLat[] }>({
+      id: "night",
+      data: [{ ring: nightPolygon(unixS) }],
+      getPolygon: (x) => x.ring,
+      getFillColor: NIGHT_FILL,
+      stroked: false,
+      filled: true,
+      // Recompute when the minute changes.
+      updateTriggers: { getPolygon: Math.floor(unixS / 60) },
+    }),
+  ];
+}
+
+/** Outline of a zone, closed. */
+export function zoneRing(z: MapZone): LonLat[] {
+  if (z.area.shape === "circle") return circleRing(z.area.centre, n(z.area.radius_m));
+  const ring = z.area.points.map(pt);
+  return ring.length ? [...ring, ring[0] as LonLat] : ring;
+}
+
+/** Where a zone's label goes: the circle's centre, or the polygon's first point. */
+/** Where a zone's name goes: its northern edge (a circle's top, a polygon's northernmost
+ * corner), clear of the reference points and units that sit at its centre. */
+export function zoneAnchor(z: MapZone): LonLat {
+  if (z.area.shape === "circle") {
+    const c = z.area.centre;
+    return project(n(c.lat_deg), n(c.lon_deg), 0, n(z.area.radius_m));
+  }
+  const top = z.area.points.reduce<GeoPoint | null>(
+    (best, q) => (best === null || n(q.lat_deg) > n(best.lat_deg) ? q : best),
+    null,
+  );
+  return top ? pt(top) : [0, 0];
+}
+
+const SENSE_COLOUR: RGBA = [110, 190, 255, 200];
+const ENGAGE_COLOUR: RGBA = [255, 110, 100, 220];
+const FACILITY_COLOUR: RGBA = [230, 230, 160, 255];
+
+/** The planning layer: zones as outlines (sense blue, engage red) and facilities as labelled
+ * marks with their radius. */
+export function planningLayers(
+  facilities: MapFacility[],
+  zones: MapZone[],
+  id = "planning",
+  hidden?: Set<string>,
+): Layer[] {
+  const label = {
+    fontFamily: "system-ui, sans-serif",
+    outlineWidth: 2,
+    outlineColor: [11, 27, 43, 255] as RGBA,
+    fontSettings: { sdf: true },
+    characterSet: LABEL_CHARSET,
+  };
+  return [
+    new PathLayer<MapZone>({
+      id: `${id}-zones`,
+      data: zones,
+      getPath: zoneRing,
+      getColor: (z) => (z.kind === "engage" ? ENGAGE_COLOUR : SENSE_COLOUR),
+      getWidth: (z) => (z.kind === "engage" ? 2 : 1.5),
+      widthUnits: "pixels",
+    }),
+    new TextLayer<MapZone>({
+      id: `${id}-zone-labels`,
+      data: zones.filter((z) => !hidden?.has(`z:${z.name}`)),
+      getPosition: zoneAnchor,
+      getText: zoneLabel,
+      getSize: 11,
+      getColor: (z) => (z.kind === "engage" ? ENGAGE_COLOUR : SENSE_COLOUR),
+      getPixelOffset: [0, -10],
+      ...label,
+    }),
+    new PathLayer<MapFacility>({
+      id: `${id}-facility-rings`,
+      data: facilities,
+      getPath: (f) =>
+        f.area
+          ? zoneRing({ name: f.name, kind: f.kind, area: f.area })
+          : circleRing(f.position, n(f.radius_m)),
+      getColor: FACILITY_COLOUR,
+      getWidth: 1,
+      widthUnits: "pixels",
+    }),
+    new TextLayer<MapFacility>({
+      id: `${id}-facilities`,
+      data: facilities.filter((f) => !hidden?.has(`f:${f.name}`)),
+      getPosition: (f) => pt(f.position),
+      getText: facilityLabel,
+      getSize: 12,
+      getColor: FACILITY_COLOUR,
+      ...label,
+    }),
+  ];
 }

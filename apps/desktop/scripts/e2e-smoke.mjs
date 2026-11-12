@@ -118,7 +118,7 @@ try {
     "Patrol here sends order_mission(patrol)",
   );
 
-  await page.getByLabel("Scenario").setInputFiles({
+  await page.getByLabel("Scenario", { exact: true }).setInputFiles({
     name: "loaded.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify({ format: "nws-scenario", name: "Loaded from file" })),
@@ -131,14 +131,16 @@ try {
     "picking a scenario file sends load_scenario and shows the new scenario",
   );
 
-  await page.getByLabel("Seat").selectOption("white");
+  await page.getByLabel("Seat").selectOption({ label: "White cell (white cell: ground truth)" });
   await page.getByRole("button", { name: /Bulk carrier Bravo/ }).waitFor({ timeout: 5_000 });
   check(
-    (await calls()).some((c) => c.cmd === "set_viewer" && c.args.viewer.kind === "white_cell"),
-    "white-cell seat sends set_viewer and shows every unit",
+    (await calls()).some((c) => c.cmd === "set_seat" && c.args.seat === 0),
+    "choosing the white-cell seat sends set_seat and shows every unit",
   );
 
-  await page.getByText("Platform database", { exact: true }).first().click();
+  // Menu bar: View › Platform database opens it in a dialog.
+  await page.getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menuitem", { name: "Platform database…" }).click();
   await page.getByPlaceholder("Search id, name or category").fill("bulk");
   await page.getByRole("button", { name: /Generic bulk carrier/ }).waitFor({ timeout: 5_000 });
   check(
@@ -151,6 +153,172 @@ try {
   check(
     await page.getByText("W-MOCK: mock warning").isVisible(),
     "platform record shows provenance and its validation warning",
+  );
+  await page.getByRole("button", { name: "Close the database" }).click();
+
+  // White-cell console: an override with its reason appears in the override log.
+  await page.getByRole("button", { name: /Bulk carrier Bravo/ }).click();
+  await page.getByLabel("Reason (logged)").fill("Ruled sunk by umpire");
+  await page.getByRole("button", { name: "Destroy" }).click();
+  await page.getByRole("tab", { name: "Log" }).click();
+  await page.getByText("Ruled sunk by umpire").waitFor({ timeout: 5_000 });
+  check(
+    (await calls()).some(
+      (c) =>
+        c.cmd === "order_adjudicate" &&
+        c.args.reason === "Ruled sunk by umpire" &&
+        c.args.action.kind === "destroy_unit" &&
+        c.args.action.unit === 2,
+    ),
+    "white-cell override sends order_adjudicate with its reason and shows in the log",
+  );
+
+  // Messages arrived while another tab was open: the tab counts them.
+  check(
+    /Messages\s*\d+/.test((await page.getByRole("tab", { name: /^Messages/ }).textContent()) ?? ""),
+    "the Messages tab shows how many messages are unread",
+  );
+  await page.getByRole("tab", { name: /^Messages/ }).click();
+  const messages = page.getByRole("region", { name: "Messages" });
+  await messages.getByText("STARTEX: proceed").waitFor({ timeout: 5_000 });
+  check(
+    await messages.getByText("Exercise control → all").isVisible(),
+    "message log shows each message with its sender and, for the white cell, its audience",
+  );
+
+  await page.getByRole("tab", { name: "Injects" }).click();
+  await page.getByRole("button", { name: "Send Distress call" }).click();
+  await messages.getByText("Engine room fire, request assistance").waitFor({ timeout: 5_000 });
+  check(
+    (await calls()).some(
+      (c) =>
+        c.cmd === "order_facilitate" &&
+        c.args.action.kind === "send_inject" &&
+        c.args.action.inject === "i01-distress",
+    ) && (await page.getByText("sent ×1").isVisible()),
+    "white cell sends an inject from the library; it appears in the message log, counted",
+  );
+
+  // Per-zone ROE override from the white-cell console.
+  await page.getByRole("tab", { name: "Planning" }).click();
+  await page.getByLabel("Weapons control in Narrows engage zone").selectOption("tight");
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some(
+      (c) =>
+        c.cmd === "order_zone_doctrine" && c.args.zone === 1 && c.args.doctrine.wcs === "tight",
+    ),
+    "the white cell overrides a zone's weapons control",
+  );
+
+  // Seat management: add a seat for Blue's executive officer and open a window for it.
+  await page.getByRole("tab", { name: "Seats" }).click();
+  await page.getByLabel("New seat", { exact: true }).fill("Blue XO");
+  await page.getByLabel("New seat plays").selectOption({ label: "Blue" });
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Open a window for Blue XO" }).click();
+  await page.waitForTimeout(300);
+  {
+    const c = await calls();
+    check(
+      c.some((x) => x.cmd === "add_seat" && x.args.name === "Blue XO" && x.args.side === 1) &&
+        c.some((x) => x.cmd === "open_seat_window" && x.args.seat === 3),
+      "the white cell adds a seat for a side and opens a window locked to it",
+    );
+  }
+
+  // Exercise review: replay from the start, scrub, read the AAR tables, return to live.
+  await page.getByRole("tab", { name: "Review" }).click();
+  await page.getByRole("button", { name: "Replay", exact: true }).click();
+  await page.getByText("REPLAY", { exact: true }).waitFor({ timeout: 5_000 });
+  check(
+    await page.getByText("Replay: matches the recorded run").isVisible(),
+    "replay starts and shows that it matches the recorded run",
+  );
+  await page.getByLabel("Replay position").fill("3");
+  await page.waitForTimeout(300);
+  check(
+    (await calls()).some((c) => c.cmd === "seek_replay" && c.args.tick === 3),
+    "the scrubber seeks the replay",
+  );
+  await page.getByRole("button", { name: "AAR tables" }).click();
+  const aar = page.getByRole("dialog", { name: "After-action review" });
+  await aar.getByRole("tab", { name: "Losses" }).click();
+  await aar.getByText("white cell: Ruled sunk by umpire").waitFor({ timeout: 5_000 });
+  await aar.getByRole("tab", { name: "Timeline" }).click();
+  await aar.getByText("Bulk carrier Bravo destroyed").click();
+  await aar.getByRole("button", { name: "Save CSV" }).click();
+  await page.waitForTimeout(300);
+  {
+    const c = await calls();
+    check(
+      c.some((x) => x.cmd === "seek_replay" && x.args.tick === 40) &&
+        c.some((x) => x.cmd === "aar_csv" && x.args.table === "timeline"),
+      "AAR tables show losses and the timeline; a timeline entry jumps the replay; CSV export",
+    );
+  }
+  await aar.getByRole("button", { name: "Close the review" }).click();
+  await page.getByRole("button", { name: "Back to live" }).click();
+  await page.waitForTimeout(400);
+  check(
+    (await page.getByText("REPLAY", { exact: true }).count()) === 0,
+    "back to the live exercise",
+  );
+
+  // Scenario editor: a new scenario, a unit placed on the map, checked by the engine, played.
+  await page.getByRole("menuitem", { name: "File" }).click();
+  await page.getByRole("menuitem", { name: "New scenario" }).click();
+  const ed = page.getByRole("dialog", { name: "Scenario editor" });
+  await ed.getByText("2 warnings.").waitFor({ timeout: 5_000 });
+  check(
+    await ed.getByText("Warning: side 2 (Red) starts with no units").isVisible(),
+    "the editor checks a new scenario with the engine and lists its warnings",
+  );
+  await ed.getByRole("tab", { name: "Units" }).click();
+  await ed.getByRole("button", { name: "Add unit on the map" }).click();
+  await ed.getByText("Click the map to place the new unit").waitFor();
+  {
+    const box = await page.locator("main.map").boundingBox();
+    if (box) await page.mouse.click(box.x + box.width / 3, box.y + box.height / 2);
+  }
+  await ed.getByRole("list", { name: "Scenario units" }).getByRole("button").first().waitFor();
+  check(
+    (await ed.getByRole("list", { name: "Scenario units" }).getByRole("button").count()) === 1,
+    "clicking the map places the new unit in the draft",
+  );
+  await ed.getByRole("tab", { name: "Planning" }).click();
+  await ed.getByRole("button", { name: "Add choke point on the map" }).click();
+  {
+    const box = await page.locator("main.map").boundingBox();
+    if (box) await page.mouse.click(box.x + box.width / 3, box.y + box.height / 3);
+  }
+  await ed.getByText("Choke point 1 engage zone · Choke point 1").waitFor({ timeout: 5_000 });
+  await ed.getByRole("tab", { name: "Events" }).click();
+  await ed.getByLabel("Add an event from a template").selectOption({ index: 1 });
+  check(
+    (await ed.getByLabel("Add an action").count()) === 1 &&
+      (await ed.getByLabel("Add a condition").count()) === 1,
+    "the template event is shown as a form with its trigger, conditions and actions",
+  );
+  await ed.getByRole("button", { name: "Play" }).click();
+  await page.waitForTimeout(400);
+  {
+    const loads = (await calls()).filter((c) => c.cmd === "load_scenario");
+    const last = loads.length ? JSON.parse(loads[loads.length - 1].args.json) : null;
+    check(
+      last !== null &&
+        last.units.length === 1 &&
+        last.units[0].side === 1 &&
+        last.events.length === 1 &&
+        last.zones.length === 2 &&
+        last.zones[1].kind === "engage" &&
+        last.format_version === 6,
+      "Play sends the checked draft (its unit, event and choke-point zones) to load_scenario",
+    );
+  }
+  check(
+    (await page.getByRole("dialog", { name: "Scenario editor" }).count()) === 0,
+    "the editor closes once its scenario is playing",
   );
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);

@@ -1,5 +1,6 @@
 //! Save games: full world state + RNG state + command log, MessagePack-encoded and versioned.
 
+use crate::adjudication::AdjudicationLog;
 use crate::ai::MissionState;
 use crate::c2::C2State;
 use crate::combat::{Health, Magazine, WeaponCatalog, WeaponsInFlight};
@@ -13,6 +14,8 @@ use crate::ids::SideId;
 use crate::mines::Minefields;
 use crate::point_defence::PointDefence;
 use crate::rng::RngStreams;
+use crate::scenario_events::{EventEngine, MessageLog};
+use crate::seats::Seats;
 use crate::time::Tick;
 use serde::{Deserialize, Serialize};
 use sim_sensors::{Environment, JammerSpec};
@@ -46,7 +49,27 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   weapons in flight. Older saves load with none.
 /// * 11: adds unit missions. Older saves load with no missions.
 /// * 12: adds minefields. Older saves load with none.
-pub const SAVE_FORMAT_VERSION: u32 = 12;
+/// * 13: adds the white-cell adjudication log. Older saves load with an empty log.
+/// * 14: adds scenario events (definitions, state, reserves, injects) and the message log.
+///   Older saves load with neither.
+/// * 15: adds the seat table. Older saves load with none (no seat checks).
+/// * 16: hit rolls record the firing unit and side. Older saves load with neither.
+/// * 17: adds the planning layer (facilities, zones, units being served) and unit loadouts.
+///   Older saves load with no planning layer, and each unit's loadout taken from its state.
+/// * 18: command posts gain comms-link fields (line of sight, antenna, anti-jam margin, relays)
+///   and the planning layer records disrupted posts. Older saves load with the defaults.
+/// * 19: unit fuel, and the planning layer's issued fuel, waiting units and diversion reasons.
+///   Older saves load with none.
+/// * 20: missions gain support, mining, mine clearing, cargo, barrier patrol and denial, and a
+///   mission's progress (phase and start tick). Older saves load at phase 0.
+/// * 21: facility areas, depth, holding limits and staging; unit draft; weather and staging
+///   diversions. Older saves load without them.
+/// * 22: zones gain a layer and sensor types. Older saves load without them.
+/// * 23: each side's tracks on weapons in flight. Older saves load with none.
+/// * 24: surface action groups in the planning layer. Older saves load with none.
+/// * 25: the recent weapon-outcome feed (display only, not hashed), so a replay that seeks to a
+///   keyframe shows the same hit and miss markers as a straight run. Older saves load with none.
+pub const SAVE_FORMAT_VERSION: u32 = 25;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +92,12 @@ pub struct UnitRecord {
     pub health: Option<Health>,
     #[serde(default)]
     pub mission: MissionState,
+    /// `None` in saves before format 17.
+    #[serde(default)]
+    pub loadout: Option<crate::planning::Loadout>,
+    /// `None` for units without a fuel model, and in saves before format 19.
+    #[serde(default)]
+    pub fuel: Option<crate::fuel::Fuel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +133,22 @@ pub struct SaveGame {
     pub point_defence: PointDefence,
     #[serde(default)]
     pub minefields: Minefields,
+    #[serde(default)]
+    pub adjudications: AdjudicationLog,
+    #[serde(default)]
+    pub events_engine: EventEngine,
+    #[serde(default)]
+    pub messages: MessageLog,
+    #[serde(default)]
+    pub seats: Seats,
+    #[serde(default)]
+    pub planning: crate::planning::PlanningLayer,
+    /// Each side's tracks on weapons in flight. Empty in saves before format 23.
+    #[serde(default)]
+    pub weapon_tracks: crate::weapon_tracks::WeaponTracks,
+    /// Recent weapon outcomes (display only). Empty in saves before format 25.
+    #[serde(default)]
+    pub outcomes: crate::outcomes::OutcomeFeed,
 }
 
 impl SaveGame {
@@ -128,7 +173,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=11 | SAVE_FORMAT_VERSION => {
+            1..=16 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

@@ -42,6 +42,8 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
                 doctrine: Doctrine::default(),
                 jammer: None,
                 mission: None,
+                reserve: false,
+                fuel_level: None,
             }
         })
         .collect();
@@ -70,5 +72,13 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
         minefields: vec![],
         environment: Default::default(),
         units,
+        events: vec![],
+        injects: vec![],
+        seats: vec![],
+        reference_points: vec![],
+        facilities: vec![],
+        zones: vec![],
+        action_groups: vec![],
+        fuel: false,
     }
 }

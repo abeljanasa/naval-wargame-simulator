@@ -10,9 +10,10 @@ mod bench;
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use serde::Serialize;
+use sim_aar::{AarTable, ExerciseRecord, Replay};
 use sim_core::Tick;
 use sim_scenario::Scenario;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(
@@ -43,6 +44,25 @@ enum Cmd {
         out: Option<PathBuf>,
         /// Open platform database file (built with `sim-db build`). Defaults to the database
         /// embedded in this binary.
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// After-action review: replay an exercise record (or run a scenario and record it), check
+    /// the replay against the recorded hash, and write the AAR tables as CSV files.
+    Aar {
+        /// An exercise record (`.nwsrec`, saved from the desktop app) or a scenario (`.json`).
+        input: PathBuf,
+        /// Directory for `sides.csv`, `losses.csv`, `weapons.csv`, `detections.csv`,
+        /// `timeline.csv` (and `record.nwsrec` when a scenario was run).
+        #[arg(long)]
+        out: PathBuf,
+        /// Scenario runs only: the seed (default: the scenario's own).
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Scenario runs only: the run length in ticks (default: the scenario's duration).
+        #[arg(long)]
+        ticks: Option<u64>,
+        /// Open platform database file. Defaults to the embedded database.
         #[arg(long)]
         db: Option<PathBuf>,
     },
@@ -84,12 +104,7 @@ fn main() -> Result<()> {
             out,
             db,
         } => {
-            let platforms = match db {
-                Some(path) => sim_db::PlatformDb::open(&sim_db::DbSource::Open(path.clone()))
-                    .with_context(|| format!("opening platform database {}", path.display()))?,
-                None => sim_db::embedded::open_platform_db()
-                    .context("building the embedded platform database")?,
-            };
+            let platforms = platforms(db.as_deref())?;
             let mut results = vec![];
             for path in &scenarios {
                 let scenario =
@@ -125,6 +140,13 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
+        Cmd::Aar {
+            input,
+            out,
+            seed,
+            ticks,
+            db,
+        } => aar(&input, &out, seed, ticks, db.as_deref()),
         Cmd::Bench {
             units,
             ticks,
@@ -144,4 +166,78 @@ fn main() -> Result<()> {
             Ok(())
         }
     }
+}
+
+fn platforms(db: Option<&Path>) -> Result<sim_db::PlatformDb> {
+    match db {
+        Some(path) => sim_db::PlatformDb::open(&sim_db::DbSource::Open(path.to_path_buf()))
+            .with_context(|| format!("opening platform database {}", path.display())),
+        None => {
+            sim_db::embedded::open_platform_db().context("building the embedded platform database")
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct AarResult {
+    scenario: String,
+    seed: u64,
+    ticks: u64,
+    verified: bool,
+    losses: usize,
+    timeline: usize,
+}
+
+fn aar(
+    input: &Path,
+    out: &Path,
+    seed: Option<u64>,
+    ticks: Option<u64>,
+    db: Option<&Path>,
+) -> Result<()> {
+    let bytes = std::fs::read(input).with_context(|| format!("reading {}", input.display()))?;
+    std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
+    let record = match ExerciseRecord::from_bytes(&bytes) {
+        Ok(r) => r,
+        Err(sim_aar::AarError::NotARecord) => {
+            // A scenario: run it and keep the record next to the tables.
+            let text = String::from_utf8(bytes).context("input is neither a record nor text")?;
+            let scenario = Scenario::from_json(&text)
+                .with_context(|| format!("loading {}", input.display()))?;
+            let mut sim = scenario.build(seed, &platforms(db)?)?;
+            sim.run_until(ticks.map_or_else(|| scenario.duration_ticks(), Tick));
+            let record = ExerciseRecord::capture(&mut sim, &scenario.name, text);
+            let path = out.join("record.nwsrec");
+            std::fs::write(&path, record.to_bytes()?)
+                .with_context(|| format!("writing {}", path.display()))?;
+            record
+        }
+        Err(e) => return Err(e).with_context(|| format!("reading {}", input.display())),
+    };
+    let scenario = Scenario::from_json(&record.scenario_json).context("the record's scenario")?;
+    let sides: Vec<_> = scenario
+        .sides
+        .iter()
+        .map(|s| (s.id, s.name.clone()))
+        .collect();
+    let replay = Replay::open(record, &sides)?;
+    let report = replay.report();
+    for table in AarTable::ALL {
+        let path = out.join(format!("{}.csv", table.file_stem()));
+        std::fs::write(&path, report.csv(table))
+            .with_context(|| format!("writing {}", path.display()))?;
+    }
+    let r = AarResult {
+        scenario: replay.record().scenario_name.clone(),
+        seed: replay.record().seed,
+        ticks: replay.end_tick().0,
+        verified: replay.verified(),
+        losses: report.losses.len(),
+        timeline: report.timeline.len(),
+    };
+    println!("{}", serde_json::to_string(&r)?);
+    if !replay.verified() {
+        bail!("the replay did not reach the recorded final state (record altered, or a determinism fault)");
+    }
+    Ok(())
 }

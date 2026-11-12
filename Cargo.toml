@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/sim-aar",
     "crates/sim-ai",
     "crates/sim-c2",
+    "crates/sim-events",
     "crates/sim-core",
     "crates/sim-geo",
     "crates/sim-sensors",
@@ -20,10 +22,12 @@ license = "LicenseRef-Proprietary"
 publish = false
 
 [workspace.dependencies]
+sim-aar = { path = "crates/sim-aar" }
 sim-ai = { path = "crates/sim-ai" }
 sim-c2 = { path = "crates/sim-c2" }
 sim-core = { path = "crates/sim-core" }
 sim-db = { path = "crates/sim-db" }
+sim-events = { path = "crates/sim-events" }
 sim-geo = { path = "crates/sim-geo" }
 sim-scenario = { path = "crates/sim-scenario" }
 sim-sensors = { path = "crates/sim-sensors" }
@@ -33,6 +37,8 @@ anyhow = "1"
 bevy_ecs = "0.20"
 clap = { version = "4", features = ["derive"] }
 libm = "0.2"
+# Lua 5.4 for scenario scripts, built from bundled source (no system Lua; works air-gapped).
+mlua = { version = "0.12", features = ["lua54", "vendored"] }
 proptest = "1"
 rand_chacha = { version = "0.9", features = ["serde"] }
 rmp-serde = "1"

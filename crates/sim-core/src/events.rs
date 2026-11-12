@@ -155,6 +155,12 @@ pub enum SimEventKind {
     HitRoll {
         weapon_id: Option<u64>,
         weapon: String,
+        /// The firing unit (none for mines). Absent before save format 16.
+        #[serde(default)]
+        shooter: Option<UnitId>,
+        /// The firing side (the minefield's side for mines). Absent before save format 16.
+        #[serde(default)]
+        side: Option<SideId>,
         target: UnitId,
         base_ph: f64,
         size_modifier: f64,
@@ -166,6 +172,39 @@ pub enum SimEventKind {
         ph: f64,
         draw: f64,
         hit: bool,
+    },
+    /// A scenario event fired (its actions follow).
+    ScenarioEventFired {
+        event: String,
+    },
+    /// A scenario event's trigger occurred but condition `condition` (0-based) did not hold.
+    ScenarioEventHeld {
+        event: String,
+        condition: u32,
+    },
+    /// Condition `condition` (0-based, a Lua script) of a triggered event could not be
+    /// evaluated; the event is held.
+    ScenarioScriptFailed {
+        event: String,
+        condition: u32,
+        reason: String,
+    },
+    /// Action `action` (0-based) of a fired event could not be carried out.
+    ScenarioActionFailed {
+        event: String,
+        action: u32,
+        reason: String,
+    },
+    /// A white-cell facilitation action (inject, message, event fired or switched).
+    Facilitated {
+        umpire: String,
+        action: crate::scenario_events::Facilitation,
+    },
+    /// A white-cell override, with who made it and why.
+    Adjudicated {
+        umpire: String,
+        reason: String,
+        action: crate::adjudication::Adjudication,
     },
     /// One transit-risk draw for a ship moving through another side's minefield.
     MineEncounter {
@@ -268,6 +307,147 @@ pub enum SimEventKind {
         side: SideId,
         number: u32,
         target: UnitId,
+    },
+    /// `side` gained contact `contact` inside its sense zone `zone` (planning layer).
+    ZoneAlert {
+        side: SideId,
+        zone: u32,
+        contact: u32,
+    },
+    /// A unit alongside facility `facility` is fully repaired; its systems are restored.
+    UnitRepaired {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// A unit alongside facility `facility` has been rearmed to its loadout.
+    UnitRearmed {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// A command post was lost with the unit carrying it.
+    CommandPostDown {
+        facility: u32,
+    },
+    /// A command post went down while jammed or with its comms knocked out.
+    CommandPostDisrupted {
+        facility: u32,
+        status: sim_c2::comms::LinkStatus,
+    },
+    /// A disrupted command post is back up.
+    CommandPostRestored {
+        facility: u32,
+    },
+    /// A unit ran out of fuel: no propulsion until refuelled.
+    FuelExhausted {
+        unit: UnitId,
+    },
+    /// A unit on a mission below bingo fuel was sent to a refuelling point.
+    DivertedForFuel {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// A unit was filled up at a refuelling point.
+    UnitRefuelled {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// A unit is waiting for a free berth at a facility.
+    WaitingForBerth {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// A unit on a mining mission laid its field.
+    MissionMinesLaid {
+        unit: UnitId,
+        field: u32,
+        mines: u32,
+    },
+    /// A mission could not be carried out (it is marked complete).
+    MissionFailed {
+        unit: UnitId,
+        reason: String,
+    },
+    /// A unit clearing mines tried to sweep one mine of a field: P = 1 − exp(−ρ·W·d).
+    MineSwept {
+        unit: UnitId,
+        field: u32,
+        distance_m: f64,
+        p: f64,
+        draw: f64,
+        swept: bool,
+    },
+    CargoLoaded {
+        unit: UnitId,
+        tonnes: f64,
+    },
+    CargoDelivered {
+        unit: UnitId,
+        tonnes: f64,
+    },
+    /// A surface unit at or above its weather limit was sent to a sheltering port.
+    ShelteringFromWeather {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// The weather eased: a sheltering unit resumes its mission.
+    WeatherEased {
+        unit: UnitId,
+    },
+    /// An action group's leader was lost or left; the first member leads now.
+    GroupLeaderChanged {
+        group: String,
+        leader: UnitId,
+    },
+    /// An action group lost its last unit.
+    GroupDissolved {
+        group: String,
+    },
+    UnitDetached {
+        unit: UnitId,
+        group: String,
+    },
+    UnitJoined {
+        unit: UnitId,
+        group: String,
+    },
+    /// A side gained a track on another side's weapon in flight.
+    WeaponDetected {
+        side: SideId,
+        weapon_id: u64,
+        by: UnitId,
+        sensor: crate::detection::SensorKind,
+    },
+    /// A unit whose mission is complete was sent to hold at a staging anchorage.
+    HoldingAtAnchorage {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// An order held while its command post was down was carried out.
+    QueuedOrderApplied {
+        seq: u64,
+    },
+    /// An order held while its command post was down could not be carried out.
+    QueuedOrderDropped {
+        seq: u64,
+        reason: String,
+    },
+    /// An engage zone's assigned shooter engaged a contact inside it (the launch or hit roll
+    /// follows).
+    ZoneEngage {
+        zone: u32,
+        unit: UnitId,
+        contact: u32,
+        weapon: String,
+    },
+    /// Another side's unit entered a choke point.
+    ChokePointTransit {
+        choke_point: String,
+        unit: UnitId,
+    },
+    /// A mission-killed unit was sent to a port for repair.
+    DivertedToPort {
+        unit: UnitId,
+        facility: u32,
     },
 }
 

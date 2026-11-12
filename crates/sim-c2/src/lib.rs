@@ -8,8 +8,11 @@
 //!   setting wins, and unset fields fall back to the defaults in [`ResolvedDoctrine::DEFAULT`].
 //! * **Release rule:** [`may_engage`] says whether doctrine allows firing at a track, given what
 //!   the side knows about the track's affiliation ([`track_affiliation`]).
+//! * **Comms links:** whether an order gets from a command post to a unit ([`comms`]).
 
 #![forbid(unsafe_code)]
+
+pub mod comms;
 
 use serde::{Deserialize, Serialize};
 use sim_sensors::Classification;

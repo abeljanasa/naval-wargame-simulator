@@ -4,7 +4,7 @@
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import type { FrameEvent, SessionInfo, Viewer } from "../lib/bindings";
+import type { FrameEvent, Seat, SessionInfo, Viewer } from "../lib/bindings";
 
 declare global {
   interface Window {
@@ -13,20 +13,134 @@ declare global {
 }
 window.__ipcCalls = [];
 
+const seats: Seat[] = [
+  { id: 0, name: "White cell", role: "white_cell" },
+  { id: 1, name: "Blue", role: "side", side: 1 },
+  { id: 2, name: "Neutral shipping", role: "side", side: 2 },
+];
+let seatId = 1;
 let viewer: Viewer = { kind: "side", side: 1 };
+const seatViewer = (s: Seat): Viewer =>
+  s.role === "white_cell" ? { kind: "white_cell" } : { kind: "side", side: s.side };
 let paused = true;
 let tick = 0;
+/** Set while "reviewing" a replay; the live tick is kept in `liveTick`. */
+let replay: { end_s: number; verified: boolean } | null = null;
+let liveTick = 0;
+const aarReport = () => ({
+  end_tick: tick,
+  sides: [
+    {
+      side: 1,
+      name: "Blue",
+      units_start: 1,
+      reinforcements: 0,
+      destroyed: 0,
+      removed: 0,
+      remaining: 1,
+      weapons_fired: 2,
+      hits: 1,
+      kills: 0,
+    },
+  ],
+  losses: [
+    {
+      tick: 40,
+      unit: 2,
+      name: "Bulk carrier Bravo",
+      side: 2,
+      side_name: "Neutral shipping",
+      platform: "GEN-MV-BULK",
+      removed: false,
+      cause: "white cell: Ruled sunk by umpire",
+      by_side: null,
+    },
+  ],
+  weapons: [],
+  detections: [],
+  timeline: [
+    { tick: 12, kind: "order" as const, side: 1, text: "Blue: routed Frigate Alpha (2 waypoints)" },
+    { tick: 40, kind: "loss" as const, side: 2, text: "Bulk carrier Bravo destroyed" },
+  ],
+});
 let refusals: string[] = [];
+const adjudications: {
+  tick: number;
+  umpire: string;
+  reason: string;
+  action: { kind: "destroy_unit"; unit: number };
+}[] = [];
 let emcon: "active" | "silent" | null = null;
+type MockMessage = {
+  tick: number;
+  from: string;
+  to: { to: "all" } | { to: "side"; side: number } | { to: "white_cell" };
+  text: string;
+  title: string | null;
+  inject: string | null;
+};
+const messages: MockMessage[] = [
+  {
+    tick: 0,
+    from: "Exercise control",
+    to: { to: "all" },
+    text: "STARTEX: proceed",
+    title: null,
+    inject: null,
+  },
+];
+const injects = [
+  {
+    inject: {
+      id: "i01-distress",
+      title: "Distress call",
+      from: "MV Ember",
+      to: "side" as const,
+      side: 1,
+      text: "Engine room fire, request assistance",
+      note: "Tests whether Blue diverts",
+    },
+    sent: 0,
+  },
+];
+const scenarioEvents = [
+  { id: "e01-startex", name: "Exercise control", enabled: true, repeatable: false, fired: 1 },
+];
 
+const zones = [
+  {
+    id: 1,
+    name: "Narrows engage zone",
+    side: 1,
+    kind: "engage" as const,
+    area: {
+      shape: "circle" as const,
+      centre: { lat_deg: -39.3, lon_deg: 146.4 },
+      radius_m: 15000,
+    },
+    doctrine: { wcs: "free" as const, emcon: null, engage_unfriendly: true },
+    choke_point: "Narrows",
+    shooters: [],
+  },
+];
+// The loaded scenario, as the real backend keeps it (get_session reports it after a load).
+let scenarioName = "E2E — mock scenario";
 const session = (): SessionInfo => ({
-  scenario_name: "E2E — mock scenario",
+  scenario_name: scenarioName,
   description: "",
   sides: [
     { id: 1, name: "Blue" },
     { id: 2, name: "Neutral shipping" },
   ],
   viewer,
+  seat: seats.find((s) => s.id === seatId) ?? { id: 0, name: "White cell", role: "white_cell" },
+  seats: [...seats],
+  locked: false,
+  controls_time: true,
+  reference_points: [{ name: "RV Alpha", position: { lat_deg: -39.2, lon_deg: 145.8 } }],
+  facilities: [],
+  zones: viewer.kind === "white_cell" ? zones : [],
+  action_groups: [],
 });
 
 const platforms = [
@@ -58,7 +172,8 @@ mockIPC(
         return null;
       case "load_scenario": {
         const parsed = JSON.parse((args as { json: string }).json) as { name: string };
-        return { ...session(), scenario_name: parsed.name };
+        scenarioName = parsed.name;
+        return session();
       }
       case "db_search": {
         const q = (args as { query: string }).query.toLowerCase();
@@ -92,15 +207,124 @@ mockIPC(
             message: "mock warning",
           },
         ];
+      case "order_adjudicate": {
+        const a = args as { reason: string; action: { kind: "destroy_unit"; unit: number } };
+        adjudications.push({ tick, umpire: "local", reason: a.reason, action: a.action });
+        return null;
+      }
+      case "order_facilitate": {
+        const a = (args as { action: { kind: string; inject?: string } }).action;
+        const s = injects.find((x) => x.inject.id === a.inject);
+        if (a.kind === "send_inject" && s) {
+          s.sent += 1;
+          messages.push({
+            tick,
+            from: s.inject.from,
+            to: { to: s.inject.to, side: s.inject.side },
+            text: s.inject.text,
+            title: s.inject.title,
+            inject: s.inject.id,
+          });
+        }
+        return null;
+      }
       case "order_engage":
         refusals = ["C1 track error 900 m exceeds the 500 m WPN-SAM-MR needs"];
         return null;
       case "order_doctrine":
         emcon = (args as { doctrine: { emcon: "active" | "silent" | null } }).doctrine.emcon;
         return null;
-      case "set_viewer":
-        viewer = (args as { viewer: Viewer }).viewer;
+      case "set_seat": {
+        const s = seats.find((x) => x.id === (args as { seat: number }).seat);
+        if (s) {
+          seatId = s.id;
+          viewer = seatViewer(s);
+        }
+        return session();
+      }
+      case "add_seat": {
+        const a = args as { name: string; side: number | null };
+        const id = Math.max(...seats.map((s) => s.id)) + 1;
+        seats.push(
+          a.side === null
+            ? { id, name: a.name, role: "white_cell" }
+            : { id, name: a.name, role: "side", side: a.side },
+        );
+        return session();
+      }
+      case "remove_seat": {
+        const i = seats.findIndex((s) => s.id === (args as { seat: number }).seat);
+        if (i >= 0) seats.splice(i, 1);
+        return session();
+      }
+      case "open_seat_window":
         return null;
+      case "order_zone_doctrine": {
+        const a = args as { zone: number; doctrine: (typeof zones)[number]["doctrine"] };
+        const z = zones.find((x) => x.id === a.zone);
+        if (z) z.doctrine = a.doctrine;
+        return session();
+      }
+      case "db_weapons":
+        return [
+          { id: "WPN-MINE-MOORED", name: "Generic moored mine", kind: "mine" },
+          { id: "WPN-SAM-MR", name: "Generic medium-range SAM", kind: "sam" },
+        ];
+      case "editor_current":
+        return {
+          format: "nws-scenario",
+          format_version: 4,
+          name: "E2E — mock scenario",
+          seed: 7,
+          duration_s: 7200,
+          sides: [
+            { id: 1, name: "Blue" },
+            { id: 2, name: "Neutral shipping" },
+          ],
+          units: [
+            {
+              id: 1,
+              name: "Frigate Alpha",
+              side: 1,
+              platform: "GEN-FFG",
+              position: { lat_deg: -39.3, lon_deg: 146.0 },
+              route: [],
+            },
+          ],
+        };
+      case "editor_check": {
+        // The mock reports one warning per side without units, as the engine would.
+        const draft = JSON.parse((args as { json: string }).json) as {
+          sides: { id: number; name: string }[];
+          units: { side: number }[];
+        };
+        const issues = draft.sides
+          .filter((x) => !draft.units.some((u) => u.side === x.id))
+          .map((x) => ({
+            severity: "warning",
+            message: `side ${x.id} (${x.name}) starts with no units`,
+          }));
+        return { issues, scenario: draft };
+      }
+      case "review_exercise":
+        liveTick = tick;
+        replay = { end_s: tick, verified: true };
+        tick = 0;
+        paused = true;
+        return null;
+      case "seek_replay":
+        tick = Math.min((args as { tick: number }).tick, replay?.end_s ?? 0);
+        return null;
+      case "close_review":
+        replay = null;
+        tick = liveTick;
+        return null;
+      case "save_record":
+        return [1, 2, 3];
+      case "get_aar":
+        return { report: aarReport(), replaying: replay !== null };
+      case "aar_csv":
+        return "time,tick,kind,side,text\n";
       default:
         return null;
     }
@@ -210,6 +434,7 @@ const frame = (): FrameEvent => {
       compression: "x1",
       achieved_ratio: paused ? 0 : 1,
       scenario_duration_s: 86400,
+      replay,
     },
     // The mock always sends full updates; diffs are covered by the backend's own tests.
     update: {
@@ -229,6 +454,15 @@ const frame = (): FrameEvent => {
       bearings,
       weapons: [],
       minefields: [],
+      adjudications,
+      messages,
+      injects: viewer.kind === "white_cell" ? injects : [],
+      scenario_events: viewer.kind === "white_cell" ? scenarioEvents : [],
+      comms: [],
+      posts: [],
+      weapon_tracks: [],
+      action_groups: [],
+      outcomes: [],
       refusals: sent,
     },
   };
@@ -236,6 +470,6 @@ const frame = (): FrameEvent => {
 
 await import("../main");
 setInterval(() => {
-  if (!paused) tick += 1;
+  if (!paused && (!replay || tick < replay.end_s)) tick += 1;
   void emit("frame-event", frame());
 }, 100);

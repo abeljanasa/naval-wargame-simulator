@@ -4,8 +4,10 @@
 //! Every tick, before weapons move:
 //! 1. Interceptor shots due this tick resolve with a `Weapons` Ph draw; a kill removes the
 //!    threat.
-//! 2. Each operational, radiating defender (unit-id order) detects enemy missiles inside its
-//!    radar horizon and R₅₀ against a 0.1 m² missile, and after the weapon's reaction time
+//! 2. Each operational defender (unit-id order) sees an enemy missile when its radiating radar
+//!    has it inside the radar horizon and R₅₀ against a 0.1 m² missile, or when it holds the
+//!    side's track on it this tick from any of its sensors (IR, EO, visual, ESM:
+//!    `weapon_tracks.rs`), and after the weapon's reaction time
 //!    engages them (threat-id order) with SAMs (area defence), guns and CIWS (self-defence only),
 //!    one shot per free fire channel. Saturation emerges: channels stay busy until intercept.
 //! 3. A ship under attack fires a matched decoy once per threat when it closes inside 10 km
@@ -87,16 +89,16 @@ pub(crate) fn point_defence_system(world: &mut World) {
 
     // Defenders: operational units with a radiating radar, in unit-id order.
     let c2 = world.resource::<C2State>().clone();
+    let planning = world.resource::<crate::planning::PlanningLayer>().clone();
     let mut defenders: Vec<Defender> = world
         .query::<(Entity, &Unit, &Position, &SensorSuite, &Health)>()
         .iter(world)
-        .filter(|(_, u, _, _, h)| {
-            h.status == Status::Operational && c2.doctrine_for(u).emcon == Emcon::Active
-        })
-        .filter_map(|(e, u, p, s, _)| {
+        .filter(|(_, _, _, s, h)| h.status == Status::Operational && !s.0.is_empty())
+        .map(|(e, u, p, s, _)| {
+            let emits = planning.doctrine_for(&c2, u, p.point).emcon == Emcon::Active;
             let radars: Vec<(f64, f64)> =
                 s.0.iter()
-                    .filter(|r| r.kind == SensorKind::Radar)
+                    .filter(|r| emits && r.kind == SensorKind::Radar)
                     .filter_map(|r| {
                         let h = sensor_height_m(r.mount_height_m, u.domain, p.altitude_m)?;
                         let r50 = detection_range_m(
@@ -108,15 +110,23 @@ pub(crate) fn point_defence_system(world: &mut World) {
                         Some((h, r50))
                     })
                     .collect();
-            (!radars.is_empty()).then_some(Defender {
+            Defender {
                 id: u.id,
                 entity: e,
                 side: u.side,
                 position: *p,
                 radars,
-            })
+            }
         })
         .collect();
+    let tracks = world
+        .resource::<crate::weapon_tracks::WeaponTracks>()
+        .clone();
+    // Action groups share their picture and deconflict their area-defence fire.
+    let groups = planning.action_groups.clone();
+    let mates = |u: UnitId| -> Vec<UnitId> {
+        crate::planning::group_of(&groups, u).map_or_else(|| vec![u], |g| g.units())
+    };
     defenders.sort_by_key(|d| d.id);
 
     for d in &defenders {
@@ -147,7 +157,8 @@ pub(crate) fn point_defence_system(world: &mut World) {
             let seen = d
                 .radars
                 .iter()
-                .any(|&(h, r50)| range <= r50.min(radar_horizon_m(h, t.altitude_m.max(0.0))));
+                .any(|&(h, r50)| range <= r50.min(radar_horizon_m(h, t.altitude_m.max(0.0))))
+                || tracks.seen_by_any(d.side, t.id, &mates(d.id), tick);
             if !seen {
                 continue;
             }
@@ -168,6 +179,22 @@ pub(crate) fn point_defence_system(world: &mut World) {
                 // Guns and CIWS defend only their own ship; SAMs defend the area.
                 if w.kind != WeaponKind::Sam && t.target != d.id {
                     continue;
+                }
+                // One area-defence shot per threat at a time across an action group.
+                if w.kind == WeaponKind::Sam {
+                    let group = mates(d.id);
+                    let pd = world.resource::<PointDefence>();
+                    let taken = pd.shots.iter().any(|s| {
+                        s.threat == t.id
+                            && s.defender != d.id
+                            && group.contains(&s.defender)
+                            && catalog
+                                .get(&s.interceptor)
+                                .is_some_and(|k| k.kind == WeaponKind::Sam)
+                    });
+                    if taken {
+                        continue;
+                    }
                 }
                 if tick.0 < first.0 + reaction_time_s(w.kind) {
                     continue;
@@ -280,7 +307,24 @@ fn resolve_shots(world: &mut World, tick: Tick, catalog: &BTreeMap<String, Weapo
             },
         );
         if killed {
-            world.resource_mut::<WeaponsInFlight>().list.remove(idx);
+            let threat = world.resource_mut::<WeaponsInFlight>().list.remove(idx);
+            let (defender, _, _) = crate::outcomes::unit_info(world, s.defender);
+            crate::outcomes::note(
+                world,
+                crate::outcomes::Note {
+                    tick,
+                    weapon: threat.weapon.clone(),
+                    result: crate::outcomes::OutcomeKind::ShotDown,
+                    position: Some(threat.position),
+                    shooter: Some(threat.shooter),
+                    shooter_side: Some(threat.side),
+                    target: Some(threat.target),
+                    reason: Some(format!(
+                        "shot down by {}",
+                        defender.unwrap_or_else(|| format!("unit {}", s.defender.0))
+                    )),
+                },
+            );
             world.resource_mut::<EventLog>().push(
                 tick,
                 SimEventKind::WeaponMissed {

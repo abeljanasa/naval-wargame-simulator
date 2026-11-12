@@ -1,5 +1,6 @@
 //! The `Simulation` facade: the only public way to drive the world.
 
+use crate::adjudication::{adjudicate, AdjudicationLog, ADJUDICATION_VIEW_LIMIT};
 use crate::ai::{ai_system, MissionState};
 use crate::c2::C2State;
 use crate::combat::{
@@ -7,7 +8,7 @@ use crate::combat::{
     WeaponCatalog, WeaponsInFlight,
 };
 use crate::command::DoctrineScope;
-use crate::command::{Command, CommandPayload, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
+use crate::command::{Command, CommandPayload, Issuer, LoggedCommand, UnitSpawn, PROTOCOL_VERSION};
 use crate::components::{Domain, Kinematics, Position, Route, Unit};
 use crate::detection::{
     default_rcs_m2, detection_system, ContactTable, EnvState, Jammer, SensorSuite, Signature,
@@ -19,9 +20,14 @@ use crate::hash::StateHash;
 use crate::ids::{SideId, UnitId};
 use crate::mines::{lay_mines, mine_system, Minefields};
 use crate::movement::movement_system;
+use crate::planning::{
+    command_authority, planning_system, Authority, Loadout, PlanningLayer, QueuedOrder,
+};
 use crate::point_defence::{point_defence_system, PointDefence};
 use crate::rng::RngStreams;
 use crate::save::{SaveGame, UnitRecord, SAVE_FORMAT_VERSION, SAVE_MAGIC};
+use crate::scenario_events::{facilitate, scenario_events_system, EventEngine, MessageLog};
+use crate::seats::Seats;
 use crate::snapshot::{ContactView, PostureView, RouteView, Snapshot, UnitView, Viewer};
 use crate::snapshot::{StoreView, WeaponView};
 use crate::time::{SimClock, Tick};
@@ -111,6 +117,8 @@ impl Simulation {
         world.insert_resource(SimClock::default());
         world.insert_resource(RngStreams::new(seed));
         world.insert_resource(EventLog::default());
+        // Display only: saved but not hashed (outcomes.rs).
+        world.insert_resource(crate::outcomes::OutcomeFeed::default());
         world.insert_resource(CommandLog::default());
         world.insert_resource(UnitIndex::default());
         world.insert_resource(ContactTable::default());
@@ -121,8 +129,14 @@ impl Simulation {
         world.insert_resource(WeaponsInFlight::default());
         world.insert_resource(PointDefence::default());
         world.insert_resource(Minefields::default());
+        world.insert_resource(AdjudicationLog::default());
+        world.insert_resource(EventEngine::default());
+        world.insert_resource(MessageLog::default());
+        world.insert_resource(Seats::default());
+        world.insert_resource(PlanningLayer::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
+        world.insert_resource(crate::weapon_tracks::WeaponTracks::default());
         Self {
             world,
             schedule: build_schedule(),
@@ -139,6 +153,16 @@ impl Simulation {
     /// (by id), so it must be set again after loading a save, or the run will not match.
     pub fn set_land_mask(&mut self, mask: Arc<LandMask>) {
         self.world.insert_resource(LandMaskRes(Some(mask)));
+    }
+
+    /// The id of the coastline in use, if any (record it to replay the run).
+    #[must_use]
+    pub fn land_mask_id(&self) -> Option<String> {
+        self.world
+            .resource::<LandMaskRes>()
+            .0
+            .as_ref()
+            .map(|m| m.id().to_owned())
     }
 
     #[must_use]
@@ -204,6 +228,24 @@ impl Simulation {
         &self.world.resource::<WeaponsInFlight>().list
     }
 
+    /// Coverage and gaps of sense zone `zone` by its side's sensors now
+    /// (`docs/models/planning-layer.md` §Coverage). A query: it changes nothing. `None`: no such
+    /// sense zone.
+    pub fn zone_coverage(&mut self, zone: u32) -> Option<crate::coverage::ZoneCoverage> {
+        crate::coverage::zone_coverage(&mut self.world, zone)
+    }
+
+    /// The side a zone belongs to, if it exists.
+    #[must_use]
+    pub fn zone_side(&self, zone: u32) -> Option<SideId> {
+        self.world
+            .resource::<PlanningLayer>()
+            .zones
+            .iter()
+            .find(|z| z.id == zone)
+            .map(|z| z.side)
+    }
+
     /// Rebuilds a run from a seed and a command log, then advances to `until`.
     pub fn replay(seed: u64, log: &[LoggedCommand], until: Tick) -> Result<Self, SimError> {
         let mut sim = Self::new(seed);
@@ -228,10 +270,12 @@ impl Simulation {
             &Magazine,
             &Health,
             &MissionState,
+            Option<&Loadout>,
+            Option<&crate::fuel::Fuel>,
         )>();
         let mut v: Vec<UnitRecord> = q
             .iter(&self.world)
-            .map(|(u, p, k, r, s, sig, j, m, hl, ms)| UnitRecord {
+            .map(|(u, p, k, r, s, sig, j, m, hl, ms, lo, fu)| UnitRecord {
                 unit: u.clone(),
                 position: *p,
                 kinematics: *k,
@@ -242,6 +286,8 @@ impl Simulation {
                 magazine: m.clone(),
                 health: Some(hl.clone()),
                 mission: ms.clone(),
+                loadout: lo.cloned(),
+                fuel: fu.copied(),
             })
             .collect();
         v.sort_by_key(|r| r.unit.id);
@@ -252,6 +298,7 @@ impl Simulation {
     pub fn snapshot(&mut self, viewer: Viewer) -> Snapshot {
         let tick = self.tick();
         let c2 = self.world.resource::<C2State>().clone();
+        let planning = self.world.resource::<PlanningLayer>().clone();
         let records = self.unit_records();
         let side_of: BTreeMap<UnitId, SideId> =
             records.iter().map(|r| (r.unit.id, r.unit.side)).collect();
@@ -267,7 +314,7 @@ impl Simulation {
                     next: r.route.next as u32,
                     waypoints: r.route.waypoints,
                 });
-                let doctrine = c2.doctrine_for(&r.unit);
+                let doctrine = planning.doctrine_for(&c2, &r.unit, r.position.point);
                 UnitView {
                     doctrine,
                     doctrine_set: r.unit.doctrine,
@@ -284,6 +331,7 @@ impl Simulation {
                     flooding: r.health.as_ref().is_some_and(|h| h.flooding),
                     mission: r.mission.mission.clone(),
                     mission_complete: r.mission.complete,
+                    fuel_fraction: r.fuel.map(|f| f.fraction()),
                     stores: r
                         .magazine
                         .0
@@ -356,6 +404,37 @@ impl Simulation {
                 })
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
+            outcomes: crate::outcomes::visible(
+                self.world.resource::<crate::outcomes::OutcomeFeed>(),
+                tick,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+            ),
+            adjudications: match viewer {
+                Viewer::WhiteCell => {
+                    let log = &self.world.resource::<AdjudicationLog>().0;
+                    log[log.len().saturating_sub(ADJUDICATION_VIEW_LIMIT)..].to_vec()
+                }
+                Viewer::Side { .. } => Vec::new(),
+            },
+            seats: self.world.resource::<Seats>().visible(match viewer {
+                Viewer::WhiteCell => None,
+                Viewer::Side { side } => Some(side),
+            }),
+            injects: match viewer {
+                Viewer::WhiteCell => self.world.resource::<EventEngine>().inject_status(),
+                Viewer::Side { .. } => Vec::new(),
+            },
+            scenario_events: match viewer {
+                Viewer::WhiteCell => self.world.resource::<EventEngine>().event_status(),
+                Viewer::Side { .. } => Vec::new(),
+            },
+            messages: self.world.resource::<MessageLog>().visible(match viewer {
+                Viewer::WhiteCell => None,
+                Viewer::Side { side } => Some(side),
+            }),
             minefields: self.world.resource::<Minefields>().visible(match viewer {
                 Viewer::WhiteCell => None,
                 Viewer::Side { side } => Some(side),
@@ -380,6 +459,43 @@ impl Simulation {
                     homing: w.homing,
                 })
                 .collect(),
+            comms: match viewer {
+                Viewer::WhiteCell => {
+                    let mut sides: Vec<SideId> = side_of.values().copied().collect();
+                    sides.sort_unstable();
+                    sides.dedup();
+                    sides
+                        .into_iter()
+                        .flat_map(|s| crate::planning::comms_views(&self.world, s))
+                        .collect()
+                }
+                Viewer::Side { side } => crate::planning::comms_views(&self.world, side),
+            },
+            action_groups: self
+                .world
+                .resource::<PlanningLayer>()
+                .action_groups
+                .iter()
+                .filter(|g| match viewer {
+                    Viewer::WhiteCell => true,
+                    Viewer::Side { side } => g.side == side,
+                })
+                .cloned()
+                .collect(),
+            weapon_tracks: crate::weapon_tracks::views(
+                &self.world,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+            ),
+            posts: crate::planning::post_views(
+                &self.world,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+            ),
             bearings: self.world.resource::<BearingTable>().views(
                 match viewer {
                     Viewer::WhiteCell => None,
@@ -468,6 +584,14 @@ impl Simulation {
                 h.u8(u8::from(s.active));
             }
             h.opt_f64(r.jammer.map(|j| j.jn_db_at_1km));
+            // Hashed only when present, so units without fuel keep their hashes.
+            if let Some(f) = &r.fuel {
+                h.f64(f.capacity_t);
+                h.f64(f.endurance_m);
+                h.f64(f.cruise_mps);
+                h.f64(f.fuel_t);
+                h.f64(f.bingo);
+            }
         }
         let catalog = self.world.resource::<WeaponCatalog>();
         h.u64(catalog.0.len() as u64);
@@ -494,6 +618,57 @@ impl Simulation {
             h.f64(w.range_left_m);
             h.u8(u8::from(w.seeker_tried) | (u8::from(w.homing) << 1));
             h.opt_f64(w.decoy_effect);
+        }
+        let adj = self.world.resource::<AdjudicationLog>();
+        h.u64(adj.0.len() as u64);
+        for a in &adj.0 {
+            h.u64(a.tick.0);
+            h.str(&a.umpire);
+            h.str(&a.reason);
+        }
+        let ev = self.world.resource::<EventEngine>();
+        h.u64(ev.events.len() as u64);
+        for (id, rt) in &ev.runtime {
+            h.str(id);
+            h.u8(u8::from(rt.enabled));
+            h.u64(u64::from(rt.fired));
+            h.u64(rt.inside.len() as u64);
+            for u in &rt.inside {
+                h.u64(*u);
+            }
+        }
+        for id in ev.reserves.keys() {
+            h.u64(id.0);
+        }
+        h.u64(ev.injects.len() as u64);
+        for (id, n) in &ev.sent {
+            h.str(id);
+            h.u64(u64::from(*n));
+        }
+        for (u, side) in &ev.sides {
+            h.u64(u.0);
+            h.u16(side.0);
+        }
+        let seats = self.world.resource::<Seats>();
+        h.u64(seats.0.len() as u64);
+        for s in seats.0.values() {
+            h.u64(u64::from(s.id));
+            h.str(&s.name);
+            match s.role {
+                crate::seats::SeatRole::WhiteCell => h.u16(u16::MAX),
+                crate::seats::SeatRole::Side { side } => h.u16(side.0),
+            }
+        }
+        self.world.resource::<PlanningLayer>().hash(&mut h);
+        self.world
+            .resource::<crate::weapon_tracks::WeaponTracks>()
+            .hash(&mut h);
+        let msgs = self.world.resource::<MessageLog>();
+        h.u64(msgs.0.len() as u64);
+        for m in &msgs.0 {
+            h.u64(m.tick.0);
+            h.str(&m.from);
+            h.str(&m.text);
         }
         let mf = self.world.resource::<Minefields>();
         h.u64(u64::from(mf.next_id));
@@ -608,6 +783,17 @@ impl Simulation {
 
     /// Captures everything needed to resume this run exactly.
     pub fn save(&mut self) -> SaveGame {
+        self.save_with(true)
+    }
+
+    /// A save without the event log: a replay keyframe. The run continues exactly from it (the
+    /// model reads only the current tick's events), but its state hash differs from the original
+    /// run's, which also counts past events.
+    pub fn keyframe(&mut self) -> SaveGame {
+        self.save_with(false)
+    }
+
+    fn save_with(&mut self, with_events: bool) -> SaveGame {
         let units = self.unit_records();
         let log = self.world.resource::<CommandLog>();
         SaveGame {
@@ -619,7 +805,11 @@ impl Simulation {
             commands: log.in_seq_order(),
             rng: self.world.resource::<RngStreams>().clone(),
             units,
-            events: self.events().to_vec(),
+            events: if with_events {
+                self.events().to_vec()
+            } else {
+                Vec::new()
+            },
             contacts: self.world.resource::<ContactTable>().records(),
             next_contact_numbers: self.world.resource::<ContactTable>().next_numbers(),
             c2: self.world.resource::<C2State>().clone(),
@@ -630,6 +820,19 @@ impl Simulation {
             weapons_in_flight: self.world.resource::<WeaponsInFlight>().clone(),
             point_defence: self.world.resource::<PointDefence>().clone(),
             minefields: self.world.resource::<Minefields>().clone(),
+            adjudications: self.world.resource::<AdjudicationLog>().clone(),
+            events_engine: self.world.resource::<EventEngine>().clone(),
+            messages: self.world.resource::<MessageLog>().clone(),
+            seats: self.world.resource::<Seats>().clone(),
+            planning: self.world.resource::<PlanningLayer>().clone(),
+            weapon_tracks: self
+                .world
+                .resource::<crate::weapon_tracks::WeaponTracks>()
+                .clone(),
+            outcomes: self
+                .world
+                .resource::<crate::outcomes::OutcomeFeed>()
+                .clone(),
         }
     }
 
@@ -663,6 +866,13 @@ impl Simulation {
         sim.world.insert_resource(save.weapons_in_flight);
         sim.world.insert_resource(save.point_defence);
         sim.world.insert_resource(save.minefields);
+        sim.world.insert_resource(save.adjudications);
+        sim.world.insert_resource(save.events_engine);
+        sim.world.insert_resource(save.messages);
+        sim.world.insert_resource(save.seats);
+        sim.world.insert_resource(save.planning);
+        sim.world.insert_resource(save.weapon_tracks);
+        sim.world.insert_resource(save.outcomes);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -679,6 +889,13 @@ impl Simulation {
             let health = r
                 .health
                 .unwrap_or_else(|| Health::new(default_damage_profile(r.unit.domain)));
+            // Saves before format 17 have no loadout: take what the unit has now.
+            let loadout = r.loadout.unwrap_or_else(|| Loadout {
+                sensors: r.sensors.0.clone(),
+                max_speed_mps: r.kinematics.max_speed_mps,
+                stores: r.magazine.0.clone(),
+            });
+            let fuel = r.fuel;
             let e = sim
                 .world
                 .spawn((
@@ -692,8 +909,12 @@ impl Simulation {
                     health,
                     r.magazine,
                     r.mission,
+                    loadout,
                 ))
                 .id();
+            if let Some(f) = fuel {
+                sim.world.entity_mut(e).insert(f);
+            }
             if index.insert(id, e).is_some() {
                 return Err(SimError::CorruptSave(format!("duplicate unit {id}")));
             }
@@ -729,8 +950,50 @@ fn hash_mission(h: &mut StateHash, m: &MissionState) {
                     h.f64(*range_m);
                 }
                 sim_ai::Mission::Strike { contact } => h.u64(u64::from(*contact)),
+                sim_ai::Mission::Support { station, radius_m }
+                | sim_ai::Mission::MineClearing {
+                    centre: station,
+                    radius_m,
+                } => {
+                    h.f64(station.lat_deg);
+                    h.f64(station.lon_deg);
+                    h.f64(*radius_m);
+                }
+                sim_ai::Mission::Mining {
+                    centre,
+                    radius_m,
+                    mines,
+                } => {
+                    h.f64(centre.lat_deg);
+                    h.f64(centre.lon_deg);
+                    h.f64(*radius_m);
+                    h.u64(u64::from(*mines));
+                }
+                sim_ai::Mission::Cargo {
+                    origin,
+                    destination,
+                    tonnes,
+                } => {
+                    h.opt_f64(origin.map(|o| o.lat_deg));
+                    h.opt_f64(origin.map(|o| o.lon_deg));
+                    h.f64(destination.lat_deg);
+                    h.f64(destination.lon_deg);
+                    h.f64(*tonnes);
+                }
+                sim_ai::Mission::BarrierPatrol { start, end } => {
+                    for p in [start, end] {
+                        h.f64(p.lat_deg);
+                        h.f64(p.lon_deg);
+                    }
+                }
+                sim_ai::Mission::Denial { choke_point } => h.str(choke_point),
             }
         }
+    }
+    // Hashed only when used, so earlier runs keep their hashes.
+    if m.phase != 0 || m.since.is_some() {
+        h.u8(m.phase);
+        h.u64(m.since.map_or(u64::MAX, |t| t.0));
     }
 }
 
@@ -748,12 +1011,15 @@ fn build_schedule() -> Schedule {
         (
             apply_commands_system,
             movement_system,
+            crate::weapon_tracks::weapon_tracks_system,
             point_defence_system,
             weapons_system,
             mine_system,
             damage_control_system,
             detection_system,
             ai_system,
+            planning_system,
+            scenario_events_system,
             advance_clock_system,
         )
             .chain(),
@@ -770,7 +1036,25 @@ fn apply_commands_system(world: &mut World) {
     let tick = world.resource::<SimClock>().tick;
     let due = world.resource::<CommandLog>().due(tick);
     for (seq, cmd) in due {
-        let kind = match apply_command(world, &cmd) {
+        let checked = world.resource::<Seats>().check(&cmd).and_then(|()| {
+            match command_authority(world, &cmd) {
+                Authority::Ok => Ok(()),
+                Authority::Refused(reason) => Err(reason),
+                // Held for the alternate command post; logged as refused for now, with why.
+                Authority::Queued { release, reason } => {
+                    world
+                        .resource_mut::<PlanningLayer>()
+                        .queued
+                        .push(QueuedOrder {
+                            release,
+                            seq,
+                            command: cmd.clone(),
+                        });
+                    Err(format!("queued: {reason}"))
+                }
+            }
+        });
+        let kind = match checked.and_then(|()| apply_command(world, &cmd)) {
             Ok(()) => SimEventKind::CommandApplied { seq },
             Err(reason) => SimEventKind::CommandRejected { seq, reason },
         };
@@ -778,7 +1062,7 @@ fn apply_commands_system(world: &mut World) {
     }
 }
 
-fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
+pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
     match &cmd.payload {
         CommandPayload::SpawnUnit(spawn) => {
             if !cmd.issuer.is_privileged() {
@@ -869,6 +1153,58 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
             let entity = authorised_entity(world, cmd, *shooter)?;
             engage(world, cmd, *shooter, *contact, weapon, *rounds, entity)
         }
+        CommandPayload::Adjudicate { reason, action } => match &cmd.issuer {
+            Issuer::WhiteCell { umpire } => adjudicate(world, umpire, reason, action),
+            _ => Err("only the white cell may adjudicate".into()),
+        },
+        CommandPayload::SetPlanning {
+            facilities,
+            zones,
+            action_groups,
+        } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set the planning layer".into());
+            }
+            let mut layer = world.resource_mut::<PlanningLayer>();
+            layer.set(facilities.clone(), zones.clone());
+            if let Some(groups) = action_groups {
+                layer.action_groups.clone_from(groups);
+            }
+            Ok(())
+        }
+        CommandPayload::AssignGroupMission { .. }
+        | CommandPayload::DetachFromGroup { .. }
+        | CommandPayload::JoinGroup { .. } => crate::planning::group_order(world, cmd),
+        CommandPayload::SetSeats { seats } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set seats".into());
+            }
+            world.insert_resource(Seats(seats.iter().map(|s| (s.id, s.clone())).collect()));
+            Ok(())
+        }
+        CommandPayload::Facilitate { action } => match &cmd.issuer {
+            Issuer::WhiteCell { umpire } => facilitate(world, umpire, action),
+            _ => Err("only the white cell may send injects or run events".into()),
+        },
+        CommandPayload::SetEvents {
+            events,
+            reserves,
+            injects,
+        } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set events".into());
+            }
+            let index = &world.resource::<UnitIndex>().0;
+            if let Some(r) = reserves.iter().find(|r| index.contains_key(&r.id)) {
+                return Err(format!("reserve {} is already in play", r.id));
+            }
+            world.resource_mut::<EventEngine>().load(
+                events.clone(),
+                reserves.clone(),
+                injects.clone(),
+            );
+            Ok(())
+        }
         CommandPayload::CreateMinefield {
             side,
             centre,
@@ -901,11 +1237,15 @@ fn apply_command(world: &mut World, cmd: &Command) -> Result<(), String> {
         }
         CommandPayload::AssignMission { unit, mission } => {
             let entity = authorised_entity(world, cmd, *unit)?;
+            // A new mission ends any diversion (repair, fuel, weather, staging).
+            world.resource_mut::<PlanningLayer>().diverted.remove(unit);
             let mut m = world
                 .get_mut::<MissionState>(entity)
                 .ok_or_else(|| format!("{unit} cannot take missions"))?;
             m.mission = mission.clone();
             m.complete = false;
+            m.phase = 0;
+            m.since = None;
             Ok(())
         }
         CommandPayload::SetEnvironment { environment } => {
@@ -1010,6 +1350,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 category: s.category.clone(),
                 group: s.group.clone(),
                 doctrine: s.doctrine,
+                draft_m: s.draft_m,
             },
             Position {
                 point: s.position,
@@ -1023,9 +1364,16 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             },
             Jammer(s.jammer),
             Magazine(s.stores.clone()),
+            Loadout {
+                sensors: s.sensors.clone(),
+                max_speed_mps: s.max_speed_mps,
+                stores: s.stores.clone(),
+            },
             MissionState {
                 mission: s.mission.clone(),
                 complete: false,
+                phase: 0,
+                since: None,
             },
             Health::new(
                 s.damage_profile
@@ -1046,6 +1394,11 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             },
         ))
         .id();
+    if let Some(f) = &s.fuel {
+        world
+            .entity_mut(entity)
+            .insert(crate::fuel::Fuel::from_spec(f));
+    }
     world.resource_mut::<UnitIndex>().0.insert(s.id, entity);
     world
         .resource_mut::<EventLog>()

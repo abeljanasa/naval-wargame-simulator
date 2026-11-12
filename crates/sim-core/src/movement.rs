@@ -10,10 +10,13 @@
 //!
 //! Land: routes are planned round the coastline when ordered (`sim_geo::land`), and a ship or
 //! submarine that would still move onto land stops instead (`LandAhead`).
-//! Not yet modelled (see `docs/backlog.md`): shallow water and draft limits, sea-state penalties, fuel.
+//! Fuel (`docs/models/fuel.md`): a unit with a fuel model burns fuel by speed after it moves; out
+//! of fuel, its ordered speed counts as zero and it coasts to a stop.
+//! Not yet modelled (see `docs/backlog.md`): shallow water and draft limits, sea-state penalties.
 
 use crate::components::{Domain, Kinematics, Position, Route, Unit};
 use crate::events::{EventLog, SimEventKind};
+use crate::fuel::{burn_t_per_s, Fuel};
 use crate::sim::LandMaskRes;
 use crate::time::{SimClock, TICK_SECONDS};
 use bevy_ecs::prelude::*;
@@ -22,22 +25,40 @@ use sim_geo::{direct, inverse};
 /// Distance below which a waypoint counts as reached, metres. This absorbs floating-point residue.
 const ARRIVAL_EPSILON_M: f64 = 1e-3;
 
+/// What the movement system reads and writes for each unit.
+type MovingUnit = (
+    Entity,
+    &'static Unit,
+    &'static mut Position,
+    &'static mut Kinematics,
+    &'static mut Route,
+    Option<&'static mut Fuel>,
+);
+
 pub(crate) fn movement_system(
     clock: Res<SimClock>,
     land: Res<LandMaskRes>,
     mut log: ResMut<EventLog>,
-    mut units: Query<(Entity, &Unit, &mut Position, &mut Kinematics, &mut Route)>,
+    mut units: Query<MovingUnit>,
 ) {
     let tick = clock.tick;
     let mut order: Vec<_> = units.iter().map(|(e, u, ..)| (u.id, e)).collect();
     order.sort_unstable();
 
     for (_, entity) in order {
-        let Ok((_, unit, mut pos, mut kin, mut route)) = units.get_mut(entity) else {
+        let Ok((_, unit, mut pos, mut kin, mut route, mut fuel)) = units.get_mut(entity) else {
             continue;
         };
         let before = (*pos, kin.heading_deg);
+        // Out of fuel: no propulsion this tick. The order is kept for when it is refuelled.
+        let dry = fuel.as_ref().is_some_and(|f| f.empty());
+        let ordered = kin.ordered_speed_mps;
+        if dry {
+            kin.ordered_speed_mps = 0.0;
+        }
+        let mut finished = false;
         step_unit(&mut pos, &mut kin, &mut route, |idx, done| {
+            finished |= done;
             #[allow(clippy::cast_possible_truncation)] // routes are far shorter than u32::MAX
             log.push(
                 tick,
@@ -60,6 +81,17 @@ pub(crate) fn movement_system(
                 kin.speed_mps = 0.0;
                 kin.ordered_speed_mps = 0.0;
                 log.push(tick, SimEventKind::LandAhead { unit: unit.id });
+            }
+        }
+        if dry && !finished {
+            kin.ordered_speed_mps = ordered;
+        }
+        if let Some(f) = fuel.as_mut() {
+            if !f.empty() {
+                f.fuel_t = (f.fuel_t - burn_t_per_s(f, kin.speed_mps) * TICK_SECONDS).max(0.0);
+                if f.empty() {
+                    log.push(tick, SimEventKind::FuelExhausted { unit: unit.id });
+                }
             }
         }
     }

@@ -448,6 +448,7 @@ pub(crate) fn detection_system(
     mut contacts: ResMut<ContactTable>,
     mut log: ResMut<EventLog>,
     c2: Res<C2State>,
+    planning: Res<crate::planning::PlanningLayer>,
     env: Res<EnvState>,
     mut bearings: ResMut<BearingTable>,
     library: Res<EmitterLibrary>,
@@ -474,7 +475,7 @@ pub(crate) fn detection_system(
             position: *p,
             sensors: s,
             rcs_m2: sig.rcs_m2,
-            emits: c2.doctrine_for(u).emcon == Emcon::Active,
+            emits: planning.doctrine_for(&c2, u, p.point).emcon == Emcon::Active,
             jammer: j.0,
             speed_mps: k.speed_mps,
             radiated_noise_db: sig

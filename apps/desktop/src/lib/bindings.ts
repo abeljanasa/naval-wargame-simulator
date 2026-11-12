@@ -8,24 +8,50 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
-	getSession: () => __TAURI_INVOKE<SessionInfo>("get_session"),
+	getSession: () => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("get_session")),
 	/**
 	 *  Loads a scenario from the JSON text of a file the user picked in the UI. The webview reads
 	 *  the file, so the app needs no filesystem permission. The text gets the same checks as any
 	 *  scenario: format and version, structure, platform resolution and command validation.
 	 */
-	loadScenario: (json: string) => typedError<SessionInfo, string>(__TAURI_INVOKE("load_scenario", { json })),
+	loadScenario: (json: string) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("load_scenario", { json })),
 	/**  Platforms whose id, name or category contains `query` (case-insensitive), sorted by id. */
 	dbSearch: (query: string) => typedError<DbPlatformRow[], string>(__TAURI_INVOKE("db_search", { query })),
 	/**  One platform record, with its sensors, RCS and provenance. */
 	dbPlatform: (id: string) => typedError<DbPlatformDetail_Serialize, string>(__TAURI_INVOKE("db_platform", { id })),
 	/**  Every validation finding on the loaded database (warnings only: errors stop it loading). */
 	dbIssues: () => typedError<DbIssue[], string>(__TAURI_INVOKE("db_issues")),
-	setPaused: (paused: boolean) => __TAURI_INVOKE<void>("set_paused", { paused }),
-	setTimeCompression: (compression: TimeCompression) => __TAURI_INVOKE<void>("set_time_compression", { compression }),
-	setViewer: (viewer: Viewer) => __TAURI_INVOKE<void>("set_viewer", { viewer }),
-	/**  Advances a paused simulation by `ticks` (single-step for the umpire). */
-	stepTicks: (ticks: number) => __TAURI_INVOKE<void>("step_ticks", { ticks }),
+	/**
+	 *  Every record of `kind` (`platform`, `sensor` or `weapon`) in the sources, with this
+	 *  session's edits.
+	 */
+	dbSourceRecords: (kind: string) => typedError<DbSourceRow[], string>(__TAURI_INVOKE("db_source_records", { kind })),
+	/**  The authored JSON of a record, from the sources with this session's edits. */
+	dbRecordSource: (kind: string, id: string) => typedError<DbRecordSource, string>(__TAURI_INVOKE("db_record_source", { kind, id })),
+	/**  Checks an edited record against the whole database (live, while the user types). */
+	dbCheckRecord: (kind: string, id: string, text: string) => __TAURI_INVOKE<DbCheck_Serialize>("db_check_record", { kind, id, text }),
+	/**
+	 *  Keeps an edited record for this session and returns its whole source file, to save. Refused
+	 *  while the edit does not load or has errors.
+	 */
+	dbApplyRecord: (kind: string, id: string, text: string) => typedError<DbSourceFile, string>(__TAURI_INVOKE("db_apply_record", { kind, id, text })),
+	/**  Runs or pauses the clock (white-cell windows only). */
+	setPaused: (paused: boolean) => typedError<null, string>(__TAURI_INVOKE("set_paused", { paused })),
+	/**  Sets time compression (white-cell windows only). */
+	setTimeCompression: (compression: TimeCompression) => typedError<null, string>(__TAURI_INVOKE("set_time_compression", { compression })),
+	/**  Moves the main window to another seat (seat windows are locked). */
+	setSeat: (seat: number) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("set_seat", { seat })),
+	/**  Adds a seat for `side`, or a white-cell seat when `side` is null (white-cell windows only). */
+	addSeat: (name: string, side: SideId | null) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("add_seat", { name, side })),
+	/**  Removes a seat and closes its windows (white-cell windows only). */
+	removeSeat: (seat: number) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("remove_seat", { seat })),
+	/**
+	 *  Opens a window locked to `seat` (white-cell windows only). Async: on Windows, creating a
+	 *  window from a synchronous command deadlocks.
+	 */
+	openSeatWindow: (seat: number) => typedError<null, string>(__TAURI_INVOKE("open_seat_window", { seat })),
+	/**  Advances a paused simulation by `ticks` (single-step for the umpire; white-cell windows only). */
+	stepTicks: (ticks: number) => typedError<null, string>(__TAURI_INVOKE("step_ticks", { ticks })),
 	orderRoute: (unit: UnitId, waypoints: GeoPoint[]) => typedError<null, string>(__TAURI_INVOKE("order_route", { unit, waypoints })),
 	orderSpeed: (unit: UnitId, speedMps: number | null) => typedError<null, string>(__TAURI_INVOKE("order_speed", { unit, speedMps })),
 	/**  Sets doctrine (WCS, EMCON, ROE) on one unit; unset fields inherit from its group and side. */
@@ -33,7 +59,55 @@ export const commands = {
 	/**  Fires `rounds` of `weapon` from `shooter` at the seat's contact `contact`. */
 	orderEngage: (shooter: UnitId, contact: number, weapon: string, rounds: number) => typedError<null, string>(__TAURI_INVOKE("order_engage", { shooter, contact, weapon, rounds })),
 	/**  Gives a unit a mission (patrol, ferry, escort, strike), or clears it with `null`. */
-	orderMission: (unit: UnitId, mission: Mission | null) => typedError<null, string>(__TAURI_INVOKE("order_mission", { unit, mission })),
+	orderMission: (unit: UnitId, mission: Mission_Deserialize | null) => typedError<null, string>(__TAURI_INVOKE("order_mission", { unit, mission })),
+	/**  A white-cell adjudication override with its reason (white-cell seat only). */
+	orderAdjudicate: (reason: string, action: Adjudication_Deserialize) => typedError<null, string>(__TAURI_INVOKE("order_adjudicate", { reason, action })),
+	/**
+	 *  A white-cell facilitation action: inject, message, fire or switch an event (white-cell seat
+	 *  only).
+	 */
+	orderFacilitate: (action: Facilitation) => typedError<null, string>(__TAURI_INVOKE("order_facilitate", { action })),
+	/**  Changes one zone's doctrine (white cell only): a per-zone ROE/WCS override. */
+	orderZoneDoctrine: (zone: number, doctrine: Doctrine_Deserialize) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_zone_doctrine", { zone, doctrine })),
+	/**
+	 *  Coverage and gaps of a sense zone by its side's sensors now (the window's own side's zones;
+	 *  any zone for the white cell).
+	 */
+	zoneCoverage: (zone: number) => typedError<ZoneCoverage | null, string>(__TAURI_INVOKE("zone_coverage", { zone })),
+	/**  Gives an action group its mission (run by its leader); `None` clears it. */
+	orderGroupMission: (group: string, mission: Mission_Deserialize | null) => typedError<null, string>(__TAURI_INVOKE("order_group_mission", { group, mission })),
+	/**  White cell: replaces the planning layer's facilities and zones in play. */
+	orderPlanning: (facilities: Facility_Deserialize[], zones: Zone_Deserialize[]) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_planning", { facilities, zones })),
+	/**  Takes a unit out of its action group. */
+	orderDetach: (unit: UnitId) => typedError<null, string>(__TAURI_INVOKE("order_detach", { unit })),
+	/**  Puts a unit into an action group at a station on its leader. */
+	orderJoin: (unit: UnitId, group: string, bearingDeg: number | null, rangeM: number | null) => typedError<null, string>(__TAURI_INVOKE("order_join", { unit, group, bearingDeg, rangeM })),
+	/**  Every weapon type, sorted by id. */
+	dbWeapons: () => typedError<DbWeaponRow[], string>(__TAURI_INVOKE("db_weapons")),
+	/**
+	 *  Checks a draft scenario for the editor: every error and warning at once
+	 *  (`docs/models/scenario-editor.md`).
+	 */
+	editorCheck: (json: string) => typedError<EditorCheck_Serialize, string>(__TAURI_INVOKE("editor_check", { json })),
+	/**  The scenario now loaded, for the editor to start from. */
+	editorCurrent: () => __TAURI_INVOKE<Scenario_Serialize>("editor_current"),
+	/**  Reviews the live exercise so far as a replay (control station and white-cell seats). */
+	reviewExercise: () => typedError<null, string>(__TAURI_INVOKE("review_exercise")),
+	/**  Leaves the replay and shows the live exercise again. */
+	closeReview: () => typedError<null, string>(__TAURI_INVOKE("close_review")),
+	/**  Moves the replay scrubber to `tick`. */
+	seekReplay: (tick: Tick) => typedError<null, string>(__TAURI_INVOKE("seek_replay", { tick })),
+	/**  The exercise record (replay under review, or the live run so far) for the UI to save. */
+	saveRecord: () => typedError<number[], string>(__TAURI_INVOKE("save_record")),
+	/**
+	 *  Opens an exercise record the user picked (the webview reads the file): its scenario replaces
+	 *  the session and the record is replayed for review.
+	 */
+	openRecord: (bytes: number[]) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("open_record", { bytes })),
+	/**  The after-action review tables. */
+	getAar: () => typedError<AarView_Serialize, string>(__TAURI_INVOKE("get_aar")),
+	/**  One AAR table as CSV text, for the UI to save. */
+	aarCsv: (table: AarTable) => typedError<string, string>(__TAURI_INVOKE("aar_csv", { table })),
 };
 
 /** Events */
@@ -42,6 +116,182 @@ export const events = {
 };
 
 /* Types */
+/**  The after-action review of one run. */
+export type AarReport = AarReport_Serialize | AarReport_Deserialize;
+
+/**  The after-action review of one run. */
+export type AarReport_Deserialize = {
+	/**  The tick the logs run to. */
+	end_tick: Tick,
+	sides: SideSummary[],
+	losses: LossRow_Deserialize[],
+	weapons: WeaponRow[],
+	detections: DetectionRow_Deserialize[],
+	timeline: TimelineEntry_Deserialize[],
+};
+
+/**  The after-action review of one run. */
+export type AarReport_Serialize = {
+	/**  The tick the logs run to. */
+	end_tick: Tick,
+	sides: SideSummary[],
+	losses: LossRow_Serialize[],
+	weapons: WeaponRow[],
+	detections: DetectionRow_Serialize[],
+	timeline: TimelineEntry_Serialize[],
+};
+
+/**  The tables of an [`AarReport`]. */
+export type AarTable = "sides" | "losses" | "weapons" | "detections" | "timeline";
+
+/**
+ *  The after-action review for one window: the whole report, with the timeline cut to what the
+ *  window's seat may see.
+ */
+export type AarView = AarView_Serialize | AarView_Deserialize;
+
+/**
+ *  The after-action review for one window: the whole report, with the timeline cut to what the
+ *  window's seat may see.
+ */
+export type AarView_Deserialize = {
+	report: AarReport_Deserialize,
+	/**  Built from a replay (else from the live run so far). */
+	replaying: boolean,
+};
+
+/**
+ *  The after-action review for one window: the whole report, with the timeline cut to what the
+ *  window's seat may see.
+ */
+export type AarView_Serialize = {
+	report: AarReport_Serialize,
+	/**  Built from a replay (else from the live run so far). */
+	replaying: boolean,
+};
+
+/**
+ *  A surface action group (`docs/models/planning-layer.md` §Surface action groups): the leader
+ *  runs the group's one mission, the members keep station on it, and the group shares its air
+ *  defence picture and deconflicts its area-defence fire.
+ */
+export type ActionGroup = ActionGroup_Serialize | ActionGroup_Deserialize;
+
+/**
+ *  A surface action group (`docs/models/planning-layer.md` §Surface action groups): the leader
+ *  runs the group's one mission, the members keep station on it, and the group shares its air
+ *  defence picture and deconflicts its area-defence fire.
+ */
+export type ActionGroup_Deserialize = {
+	name: string,
+	side: SideId,
+	leader: UnitId,
+	members: GroupStation[],
+	/**  Group doctrine for the leader and members (they are put in a group of this name). */
+	doctrine?: Doctrine_Deserialize,
+	/**  The group's one mission, run by the leader (and handed to a successor). */
+	mission?: Mission_Deserialize | null,
+};
+
+/**
+ *  A surface action group (`docs/models/planning-layer.md` §Surface action groups): the leader
+ *  runs the group's one mission, the members keep station on it, and the group shares its air
+ *  defence picture and deconflicts its area-defence fire.
+ */
+export type ActionGroup_Serialize = {
+	name: string,
+	side: SideId,
+	leader: UnitId,
+	members: GroupStation[],
+	/**  Group doctrine for the leader and members (they are put in a group of this name). */
+	doctrine?: Doctrine_Serialize,
+	/**  The group's one mission, run by the leader (and handed to a successor). */
+	mission?: Mission_Serialize,
+};
+
+/**  One override. */
+export type Adjudication = Adjudication_Serialize | Adjudication_Deserialize;
+
+/**  An override as recorded. */
+export type AdjudicationRecord = AdjudicationRecord_Serialize | AdjudicationRecord_Deserialize;
+
+/**  An override as recorded. */
+export type AdjudicationRecord_Deserialize = {
+	tick: Tick,
+	umpire: string,
+	reason: string,
+	action: Adjudication_Deserialize,
+};
+
+/**  An override as recorded. */
+export type AdjudicationRecord_Serialize = {
+	tick: Tick,
+	umpire: string,
+	reason: string,
+	action: Adjudication_Serialize,
+};
+
+/**  One override. */
+export type Adjudication_Deserialize = 
+/**
+ *  Resolve a weapon in flight now: a hit does its full damage with no Ph roll; a miss
+ *  removes it.
+ */
+{ kind: "force_weapon_outcome"; weapon_id: number; hit: boolean } | 
+/**
+ *  Set a unit's damage, in damage points. `clear_effects` also puts out fires, stops
+ *  flooding and clears critical-hit flags (a repair).
+ */
+{ kind: "set_damage"; unit: UnitId; damage_dp: number | null; clear_effects: boolean } | 
+/**  Sink or shoot down a unit (logged as destroyed). */
+{ kind: "destroy_unit"; unit: UnitId } | 
+/**  Take a unit out of the exercise without it counting as destroyed. */
+{ kind: "remove_unit"; unit: UnitId } | 
+/**  Place a unit somewhere else; its route is cleared. */
+{ kind: "move_unit"; unit: UnitId; position: GeoPoint; altitude_m?: number | null } | 
+/**  Set the rounds of one weapon a unit carries (0 removes it). */
+{ kind: "set_stores"; unit: UnitId; weapon: string; count: number };
+
+/**  One override. */
+export type Adjudication_Serialize = 
+/**
+ *  Resolve a weapon in flight now: a hit does its full damage with no Ph roll; a miss
+ *  removes it.
+ */
+{ kind: "force_weapon_outcome"; weapon_id: number; hit: boolean } | 
+/**
+ *  Set a unit's damage, in damage points. `clear_effects` also puts out fires, stops
+ *  flooding and clears critical-hit flags (a repair).
+ */
+{ kind: "set_damage"; unit: UnitId; damage_dp: number | null; clear_effects: boolean } | 
+/**  Sink or shoot down a unit (logged as destroyed). */
+{ kind: "destroy_unit"; unit: UnitId } | 
+/**  Take a unit out of the exercise without it counting as destroyed. */
+{ kind: "remove_unit"; unit: UnitId } | 
+/**  Place a unit somewhere else; its route is cleared. */
+{ kind: "move_unit"; unit: UnitId; position: GeoPoint; altitude_m: number | null } | 
+/**  Set the rounds of one weapon a unit carries (0 removes it). */
+{ kind: "set_stores"; unit: UnitId; weapon: string; count: number };
+
+/**  A region of the sea. */
+export type Area = 
+/**  Within `radius_m` (geodesic) of `centre`. */
+{ shape: "circle"; centre: GeoPoint; radius_m: number | null } | 
+/**
+ *  Inside the polygon, whose edges are straight lines in latitude and longitude. It must not
+ *  cross the antimeridian.
+ */
+{ shape: "polygon"; points: GeoPoint[] };
+
+/**  Who receives a message. */
+export type Audience = 
+/**  Every side (and the white cell). */
+{ to: "all" } | 
+/**  One side (and the white cell). */
+{ to: "side"; side: number } | 
+/**  The white cell only. */
+{ to: "white_cell" };
+
 /**  A measured bearing from an observer. */
 export type BearingLine = {
 	from: GeoPoint,
@@ -76,7 +326,10 @@ export type Classification =
 "identified";
 
 /**  Clock status sent with every frame. */
-export type ClockStatus = {
+export type ClockStatus = ClockStatus_Serialize | ClockStatus_Deserialize;
+
+/**  Clock status sent with every frame. */
+export type ClockStatus_Deserialize = {
 	tick: Tick,
 	game_time_s: number | null,
 	paused: boolean,
@@ -84,7 +337,91 @@ export type ClockStatus = {
 	/**  Game seconds per wall second actually achieved over the last frame. */
 	achieved_ratio: number | null,
 	scenario_duration_s: number | null,
+	/**  Set while the session is reviewing a replay instead of running live. */
+	replay?: ReplayClock | null,
 };
+
+/**  Clock status sent with every frame. */
+export type ClockStatus_Serialize = {
+	tick: Tick,
+	game_time_s: number | null,
+	paused: boolean,
+	compression: TimeCompression,
+	/**  Game seconds per wall second actually achieved over the last frame. */
+	achieved_ratio: number | null,
+	scenario_duration_s: number | null,
+	/**  Set while the session is reviewing a replay instead of running live. */
+	replay: ReplayClock | null,
+};
+
+/**  Comparison for counts. */
+export type Cmp = "lt" | "le" | "eq" | "ge" | "gt";
+
+/**  A unit's comms as its side sees them. */
+export type CommsView = CommsView_Serialize | CommsView_Deserialize;
+
+/**  A unit's comms as its side sees them. */
+export type CommsView_Deserialize = {
+	unit: UnitId,
+	status: LinkStatus,
+	/**  The post whose link reaches the unit (or that was tried last). */
+	post?: number | null,
+	/**  The relay the link goes through, if not direct. */
+	via?: UnitId | null,
+};
+
+/**  A unit's comms as its side sees them. */
+export type CommsView_Serialize = {
+	unit: UnitId,
+	status: LinkStatus,
+	/**  The post whose link reaches the unit (or that was tried last). */
+	post: number | null,
+	/**  The relay the link goes through, if not direct. */
+	via: UnitId | null,
+};
+
+/**  Something that must be true for a triggered event to fire. */
+export type Condition = Condition_Serialize | Condition_Deserialize;
+
+/**  Something that must be true for a triggered event to fire. */
+export type Condition_Deserialize = 
+/**  The event has fired at least once. */
+{ type: "event_fired"; event: string } | 
+/**  The event has not fired. */
+{ type: "event_not_fired"; event: string } | { type: "unit_alive"; unit: number } | 
+/**  The unit has been destroyed or removed (or never existed). */
+{ type: "unit_gone"; unit: number } | 
+/**  The number of `side`'s units still in play, compared with `count`. */
+{ type: "units_alive"; side: number; cmp: Cmp; count: number } | 
+/**  Game time is within the window (either end may be left open). */
+{ type: "time_between"; from_s?: number | null; to_s?: number | null } | 
+/**
+ *  Holds with probability `p` (one draw from the `Events` stream, taken only when this
+ *  condition is reached).
+ */
+{ type: "probability"; p: number | null } | 
+/**  A Lua script that returns `true` or `false` (`docs/models/lua-scripting.md`). */
+{ type: "lua"; script: string };
+
+/**  Something that must be true for a triggered event to fire. */
+export type Condition_Serialize = 
+/**  The event has fired at least once. */
+{ type: "event_fired"; event: string } | 
+/**  The event has not fired. */
+{ type: "event_not_fired"; event: string } | { type: "unit_alive"; unit: number } | 
+/**  The unit has been destroyed or removed (or never existed). */
+{ type: "unit_gone"; unit: number } | 
+/**  The number of `side`'s units still in play, compared with `count`. */
+{ type: "units_alive"; side: number; cmp: Cmp; count: number } | 
+/**  Game time is within the window (either end may be left open). */
+{ type: "time_between"; from_s: number | null; to_s: number | null } | 
+/**
+ *  Holds with probability `p` (one draw from the `Events` stream, taken only when this
+ *  condition is reached).
+ */
+{ type: "probability"; p: number | null } | 
+/**  A Lua script that returns `true` or `false` (`docs/models/lua-scripting.md`). */
+{ type: "lua"; script: string };
 
 /**
  *  One entry in a side's perceived picture. It deliberately carries no target unit id, so a
@@ -150,6 +487,31 @@ export type ContactView_Serialize = {
 	sensor_id: string,
 };
 
+/**  One sampled cell. */
+export type CoverageCell = {
+	centre: GeoPoint,
+	covered: boolean,
+};
+
+/**  The result of checking an edited record against the whole database. */
+export type DbCheck = DbCheck_Serialize | DbCheck_Deserialize;
+
+/**  The result of checking an edited record against the whole database. */
+export type DbCheck_Deserialize = {
+	/**  Why the edited sources do not load (bad JSON, an unknown field, a wrong type), if so. */
+	error?: string | null,
+	/**  Every error, and the warnings on the edited record. */
+	issues: DbIssue[],
+};
+
+/**  The result of checking an edited record against the whole database. */
+export type DbCheck_Serialize = {
+	/**  Why the edited sources do not load (bad JSON, an unknown field, a wrong type), if so. */
+	error: string | null,
+	/**  Every error, and the warnings on the edited record. */
+	issues: DbIssue[],
+};
+
 /**  A validation finding on the platform database. */
 export type DbIssue = {
 	/**  `error` or `warning`. */
@@ -198,6 +560,13 @@ export type DbPlatformRow = {
 	max_speed_mps: number | null,
 };
 
+/**  A platform record as authored in its JSON source file. */
+export type DbRecordSource = {
+	/**  Source file, e.g. `platforms/surface-combatants.json`. */
+	file: string,
+	text: string,
+};
+
 /**  A fitted sensor as shown in the browser. */
 export type DbSensorRow = {
 	sensor_id: string,
@@ -206,8 +575,63 @@ export type DbSensorRow = {
 	max_range_m: number | null,
 };
 
+/**  A whole source file, to save. */
+export type DbSourceFile = {
+	name: string,
+	text: string,
+};
+
+/**  A record in the sources: id and name. */
+export type DbSourceRow = {
+	id: string,
+	name: string,
+};
+
+/**  A weapon type in the platform database (for the scenario editor's pickers). */
+export type DbWeaponRow = {
+	id: string,
+	name: string,
+	kind: string,
+};
+
+/**  One contact held by one side. */
+export type DetectionRow = DetectionRow_Serialize | DetectionRow_Deserialize;
+
+/**  One contact held by one side. */
+export type DetectionRow_Deserialize = {
+	side: SideId,
+	side_name: string,
+	contact: number,
+	target: UnitId,
+	target_name: string,
+	target_side?: SideId | null,
+	gained: Tick,
+	/**  `None`: still held at the end. */
+	lost?: Tick | null,
+	/**  Seconds held (to the end of the record if never lost). */
+	held_s: number | null,
+};
+
+/**  One contact held by one side. */
+export type DetectionRow_Serialize = {
+	side: SideId,
+	side_name: string,
+	contact: number,
+	target: UnitId,
+	target_name: string,
+	target_side: SideId | null,
+	gained: Tick,
+	/**  `None`: still held at the end. */
+	lost: Tick | null,
+	/**  Seconds held (to the end of the record if never lost). */
+	held_s: number | null,
+};
+
 /**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
 export type Doctrine = Doctrine_Serialize | Doctrine_Deserialize;
+
+/**  Where a doctrine action applies (the same JSON as `sim-core`'s `DoctrineScope`). */
+export type DoctrineTarget = { level: "side"; side: number } | { level: "group"; side: number; group: string } | { level: "unit"; unit: number };
 
 /**  Doctrine set at one level (side, group or unit). `None` inherits from the level above. */
 export type Doctrine_Deserialize = {
@@ -227,6 +651,25 @@ export type Doctrine_Serialize = {
 
 /**  Broad physical domain of a unit. */
 export type Domain = "surface" | "subsurface" | "air" | "land";
+
+/**  The scenario editor's check of a draft. */
+export type EditorCheck = EditorCheck_Serialize | EditorCheck_Deserialize;
+
+/**  The scenario editor's check of a draft. */
+export type EditorCheck_Deserialize = {
+	/**  Errors first, then warnings. Errors block saving and playing. */
+	issues: ScenarioIssue[],
+	/**  The draft as the engine reads it (absent when it is not a scenario at all). */
+	scenario?: Scenario_Deserialize | null,
+};
+
+/**  The scenario editor's check of a draft. */
+export type EditorCheck_Serialize = {
+	/**  Errors first, then warnings. Errors block saving and playing. */
+	issues: ScenarioIssue[],
+	/**  The draft as the engine reads it (absent when it is not a scenario at all). */
+	scenario: Scenario_Serialize | null,
+};
 
 /**
  *  Emission control for active sensors. Phase 2 slice 2 has two states; graded states (for
@@ -273,20 +716,218 @@ export type ErrorEllipse = {
 	orientation_deg: number | null,
 };
 
+/**  What a fired event does. */
+export type EventAction = EventAction_Serialize | EventAction_Deserialize;
+
+/**  What a fired event does. */
+export type EventAction_Deserialize = 
+/**  Sends a message to the audience's message log. */
+{
+	type: "message",
+} & {
+	text: string,
+} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Deserialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Deserialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission?: Mission_Deserialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+/**  Brings a reserve unit (declared in the scenario, held off the board) into play. */
+({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+/**  Turns an event on or off. */
+({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+/**  Delivers an inject from the scenario's library. */
+({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+/**  A Lua script whose `sim.*` requests become actions (`docs/models/lua-scripting.md`). */
+({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never };
+
+/**  What a fired event does. */
+export type EventAction_Serialize = 
+/**  Sends a message to the audience's message log. */
+{
+	type: "message",
+} & {
+	text: string,
+} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Serialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Serialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission: Mission_Serialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+/**  Brings a reserve unit (declared in the scenario, held off the board) into play. */
+({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+/**  Turns an event on or off. */
+({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+/**  Delivers an inject from the scenario's library. */
+({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+/**  A Lua script whose `sim.*` requests become actions (`docs/models/lua-scripting.md`). */
+({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never };
+
+/**  An event as the white cell sees it. */
+export type EventStatus = {
+	id: string,
+	name: string,
+	enabled: boolean,
+	repeatable: boolean,
+	fired: number,
+};
+
+/**  A white-cell facilitation action: running the exercise, as opposed to overriding outcomes. */
+export type Facilitation = 
+/**  Sends an inject from the library now. */
+({ kind: "send_inject"; inject: string }) & { enabled?: never; event?: never } | 
+/**  Sends a free-text message from exercise control. */
+{
+	kind: "send_message",
+} & {
+	text: string,
+} & Audience | 
+/**
+ *  Fires an event now: its actions run regardless of its trigger, conditions and whether it
+ *  is enabled or spent. It counts as fired.
+ */
+({ kind: "fire_event"; event: string }) & { enabled?: never; inject?: never } | 
+/**  Turns an event on or off. */
+({ kind: "set_event_enabled"; event: string; enabled: boolean }) & { inject?: never };
+
+/**  A planning-layer facility. */
+export type Facility = Facility_Serialize | Facility_Deserialize;
+
+/**  What a facility is. */
+export type FacilityKind = "command_post" | "refuelling_point" | "sheltering_port" | "anchorage";
+
+/**  A planning-layer facility. */
+export type Facility_Deserialize = {
+	id: number,
+	name: string,
+	side: SideId,
+	kind: FacilityKind,
+	/**
+	 *  Where it is (for a command post carried by a unit: where it starts; it then moves with
+	 *  the unit).
+	 */
+	position: GeoPoint,
+	/**  Units within this distance are alongside (ports, anchorages) or at the post. */
+	radius_m: number | null,
+	/**  Command posts: orders reach subordinates within this range (default: `radius_m`). */
+	range_m?: number | null,
+	/**  Units served at once (in unit-id order); 0 = no limit. */
+	berths?: number,
+	services?: Services_Deserialize,
+	/**
+	 *  Command posts: the unit carrying the post (a flagship, an aircraft, a land unit). The
+	 *  post is down once the unit is lost.
+	 */
+	unit?: UnitId | null,
+	/**  Command posts: the units it commands; empty = every unit of its side. */
+	subordinates?: UnitId[],
+	/**  Command posts: the post that takes over this post's subordinates when it is down. */
+	alternate?: number | null,
+	/**  Command posts: seconds from going down to the alternate taking over. */
+	handover_s?: number | null,
+	/**  Command posts: orders issued in the gap are lost or queued. */
+	orders_in_gap?: GapPolicy,
+	/**
+	 *  Command posts: the link is VHF/UHF only, so limited by the radio horizon. Default: beyond
+	 *  line of sight (HF or satellite).
+	 */
+	line_of_sight?: boolean,
+	/**  Command posts ashore: antenna height, m (default 30). */
+	antenna_m?: number | null,
+	/**  Command posts: the link's anti-jam margin, dB (default 10). */
+	anti_jam_db?: number | null,
+	/**  Command posts: units of its side that relay its traffic when the direct link fails. */
+	relays?: UnitId[],
+	/**  Refuelling: tonnes per hour transferred to one unit (default 300). */
+	transfer_t_per_h?: number | null,
+	/**  Refuelling: tonnes held at the start; `None` = unlimited (a depot ashore). */
+	fuel_t?: number | null,
+	/**
+	 *  The facility's water (ports, anchorages, fixed points): a polygon or circle used instead of
+	 *  `radius_m` round `position`, which stays the point units steer for.
+	 */
+	area?: Area | null,
+	/**  Depth of water, metres: units whose draft plus 1 m clearance exceeds it cannot use it. */
+	depth_m?: number | null,
+	/**  Holding limit: above this sea state units do not stay or come here. */
+	max_sea_state?: number | null,
+	/**  Anchorages: AI-run units whose mission is complete hold here until tasked again. */
+	staging?: boolean,
+};
+
+/**  A planning-layer facility. */
+export type Facility_Serialize = {
+	id: number,
+	name: string,
+	side: SideId,
+	kind: FacilityKind,
+	/**
+	 *  Where it is (for a command post carried by a unit: where it starts; it then moves with
+	 *  the unit).
+	 */
+	position: GeoPoint,
+	/**  Units within this distance are alongside (ports, anchorages) or at the post. */
+	radius_m: number | null,
+	/**  Command posts: orders reach subordinates within this range (default: `radius_m`). */
+	range_m: number | null,
+	/**  Units served at once (in unit-id order); 0 = no limit. */
+	berths: number,
+	services: Services_Serialize,
+	/**
+	 *  Command posts: the unit carrying the post (a flagship, an aircraft, a land unit). The
+	 *  post is down once the unit is lost.
+	 */
+	unit: UnitId | null,
+	/**  Command posts: the units it commands; empty = every unit of its side. */
+	subordinates: UnitId[],
+	/**  Command posts: the post that takes over this post's subordinates when it is down. */
+	alternate: number | null,
+	/**  Command posts: seconds from going down to the alternate taking over. */
+	handover_s: number | null,
+	/**  Command posts: orders issued in the gap are lost or queued. */
+	orders_in_gap: GapPolicy,
+	/**
+	 *  Command posts: the link is VHF/UHF only, so limited by the radio horizon. Default: beyond
+	 *  line of sight (HF or satellite).
+	 */
+	line_of_sight: boolean,
+	/**  Command posts ashore: antenna height, m (default 30). */
+	antenna_m: number | null,
+	/**  Command posts: the link's anti-jam margin, dB (default 10). */
+	anti_jam_db: number | null,
+	/**  Command posts: units of its side that relay its traffic when the direct link fails. */
+	relays: UnitId[],
+	/**  Refuelling: tonnes per hour transferred to one unit (default 300). */
+	transfer_t_per_h: number | null,
+	/**  Refuelling: tonnes held at the start; `None` = unlimited (a depot ashore). */
+	fuel_t: number | null,
+	/**
+	 *  The facility's water (ports, anchorages, fixed points): a polygon or circle used instead of
+	 *  `radius_m` round `position`, which stays the point units steer for.
+	 */
+	area: Area | null,
+	/**  Depth of water, metres: units whose draft plus 1 m clearance exceeds it cannot use it. */
+	depth_m: number | null,
+	/**  Holding limit: above this sea state units do not stay or come here. */
+	max_sea_state: number | null,
+	/**  Anchorages: AI-run units whose mission is complete hold here until tasked again. */
+	staging: boolean,
+};
+
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent = FrameEvent_Serialize | FrameEvent_Deserialize;
 
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent_Deserialize = {
-	clock: ClockStatus,
+	clock: ClockStatus_Deserialize,
 	update: SnapshotUpdate_Deserialize,
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */
 export type FrameEvent_Serialize = {
-	clock: ClockStatus,
+	clock: ClockStatus_Serialize,
 	update: SnapshotUpdate_Serialize,
 };
+
+/**
+ *  What happens to a player's order issued while a command post is down and its alternate has
+ *  not yet taken over.
+ */
+export type GapPolicy = 
+/**  Refused. */
+"lose" | 
+/**  Held, and carried out when the alternate takes over (if the unit is then in its range). */
+"queue";
 
 /**
  *  A point on the WGS-84 ellipsoid, in decimal degrees.
@@ -296,6 +937,160 @@ export type FrameEvent_Serialize = {
 export type GeoPoint = {
 	lat_deg: number | null,
 	lon_deg: number | null,
+};
+
+/**  A named group (task group, formation) of one side, with its doctrine. */
+export type GroupDef = GroupDef_Serialize | GroupDef_Deserialize;
+
+/**  A named group (task group, formation) of one side, with its doctrine. */
+export type GroupDef_Deserialize = {
+	side: SideId,
+	name: string,
+	doctrine?: Doctrine_Deserialize,
+};
+
+/**  A named group (task group, formation) of one side, with its doctrine. */
+export type GroupDef_Serialize = {
+	side: SideId,
+	name: string,
+	doctrine: Doctrine_Serialize,
+};
+
+/**  One member's station in a surface action group. */
+export type GroupStation = {
+	unit: UnitId,
+	/**  Relative to the leader's heading, degrees. */
+	bearing_deg: number | null,
+	range_m: number | null,
+};
+
+/**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */
+export type Inject = Inject_Serialize | Inject_Deserialize;
+
+/**  An inject as the white cell sees it. */
+export type InjectStatus = InjectStatus_Serialize | InjectStatus_Deserialize;
+
+/**  An inject as the white cell sees it. */
+export type InjectStatus_Deserialize = {
+	inject: Inject_Deserialize,
+	sent: number,
+};
+
+/**  An inject as the white cell sees it. */
+export type InjectStatus_Serialize = {
+	inject: Inject_Serialize,
+	sent: number,
+};
+
+/**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */
+export type Inject_Deserialize = {
+	/**  Unique id, referred to by `send_inject` actions. */
+	id: string,
+	/**  Short heading shown with the message. */
+	title: string,
+	/**
+	 *  Who the message appears to come from (role-play), e.g. `MV Ember`. Empty: the event's
+	 *  name, or `Exercise control` when the white cell sends it.
+	 */
+	from?: string,
+	text: string,
+	/**  Guidance for the white cell (when to use it, expected response). Never sent to sides. */
+	note?: string,
+} & Audience;
+
+/**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */
+export type Inject_Serialize = {
+	/**  Unique id, referred to by `send_inject` actions. */
+	id: string,
+	/**  Short heading shown with the message. */
+	title: string,
+	/**
+	 *  Who the message appears to come from (role-play), e.g. `MV Ember`. Empty: the event's
+	 *  name, or `Exercise control` when the white cell sends it.
+	 */
+	from: string,
+	text: string,
+	/**  Guidance for the white cell (when to use it, expected response). Never sent to sides. */
+	note: string,
+} & Audience;
+
+/**  A noise jammer carried by a unit. */
+export type JammerSpec = {
+	/**  Jamming-to-noise ratio it produces in a victim radar's main beam at 1 km, dB. */
+	jn_db_at_1km: number | null,
+};
+
+/**  The state of a unit's link to its command post, or of a hop. */
+export type LinkStatus = "up" | "out_of_range" | "beyond_horizon" | "jammed" | 
+/**  Too deep to receive. */
+"submerged" | 
+/**  Comms knocked out by a critical hit (at either end). */
+"knocked_out" | 
+/**  No command post commands the unit, or every one is down. */
+"no_post";
+
+/**  One unit lost. */
+export type LossRow = LossRow_Serialize | LossRow_Deserialize;
+
+/**  One unit lost. */
+export type LossRow_Deserialize = {
+	tick: Tick,
+	unit: UnitId,
+	name: string,
+	side: SideId,
+	side_name: string,
+	platform?: string | null,
+	/**  Removed by the white cell rather than destroyed. */
+	removed: boolean,
+	/**  What did it: the weapon and who fired it, or the white cell's reason. */
+	cause: string,
+	/**  The side credited with the kill, if any. */
+	by_side?: SideId | null,
+};
+
+/**  One unit lost. */
+export type LossRow_Serialize = {
+	tick: Tick,
+	unit: UnitId,
+	name: string,
+	side: SideId,
+	side_name: string,
+	platform: string | null,
+	/**  Removed by the white cell rather than destroyed. */
+	removed: boolean,
+	/**  What did it: the weapon and who fired it, or the white cell's reason. */
+	cause: string,
+	/**  The side credited with the kill, if any. */
+	by_side: SideId | null,
+};
+
+/**  A message delivered to a message log. */
+export type Message = Message_Serialize | Message_Deserialize;
+
+/**  A message delivered to a message log. */
+export type Message_Deserialize = {
+	tick: Tick,
+	/**  The inject's sender, the event's name (or id), or `Exercise control` for the white cell. */
+	from: string,
+	to: Audience,
+	text: string,
+	/**  The inject's title, when the message is an inject. */
+	title?: string | null,
+	/**  The inject's id, when the message is an inject. */
+	inject?: string | null,
+};
+
+/**  A message delivered to a message log. */
+export type Message_Serialize = {
+	tick: Tick,
+	/**  The inject's sender, the event's name (or id), or `Exercise control` for the white cell. */
+	from: string,
+	to: Audience,
+	text: string,
+	/**  The inject's title, when the message is an inject. */
+	title: string | null,
+	/**  The inject's id, when the message is an inject. */
+	inject: string | null,
 };
 
 /**  A circular minefield. */
@@ -311,7 +1106,10 @@ export type Minefield = {
 };
 
 /**  What a unit has been told to do. */
-export type Mission = 
+export type Mission = Mission_Serialize | Mission_Deserialize;
+
+/**  What a unit has been told to do. */
+export type Mission_Deserialize = 
 /**  Steam between random points in a circular area. */
 { kind: "patrol"; centre: GeoPoint; radius_m: number | null } | 
 /**  Go to a point, then the mission is complete. */
@@ -319,12 +1117,186 @@ export type Mission =
 /**  Keep station on another unit: `bearing_deg` relative to its heading, at `range_m`. */
 { kind: "escort"; escorted: number; bearing_deg: number | null; range_m: number | null } | 
 /**  Close and attack one of the side's contacts. */
-{ kind: "strike"; contact: number };
+{ kind: "strike"; contact: number } | 
+/**
+ *  Hold a station (within `radius_m` of it), engaging nothing on its own: an oiler, a
+ *  picket, an ESM or relay station.
+ */
+{ kind: "support"; station: GeoPoint; radius_m: number | null } | 
+/**  Go to `centre` and lay `mines` (or all it carries, if fewer) in a circle of `radius_m`. */
+{ kind: "mining"; centre: GeoPoint; radius_m: number | null; mines: number } | 
+/**
+ *  Sweep the area at 8 kn: it removes mines of other sides' fields it passes through, at a
+ *  tenth of a normal ship's risk. It never completes on its own: the side cannot know the
+ *  area is clear.
+ */
+{ kind: "mine_clearing"; centre: GeoPoint; radius_m: number | null } | 
+/**
+ *  Carry `tonnes` to `destination` (loading first at `origin`, if given): 30 minutes to load
+ *  and to unload, then complete.
+ */
+{ kind: "cargo"; origin?: GeoPoint | null; destination: GeoPoint; tonnes: number | null } | 
+/**  Steam back and forth between two points across a passage. */
+{ kind: "barrier_patrol"; start: GeoPoint; end: GeoPoint } | 
+/**
+ *  Patrol inside the side's zones of a choke point and engage only contacts believed inside
+ *  them.
+ */
+{ kind: "denial"; choke_point: string };
+
+/**  What a unit has been told to do. */
+export type Mission_Serialize = 
+/**  Steam between random points in a circular area. */
+{ kind: "patrol"; centre: GeoPoint; radius_m: number | null } | 
+/**  Go to a point, then the mission is complete. */
+{ kind: "ferry"; destination: GeoPoint } | 
+/**  Keep station on another unit: `bearing_deg` relative to its heading, at `range_m`. */
+{ kind: "escort"; escorted: number; bearing_deg: number | null; range_m: number | null } | 
+/**  Close and attack one of the side's contacts. */
+{ kind: "strike"; contact: number } | 
+/**
+ *  Hold a station (within `radius_m` of it), engaging nothing on its own: an oiler, a
+ *  picket, an ESM or relay station.
+ */
+{ kind: "support"; station: GeoPoint; radius_m: number | null } | 
+/**  Go to `centre` and lay `mines` (or all it carries, if fewer) in a circle of `radius_m`. */
+{ kind: "mining"; centre: GeoPoint; radius_m: number | null; mines: number } | 
+/**
+ *  Sweep the area at 8 kn: it removes mines of other sides' fields it passes through, at a
+ *  tenth of a normal ship's risk. It never completes on its own: the side cannot know the
+ *  area is clear.
+ */
+{ kind: "mine_clearing"; centre: GeoPoint; radius_m: number | null } | 
+/**
+ *  Carry `tonnes` to `destination` (loading first at `origin`, if given): 30 minutes to load
+ *  and to unload, then complete.
+ */
+{ kind: "cargo"; origin: GeoPoint | null; destination: GeoPoint; tonnes: number | null } | 
+/**  Steam back and forth between two points across a passage. */
+{ kind: "barrier_patrol"; start: GeoPoint; end: GeoPoint } | 
+/**
+ *  Patrol inside the side's zones of a choke point and engage only contacts believed inside
+ *  them.
+ */
+{ kind: "denial"; choke_point: string };
+
+/**
+ *  One weapon outcome. Names are as they were when it happened (a destroyed unit leaves the
+ *  world). The picture blanks what a side's viewer may not know.
+ */
+export type Outcome = Outcome_Serialize | Outcome_Deserialize;
+
+export type OutcomeKind = "hit" | "miss" | 
+/**  Killed in flight by point defence. */
+"shot_down";
+
+/**
+ *  One weapon outcome. Names are as they were when it happened (a destroyed unit leaves the
+ *  world). The picture blanks what a side's viewer may not know.
+ */
+export type Outcome_Deserialize = {
+	tick: Tick,
+	/**  Weapon type, e.g. `WPN-ASM-SUB`. */
+	weapon: string,
+	result: OutcomeKind,
+	/**  Where it happened: the target for a hit, the weapon for a miss or a kill in flight. */
+	position: GeoPoint,
+	shooter?: UnitId | null,
+	shooter_name?: string | null,
+	/**  The firing side (a minefield's side for a mine). */
+	shooter_side?: SideId | null,
+	target?: UnitId | null,
+	target_name?: string | null,
+	target_side?: SideId | null,
+	/**  Why it missed, or who shot it down. */
+	reason?: string | null,
+};
+
+/**
+ *  One weapon outcome. Names are as they were when it happened (a destroyed unit leaves the
+ *  world). The picture blanks what a side's viewer may not know.
+ */
+export type Outcome_Serialize = {
+	tick: Tick,
+	/**  Weapon type, e.g. `WPN-ASM-SUB`. */
+	weapon: string,
+	result: OutcomeKind,
+	/**  Where it happened: the target for a hit, the weapon for a miss or a kill in flight. */
+	position: GeoPoint,
+	shooter: UnitId | null,
+	shooter_name: string | null,
+	/**  The firing side (a minefield's side for a mine). */
+	shooter_side: SideId | null,
+	target: UnitId | null,
+	target_name: string | null,
+	target_side: SideId | null,
+	/**  Why it missed, or who shot it down. */
+	reason: string | null,
+};
+
+/**  A command post's state. */
+export type PostView = PostView_Serialize | PostView_Deserialize;
+
+/**  A command post's state. */
+export type PostView_Deserialize = {
+	facility: number,
+	up: boolean,
+	/**  Why it is down: jammed, comms knocked out, or (lost with its unit) `no_post`. */
+	status: LinkStatus,
+	/**  Game time it went down. */
+	since_s?: number | null,
+};
+
+/**  A command post's state. */
+export type PostView_Serialize = {
+	facility: number,
+	up: boolean,
+	/**  Why it is down: jammed, comms knocked out, or (lost with its unit) `no_post`. */
+	status: LinkStatus,
+	/**  Game time it went down. */
+	since_s: number | null,
+};
 
 /**  How one side regards another. */
 export type Posture = "friendly" | 
 /**  The default between sides that have not set a posture. */
 "neutral" | "unfriendly" | "hostile";
+
+/**
+ *  A named point on the map (a rendezvous, a waypoint name, a briefing mark). It has no effect
+ *  on the simulation; the desktop shows it to the sides that may see it.
+ */
+export type ReferencePoint = ReferencePoint_Serialize | ReferencePoint_Deserialize;
+
+/**
+ *  A named point on the map (a rendezvous, a waypoint name, a briefing mark). It has no effect
+ *  on the simulation; the desktop shows it to the sides that may see it.
+ */
+export type ReferencePoint_Deserialize = {
+	name: string,
+	position: GeoPoint,
+	/**  Shown to this side only (and the white cell); `None`: every side. */
+	side?: SideId | null,
+};
+
+/**
+ *  A named point on the map (a rendezvous, a waypoint name, a briefing mark). It has no effect
+ *  on the simulation; the desktop shows it to the sides that may see it.
+ */
+export type ReferencePoint_Serialize = {
+	name: string,
+	position: GeoPoint,
+	/**  Shown to this side only (and the white cell); `None`: every side. */
+	side?: SideId,
+};
+
+/**  The replay being reviewed. */
+export type ReplayClock = {
+	/**  Where the record ends (the scrubber's range is 0 to this). */
+	end_s: number | null,
+	/**  The rebuilt run reached the recorded final state exactly. */
+	verified: boolean,
+};
 
 /**  Doctrine with every field decided. */
 export type ResolvedDoctrine = ResolvedDoctrine_Serialize | ResolvedDoctrine_Deserialize;
@@ -348,11 +1320,313 @@ export type RouteView = {
 	next: number,
 };
 
-export type SessionInfo = {
+export type Scenario = Scenario_Serialize | Scenario_Deserialize;
+
+/**  A scenario event. */
+export type ScenarioEvent = ScenarioEvent_Serialize | ScenarioEvent_Deserialize;
+
+/**  A scenario event. */
+export type ScenarioEvent_Deserialize = {
+	/**  Unique id, referred to by conditions and actions. Events are checked in id order. */
+	id: string,
+	/**  For the white cell and the logs. */
+	name?: string,
+	/**  A disabled event is not checked until an action or the white cell enables it. */
+	enabled?: boolean,
+	/**  Fire every time the trigger occurs, rather than once. */
+	repeatable?: boolean,
+	trigger: Trigger_Deserialize,
+	conditions?: Condition_Deserialize[],
+	actions: EventAction_Deserialize[],
+};
+
+/**  A scenario event. */
+export type ScenarioEvent_Serialize = {
+	/**  Unique id, referred to by conditions and actions. Events are checked in id order. */
+	id: string,
+	/**  For the white cell and the logs. */
+	name: string,
+	/**  A disabled event is not checked until an action or the white cell enables it. */
+	enabled: boolean,
+	/**  Fire every time the trigger occurs, rather than once. */
+	repeatable: boolean,
+	trigger: Trigger_Serialize,
+	conditions: Condition_Serialize[],
+	actions: EventAction_Serialize[],
+};
+
+/**  One problem found by [`Scenario::check`]. */
+export type ScenarioIssue = {
+	severity: Severity,
+	message: string,
+};
+
+/**  A minefield laid before the scenario starts. */
+export type ScenarioMinefield = {
+	side: SideId,
+	centre: GeoPoint,
+	radius_m: number | null,
+	mines: number,
+	/**  Mine type (platform database weapon id). */
+	weapon: string,
+};
+
+/**  A unit as written in a scenario file. */
+export type ScenarioUnit = ScenarioUnit_Serialize | ScenarioUnit_Deserialize;
+
+/**  A unit as written in a scenario file. */
+export type ScenarioUnit_Deserialize = {
+	id: UnitId,
+	name: string,
+	side: SideId,
+	/**  Platform database class. When given, it supplies everything below that is left out. */
+	platform?: string | null,
+	domain?: Domain | null,
+	position: GeoPoint,
+	altitude_m?: number | null,
+	heading_deg?: number | null,
+	/**  Initial (and ordered) speed. Defaults to the platform's cruise speed, or 0. */
+	speed_mps?: number | null,
+	max_speed_mps?: number | null,
+	accel_mps2?: number | null,
+	route?: GeoPoint[],
+	/**  Group within the side (declared in `groups`). */
+	group?: string | null,
+	/**  Doctrine set on this unit; unset fields inherit from its group and side. */
+	doctrine?: Doctrine_Deserialize,
+	/**
+	 *  A noise jammer (radiates while the unit's EMCON is active). Until the database carries
+	 *  ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+	 */
+	jammer?: JammerSpec | null,
+	/**  Mission at start. */
+	mission?: Mission_Deserialize | null,
+	/**  Held off the board until an event's `spawn_reserve` action brings it in. */
+	reserve?: boolean,
+	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
+	fuel_level?: number | null,
+};
+
+/**  A unit as written in a scenario file. */
+export type ScenarioUnit_Serialize = {
+	id: UnitId,
+	name: string,
+	side: SideId,
+	/**  Platform database class. When given, it supplies everything below that is left out. */
+	platform?: string,
+	domain?: Domain,
+	position: GeoPoint,
+	altitude_m: number | null,
+	heading_deg: number | null,
+	/**  Initial (and ordered) speed. Defaults to the platform's cruise speed, or 0. */
+	speed_mps?: number | null,
+	max_speed_mps?: number | null,
+	accel_mps2?: number | null,
+	route: GeoPoint[],
+	/**  Group within the side (declared in `groups`). */
+	group?: string,
+	/**  Doctrine set on this unit; unset fields inherit from its group and side. */
+	doctrine?: Doctrine_Serialize,
+	/**
+	 *  A noise jammer (radiates while the unit's EMCON is active). Until the database carries
+	 *  ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+	 */
+	jammer?: JammerSpec,
+	/**  Mission at start. */
+	mission?: Mission_Serialize,
+	/**  Held off the board until an event's `spawn_reserve` action brings it in. */
+	reserve?: boolean,
+	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
+	fuel_level?: number | null,
+};
+
+export type Scenario_Deserialize = {
+	format: string,
+	format_version: number,
+	name: string,
+	description?: string,
+	/**  Default RNG seed. Batch runs override it per replication. */
+	seed: number | null,
+	/**  Default run length in game seconds. */
+	duration_s: number | null,
+	sides: SideDef_Deserialize[],
+	groups?: GroupDef_Deserialize[],
+	/**  Minefields at the start. */
+	minefields?: ScenarioMinefield[],
+	/**  Sea state and weather loss for the whole scenario (default: calm, clear). */
+	environment?: Environment_Deserialize,
+	units: ScenarioUnit_Deserialize[],
+	/**  Scenario events, checked every tick (`docs/models/events.md`). */
+	events?: ScenarioEvent_Deserialize[],
+	/**  The inject library: prepared messages sent by events or by the white cell. */
+	injects?: Inject_Deserialize[],
+	/**
+	 *  Player positions. Empty: one white-cell seat and one seat per side
+	 *  (`Scenario::seats_or_default`).
+	 */
+	seats?: Seat[],
+	/**  Named map points for planning and briefing (format 4). */
+	reference_points?: ReferencePoint_Deserialize[],
+	/**  Planning layer: command posts, refuelling points, sheltering ports, anchorages (format 5). */
+	facilities?: Facility_Deserialize[],
+	/**  Planning layer: sense and engage zones, e.g. at choke points (format 5). */
+	zones?: Zone_Deserialize[],
+	/**  Surface action groups: members keep station on the leader (format 5). */
+	action_groups?: ActionGroup_Deserialize[],
+	/**  The fuel model for ships and submarines (format 6; `docs/models/fuel.md`). */
+	fuel?: boolean,
+};
+
+export type Scenario_Serialize = {
+	format: string,
+	format_version: number,
+	name: string,
+	description: string,
+	/**  Default RNG seed. Batch runs override it per replication. */
+	seed: number | null,
+	/**  Default run length in game seconds. */
+	duration_s: number | null,
+	sides: SideDef_Serialize[],
+	groups?: GroupDef_Serialize[],
+	/**  Minefields at the start. */
+	minefields?: ScenarioMinefield[],
+	/**  Sea state and weather loss for the whole scenario (default: calm, clear). */
+	environment?: Environment_Serialize,
+	units: ScenarioUnit_Serialize[],
+	/**  Scenario events, checked every tick (`docs/models/events.md`). */
+	events?: ScenarioEvent_Serialize[],
+	/**  The inject library: prepared messages sent by events or by the white cell. */
+	injects?: Inject_Serialize[],
+	/**
+	 *  Player positions. Empty: one white-cell seat and one seat per side
+	 *  (`Scenario::seats_or_default`).
+	 */
+	seats?: Seat[],
+	/**  Named map points for planning and briefing (format 4). */
+	reference_points?: ReferencePoint_Serialize[],
+	/**  Planning layer: command posts, refuelling points, sheltering ports, anchorages (format 5). */
+	facilities?: Facility_Serialize[],
+	/**  Planning layer: sense and engage zones, e.g. at choke points (format 5). */
+	zones?: Zone_Serialize[],
+	/**  Surface action groups: members keep station on the leader (format 5). */
+	action_groups?: ActionGroup_Serialize[],
+	/**  The fuel model for ships and submarines (format 6; `docs/models/fuel.md`). */
+	fuel?: boolean,
+};
+
+/**  A player position. */
+export type Seat = {
+	id: number,
+	/**  Unique. A white-cell seat's name is the umpire id on its overrides and injects. */
+	name: string,
+} & SeatRole;
+
+/**  What a seat may do. */
+export type SeatRole = 
+/**  Ground truth, every side, overrides, injects and time. */
+{ role: "white_cell" } | 
+/**  One side's picture and units. */
+{ role: "side"; side: SideId };
+
+/**  Sensor kinds, matching the platform database `sensors.kind` values. */
+export type SensorKind = "radar" | "sonar_hull" | "sonar_towed" | "sonar_dipping" | "sonobuoy" | "esm" | "ir" | "eo" | "visual" | "mad";
+
+/**  What a facility does for units of its side stopped within its radius. */
+export type Services = Services_Serialize | Services_Deserialize;
+
+/**  What a facility does for units of its side stopped within its radius. */
+export type Services_Deserialize = {
+	/**  Puts out fires, stops flooding and removes damage; a full repair restores systems. */
+	repair?: boolean,
+	/**  Restores the unit's weapons to its loadout after [`REARM_TICKS`] alongside. */
+	rearm?: boolean,
+	/**  Refuels ships and submarines that carry a fuel model (`docs/models/fuel.md`). */
+	refuel?: boolean,
+};
+
+/**  What a facility does for units of its side stopped within its radius. */
+export type Services_Serialize = {
+	/**  Puts out fires, stops flooding and removes damage; a full repair restores systems. */
+	repair: boolean,
+	/**  Restores the unit's weapons to its loadout after [`REARM_TICKS`] alongside. */
+	rearm: boolean,
+	/**  Refuels ships and submarines that carry a fuel model (`docs/models/fuel.md`). */
+	refuel: boolean,
+};
+
+export type SessionInfo = SessionInfo_Serialize | SessionInfo_Deserialize;
+
+export type SessionInfo_Deserialize = {
 	scenario_name: string,
 	description: string,
 	sides: SideInfo[],
 	viewer: Viewer,
+	/**  This window's seat. */
+	seat: Seat,
+	/**  Every seat (for the seat picker and seat management). */
+	seats: Seat[],
+	/**  This window is locked to its seat (a seat window). */
+	locked: boolean,
+	/**  This window may run the clock and manage seats. */
+	controls_time: boolean,
+	/**  The scenario's reference points this window's seat may see. */
+	reference_points: ReferencePoint_Deserialize[],
+	/**  Planning-layer facilities this window's seat may see (its side's; all for the white cell). */
+	facilities: Facility_Deserialize[],
+	/**  Planning-layer zones this window's seat may see. */
+	zones: Zone_Deserialize[],
+	/**  Surface action groups this window's seat may see. */
+	action_groups: ActionGroup_Deserialize[],
+};
+
+export type SessionInfo_Serialize = {
+	scenario_name: string,
+	description: string,
+	sides: SideInfo[],
+	viewer: Viewer,
+	/**  This window's seat. */
+	seat: Seat,
+	/**  Every seat (for the seat picker and seat management). */
+	seats: Seat[],
+	/**  This window is locked to its seat (a seat window). */
+	locked: boolean,
+	/**  This window may run the clock and manage seats. */
+	controls_time: boolean,
+	/**  The scenario's reference points this window's seat may see. */
+	reference_points: ReferencePoint_Serialize[],
+	/**  Planning-layer facilities this window's seat may see (its side's; all for the white cell). */
+	facilities: Facility_Serialize[],
+	/**  Planning-layer zones this window's seat may see. */
+	zones: Zone_Serialize[],
+	/**  Surface action groups this window's seat may see. */
+	action_groups: ActionGroup_Serialize[],
+};
+
+/**  How serious a scenario problem is. */
+export type Severity = 
+/**  The scenario cannot be saved or played. */
+"error" | 
+/**  Allowed, but probably a mistake. */
+"warning";
+
+export type SideDef = SideDef_Serialize | SideDef_Deserialize;
+
+export type SideDef_Deserialize = {
+	id: SideId,
+	name: string,
+	/**  How this side regards the others. Sides not listed are neutral. */
+	postures?: SidePosture[],
+	/**  Side-wide doctrine; groups and units inherit unset fields from it. */
+	doctrine?: Doctrine_Deserialize,
+};
+
+export type SideDef_Serialize = {
+	id: SideId,
+	name: string,
+	/**  How this side regards the others. Sides not listed are neutral. */
+	postures?: SidePosture[],
+	/**  Side-wide doctrine; groups and units inherit unset fields from it. */
+	doctrine?: Doctrine_Serialize,
 };
 
 /**  Side (faction) identifier. */
@@ -361,6 +1635,30 @@ export type SideId = number;
 export type SideInfo = {
 	id: SideId,
 	name: string,
+};
+
+export type SidePosture = {
+	toward: SideId,
+	posture: Posture,
+};
+
+/**  One side's totals. */
+export type SideSummary = {
+	side: SideId,
+	name: string,
+	/**  Units on the board at tick 0. */
+	units_start: number,
+	/**  Units that came in later (reserves, white-cell spawns). */
+	reinforcements: number,
+	destroyed: number,
+	/**  Taken out of the exercise by the white cell (not counted as destroyed). */
+	removed: number,
+	remaining: number,
+	/**  Strike weapons fired (missiles, torpedoes, guns, mines struck). */
+	weapons_fired: number,
+	hits: number,
+	/**  Enemy units destroyed with this side's weapons. */
+	kills: number,
 };
 
 /**
@@ -391,6 +1689,24 @@ export type SnapshotUpdate_Deserialize = {
 	refusals: string[],
 	/**  The viewer's minefields (own side; every field for the white cell). */
 	minefields: Minefield[],
+	/**  White cell only: the most recent overrides (sent whole). */
+	adjudications: AdjudicationRecord_Deserialize[],
+	/**  The seat's message log, latest 100 (sent whole). */
+	messages: Message_Deserialize[],
+	/**  White cell only: the inject library with send counts. */
+	injects: InjectStatus_Deserialize[],
+	/**  White cell only: every scenario event's state. */
+	scenario_events: EventStatus[],
+	/**  The comms link of each of the viewer's units (when its side has command posts). */
+	comms: CommsView_Deserialize[],
+	/**  The viewer's command posts and whether each is up. */
+	posts: PostView_Deserialize[],
+	/**  The viewer's tracks on other sides' missiles and torpedoes. */
+	weapon_tracks: WeaponTrackView[],
+	/**  The viewer's surface action groups. */
+	action_groups: ActionGroup_Deserialize[],
+	/**  Weapon outcomes of the last minute this seat may know (hit, miss, shot down). */
+	outcomes: Outcome_Deserialize[],
 };
 
 /**
@@ -415,6 +1731,24 @@ export type SnapshotUpdate_Serialize = {
 	refusals: string[],
 	/**  The viewer's minefields (own side; every field for the white cell). */
 	minefields: Minefield[],
+	/**  White cell only: the most recent overrides (sent whole). */
+	adjudications: AdjudicationRecord_Serialize[],
+	/**  The seat's message log, latest 100 (sent whole). */
+	messages: Message_Serialize[],
+	/**  White cell only: the inject library with send counts. */
+	injects: InjectStatus_Serialize[],
+	/**  White cell only: every scenario event's state. */
+	scenario_events: EventStatus[],
+	/**  The comms link of each of the viewer's units (when its side has command posts). */
+	comms: CommsView_Serialize[],
+	/**  The viewer's command posts and whether each is up. */
+	posts: PostView_Serialize[],
+	/**  The viewer's tracks on other sides' missiles and torpedoes. */
+	weapon_tracks: WeaponTrackView[],
+	/**  The viewer's surface action groups. */
+	action_groups: ActionGroup_Serialize[],
+	/**  Weapon outcomes of the last minute this seat may know (hit, miss, shot down). */
+	outcomes: Outcome_Serialize[],
 };
 
 /**  What a unit can still do. */
@@ -443,6 +1777,65 @@ export type Tick = number;
 export type TimeCompression = "x1" | "x2" | "x5" | "x15" | "x30" | "x60" | 
 /**  As fast as the machine allows. */
 "max";
+
+/**  One line of the exercise timeline. */
+export type TimelineEntry = TimelineEntry_Serialize | TimelineEntry_Deserialize;
+
+/**  One line of the exercise timeline. */
+export type TimelineEntry_Deserialize = {
+	tick: Tick,
+	kind: TimelineKind,
+	/**  The side it concerns (`None`: exercise control). */
+	side?: SideId | null,
+	text: string,
+};
+
+/**  One line of the exercise timeline. */
+export type TimelineEntry_Serialize = {
+	tick: Tick,
+	kind: TimelineKind,
+	/**  The side it concerns (`None`: exercise control). */
+	side: SideId | null,
+	text: string,
+};
+
+/**  What a timeline entry is about. */
+export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | "override" | "facilitation" | "event" | "script_error";
+
+/**  What makes an event check its conditions. */
+export type Trigger = Trigger_Serialize | Trigger_Deserialize;
+
+/**  What makes an event check its conditions. */
+export type Trigger_Deserialize = 
+/**  Once, on the tick when game time reaches `at_s`. */
+{ type: "time"; at_s: number | null } | 
+/**  At `start_s`, then every `period_s` after it. */
+{ type: "every"; period_s: number | null; start_s?: number | null } | 
+/**
+ *  A unit (of `side`, or the given `unit`, or any) comes into the area. A unit already
+ *  inside when the events are loaded counts as entering on the first check.
+ */
+{ type: "area_entered"; area: Area; side?: number | null; unit?: number | null } | 
+/**  A unit (of `side`, or the given `unit`, or any) is destroyed. */
+{ type: "unit_destroyed"; side?: number | null; unit?: number | null } | 
+/**  `side` gains a new track (on a unit of `target_side`, or any). */
+{ type: "contact_gained"; side: number; target_side?: number | null };
+
+/**  What makes an event check its conditions. */
+export type Trigger_Serialize = 
+/**  Once, on the tick when game time reaches `at_s`. */
+{ type: "time"; at_s: number | null } | 
+/**  At `start_s`, then every `period_s` after it. */
+{ type: "every"; period_s: number | null; start_s: number | null } | 
+/**
+ *  A unit (of `side`, or the given `unit`, or any) comes into the area. A unit already
+ *  inside when the events are loaded counts as entering on the first check.
+ */
+{ type: "area_entered"; area: Area; side: number | null; unit: number | null } | 
+/**  A unit (of `side`, or the given `unit`, or any) is destroyed. */
+{ type: "unit_destroyed"; side: number | null; unit: number | null } | 
+/**  `side` gains a new track (on a unit of `target_side`, or any). */
+{ type: "contact_gained"; side: number; target_side: number | null };
 
 /**
  *  Stable unit identifier assigned by the scenario. It never depends on ECS entity
@@ -480,8 +1873,10 @@ export type UnitView_Deserialize = {
 	flooding: boolean,
 	/**  Rounds carried, by weapon id (sorted). */
 	stores: StoreView[],
-	mission?: Mission | null,
+	mission?: Mission_Deserialize | null,
 	mission_complete: boolean,
+	/**  Fraction of fuel left, for units with a fuel model. */
+	fuel_fraction?: number | null,
 };
 
 export type UnitView_Serialize = {
@@ -512,8 +1907,10 @@ export type UnitView_Serialize = {
 	flooding: boolean,
 	/**  Rounds carried, by weapon id (sorted). */
 	stores: StoreView[],
-	mission: Mission | null,
+	mission: Mission_Serialize | null,
 	mission_complete: boolean,
+	/**  Fraction of fuel left, for units with a fuel model. */
+	fuel_fraction: number | null,
 };
 
 /**  Whose picture a snapshot shows. */
@@ -555,6 +1952,35 @@ export type Wcs_Serialize =
 /**  Fire at any track not identified as friendly or neutral. */
 "free";
 
+/**  Weapons expended against effective, for one weapon type of one side. */
+export type WeaponRow = {
+	side: SideId,
+	side_name: string,
+	weapon: string,
+	/**  Fired in defence (an interceptor at an incoming weapon) rather than at a unit. */
+	defensive: boolean,
+	fired: number,
+	/**  Hit rolls won (for interceptors: threats killed). */
+	hits: number,
+	/**  Hit rolls lost, or no hit for another reason (lost track, seeker, fuel, adjudicated). */
+	missed: number,
+	/**  Shot down by the target side's point defence. */
+	intercepted: number,
+	/**  Units destroyed with this as the last weapon to hit them. */
+	kills: number,
+};
+
+/**  A side's view of one weapon it tracks. */
+export type WeaponTrackView = {
+	side: SideId,
+	weapon_id: number,
+	position: GeoPoint,
+	/**  `air` (a missile) or `subsurface` (a torpedo). */
+	domain: Domain,
+	sensor: SensorKind,
+	first_seen_s: number | null,
+};
+
 /**  A missile or torpedo in flight, as shown to its own side (and the white cell). */
 export type WeaponView = {
 	id: number,
@@ -565,6 +1991,77 @@ export type WeaponView = {
 	heading_deg: number | null,
 	/**  The seeker has acquired its target. */
 	homing: boolean,
+};
+
+/**  A sense or engage zone of one side. */
+export type Zone = Zone_Serialize | Zone_Deserialize;
+
+/**  A sense zone's coverage by its side's sensors, now. */
+export type ZoneCoverage = {
+	zone: number,
+	/**  The sensor types counted (the zone's list, or every type). */
+	sensors: SensorKind[],
+	/**  Cells inside the zone, row by row from the south-west. */
+	cells: CoverageCell[],
+	/**  Half a cell's height and width, degrees (to draw the cells). */
+	half_lat_deg: number | null,
+	half_lon_deg: number | null,
+	/**  Covered cells over cells inside the zone (0 when it has none). */
+	fraction: number | null,
+};
+
+/**  What a zone governs. */
+export type ZoneKind = 
+/**  Own units inside take the zone's doctrine; contacts gained inside raise an alert. */
+"sense" | 
+/**  Targets inside are engaged under the zone's weapons control and ROE. */
+"engage";
+
+/**  A zone's layer in a choke point's defence: sense far out, engage in the inner layers. */
+export type ZoneLayer = "outer" | "middle" | "inner";
+
+/**  A sense or engage zone of one side. */
+export type Zone_Deserialize = {
+	id: number,
+	name: string,
+	side: SideId,
+	kind: ZoneKind,
+	area: Area,
+	/**  Fields set here override the unit's own, its group's and its side's. */
+	doctrine?: Doctrine_Deserialize,
+	/**  The choke point this zone belongs to, if any. */
+	choke_point?: string | null,
+	/**
+	 *  Engage zones: units that engage contacts inside the zone on their own (one round per
+	 *  contact per AI period, under the zone's rules).
+	 */
+	shooters?: UnitId[],
+	/**  The zone's layer in a choke point's defence (outer, middle, inner). */
+	layer?: ZoneLayer | null,
+	/**  Sense zones: the sensor types this layer is for; coverage counts only these (empty: all). */
+	sensors?: SensorKind[],
+};
+
+/**  A sense or engage zone of one side. */
+export type Zone_Serialize = {
+	id: number,
+	name: string,
+	side: SideId,
+	kind: ZoneKind,
+	area: Area,
+	/**  Fields set here override the unit's own, its group's and its side's. */
+	doctrine: Doctrine_Serialize,
+	/**  The choke point this zone belongs to, if any. */
+	choke_point: string | null,
+	/**
+	 *  Engage zones: units that engage contacts inside the zone on their own (one round per
+	 *  contact per AI period, under the zone's rules).
+	 */
+	shooters: UnitId[],
+	/**  The zone's layer in a choke point's defence (outer, middle, inner). */
+	layer: ZoneLayer | null,
+	/**  Sense zones: the sensor types this layer is for; coverage counts only these (empty: all). */
+	sensors: SensorKind[],
 };
 
 /* Tauri Specta runtime */
