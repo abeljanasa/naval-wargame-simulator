@@ -119,6 +119,7 @@ Non-critical issues go to the backlog with the Phase 4 plan.
 
 ## 9. After the pilot
 
-- Write the pilot report: results against §7, the questionnaire, the issues.
+- Write the pilot report ([template](pilot-report-template.md)): results against §7, the questionnaire, the issues.
+- The panel decides on the [sign-off sheet](sign-off.md).
 - Triage the issues with the client into "fix before release 1.0" and Phase 4.
 - Tag release 1.0 once the panel accepts Gate 3.

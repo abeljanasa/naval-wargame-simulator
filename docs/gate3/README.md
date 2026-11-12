@@ -7,14 +7,22 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
   - **Slices 1–9:** the TTX release.
   - **Slices 10–17:** close the in-phase P1 gaps the first version of this pack listed.
   - **Slices 18–20:** this pack brought up to date; a pilot scenario that uses the whole planning layer; the printed pilot kit.
+  - **Since slice 20** ([DL-0037](../design-log/DL-0037-db-editing-and-rehearsal.md)):
+    - the white-cell run sheet rehearsed in the packaged app, with the problems it found fixed;
+    - a packaged-app end-to-end test;
+    - in-app editing of platform records;
+    - unit-type codes in the map symbols;
+    - Linux dropped as a target ([ADR-0006](../adr/0006-target-platforms.md)).
   - **Moved to Phase 4 at the client's choice (2026-11-12),** because they need outside data or a Phase 4 subsystem (§7 below):
     - satellite imagery;
     - terrain and bathymetry data, and what depends on them;
     - air operations.
-- **Three conditions remain:**
+- **Four conditions remain.** None can be met from the codebase:
+  - **CI on the latest commits.** GitHub stopped starting Actions jobs on 2026-11-12 (a billing or spending-limit block on the account). The last fully green run is `6835749`. Everything since passes locally (see the CI row).
   - the client's signing certificates;
-  - the air-gapped run of the signed release build;
+  - the air-gapped run of the signed release build on disconnected Windows and macOS machines;
   - the TTX pilot itself.
+- **Closing the gate:** [pilot report template](pilot-report-template.md) and [panel sign-off](sign-off.md).
 
 ## Definition of done (§16)
 
@@ -25,8 +33,8 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
 | A white cell can run a multi-seat exercise with injects, overrides and AAR | [white-cell manual](../manuals/white-cell-manual.md); models: [multi-seat](../models/multi-seat.md), [injects](../models/injects.md), [adjudication](../models/adjudication.md), [replay-aar](../models/replay-aar.md); host tests and e2e | **Done**, now with live planning-layer edits (slice 17) |
 | Signed installers for Windows and macOS (Linux dropped by the client, 2026-11-12, [ADR-0006](../adr/0006-target-platforms.md)) | Release workflow (`.github/workflows/release.yml`); macOS re-enabled; [releasing.md](../build/releasing.md) | **Waiting for the client's certificates.** Installers build unsigned until the Actions secrets are set. Every installer and scenario ships with a SHA-256 sum. Unsigned dry run on 2026-11-12 ([run 43180956359](https://github.com/abeljanasa/naval-wargame-simulator/actions/runs/43180956359)): installers built on all three OSes then targeted, passed the release scan, and produced SBOMs. Only the signing steps were skipped |
 | Installers run air-gapped | [air-gapped.md](../build/air-gapped.md): Phase 1 Windows bundle built and run with networking blocked; the app makes no network calls | **To repeat** on the release build, on a disconnected machine, for Windows and macOS |
-| All CI checks are green | PR #3 checks (Windows and macOS) | **Green** on the push of slices 10–18 and the desktop layout (2026-11-12) |
-| Manuals are complete | [User manual](../manuals/user-manual.md), [white-cell manual](../manuals/white-cell-manual.md), [scripting reference](../manuals/scripting-reference.md) (examples checked by `sim-scenario/tests/docs.rs`) | **Done**, updated for slices 10–17 (review at the pilot) |
+| All CI checks are green | PR #3 checks (Windows and macOS) | **Green up to `6835749`** (all 13 checks, 2026-11-12). **Later commits are not yet checked:** GitHub stopped starting jobs (account billing block). Locally on Windows, every later commit passes: the full workspace tests and clippy, the front-end type check, lint, unit tests and smoke test, and the packaged-app end-to-end test (20 checks). To confirm on GitHub once billing is restored |
+| Manuals are complete | [User manual](../manuals/user-manual.md), [white-cell manual](../manuals/white-cell-manual.md), [scripting reference](../manuals/scripting-reference.md) (examples checked by `sim-scenario/tests/docs.rs`) | **Done**, updated for slices 10–20, record editing and the pause behaviour (review at the pilot) |
 | A navy staff has run a TTX pilot on the release build | [TTX pilot plan](ttx-pilot-plan.md) | **Planned**: needs the client's staff and the signed build |
 
 ## P1 features of §7
@@ -78,7 +86,8 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
 | 17 Editing and facilitation | [DL-0036](../design-log/DL-0036-desktop-facilitation.md) | [scenario-editor.md](../models/scenario-editor.md) | `cb7bdbb` |
 | 18 Pack update | — | this page, the manuals, the backlog | `3846541` |
 | 19 Pilot scenario | — | [ttx-pilot-plan.md](ttx-pilot-plan.md) §4 | `04adeb8` |
-| 20 Pilot kit | — | [pilot-kit/](pilot-kit/README.md): installation check, seat card, white-cell run sheet, observer's log, questionnaire; release artefacts carry the scenarios and SHA-256 sums | this commit |
+| 20 Pilot kit | — | [pilot-kit/](pilot-kit/README.md): installation check, seat card, white-cell run sheet, observer's log, questionnaire; release artefacts carry the scenarios and SHA-256 sums | `69dbe2e` |
+| Rehearsal, record editing, symbol codes | [DL-0037](../design-log/DL-0037-db-editing-and-rehearsal.md) | [symbology.md](../behaviour-specs/symbology.md), user and white-cell manuals | `8061b16`, `72606a0`, `aa819e3`, `04b0a2e`, `ca31b3a` |
 
 ## Whole-system checks
 
@@ -90,7 +99,8 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
 | `record_round_trips_and_replays_exactly`, `seeking_matches_a_straight_run`, `a_tampered_record_is_reported` | Records replay exactly; the scrubber matches a straight run; tampering is caught |
 | `report_accounts_for_every_shot_and_loss` | The AAR counts every launch, hit, intercept and loss |
 | `planning_layer_and_action_groups_load_build_and_hold_station`, planning tests in `sim-core/tests/combat.rs` | Every planning behaviour, by hand-checkable scenarios: comms, fuel, missions, anchorages and weather, coverage, weapon tracks, action groups (52 engine tests in that file) |
-| e2e smoke (`npm run e2e`) | The real UI: seats, injects, overrides, replay and AAR, editor (event forms), zone override |
+| e2e smoke (`npm run e2e`) | The real UI against a mocked backend: seats, injects, overrides, replay and AAR, editor (event forms), zone override |
+| Packaged-app test (`npm run e2e:app`, CI on Windows) | The built app over WebDriver: starting picture, database and record editor, pilot scenario load, and the white-cell run sheet. That covers console tabs, events, an inject during a pause, command posts, a locked seat window, a logged override, a run at Max and a verified replay. Screenshots with `E2E_SHOTS` |
 
 ## Decisions for the panel
 
