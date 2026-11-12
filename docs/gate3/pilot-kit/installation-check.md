@@ -18,7 +18,8 @@ Machine: ____________  OS and version: ____________  Checked by: ____________  D
 |---|---|---|
 | ☐ | Disconnect the network: unplug the cable, turn off Wi-Fi and Bluetooth, and disable the adapters in the OS settings | The OS reports no network |
 | ☐ | Copy the folder from the media and verify the sums (commands below) | Every line says `OK` |
-| ☐ | Install. **Windows:** the MSI or the setup `.exe`. **macOS:** open the `.dmg` and drag the app to Applications. | It installs with no download prompt. An **unsigned** build shows the OS warning (Windows SmartScreen *More info › Run anyway*; macOS right-click › *Open*). Note it below |
+| ☐ | **Windows:** install the signing certificate as trusted, unless IT has deployed it (administrator PowerShell; commands below) | Both imports succeed |
+| ☐ | Install. **Windows:** the MSI or the setup `.exe`. **macOS:** open the `.dmg` and drag the app to Applications. | It installs with no download prompt. **Windows:** the prompt names the publisher *Naval Wargame Simulator*. **macOS:** the app is ad-hoc signed, so approve it once (right-click › *Open*). Note anything else below |
 | ☐ | Start *Naval Wargame Simulator* | The map shows the coastline; no error about the network |
 | ☐ | **File › Open scenario…** → `release-extra/scenarios/phase3-pilot.json` | The title reads *Phase 3 — Kent passage pilot*; the units are on the map |
 | ☐ | **Seats** tab → **Open window** for Blue and for Red | Each window shows only its own side |
@@ -45,6 +46,16 @@ Get-Content release-extra\SHA256SUMS-windows-2022.txt | ForEach-Object {
   if ((Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash -eq $hash) { "OK    $file" } else { "FAIL  $file" }
 }
 ```
+
+**Windows, trusting the signing certificate** (`nws-codesign.cer`, from the release owner; [ADR-0008](../../adr/0008-self-signed-code-signing.md)):
+
+```powershell
+Import-Certificate -FilePath nws-codesign.cer -CertStoreLocation Cert:\LocalMachine\Root
+Import-Certificate -FilePath nws-codesign.cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+Get-AuthenticodeSignature .\target\release\bundle\msi\*.msi | Format-List Status, SignerCertificate
+```
+
+The last line should show `Status : Valid` and the subject `CN=Naval Wargame Simulator`.
 
 A `FAIL` means the copy is damaged or altered. Don't install it: copy it again from the media, or from the artefact.
 

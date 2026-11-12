@@ -8,3 +8,7 @@ Thumbs.db
 *.stackdump
 nws-sbom.json
 sbom-rust.json
+
+# Signing keys never enter the repository (ADR-0008).
+*.pfx
+*.p12

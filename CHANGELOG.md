@@ -22,6 +22,12 @@
 - **The review scrubber ran past the panel's edge** and added a horizontal scrollbar.
 - **Typing in a text area triggered keyboard shortcuts.** A space paused or ran the clock, a digit changed the compression, and the character was lost. That affected Lua scripts, event JSON and more. Shortcuts now ignore every text entry. Found while testing the record editor.
 
+### Added (signing, ADR-0008)
+
+- **`scripts/signing/new-selfsigned-codesign.ps1`** makes the self-signed Windows code-signing certificate (`CN=Naval Wargame Simulator`, 3 years). It exports the PFX and the public `.cer`, and sets the Actions secrets. The client types the password; it is never printed.
+- **Release:** the Windows signing step deletes the PFX even when signing fails, then checks that every installer carries a signature. macOS builds are ad-hoc signed.
+- **Docs:** trusting the certificate on exercise machines (Group Policy or `Import-Certificate`) is in `releasing.md` and the installation check.
+
 ### Decided (Phase 4, ADR-0007)
 
 - **Region of interest:** the whole Philippine Area of Responsibility. Full-resolution data covers 3°N–27°N, 111°E–137°E, including the Kalayaan Island Group.

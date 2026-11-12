@@ -28,7 +28,36 @@ Set these in the repository's (or organisation's) Actions secrets.
 | `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: <Org> (<TEAMID>)` |
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarisation (app-specific password) |
 
-macOS builds are back in the CI and release matrices (Gate 3, 2026-11-11). Without the Apple secrets the `.dmg` is unsigned and not notarised; Gatekeeper will then block it until the user allows it in System Settings.
+### Self-signed Windows certificate (ADR-0008)
+
+The TTX release signs Windows installers with a self-signed certificate made by the client. Run this once, and again before the certificate expires (3 years), in your own PowerShell window. It asks for the PFX password:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\signing\new-selfsigned-codesign.ps1
+```
+
+It does four things:
+- creates `CN=Naval Wargame Simulator` (RSA 3072, SHA-256);
+- writes `%USERPROFILE%\nws-signing\nws-codesign.pfx` (the private key: back it up, never commit it) and `nws-codesign.cer` (the public certificate);
+- removes the key from the certificate store;
+- sets `WINDOWS_CERTIFICATE` and `WINDOWS_CERTIFICATE_PASSWORD` with the GitHub CLI. Use `-SkipSecrets` to set them later.
+
+The release workflow then signs and timestamps every MSI and NSIS installer, and checks that each carries a signature.
+
+**Trust on the exercise machines.** A self-signed certificate is trusted only where its `.cer` is installed:
+- **Group Policy:** add it to *Trusted Root Certification Authorities* and *Trusted Publishers*.
+- **By hand,** in an administrator PowerShell, on each machine:
+
+```powershell
+Import-Certificate -FilePath nws-codesign.cer -CertStoreLocation Cert:\LocalMachine\Root
+Import-Certificate -FilePath nws-codesign.cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher
+```
+
+The installer then shows the publisher *Naval Wargame Simulator*. On a machine without the `.cer`, Windows shows "unknown publisher".
+
+### macOS
+
+macOS builds are ad-hoc signed (`bundle.macOS.signingIdentity: "-"`). The app is sealed against tampering, but it is not notarised, so each Mac approves it once: right-click › **Open**, or System Settings › Privacy & Security. If an Apple Developer ID is obtained later, the `APPLE_*` secrets above override the ad-hoc identity.
 
 The SHA-256 sums (`release-extra/SHA256SUMS-<os>.txt`) travel with the installers, signed or not.
 

@@ -48,7 +48,7 @@ jobs:
               echo "$v<<EOF" >> "$GITHUB_ENV"; printf '%s\n' "${!v}" >> "$GITHUB_ENV"; echo "EOF" >> "$GITHUB_ENV"
             done
           else
-            echo "::warning::APPLE_CERTIFICATE not configured: macOS build will be UNSIGNED"
+            echo "::warning::APPLE_CERTIFICATE not configured: macOS build is ad-hoc signed (tauri.conf.json), not notarised (ADR-0008)"
           fi
 
       - name: Build installers
@@ -70,13 +70,24 @@ jobs:
           }
           $pfx = Join-Path $env:RUNNER_TEMP "signing.pfx"
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
-          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
-          $files = Get-ChildItem target\release\bundle -Recurse -Include *.msi,*.exe
-          foreach ($f in $files) {
-            & $signtool.FullName sign /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f.FullName
-            if ($LASTEXITCODE -ne 0) { throw "signing failed: $($f.FullName)" }
+          try {
+            $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+            $files = Get-ChildItem target\release\bundle -Recurse -Include *.msi,*.exe
+            foreach ($f in $files) {
+              & $signtool.FullName sign /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 $f.FullName
+              if ($LASTEXITCODE -ne 0) { throw "signing failed: $($f.FullName)" }
+            }
+          } finally {
+            Remove-Item $pfx -ErrorAction SilentlyContinue
           }
-          Remove-Item $pfx
+          # Every installer must now carry a signature. With the self-signed certificate (ADR-0008)
+          # the runner does not trust its root, so the status is not "Valid"; the signer and the
+          # timestamp are what matter here.
+          foreach ($f in $files) {
+            $sig = Get-AuthenticodeSignature $f.FullName
+            if ($sig.Status -eq "NotSigned" -or -not $sig.SignerCertificate) { throw "not signed: $($f.Name)" }
+            Write-Output "$($f.Name): signed by $($sig.SignerCertificate.Subject), timestamped: $([bool]$sig.TimeStamperCertificate), status $($sig.Status)"
+          }
 
       # Master prompt §3: no database outside the allowlist, nothing but UNCLASSIFIED, in release artefacts.
       - name: Release scan
