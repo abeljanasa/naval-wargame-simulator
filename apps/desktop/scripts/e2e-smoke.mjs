@@ -138,7 +138,9 @@ try {
     "choosing the white-cell seat sends set_seat and shows every unit",
   );
 
-  await page.getByText("Platform database", { exact: true }).first().click();
+  // Menu bar: View › Platform database opens it in a dialog.
+  await page.getByRole("menuitem", { name: "View" }).click();
+  await page.getByRole("menuitem", { name: "Platform database…" }).click();
   await page.getByPlaceholder("Search id, name or category").fill("bulk");
   await page.getByRole("button", { name: /Generic bulk carrier/ }).waitFor({ timeout: 5_000 });
   check(
@@ -152,11 +154,13 @@ try {
     await page.getByText("W-MOCK: mock warning").isVisible(),
     "platform record shows provenance and its validation warning",
   );
+  await page.getByRole("button", { name: "Close the database" }).click();
 
   // White-cell console: an override with its reason appears in the override log.
   await page.getByRole("button", { name: /Bulk carrier Bravo/ }).click();
   await page.getByLabel("Reason (logged)").fill("Ruled sunk by umpire");
   await page.getByRole("button", { name: "Destroy" }).click();
+  await page.getByRole("tab", { name: "Log" }).click();
   await page.getByText("Ruled sunk by umpire").waitFor({ timeout: 5_000 });
   check(
     (await calls()).some(
@@ -169,6 +173,12 @@ try {
     "white-cell override sends order_adjudicate with its reason and shows in the log",
   );
 
+  // Messages arrived while another tab was open: the tab counts them.
+  check(
+    /Messages\s*\d+/.test((await page.getByRole("tab", { name: /^Messages/ }).textContent()) ?? ""),
+    "the Messages tab shows how many messages are unread",
+  );
+  await page.getByRole("tab", { name: /^Messages/ }).click();
   const messages = page.getByRole("region", { name: "Messages" });
   await messages.getByText("STARTEX: proceed").waitFor({ timeout: 5_000 });
   check(
@@ -176,6 +186,7 @@ try {
     "message log shows each message with its sender and, for the white cell, its audience",
   );
 
+  await page.getByRole("tab", { name: "Injects" }).click();
   await page.getByRole("button", { name: "Send Distress call" }).click();
   await messages.getByText("Engine room fire, request assistance").waitFor({ timeout: 5_000 });
   check(
@@ -189,6 +200,7 @@ try {
   );
 
   // Per-zone ROE override from the white-cell console.
+  await page.getByRole("tab", { name: "Planning" }).click();
   await page.getByLabel("Weapons control in Narrows engage zone").selectOption("tight");
   await page.waitForTimeout(300);
   check(
@@ -200,6 +212,7 @@ try {
   );
 
   // Seat management: add a seat for Blue's executive officer and open a window for it.
+  await page.getByRole("tab", { name: "Seats" }).click();
   await page.getByLabel("New seat", { exact: true }).fill("Blue XO");
   await page.getByLabel("New seat plays").selectOption({ label: "Blue" });
   await page.getByRole("button", { name: "Add", exact: true }).click();
@@ -215,6 +228,7 @@ try {
   }
 
   // Exercise review: replay from the start, scrub, read the AAR tables, return to live.
+  await page.getByRole("tab", { name: "Review" }).click();
   await page.getByRole("button", { name: "Replay", exact: true }).click();
   await page.getByText("REPLAY", { exact: true }).waitFor({ timeout: 5_000 });
   check(
@@ -252,7 +266,8 @@ try {
   );
 
   // Scenario editor: a new scenario, a unit placed on the map, checked by the engine, played.
-  await page.getByRole("button", { name: "New scenario" }).click();
+  await page.getByRole("menuitem", { name: "File" }).click();
+  await page.getByRole("menuitem", { name: "New scenario" }).click();
   const ed = page.getByRole("dialog", { name: "Scenario editor" });
   await ed.getByText("2 warnings.").waitFor({ timeout: 5_000 });
   check(
