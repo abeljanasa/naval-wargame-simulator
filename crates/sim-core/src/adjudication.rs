@@ -163,6 +163,20 @@ pub(crate) fn adjudicate(
                 return Ok(());
             };
             if *hit {
+                // The ruling shows as a hit, at the target, before the damage lands.
+                crate::outcomes::note(
+                    world,
+                    crate::outcomes::Note {
+                        tick,
+                        weapon: w.weapon.clone(),
+                        result: crate::outcomes::OutcomeKind::Hit,
+                        position: None,
+                        shooter: Some(w.shooter),
+                        shooter_side: Some(w.side),
+                        target: Some(w.target),
+                        reason: Some("adjudicated".into()),
+                    },
+                );
                 let spec = world.resource::<WeaponCatalog>().0.get(&w.weapon).cloned();
                 if let Some(spec) = spec {
                     apply_hit(
@@ -181,6 +195,7 @@ pub(crate) fn adjudicate(
                         reason: "adjudicated miss".into(),
                     },
                 );
+                crate::combat::note_miss(world, &w, tick, "adjudicated miss");
             }
         }
         Adjudication::SetDamage {

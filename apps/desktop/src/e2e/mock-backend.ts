@@ -462,6 +462,7 @@ const frame = (): FrameEvent => {
       posts: [],
       weapon_tracks: [],
       action_groups: [],
+      outcomes: [],
       refusals: sent,
     },
   };

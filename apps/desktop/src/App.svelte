@@ -6,6 +6,8 @@
     createMap,
     declutter,
     labelCandidates,
+    outcomeLayers,
+    outcomeText,
     buildLayers,
     coverageLayers,
     nightLayers,
@@ -17,6 +19,7 @@
     setMapTheme,
     CONTAINMENT_95,
     type MapTheme,
+    type SymbolStyle,
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
@@ -189,6 +192,26 @@
     }
   }
 
+  // Unit figures by default; APP-6 frames as the alternative (remembered like the theme).
+  let symbolStyle = $state<SymbolStyle>(readSymbolStyle());
+
+  function readSymbolStyle(): SymbolStyle {
+    try {
+      return localStorage.getItem("nws-symbols") === "frames" ? "frames" : "figures";
+    } catch {
+      return "figures";
+    }
+  }
+
+  function toggleSymbols() {
+    symbolStyle = symbolStyle === "figures" ? "frames" : "figures";
+    try {
+      localStorage.setItem("nws-symbols", symbolStyle);
+    } catch {
+      // Storage unavailable: the choice lasts for this session only.
+    }
+  }
+
   $effect(() => {
     document.documentElement.dataset.theme = theme;
     if (map) setMapTheme(map, theme);
@@ -240,6 +263,21 @@
       { padding: 80, maxZoom: 9, duration: 0 },
     );
   });
+
+  // The newest weapon outcome of the last 15 s, as a notice in the status bar.
+  const latestOutcome = $derived.by(() => {
+    const now = n(clock?.game_time_s ?? 0);
+    const recent = sim.outcomes.filter((o) => now - n(o.tick) <= 15);
+    return recent.length ? recent[recent.length - 1] : null;
+  });
+  const latestOutcomeText = $derived(
+    latestOutcome
+      ? outcomeText(
+          latestOutcome,
+          sim.session?.viewer.kind === "side" ? sim.session.viewer.side : null,
+        )
+      : "",
+  );
 
   // Label declutter (map.ts): where labels would overlap on screen, the lower priority hides until
   // the user zooms in. Recomputed when the picture changes and as the map moves.
@@ -314,8 +352,10 @@
           draft: sim.draft,
           onPickUnit: (id) => sim.select(id),
           hiddenLabels,
+          symbolStyle,
         }),
         ...referenceLayers(sim.session?.reference_points ?? [], undefined, hiddenLabels),
+        ...outcomeLayers(sim.outcomes, n(clock?.game_time_s ?? 0)),
       ],
     });
   });
@@ -440,6 +480,11 @@
           onselect: () => (showNight = !showNight),
         },
         { label: "Dark theme", checked: theme === "dark", onselect: toggleTheme },
+        {
+          label: "Unit figures (off: APP-6 frames)",
+          checked: symbolStyle === "figures",
+          onselect: toggleSymbols,
+        },
         { label: "Picture", separatorBefore: true, onselect: () => (leftTab = "picture") },
         { label: "Messages", onselect: () => (leftTab = "messages") },
         {
@@ -1313,6 +1358,8 @@
       >
     {:else if editor.error && !editor.open}
       <span class="error">{editor.error}</span>
+    {:else if latestOutcome}
+      <span class="outcome {latestOutcome.result}">{latestOutcomeText}</span>
     {:else}
       <span class="dim">Space run/pause · 1–7 compression · . step · Esc deselect</span>
     {/if}
@@ -1760,6 +1807,18 @@
     text-overflow: ellipsis;
   }
   .statusbar .prompt {
+    color: var(--warn);
+  }
+  .statusbar .outcome {
+    font-weight: 600;
+  }
+  .statusbar .outcome.hit {
+    color: #ff7a4d;
+  }
+  .statusbar .outcome.miss {
+    color: var(--text);
+  }
+  .statusbar .outcome.shot_down {
     color: var(--warn);
   }
 

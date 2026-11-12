@@ -22,6 +22,7 @@ import type {
   ContactView,
   GeoPoint,
   Minefield,
+  Outcome,
   UnitView,
   Viewer,
   WeaponTrackView,
@@ -29,6 +30,16 @@ import type {
 } from "./bindings";
 import { n, project } from "./format";
 import { AFFILIATION_COLOUR, functionCode, symbolUrl, type Affiliation } from "./symbols";
+import {
+  MUNITION_LABEL,
+  figureCanvas,
+  figureKind,
+  figureShape,
+  figureUrl,
+  munitionKind,
+  munitionUrl,
+  type FigureKind,
+} from "./silhouettes";
 
 type LonLat = [number, number];
 
@@ -152,6 +163,122 @@ export interface SceneInput {
   onPickUnit: (id: number) => void;
   /** Label keys hidden by `declutter` (none if absent). */
   hiddenLabels?: Set<string>;
+  /** Unit figures (default) or APP-6 frames with a function code. */
+  symbolStyle?: SymbolStyle;
+}
+
+export type SymbolStyle = "figures" | "frames";
+
+/** How long an outcome marker stays on the map, and how long it is labelled, game seconds. */
+export const OUTCOME_SHOW_S = 60;
+export const OUTCOME_LABEL_S = 20;
+
+/**
+ * A one-line notice of a weapon outcome, worded for the viewer. `side` is the viewer's side
+ * (`null` for the white cell). Side viewers never learn more than the outcome feed gives them.
+ */
+export function outcomeText(o: Outcome, side: number | null): string {
+  const what = MUNITION_LABEL[munitionKind(o.weapon)];
+  const cap = what.charAt(0).toUpperCase() + what.slice(1);
+  const why = o.reason && o.result === "miss" ? ` (${o.reason})` : "";
+  // Point defence names the defender in the reason ("shot down by …").
+  const downBy = o.reason?.startsWith("shot down by ") ? ` was ${o.reason}` : " was shot down";
+  if (side === null) {
+    const from = o.shooter_name ? ` from ${o.shooter_name}` : "";
+    const target = o.target_name ?? "its target";
+    return o.result === "hit"
+      ? `${cap}${from} hit ${target}`
+      : o.result === "miss"
+        ? `${cap}${from} missed ${target}${why}`
+        : `${cap}${from} at ${target}${downBy}`;
+  }
+  if (o.shooter_side === side) {
+    const from = o.shooter_name ? ` from ${o.shooter_name}` : "";
+    const result =
+      o.result === "hit"
+        ? "hit its target"
+        : o.result === "miss"
+          ? `missed${why}`
+          : "was shot down";
+    return `Our ${what}${from} ${result}`;
+  }
+  const target = o.target_name ?? "One of our units";
+  return o.result === "hit"
+    ? `${target} was hit by an enemy ${what}`
+    : o.result === "miss"
+      ? `An enemy ${what} missed ${target}`
+      : `An enemy ${what} aimed at ${target}${downBy}`;
+}
+
+/** Markers where outcomes happened, fading over OUTCOME_SHOW_S: a filled burst for a hit, a
+ * pale ring for a miss, an amber ring for a weapon shot down; labelled for the first seconds. */
+export function outcomeLayers(outcomes: Outcome[], gameTimeS: number): Layer[] {
+  const live = outcomes.filter((o) => gameTimeS - n(o.tick) <= OUTCOME_SHOW_S);
+  const fade = (o: Outcome) =>
+    Math.round(255 * Math.max(0.15, 1 - (gameTimeS - n(o.tick)) / OUTCOME_SHOW_S));
+  const colour = (o: Outcome): [number, number, number] =>
+    o.result === "hit" ? [255, 90, 40] : o.result === "miss" ? [220, 230, 238] : [255, 200, 70];
+  return [
+    new ScatterplotLayer<Outcome>({
+      id: "outcomes",
+      data: live,
+      getPosition: (o) => pt(o.position),
+      getRadius: (o) => 9 + Math.min(10, (gameTimeS - n(o.tick)) / 3),
+      radiusUnits: "pixels",
+      stroked: true,
+      filled: true,
+      getFillColor: (o): RGBA =>
+        o.result === "hit" ? [...colour(o), Math.round(fade(o) * 0.6)] : [0, 0, 0, 0],
+      getLineColor: (o): RGBA => [...colour(o), fade(o)],
+      lineWidthUnits: "pixels",
+      getLineWidth: (o) => (o.result === "miss" ? 1.5 : 2.5),
+      updateTriggers: {
+        getRadius: [gameTimeS],
+        getFillColor: [gameTimeS],
+        getLineColor: [gameTimeS],
+      },
+    }),
+    new TextLayer<Outcome>({
+      id: "outcome-labels",
+      data: live.filter((o) => gameTimeS - n(o.tick) <= OUTCOME_LABEL_S),
+      getPosition: (o) => pt(o.position),
+      getText: (o) => (o.result === "hit" ? "HIT" : o.result === "miss" ? "MISS" : "SHOT DOWN"),
+      getSize: 13,
+      getColor: (o): RGBA => [...colour(o), 255],
+      getPixelOffset: [0, -24],
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: 700,
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
+  ];
+}
+
+/** On-screen height of a figure, px: side profiles are wide, so a little lower. */
+function figureSize(kind: FigureKind, selected: boolean): number {
+  // A side profile fills a band of its 96 × 48 canvas, so it needs the height to read.
+  const base = figureShape(kind) === "profile" ? 30 : 32;
+  return selected ? base + 6 : base;
+}
+
+/** Figure icon for a unit or contact: profiles face the way they head (left when westbound);
+ * top-down figures are rotated by `getAngle`. */
+function figureIcon(kind: FigureKind, aff: Affiliation, selected: boolean, heading: number) {
+  const westbound = figureShape(kind) === "profile" && heading > 180 && heading < 360;
+  const [width, height] = figureCanvas(kind);
+  return {
+    id: `fig-${kind}-${aff}-${selected}-${westbound}`,
+    url: figureUrl(kind, aff, selected, westbound),
+    width,
+    height,
+  };
+}
+
+/** Deck rotates icons counter-clockwise in degrees; headings are clockwise from north. */
+function iconAngle(kind: FigureKind | null, heading: number): number {
+  return kind && figureShape(kind) === "topdown" ? -heading : 0;
 }
 
 /** Phase 1 has no postures (Phase 2, sim-c2): own side is shown as friend and every other side as unknown. */
@@ -371,6 +498,7 @@ function clip(a: GeoPoint, b: GeoPoint, max_m: number): LonLat {
 }
 
 export function buildLayers(s: SceneInput): Layer[] {
+  const figures = (s.symbolStyle ?? "figures") === "figures";
   // The selected unit's whole route; for the others only a short stub of the next leg, so long
   // transits (a ferry 100 km away) do not draw lines across the whole picture.
   const routes = s.units
@@ -465,6 +593,8 @@ export function buildLayers(s: SceneInput): Layer[] {
       getIcon: (u) => {
         const aff = affiliation(u, s.viewer);
         const sel = u.id === s.selected;
+        const kind = figures ? figureKind(u.platform, null, u.domain) : null;
+        if (kind) return figureIcon(kind, aff, sel, n(u.heading_deg));
         const code = functionCode(u.platform);
         return {
           id: `${aff}-${u.domain}-${sel}-${code}`,
@@ -473,9 +603,19 @@ export function buildLayers(s: SceneInput): Layer[] {
           height: 64,
         };
       },
-      getSize: 36, // large enough to read the function code
+      getSize: (u) => {
+        const kind = figures ? figureKind(u.platform, null, u.domain) : null;
+        // Frames: large enough to read the function code.
+        return kind ? figureSize(kind, u.id === s.selected) : 36;
+      },
+      getAngle: (u) =>
+        iconAngle(figures ? figureKind(u.platform, null, u.domain) : null, n(u.heading_deg)),
       sizeUnits: "pixels",
-      updateTriggers: { getIcon: [s.selected, s.viewer] },
+      updateTriggers: {
+        getIcon: [s.selected, s.viewer, figures],
+        getSize: [s.selected, figures],
+        getAngle: [figures],
+      },
       onClick: (info: PickingInfo<UnitView>) => {
         if (info.object) s.onPickUnit(info.object.id);
         return true;
@@ -528,25 +668,40 @@ export function buildLayers(s: SceneInput): Layer[] {
       characterSet: LABEL_CHARSET,
     }),
     // Weapons in flight: a short line along the heading, brighter once the seeker has locked on.
-    new LineLayer<WeaponView>({
+    new IconLayer<WeaponView>({
       id: "weapons",
       data: s.weapons ?? [],
-      getSourcePosition: (w) => pt(w.position),
-      getTargetPosition: (w) =>
-        project(n(w.position.lat_deg), n(w.position.lon_deg), n(w.heading_deg), 1500),
-      getColor: (w) => (w.homing ? [255, 90, 60, 255] : [255, 200, 120, 220]),
-      getWidth: 3,
+      getPosition: (w) => pt(w.position),
+      getIcon: (w) => {
+        const kind = munitionKind(w.weapon);
+        const aff = affiliation({ side: w.side } as UnitView, s.viewer);
+        return {
+          id: `mun-${kind}-${aff}-${w.homing}`,
+          url: munitionUrl(kind, aff, w.homing),
+          width: 64,
+          height: 64,
+        };
+      },
+      getSize: (w) => (munitionKind(w.weapon) === "shell" ? 14 : 22),
+      getAngle: (w) => -n(w.heading_deg),
+      sizeUnits: "pixels",
+      updateTriggers: { getIcon: [s.viewer] },
     }),
-    new ScatterplotLayer<WeaponTrackView>({
+    new IconLayer<WeaponTrackView>({
       id: "weapon-tracks",
       data: s.weaponTracks ?? [],
       getPosition: (t) => pt(t.position),
-      getRadius: 5,
-      radiusUnits: "pixels",
-      stroked: true,
-      filled: false,
-      getLineColor: (t) => (t.domain === "subsurface" ? [120, 200, 255, 255] : [255, 70, 50, 255]),
-      lineWidthMinPixels: 2,
+      getIcon: (t) => {
+        const kind = t.domain === "subsurface" ? "torpedo" : "anti_ship_missile";
+        return {
+          id: `track-${kind}`,
+          url: munitionUrl(kind, "hostile", false),
+          width: 64,
+          height: 64,
+        };
+      },
+      getSize: 22,
+      sizeUnits: "pixels",
     }),
     new PathLayer<BearingView>({
       id: "bearings",
@@ -581,7 +736,10 @@ export function buildLayers(s: SceneInput): Layer[] {
       getIcon: (c) => {
         const domain = c.domain ?? "surface";
         const aff = contactAffiliation(c);
-        // The code shows only as far as the side has classified the contact.
+        // The figure (or code) shows only as far as the side has classified the contact; an
+        // unclassified contact keeps the APP-6 frame.
+        const kind = figures ? figureKind(c.platform, c.category, c.domain) : null;
+        if (kind) return figureIcon(kind, aff, false, 0);
         const code = functionCode(c.platform, c.category);
         return {
           id: `contact-${aff}-${domain}-${code}`,
@@ -590,7 +748,11 @@ export function buildLayers(s: SceneInput): Layer[] {
           height: 64,
         };
       },
-      getSize: 30,
+      getSize: (c) => {
+        const kind = figures ? figureKind(c.platform, c.category, c.domain) : null;
+        return kind ? figureSize(kind, false) - 2 : 30;
+      },
+      updateTriggers: { getIcon: [figures], getSize: [figures] },
       sizeUnits: "pixels",
     }),
     new TextLayer<ContactView>({

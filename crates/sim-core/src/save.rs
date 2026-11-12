@@ -67,7 +67,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 22: zones gain a layer and sensor types. Older saves load without them.
 /// * 23: each side's tracks on weapons in flight. Older saves load with none.
 /// * 24: surface action groups in the planning layer. Older saves load with none.
-pub const SAVE_FORMAT_VERSION: u32 = 24;
+/// * 25: the recent weapon-outcome feed (display only, not hashed), so a replay that seeks to a
+///   keyframe shows the same hit and miss markers as a straight run. Older saves load with none.
+pub const SAVE_FORMAT_VERSION: u32 = 25;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,6 +146,9 @@ pub struct SaveGame {
     /// Each side's tracks on weapons in flight. Empty in saves before format 23.
     #[serde(default)]
     pub weapon_tracks: crate::weapon_tracks::WeaponTracks,
+    /// Recent weapon outcomes (display only). Empty in saves before format 25.
+    #[serde(default)]
+    pub outcomes: crate::outcomes::OutcomeFeed,
 }
 
 impl SaveGame {

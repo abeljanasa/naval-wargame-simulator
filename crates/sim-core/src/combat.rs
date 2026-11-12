@@ -127,6 +127,23 @@ pub struct WeaponsInFlight {
     pub list: Vec<WeaponInFlight>,
 }
 
+/// A weapon in flight that missed, for the outcome feed (where the weapon was).
+pub(crate) fn note_miss(world: &mut World, w: &WeaponInFlight, tick: Tick, reason: &str) {
+    crate::outcomes::note(
+        world,
+        crate::outcomes::Note {
+            tick,
+            weapon: w.weapon.clone(),
+            result: crate::outcomes::OutcomeKind::Miss,
+            position: Some(w.position),
+            shooter: Some(w.shooter),
+            shooter_side: Some(w.side),
+            target: Some(w.target),
+            reason: Some(reason.to_owned()),
+        },
+    );
+}
+
 fn entity_of(world: &World, unit: UnitId) -> Option<Entity> {
     world.resource::<UnitIndex>().0.get(&unit).copied()
 }
@@ -362,6 +379,24 @@ pub(crate) fn apply_hit_roll(
             hit,
         },
     );
+    // Before the hit is applied: a destroyed target leaves the world.
+    crate::outcomes::note(
+        world,
+        crate::outcomes::Note {
+            tick,
+            weapon: spec.id.clone(),
+            result: if hit {
+                crate::outcomes::OutcomeKind::Hit
+            } else {
+                crate::outcomes::OutcomeKind::Miss
+            },
+            position: None,
+            shooter,
+            shooter_side: by_side,
+            target: Some(target),
+            reason: None,
+        },
+    );
     if hit {
         apply_hit(
             world,
@@ -566,6 +601,7 @@ pub(crate) fn weapons_system(world: &mut World) {
                             reason: reason.to_owned(),
                         },
                     );
+                    note_miss(world, &w, tick, reason);
                     continue;
                 }
             }
@@ -587,6 +623,7 @@ pub(crate) fn weapons_system(world: &mut World) {
                     reason: "out of fuel".into(),
                 },
             );
+            note_miss(world, &w, tick, "out of fuel");
             continue;
         }
         keep.push(w);

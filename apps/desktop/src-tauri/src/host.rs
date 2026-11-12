@@ -94,6 +94,8 @@ pub struct SnapshotUpdate {
     pub weapon_tracks: Vec<WeaponTrackView>,
     /// The viewer's surface action groups.
     pub action_groups: Vec<ActionGroup>,
+    /// Weapon outcomes of the last minute this seat may know (hit, miss, shot down).
+    pub outcomes: Vec<sim_core::Outcome>,
 }
 
 /// Clock status sent with every frame.
@@ -1021,6 +1023,7 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
         posts: snap.posts.clone(),
         weapon_tracks: snap.weapon_tracks.clone(),
         action_groups: snap.action_groups.clone(),
+        outcomes: snap.outcomes.clone(),
     }
 }
 

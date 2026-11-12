@@ -1180,6 +1180,60 @@ export type Mission_Serialize =
  */
 { kind: "denial"; choke_point: string };
 
+/**
+ *  One weapon outcome. Names are as they were when it happened (a destroyed unit leaves the
+ *  world). The picture blanks what a side's viewer may not know.
+ */
+export type Outcome = Outcome_Serialize | Outcome_Deserialize;
+
+export type OutcomeKind = "hit" | "miss" | 
+/**  Killed in flight by point defence. */
+"shot_down";
+
+/**
+ *  One weapon outcome. Names are as they were when it happened (a destroyed unit leaves the
+ *  world). The picture blanks what a side's viewer may not know.
+ */
+export type Outcome_Deserialize = {
+	tick: Tick,
+	/**  Weapon type, e.g. `WPN-ASM-SUB`. */
+	weapon: string,
+	result: OutcomeKind,
+	/**  Where it happened: the target for a hit, the weapon for a miss or a kill in flight. */
+	position: GeoPoint,
+	shooter?: UnitId | null,
+	shooter_name?: string | null,
+	/**  The firing side (a minefield's side for a mine). */
+	shooter_side?: SideId | null,
+	target?: UnitId | null,
+	target_name?: string | null,
+	target_side?: SideId | null,
+	/**  Why it missed, or who shot it down. */
+	reason?: string | null,
+};
+
+/**
+ *  One weapon outcome. Names are as they were when it happened (a destroyed unit leaves the
+ *  world). The picture blanks what a side's viewer may not know.
+ */
+export type Outcome_Serialize = {
+	tick: Tick,
+	/**  Weapon type, e.g. `WPN-ASM-SUB`. */
+	weapon: string,
+	result: OutcomeKind,
+	/**  Where it happened: the target for a hit, the weapon for a miss or a kill in flight. */
+	position: GeoPoint,
+	shooter: UnitId | null,
+	shooter_name: string | null,
+	/**  The firing side (a minefield's side for a mine). */
+	shooter_side: SideId | null,
+	target: UnitId | null,
+	target_name: string | null,
+	target_side: SideId | null,
+	/**  Why it missed, or who shot it down. */
+	reason: string | null,
+};
+
 /**  A command post's state. */
 export type PostView = PostView_Serialize | PostView_Deserialize;
 
@@ -1651,6 +1705,8 @@ export type SnapshotUpdate_Deserialize = {
 	weapon_tracks: WeaponTrackView[],
 	/**  The viewer's surface action groups. */
 	action_groups: ActionGroup_Deserialize[],
+	/**  Weapon outcomes of the last minute this seat may know (hit, miss, shot down). */
+	outcomes: Outcome_Deserialize[],
 };
 
 /**
@@ -1691,6 +1747,8 @@ export type SnapshotUpdate_Serialize = {
 	weapon_tracks: WeaponTrackView[],
 	/**  The viewer's surface action groups. */
 	action_groups: ActionGroup_Serialize[],
+	/**  Weapon outcomes of the last minute this seat may know (hit, miss, shot down). */
+	outcomes: Outcome_Serialize[],
 };
 
 /**  What a unit can still do. */

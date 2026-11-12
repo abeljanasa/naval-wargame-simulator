@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added (map)
+
+- **Units drawn as figures of what they are** (default; **View › Unit figures**, off for APP-6 frames):
+  - side profiles for ships and submarines, facing their heading;
+  - top-down outlines for aircraft, rotated to their heading;
+  - icons for land sites.
+
+  Each figure has an affiliation colour and badge. A contact shows a figure only as far as it is classified.
+- **Munitions in flight drawn as figures:** missiles, torpedoes, rockets, bombs, gunfire, decoys. A side's tracks on incoming weapons show as missile or torpedo figures.
+- **Hit and miss feedback:** a marker where each outcome happened, and a status-bar notice. Fog of war applies:
+  - the white cell sees all, with names;
+  - a side sees its own shots without the target's identity, and attacks on its own units without the shooter.
+- **Engine:** `sim-core` `outcomes.rs`, a display-only outcome feed. It is saved (save format **25**, so replay seeks match) but not hashed, so golden replays are unchanged. The snapshot gains `outcomes`.
+- **Tests:**
+  - a figure for every platform class and weapon;
+  - notice wording;
+  - `hit_and_miss_feedback_follows_fog_of_war`;
+  - the packaged-app test waits for an outcome notice.
+
 ### Changed (platforms)
 
 - **The application targets Windows and macOS only** (client decision, 2026-11-12, ADR-0006).

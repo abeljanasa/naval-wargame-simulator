@@ -340,3 +340,44 @@ fn mindoro_pilot_reaches_every_decision_point() {
     let at: Vec<usize> = order.iter().map(|n| first(n)).collect();
     assert!(at.windows(2).all(|w| w[0] <= w[1]), "out of order: {at:?}");
 }
+
+/// Weapon outcomes reach each seat as fog of war allows: the white cell sees who hit whom; the
+/// firing side sees its hit but not the target's identity; the target's side sees the hit on
+/// its own unit but not who fired (sim-core outcomes.rs).
+#[test]
+fn hit_and_miss_feedback_follows_fog_of_war() {
+    let (s, _) = load("phase3-pilot.json");
+    let db = sim_db::embedded::open_platform_db().unwrap();
+    let mut sim = s.build(None, &db).unwrap();
+    // Cinder is sunk by Bastion's missile at 01:52:49 (6769 s) in the reference run.
+    sim.run_until(sim_core::Tick(6775));
+    let wc = sim.snapshot(sim_core::Viewer::WhiteCell).outcomes;
+    let sunk = wc
+        .iter()
+        .find(|o| {
+            o.result == sim_core::OutcomeKind::Hit
+                && o.target_name.as_deref() == Some("Red corvette (FFL) — Cinder")
+        })
+        .expect("the white cell sees the hit on Cinder");
+    assert!(sunk.shooter_name.is_some());
+    let blue = sim
+        .snapshot(sim_core::Viewer::Side {
+            side: sim_core::SideId(1),
+        })
+        .outcomes;
+    assert!(!blue.is_empty(), "Blue sees its own shots");
+    assert!(blue
+        .iter()
+        .all(|o| o.target.is_none() && o.target_name.is_none()));
+    let red = sim
+        .snapshot(sim_core::Viewer::Side {
+            side: sim_core::SideId(2),
+        })
+        .outcomes;
+    assert!(red
+        .iter()
+        .any(|o| o.target_name.as_deref() == Some("Red corvette (FFL) — Cinder")));
+    assert!(red
+        .iter()
+        .all(|o| o.shooter.is_none() && o.shooter_name.is_none()));
+}

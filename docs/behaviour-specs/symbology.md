@@ -41,6 +41,33 @@ The code comes from what the viewing side knows:
 - **Other platforms:** classes outside this table, such as regional or accredited records, fall back to their category, then to no code.
 - **Every generic class has a code.** `ui.test.ts` checks the platform database for this, so a new class needs a code in the same change.
 
+## Figures (default)
+
+**View › Unit figures** (on by default; off shows the APP-6 frames and codes above) draws each unit as a figure of what it is (`apps/desktop/src/lib/silhouettes.ts`):
+
+- **Ships and submarines:** side profiles.
+  - Each has its own: carrier, amphibious ship, cruiser, destroyer, frigate, corvette, fast attack craft, patrol vessel, MCM vessel, landing ship, oiler, stores ship, tug, survey ship, and container, bulk, tanker, ro-ro, trawler and supply vessels.
+  - Submarines are nuclear, diesel or midget.
+  - The bow faces the direction of travel, and heights are drawn 1.6× so a low hull reads at map size.
+- **Aircraft:** top-down outlines rotated to the heading. Fighter, bomber, maritime patrol, AEW (with rotodome), tanker, helicopter (rotor disc) and UAV.
+- **Land sites:** upright icons for missile and SAM batteries, radar sites, airbases and ports.
+- **Munitions in flight:** top-down, rotated to the heading. Anti-ship, surface-to-air, cruise and air-to-air missiles; torpedoes, ASW rockets, bombs, gunfire, depth charges, decoys and mines. A homing weapon is outlined in white.
+- **Colour and badge:** each figure is filled in its affiliation colour and carries a small APP-6 frame badge, so affiliation still reads by shape.
+- **Contacts:** a contact shows a figure only as far as it is classified (class, then category, then domain). An unclassified contact keeps the APP-6 frame.
+- **Coverage:** every generic platform class and every weapon has a figure, and `ui.test.ts` checks this.
+
+## Weapon outcomes
+
+Hits, misses and weapons shot down show where they happened:
+- **Markers:** a filled burst for a hit, a pale ring for a miss, an amber ring for a weapon shot down. Each is labelled for 20 seconds and fades over a minute.
+- **Notice:** the newest outcome appears in the status bar for 15 seconds.
+
+Fog of war applies (`sim-core` `outcomes.rs`):
+- **The white cell** sees all of them, with names.
+- **A side** sees:
+  - its own shots, without the target's identity, since it fired at a contact;
+  - attacks on its own units, without the firing unit.
+
 ## Not in scope
 
 - Echelon, mobility and status amplifiers.

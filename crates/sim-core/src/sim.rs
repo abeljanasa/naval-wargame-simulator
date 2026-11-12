@@ -117,6 +117,8 @@ impl Simulation {
         world.insert_resource(SimClock::default());
         world.insert_resource(RngStreams::new(seed));
         world.insert_resource(EventLog::default());
+        // Display only: saved but not hashed (outcomes.rs).
+        world.insert_resource(crate::outcomes::OutcomeFeed::default());
         world.insert_resource(CommandLog::default());
         world.insert_resource(UnitIndex::default());
         world.insert_resource(ContactTable::default());
@@ -402,6 +404,14 @@ impl Simulation {
                 })
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
+            outcomes: crate::outcomes::visible(
+                self.world.resource::<crate::outcomes::OutcomeFeed>(),
+                tick,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+            ),
             adjudications: match viewer {
                 Viewer::WhiteCell => {
                     let log = &self.world.resource::<AdjudicationLog>().0;
@@ -819,6 +829,10 @@ impl Simulation {
                 .world
                 .resource::<crate::weapon_tracks::WeaponTracks>()
                 .clone(),
+            outcomes: self
+                .world
+                .resource::<crate::outcomes::OutcomeFeed>()
+                .clone(),
         }
     }
 
@@ -858,6 +872,7 @@ impl Simulation {
         sim.world.insert_resource(save.seats);
         sim.world.insert_resource(save.planning);
         sim.world.insert_resource(save.weapon_tracks);
+        sim.world.insert_resource(save.outcomes);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,

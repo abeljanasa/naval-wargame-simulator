@@ -336,6 +336,27 @@ try {
   await click(await byText("button", "Back to live"));
   await until("live again", async () => !(await bodyText()).includes("REPLAY"));
   check(true, "back to live after the review");
+
+  // 7. Engagement feedback: hits and misses show on the map and in the status bar.
+  await click(await byText("button", "Max"));
+  await click(await el(".toolbar .play"));
+  await until(
+    "the run up to the engagement (01:20)",
+    async () => seconds(await clock()) > 4800,
+    120_000,
+  );
+  await click(await byText("button", "15×"));
+  const notice = await until(
+    "a weapon outcome in the status bar",
+    async () => {
+      const t = await text(await el(".statusbar"));
+      return / (hit|missed) | was shot down/.test(t) ? t : false;
+    },
+    180_000,
+  );
+  await click(await el(".toolbar .play"));
+  check(true, `hit/miss feedback in the status bar ("${notice.slice(0, 80)}")`);
+  await shot("08-engagement");
 } catch (e) {
   check(false, String(e.message ?? e));
 } finally {

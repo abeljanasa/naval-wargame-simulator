@@ -174,4 +174,8 @@ pub struct Snapshot {
     pub weapon_tracks: Vec<crate::weapon_tracks::WeaponTrackView>,
     /// Side viewer: its surface action groups. White cell: every side's.
     pub action_groups: Vec<crate::planning::ActionGroup>,
+    /// Weapon outcomes (hit, miss, shot down) of the last minute that this viewer may know:
+    /// all for the white cell; a side's own shots (without the target's identity) and attacks
+    /// on its own units (without the shooter's).
+    pub outcomes: Vec<crate::outcomes::Outcome>,
 }

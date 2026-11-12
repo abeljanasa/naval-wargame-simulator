@@ -23,6 +23,7 @@ mod ids;
 mod mines;
 mod movement;
 mod optical;
+mod outcomes;
 mod planning;
 mod point_defence;
 mod rng;
@@ -68,6 +69,7 @@ pub use hash::StateHash;
 pub use ids::{SideId, UnitId};
 pub use mines::{Minefield, Minefields, MINE_CHECK_PERIOD_TICKS};
 pub use optical::default_length_m;
+pub use outcomes::{Outcome, OutcomeFeed, OutcomeKind};
 pub use planning::{
     group_of, validate_groups, validate_planning, weather_limit, ActionGroup, Diversion,
     DivertReason, Facility, FacilityKind, GapPolicy, GroupStation, Loadout, PlanningLayer,

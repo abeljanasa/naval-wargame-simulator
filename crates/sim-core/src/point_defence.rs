@@ -307,7 +307,24 @@ fn resolve_shots(world: &mut World, tick: Tick, catalog: &BTreeMap<String, Weapo
             },
         );
         if killed {
-            world.resource_mut::<WeaponsInFlight>().list.remove(idx);
+            let threat = world.resource_mut::<WeaponsInFlight>().list.remove(idx);
+            let (defender, _, _) = crate::outcomes::unit_info(world, s.defender);
+            crate::outcomes::note(
+                world,
+                crate::outcomes::Note {
+                    tick,
+                    weapon: threat.weapon.clone(),
+                    result: crate::outcomes::OutcomeKind::ShotDown,
+                    position: Some(threat.position),
+                    shooter: Some(threat.shooter),
+                    shooter_side: Some(threat.side),
+                    target: Some(threat.target),
+                    reason: Some(format!(
+                        "shot down by {}",
+                        defender.unwrap_or_else(|| format!("unit {}", s.defender.0))
+                    )),
+                },
+            );
             world.resource_mut::<EventLog>().push(
                 tick,
                 SimEventKind::WeaponMissed {

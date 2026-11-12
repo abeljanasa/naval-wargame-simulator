@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { bearing, distance, gameTime, knots, latLon, MPS_PER_KNOT, project } from "./format";
 import { frameSvg, functionCode, symbolUrl } from "./symbols";
+import { figureKind, figureShape, figureUrl, munitionKind } from "./silhouettes";
 import {
   buildLayers,
   circleRing,
@@ -14,6 +15,7 @@ import {
   ellipseRing,
   LABEL_LIMIT,
   ROUTE_STUB_M,
+  outcomeText,
   declutter,
   distanceM,
   labelCandidates,
@@ -102,6 +104,82 @@ describe("symbols", () => {
     expect(url).toContain(">SSK</text>");
     expect(symbolUrl("hostile", false, "subsurface", "SSK")).not.toBe(
       symbolUrl("hostile", false, "subsurface"),
+    );
+  });
+
+  it("draws a figure by class, else category, else domain; munitions by weapon id", () => {
+    expect(figureKind("GEN-FFG")).toBe("frigate");
+    expect(figureKind("GEN-SSK")).toBe("sub_diesel");
+    expect(figureKind("XYZ", "submarine")).toBe("sub");
+    expect(figureKind(null, null, "air")).toBe("aircraft");
+    expect(figureKind(null, null, null)).toBeNull();
+    expect(figureShape("frigate")).toBe("profile");
+    expect(figureShape("fighter")).toBe("topdown");
+    expect(figureShape("radar_site")).toBe("icon");
+    const right = decodeURIComponent(figureUrl("frigate", "friend", false));
+    const left = decodeURIComponent(figureUrl("frigate", "friend", false, true));
+    expect(right).toContain('viewBox="0 6 96 36"');
+    expect(left).toContain("matrix(-1 0 0 1 96 0)");
+    expect(munitionKind("WPN-ASM-SUB")).toBe("anti_ship_missile");
+    expect(munitionKind("WPN-TORP-HW")).toBe("torpedo");
+    expect(munitionKind("WPN-GUN-76")).toBe("shell");
+  });
+
+  it("has a figure for every generic platform class and every weapon", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dir = join(process.cwd(), "../../data/db/open/platforms");
+    const ids = readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .flatMap((f) =>
+        (
+          JSON.parse(readFileSync(join(dir, f), "utf8")) as { platforms: { id: string }[] }
+        ).platforms.map((p) => p.id),
+      );
+    // A class's own figure, not just its domain's.
+    expect(ids.filter((id) => figureKind(id) === null)).toEqual([]);
+    const weapons = (
+      JSON.parse(readFileSync(join(process.cwd(), "../../data/db/open/weapons.json"), "utf8")) as {
+        weapons: { id: string; kind: string }[];
+      }
+    ).weapons;
+    for (const w of weapons) {
+      const k = munitionKind(w.id);
+      if (w.kind === "gun" || w.kind === "ciws") expect(k).toBe("shell");
+      else expect(k).not.toBe("shell");
+    }
+  });
+
+  it("words a weapon outcome for each viewer", () => {
+    const o = {
+      tick: 100,
+      weapon: "WPN-ASM-SUB",
+      result: "hit" as const,
+      position: { lat_deg: 0, lon_deg: 0 },
+      shooter: 2,
+      shooter_name: "Bastion",
+      shooter_side: 1,
+      target: 11,
+      target_name: "Cinder",
+      target_side: 2,
+      reason: null,
+    };
+    expect(outcomeText(o, null)).toBe("Anti-ship missile from Bastion hit Cinder");
+    expect(outcomeText({ ...o, target: null, target_name: null }, 1)).toBe(
+      "Our anti-ship missile from Bastion hit its target",
+    );
+    expect(outcomeText({ ...o, shooter: null, shooter_name: null }, 2)).toBe(
+      "Cinder was hit by an enemy anti-ship missile",
+    );
+    expect(outcomeText({ ...o, result: "miss", reason: "seeker did not acquire" }, null)).toBe(
+      "Anti-ship missile from Bastion missed Cinder (seeker did not acquire)",
+    );
+    const down = { ...o, result: "shot_down" as const, reason: "shot down by Cinder" };
+    expect(outcomeText(down, null)).toBe(
+      "Anti-ship missile from Bastion at Cinder was shot down by Cinder",
+    );
+    expect(outcomeText({ ...down, target: null, target_name: null }, 1)).toBe(
+      "Our anti-ship missile from Bastion was shot down",
     );
   });
 

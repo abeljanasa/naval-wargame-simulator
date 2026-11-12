@@ -2,6 +2,7 @@
 // (selection, draft route). Every change to the simulation goes through `commands`.
 
 import {
+  type Outcome,
   type ActionGroup,
   type AarTable,
   type Facility,
@@ -76,6 +77,8 @@ class SimSession {
   weaponTracks = $state<WeaponTrackView[]>([]);
   /** The seat's surface action groups. */
   groups = $state<ActionGroup[]>([]);
+  /** Weapon outcomes of the last minute this seat may know (hit, miss, shot down). */
+  outcomes = $state<Outcome[]>([]);
 
   /** The action group a unit is in, if any. */
   groupOf(unit: number): ActionGroup | undefined {
@@ -168,6 +171,7 @@ class SimSession {
     this.posts = u.posts;
     this.weaponTracks = u.weapon_tracks;
     this.groups = u.action_groups;
+    this.outcomes = u.outcomes ?? [];
     if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 
