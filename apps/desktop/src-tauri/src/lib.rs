@@ -8,7 +8,8 @@ mod host;
 use host::{AarView, ClockStatus, Host, SnapshotUpdate, TimeCompression, MAIN_WINDOW};
 use serde::{Deserialize, Serialize};
 use sim_core::{
-    Adjudication, Doctrine, Facilitation, GeoPoint, Mission, Seat, SideId, UnitId, Viewer,
+    Adjudication, CommandPayload, Doctrine, Facilitation, GeoPoint, Mission, Seat, SideId, UnitId,
+    Viewer,
 };
 use sim_scenario::{ReferencePoint, Scenario, ScenarioIssue, Severity};
 use specta_typescript::Typescript;
@@ -674,6 +675,60 @@ fn order_mission(
         .map_err(|e| e.to_string())
 }
 
+/// Gives an action group its mission (run by its leader); `None` clears it.
+#[tauri::command]
+#[specta::specta]
+fn order_group_mission(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    group: String,
+    mission: Option<Mission>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_group(
+            window.label(),
+            CommandPayload::AssignGroupMission { group, mission },
+        )
+        .map(|_| ())
+}
+
+/// Takes a unit out of its action group.
+#[tauri::command]
+#[specta::specta]
+fn order_detach(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+) -> Result<(), String> {
+    lock(&host)
+        .order_group(window.label(), CommandPayload::DetachFromGroup { unit })
+        .map(|_| ())
+}
+
+/// Puts a unit into an action group at a station on its leader.
+#[tauri::command]
+#[specta::specta]
+fn order_join(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    group: String,
+    bearing_deg: f64,
+    range_m: f64,
+) -> Result<(), String> {
+    lock(&host)
+        .order_group(
+            window.label(),
+            CommandPayload::JoinGroup {
+                unit,
+                group,
+                bearing_deg,
+                range_m,
+            },
+        )
+        .map(|_| ())
+}
+
 /// A white-cell adjudication override with its reason (white-cell seat only).
 #[tauri::command]
 #[specta::specta]
@@ -728,6 +783,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_facilitate,
             order_zone_doctrine,
             zone_coverage,
+            order_group_mission,
+            order_detach,
+            order_join,
             db_weapons,
             editor_check,
             editor_current,

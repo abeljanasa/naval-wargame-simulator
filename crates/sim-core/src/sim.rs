@@ -461,6 +461,17 @@ impl Simulation {
                 }
                 Viewer::Side { side } => crate::planning::comms_views(&self.world, side),
             },
+            action_groups: self
+                .world
+                .resource::<PlanningLayer>()
+                .action_groups
+                .iter()
+                .filter(|g| match viewer {
+                    Viewer::WhiteCell => true,
+                    Viewer::Side { side } => g.side == side,
+                })
+                .cloned()
+                .collect(),
             weapon_tracks: crate::weapon_tracks::views(
                 &self.world,
                 match viewer {
@@ -1131,15 +1142,24 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             Issuer::WhiteCell { umpire } => adjudicate(world, umpire, reason, action),
             _ => Err("only the white cell may adjudicate".into()),
         },
-        CommandPayload::SetPlanning { facilities, zones } => {
+        CommandPayload::SetPlanning {
+            facilities,
+            zones,
+            action_groups,
+        } => {
             if !cmd.issuer.is_privileged() {
                 return Err("only the scenario or white cell may set the planning layer".into());
             }
-            world
-                .resource_mut::<PlanningLayer>()
-                .set(facilities.clone(), zones.clone());
+            let mut layer = world.resource_mut::<PlanningLayer>();
+            layer.set(facilities.clone(), zones.clone());
+            if let Some(groups) = action_groups {
+                layer.action_groups.clone_from(groups);
+            }
             Ok(())
         }
+        CommandPayload::AssignGroupMission { .. }
+        | CommandPayload::DetachFromGroup { .. }
+        | CommandPayload::JoinGroup { .. } => crate::planning::group_order(world, cmd),
         CommandPayload::SetSeats { seats } => {
             if !cmd.issuer.is_privileged() {
                 return Err("only the scenario or white cell may set seats".into());

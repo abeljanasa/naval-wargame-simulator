@@ -492,6 +492,34 @@
               ? ` · lost: ${u.criticals.join(", ").replaceAll("_", " ")}`
               : ""}
           </dd>
+          {#each sim.groups.filter((x) => x.leader === u.id || x.members.some((m) => m.unit === u.id)) as g (g.name)}
+            <dt>Group</dt>
+            <dd>
+              {g.name} ({g.leader === u.id
+                ? "leader: its mission is the group's"
+                : "keeping station"})
+              <button type="button" onclick={() => void sim.detach(u.id)}>Detach</button>
+            </dd>
+          {:else}
+            {#if sim.groups.some((g) => g.side === u.side)}
+              <dt><label for="join-group">Group</label></dt>
+              <dd>
+                <select
+                  id="join-group"
+                  onchange={(e) => {
+                    const name = e.currentTarget.value;
+                    if (name) void sim.join(u.id, name);
+                    e.currentTarget.value = "";
+                  }}
+                >
+                  <option value="">join a group…</option>
+                  {#each sim.groups.filter((g) => g.side === u.side) as g (g.name)}
+                    <option value={g.name}>{g.name}</option>
+                  {/each}
+                </select>
+              </dd>
+            {/if}
+          {/each}
           {#each sim.comms.filter((c) => c.unit === u.id) as c (c.unit)}
             <dt>Comms</dt>
             <dd class:hurt={c.status !== "up"}>{commsText(c)}</dd>

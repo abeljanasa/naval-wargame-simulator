@@ -16,7 +16,7 @@
 use crate::ai::{engage_first_weapon, ensure_moving, set_route, MissionState};
 use crate::c2::C2State;
 use crate::combat::{Health, Magazine, WeaponsInFlight};
-use crate::command::{Command, Issuer};
+use crate::command::{Command, CommandPayload, Issuer};
 use crate::comms;
 use crate::components::{Kinematics, Position, Route, Unit};
 use crate::detection::{ContactTable, SensorSuite};
@@ -215,6 +215,297 @@ pub enum ZoneLayer {
     Inner,
 }
 
+fn is_default<T: Default + PartialEq>(v: &T) -> bool {
+    *v == T::default()
+}
+
+/// A surface action group (`docs/models/planning-layer.md` §Surface action groups): the leader
+/// runs the group's one mission, the members keep station on it, and the group shares its air
+/// defence picture and deconflicts its area-defence fire.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(deny_unknown_fields)]
+pub struct ActionGroup {
+    pub name: String,
+    pub side: SideId,
+    pub leader: UnitId,
+    pub members: Vec<GroupStation>,
+    /// Group doctrine for the leader and members (they are put in a group of this name).
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub doctrine: Doctrine,
+    /// The group's one mission, run by the leader (and handed to a successor).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<Mission>,
+}
+
+/// One member's station in a surface action group.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(deny_unknown_fields)]
+pub struct GroupStation {
+    pub unit: UnitId,
+    /// Relative to the leader's heading, degrees.
+    pub bearing_deg: f64,
+    pub range_m: f64,
+}
+
+impl ActionGroup {
+    /// The leader and the members, in that order.
+    #[must_use]
+    pub fn units(&self) -> Vec<UnitId> {
+        std::iter::once(self.leader)
+            .chain(self.members.iter().map(|m| m.unit))
+            .collect()
+    }
+
+    fn station_mission(&self, m: &GroupStation) -> Mission {
+        Mission::Escort {
+            escorted: self.leader.0,
+            bearing_deg: m.bearing_deg,
+            range_m: m.range_m,
+        }
+    }
+}
+
+/// Checks action groups before they are set: unique names, each unit in one group, members not
+/// the leader, finite stations.
+pub fn validate_groups(groups: &[ActionGroup]) -> Result<(), String> {
+    let mut names = BTreeSet::new();
+    let mut placed = BTreeSet::new();
+    for g in groups {
+        if g.name.trim().is_empty() || !names.insert(g.name.trim()) {
+            return Err(format!("action group {:?} needs a unique name", g.name));
+        }
+        for u in g.units() {
+            if !placed.insert(u) {
+                return Err(format!("unit {u} is in more than one action group"));
+            }
+        }
+        for m in &g.members {
+            if !(m.bearing_deg.is_finite() && m.range_m.is_finite() && m.range_m > 0.0) {
+                return Err(format!(
+                    "action group {:?}: member {} needs a finite bearing and a range > 0",
+                    g.name, m.unit
+                ));
+            }
+        }
+        if let Some(m) = &g.mission {
+            m.validate()?;
+        }
+    }
+    Ok(())
+}
+
+/// The action group a unit belongs to (as leader or member), if any.
+#[must_use]
+pub fn group_of(groups: &[ActionGroup], unit: UnitId) -> Option<&ActionGroup> {
+    groups.iter().find(|g| g.units().contains(&unit))
+}
+
+fn set_mission(world: &mut World, unit: UnitId, mission: Option<Mission>) {
+    let Some(e) = world.resource::<UnitIndex>().0.get(&unit).copied() else {
+        return;
+    };
+    if let Some(mut m) = world.get_mut::<MissionState>(e) {
+        if m.mission != mission || m.complete {
+            m.mission = mission;
+            m.complete = false;
+            m.phase = 0;
+            m.since = None;
+        }
+    }
+}
+
+fn set_group_name(world: &mut World, unit: UnitId, name: Option<String>) {
+    let Some(e) = world.resource::<UnitIndex>().0.get(&unit).copied() else {
+        return;
+    };
+    if let Some(mut u) = world.get_mut::<Unit>(e) {
+        u.group = name;
+    }
+}
+
+/// Every AI period, for each action group in order: members lost leave it; a lost leader is
+/// succeeded by the first member, which takes the group's mission; a group with no units left
+/// is dissolved; and every member not diverted keeps station on the leader (an escort mission).
+pub(crate) fn groups_system(world: &mut World, tick: Tick) {
+    let groups = world.resource::<PlanningLayer>().action_groups.clone();
+    if groups.is_empty() {
+        return;
+    }
+    let alive = |world: &World, u: UnitId| world.resource::<UnitIndex>().0.contains_key(&u);
+    let mut kept = Vec::with_capacity(groups.len());
+    let mut events = Vec::new();
+    for mut g in groups {
+        g.members.retain(|m| alive(world, m.unit));
+        if !alive(world, g.leader) {
+            if g.members.is_empty() {
+                events.push(SimEventKind::GroupDissolved { group: g.name });
+                continue;
+            }
+            let next = g.members.remove(0);
+            g.leader = next.unit;
+            set_mission(world, g.leader, g.mission.clone());
+            events.push(SimEventKind::GroupLeaderChanged {
+                group: g.name.clone(),
+                leader: g.leader,
+            });
+        }
+        for m in &g.members {
+            let diverted = world
+                .resource::<PlanningLayer>()
+                .diverted
+                .contains_key(&m.unit);
+            if !diverted {
+                set_mission(world, m.unit, Some(g.station_mission(m)));
+            }
+        }
+        kept.push(g);
+    }
+    world.resource_mut::<PlanningLayer>().action_groups = kept;
+    for kind in events {
+        world.resource_mut::<EventLog>().push(tick, kind);
+    }
+}
+
+/// A group order: its mission, a unit leaving, or a unit joining. The caller has checked the
+/// issuer may command the side.
+pub(crate) fn group_order(world: &mut World, cmd: &Command) -> Result<(), String> {
+    let tick = world.resource::<SimClock>().tick;
+    let side_ok = |side: SideId| cmd.issuer.is_privileged() || cmd.side == Some(side);
+    match &cmd.payload {
+        CommandPayload::AssignGroupMission { group, mission } => {
+            let (side, leader) = {
+                let layer = world.resource::<PlanningLayer>();
+                let g = layer
+                    .action_groups
+                    .iter()
+                    .find(|g| &g.name == group)
+                    .ok_or_else(|| format!("no action group {group:?}"))?;
+                (g.side, g.leader)
+            };
+            if !side_ok(side) {
+                return Err(format!("action group {group:?} is not the issuing side's"));
+            }
+            if let Some(g) = world
+                .resource_mut::<PlanningLayer>()
+                .action_groups
+                .iter_mut()
+                .find(|g| &g.name == group)
+            {
+                g.mission.clone_from(mission);
+            }
+            world
+                .resource_mut::<PlanningLayer>()
+                .diverted
+                .remove(&leader);
+            set_mission(world, leader, mission.clone());
+            Ok(())
+        }
+        CommandPayload::DetachFromGroup { unit } => {
+            let (index, side) = {
+                let layer = world.resource::<PlanningLayer>();
+                let i = layer
+                    .action_groups
+                    .iter()
+                    .position(|g| g.units().contains(unit))
+                    .ok_or_else(|| format!("{unit} is not in an action group"))?;
+                (i, layer.action_groups[i].side)
+            };
+            if !side_ok(side) {
+                return Err(format!("{unit} does not belong to the issuing side"));
+            }
+            let mut layer = world.resource_mut::<PlanningLayer>();
+            let g = &mut layer.action_groups[index];
+            let name = g.name.clone();
+            let mut new_leader = None;
+            if g.leader == *unit {
+                if g.members.is_empty() {
+                    layer.action_groups.remove(index);
+                } else {
+                    let next = g.members.remove(0);
+                    g.leader = next.unit;
+                    new_leader = Some((g.leader, g.mission.clone()));
+                }
+            } else {
+                g.members.retain(|m| m.unit != *unit);
+            }
+            set_mission(world, *unit, None);
+            set_group_name(world, *unit, None);
+            world.resource_mut::<EventLog>().push(
+                tick,
+                SimEventKind::UnitDetached {
+                    unit: *unit,
+                    group: name.clone(),
+                },
+            );
+            if let Some((leader, mission)) = new_leader {
+                set_mission(world, leader, mission);
+                world.resource_mut::<EventLog>().push(
+                    tick,
+                    SimEventKind::GroupLeaderChanged {
+                        group: name,
+                        leader,
+                    },
+                );
+            }
+            Ok(())
+        }
+        CommandPayload::JoinGroup {
+            unit,
+            group,
+            bearing_deg,
+            range_m,
+        } => {
+            let e = *world
+                .resource::<UnitIndex>()
+                .0
+                .get(unit)
+                .ok_or_else(|| format!("unknown unit {unit}"))?;
+            let unit_side = world
+                .get::<Unit>(e)
+                .map(|u| u.side)
+                .ok_or_else(|| format!("{unit} has no identity"))?;
+            let station = GroupStation {
+                unit: *unit,
+                bearing_deg: *bearing_deg,
+                range_m: *range_m,
+            };
+            let mission = {
+                let mut layer = world.resource_mut::<PlanningLayer>();
+                if group_of(&layer.action_groups, *unit).is_some() {
+                    return Err(format!("{unit} is already in an action group"));
+                }
+                let g = layer
+                    .action_groups
+                    .iter_mut()
+                    .find(|g| &g.name == group)
+                    .ok_or_else(|| format!("no action group {group:?}"))?;
+                if g.side != unit_side || !side_ok(g.side) {
+                    return Err(format!(
+                        "{unit} cannot join {group:?}: not the same side as the issuer and group"
+                    ));
+                }
+                let m = g.station_mission(&station);
+                g.members.push(station);
+                m
+            };
+            world.resource_mut::<PlanningLayer>().diverted.remove(unit);
+            set_mission(world, *unit, Some(mission));
+            set_group_name(world, *unit, Some(group.clone()));
+            world.resource_mut::<EventLog>().push(
+                tick,
+                SimEventKind::UnitJoined {
+                    unit: *unit,
+                    group: group.clone(),
+                },
+            );
+            Ok(())
+        }
+        _ => Err("not a group order".into()),
+    }
+}
+
 /// A unit being served at a facility.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ServiceState {
@@ -287,6 +578,9 @@ pub struct PlanningLayer {
     /// Units waiting for a berth, and where.
     #[serde(default)]
     pub waiting: BTreeMap<UnitId, u32>,
+    /// Surface action groups, in order.
+    #[serde(default)]
+    pub action_groups: Vec<ActionGroup>,
 }
 
 /// Checks a planning layer before it is set.
@@ -594,7 +888,17 @@ pub(crate) fn command_authority(world: &World, cmd: &Command) -> Authority {
     if !matches!(cmd.issuer, Issuer::Player { .. }) {
         return Authority::Ok;
     }
-    let (Some(side), Some(unit)) = (cmd.side, cmd.payload.target_unit()) else {
+    // A group's mission is an order to its leader.
+    let target = cmd.payload.target_unit().or_else(|| match &cmd.payload {
+        CommandPayload::AssignGroupMission { group, .. } => world
+            .resource::<PlanningLayer>()
+            .action_groups
+            .iter()
+            .find(|g| &g.name == group)
+            .map(|g| g.leader),
+        _ => None,
+    });
+    let (Some(side), Some(unit)) = (cmd.side, target) else {
         return Authority::Ok;
     };
     let layer = world.resource::<PlanningLayer>();
@@ -728,7 +1032,11 @@ pub(crate) fn post_views(world: &World, side: Option<SideId>) -> Vec<comms::Post
 pub(crate) fn planning_system(world: &mut World) {
     {
         let layer = world.resource::<PlanningLayer>();
-        if layer.facilities.is_empty() && layer.zones.is_empty() && layer.queued.is_empty() {
+        if layer.facilities.is_empty()
+            && layer.zones.is_empty()
+            && layer.queued.is_empty()
+            && layer.action_groups.is_empty()
+        {
             return;
         }
     }
@@ -737,6 +1045,7 @@ pub(crate) fn planning_system(world: &mut World) {
     release_queued(world, tick);
     sense_alerts(world, tick);
     if tick.0.is_multiple_of(AI_PERIOD_TICKS) {
+        groups_system(world, tick);
         zone_shooters(world, tick);
         choke_transits(world, tick);
     }

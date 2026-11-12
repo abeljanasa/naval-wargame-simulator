@@ -20,6 +20,8 @@
 
 pub mod synthetic;
 
+pub use sim_core::{ActionGroup, GroupStation};
+
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
@@ -199,32 +201,6 @@ pub struct Scenario {
     /// The fuel model for ships and submarines (format 6; `docs/models/fuel.md`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fuel: bool,
-}
-
-/// A surface action group: its members keep station on the leader, so ordering the leader moves
-/// the group. Built as escort missions on the leader.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-#[serde(deny_unknown_fields)]
-pub struct ActionGroup {
-    pub name: String,
-    pub side: SideId,
-    pub leader: UnitId,
-    pub members: Vec<GroupStation>,
-    /// Group doctrine for the leader and members (they are put in a group of this name).
-    #[serde(default, skip_serializing_if = "is_default")]
-    pub doctrine: Doctrine,
-}
-
-/// One member's station in a surface action group.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-#[serde(deny_unknown_fields)]
-pub struct GroupStation {
-    pub unit: UnitId,
-    /// Relative to the leader's heading, degrees.
-    pub bearing_deg: f64,
-    pub range_m: f64,
 }
 
 /// A named point on the map (a rendezvous, a waypoint name, a briefing mark). It has no effect
@@ -791,10 +767,11 @@ impl Scenario {
                 weapon: m.weapon.clone(),
             });
         }
-        if !self.facilities.is_empty() || !self.zones.is_empty() {
+        if !self.facilities.is_empty() || !self.zones.is_empty() || !self.action_groups.is_empty() {
             c2.push(CommandPayload::SetPlanning {
                 facilities: self.facilities.clone(),
                 zones: self.zones.clone(),
+                action_groups: (!self.action_groups.is_empty()).then(|| self.action_groups.clone()),
             });
         }
         if !self.seats.is_empty() {

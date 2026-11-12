@@ -66,7 +66,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   diversions. Older saves load without them.
 /// * 22: zones gain a layer and sensor types. Older saves load without them.
 /// * 23: each side's tracks on weapons in flight. Older saves load with none.
-pub const SAVE_FORMAT_VERSION: u32 = 23;
+/// * 24: surface action groups in the planning layer. Older saves load with none.
+pub const SAVE_FORMAT_VERSION: u32 = 24;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]

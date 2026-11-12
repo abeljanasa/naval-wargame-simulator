@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 16: surface action groups in the core)
+
+- **Action groups are engine objects** (`docs/models/planning-layer.md` §Surface action groups, DL-0035):
+  - **One mission**, run by the leader (`AssignGroupMission`).
+  - **Succession:** the first member takes over when the leader is lost or leaves (`GroupLeaderChanged`).
+  - **Stations:** members keep station every AI period.
+  - **In play:** units detach (`DetachFromGroup`) and join (`JoinGroup`).
+- **Coordinated air defence:**
+  - Members fire on any group member's weapon track (shared picture).
+  - At most one SAM per threat is in the air from the group at a time (fire deconfliction).
+- **Desktop:**
+  - The unit panel shows the group, with **Detach** and **join a group…**.
+  - **Patrol here** on a leader sets the group's mission.
+  - New commands `order_group_mission`, `order_detach`, `order_join`.
+- **Picture:** `action_groups`.
+
+### Changed (slice 16)
+
+- **`SetPlanning`** takes optional `action_groups`. When they are omitted, the groups in play are kept.
+- **Save format 24.**
+
 ### Added (Phase 3, slice 15: weapons in flight as sensor targets)
 
 - **Weapon tracks** (`docs/models/weapons-damage.md` §Weapons as sensor targets, DL-0034):

@@ -14,11 +14,11 @@
 use serde::{Deserialize, Serialize};
 use sim_aar::{AarReport, AarTable, ExerciseRecord, Replay};
 use sim_core::{
-    Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, CommsView, ContactView,
-    Doctrine, DoctrineScope, Environment, EventStatus, Facilitation, GeoPoint, InjectStatus,
-    Issuer, Message, Minefield, Mission, PostView, Seat, SeatRole, SideId, SimEventKind,
-    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponTrackView, WeaponView,
-    ZoneCoverage,
+    ActionGroup, Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, CommsView,
+    ContactView, Doctrine, DoctrineScope, Environment, EventStatus, Facilitation, GeoPoint,
+    InjectStatus, Issuer, Message, Minefield, Mission, PostView, Seat, SeatRole, SideId,
+    SimEventKind, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponTrackView,
+    WeaponView, ZoneCoverage,
 };
 use sim_scenario::Scenario;
 use std::collections::{BTreeMap, BTreeSet};
@@ -92,6 +92,8 @@ pub struct SnapshotUpdate {
     pub posts: Vec<PostView>,
     /// The viewer's tracks on other sides' missiles and torpedoes.
     pub weapon_tracks: Vec<WeaponTrackView>,
+    /// The viewer's surface action groups.
+    pub action_groups: Vec<ActionGroup>,
 }
 
 /// Clock status sent with every frame.
@@ -786,6 +788,16 @@ impl Host {
         self.order(label, CommandPayload::AssignMission { unit, mission })
     }
 
+    /// An action group order: its mission, a unit leaving it, or a unit joining it.
+    pub fn order_group(&mut self, label: &str, payload: CommandPayload) -> Result<u64, String> {
+        match payload {
+            CommandPayload::AssignGroupMission { .. }
+            | CommandPayload::DetachFromGroup { .. }
+            | CommandPayload::JoinGroup { .. } => self.order(label, payload),
+            _ => Err("not an action group order".into()),
+        }
+    }
+
     /// A white-cell override. Only a white-cell seat may adjudicate (the core refuses others).
     pub fn order_adjudicate(
         &mut self,
@@ -820,6 +832,7 @@ impl Host {
             CommandPayload::SetPlanning {
                 facilities: self.scenario.facilities.clone(),
                 zones: zones.clone(),
+                action_groups: None,
             },
         )?;
         self.zones = zones;
@@ -955,6 +968,7 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
         comms: snap.comms.clone(),
         posts: snap.posts.clone(),
         weapon_tracks: snap.weapon_tracks.clone(),
+        action_groups: snap.action_groups.clone(),
     }
 }
 

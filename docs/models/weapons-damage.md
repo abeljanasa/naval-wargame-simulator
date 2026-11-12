@@ -63,7 +63,8 @@ Every tick, before weapons move:
 1. **Interceptors in the air** that are due resolve with Ph = interceptor base Ph × the threat's manoeuvre modifier (air rules). A kill removes the threat (`InterceptRoll`, `WeaponMissed: shot down`).
 2. **Defenders** are operational units with sensors, in unit-id order. A defender sees an incoming enemy missile when either of these holds; detection here takes no draw:
    - its **radiating radar** (EMCON active) has the missile inside both the radar horizon (to the missile's altitude) and the radar's R₅₀ against a **0.1 m²** missile;
-   - the side holds a **track** on the missile this tick from one of the defender's own sensors (below), so a radar-silent ship can still defend itself with IR, EO or visual sighting.
+   - the side holds a **track** on the missile this tick from one of the defender's own sensors (below), so a radar-silent ship can still defend itself with IR, EO or visual sighting; or, in a surface action group, from any unit of the group (shared picture, [planning-layer.md](planning-layer.md)).
+   - In an action group, a defender does not fire a SAM at a threat that another member's SAM is already engaging (one area-defence shot per threat at a time across the group).
 3. **Firing:**
    - After the **reaction time** (SAM 8 s, gun 5 s, CIWS 3 s), with the threat inside the weapon's range, the defender fires one round per free **fire channel** (SAM 2, gun 1, CIWS 1), one engagement per threat at a time.
    - **SAMs defend the area**: any incoming enemy missile. **Guns and CIWS defend only their own ship.**

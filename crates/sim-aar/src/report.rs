@@ -326,11 +326,23 @@ impl<'a> Builder<'a> {
             }
             CommandPayload::Facilitate { action } => self.facilitation(action),
             CommandPayload::SetSeats { seats } => format!("set {} seats", seats.len()),
-            CommandPayload::SetPlanning { facilities, zones } => format!(
+            CommandPayload::SetPlanning {
+                facilities, zones, ..
+            } => format!(
                 "set the planning layer ({} facilities, {} zones)",
                 facilities.len(),
                 zones.len()
             ),
+            CommandPayload::AssignGroupMission { group, mission } => match mission {
+                Some(m) => format!("{group}: {}", mission_name(m)),
+                None => format!("{group}: mission cleared"),
+            },
+            CommandPayload::DetachFromGroup { unit } => {
+                format!("{} detached from its group", self.unit_name(*unit))
+            }
+            CommandPayload::JoinGroup { unit, group, .. } => {
+                format!("{} joined {group}", self.unit_name(*unit))
+            }
             CommandPayload::CreateMinefield {
                 side,
                 mines,
@@ -864,6 +876,39 @@ impl<'a> Builder<'a> {
                     TimelineKind::Event,
                     self.unit_side(*unit),
                     format!("{name} holding at anchorage {facility}"),
+                );
+            }
+            SimEventKind::GroupLeaderChanged { group, leader } => {
+                let name = self.unit_name(*leader);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*leader),
+                    format!("{name} now leads {group}"),
+                );
+            }
+            SimEventKind::GroupDissolved { group } => self.note(
+                t,
+                TimelineKind::Event,
+                None,
+                format!("{group} dissolved: no units left"),
+            ),
+            SimEventKind::UnitDetached { unit, group } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} detached from {group}"),
+                );
+            }
+            SimEventKind::UnitJoined { unit, group } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} joined {group}"),
                 );
             }
             SimEventKind::WeaponDetected {

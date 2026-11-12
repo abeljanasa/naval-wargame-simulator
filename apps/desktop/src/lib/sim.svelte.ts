@@ -2,6 +2,7 @@
 // (selection, draft route). Every change to the simulation goes through `commands`.
 
 import {
+  type ActionGroup,
   type AarTable,
   type AarView,
   type Adjudication,
@@ -71,6 +72,24 @@ class SimSession {
   posts = $state<PostView[]>([]);
   /** The seat's tracks on other sides' missiles and torpedoes. */
   weaponTracks = $state<WeaponTrackView[]>([]);
+  /** The seat's surface action groups. */
+  groups = $state<ActionGroup[]>([]);
+
+  /** The action group a unit is in, if any. */
+  groupOf(unit: number): ActionGroup | undefined {
+    return this.groups.find((g) => g.leader === unit || g.members.some((m) => m.unit === unit));
+  }
+
+  async detach(unit: number) {
+    const res = await commands.orderDetach(unit);
+    this.error = res.status === "error" ? res.error : null;
+  }
+
+  /** Joins a unit to a group, 3 km astern of the leader. */
+  async join(unit: number, group: string) {
+    const res = await commands.orderJoin(unit, group, 180, 3_000);
+    this.error = res.status === "error" ? res.error : null;
+  }
   /** Sense zones whose coverage is drawn, and their latest coverage. */
   coverageShown = $state<number[]>([]);
   coverage = $state<ZoneCoverage[]>([]);
@@ -139,6 +158,7 @@ class SimSession {
     this.comms = u.comms;
     this.posts = u.posts;
     this.weaponTracks = u.weapon_tracks;
+    this.groups = u.action_groups;
     if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 
@@ -281,7 +301,12 @@ class SimSession {
     const mission: Mission | null = clear
       ? null
       : { kind: "patrol", centre: u.position, radius_m: PATROL_RADIUS_M };
-    const res = await commands.orderMission(u.id, mission);
+    // The leader of an action group orders the group's one mission.
+    const g = this.groupOf(u.id);
+    const res =
+      g && g.leader === u.id
+        ? await commands.orderGroupMission(g.name, mission)
+        : await commands.orderMission(u.id, mission);
     this.error = res.status === "error" ? res.error : null;
   }
 

@@ -122,6 +122,11 @@ pub(crate) fn point_defence_system(world: &mut World) {
     let tracks = world
         .resource::<crate::weapon_tracks::WeaponTracks>()
         .clone();
+    // Action groups share their picture and deconflict their area-defence fire.
+    let groups = planning.action_groups.clone();
+    let mates = |u: UnitId| -> Vec<UnitId> {
+        crate::planning::group_of(&groups, u).map_or_else(|| vec![u], |g| g.units())
+    };
     defenders.sort_by_key(|d| d.id);
 
     for d in &defenders {
@@ -153,7 +158,7 @@ pub(crate) fn point_defence_system(world: &mut World) {
                 .radars
                 .iter()
                 .any(|&(h, r50)| range <= r50.min(radar_horizon_m(h, t.altitude_m.max(0.0))))
-                || tracks.seen_by(d.side, t.id, d.id, tick);
+                || tracks.seen_by_any(d.side, t.id, &mates(d.id), tick);
             if !seen {
                 continue;
             }
@@ -174,6 +179,22 @@ pub(crate) fn point_defence_system(world: &mut World) {
                 // Guns and CIWS defend only their own ship; SAMs defend the area.
                 if w.kind != WeaponKind::Sam && t.target != d.id {
                     continue;
+                }
+                // One area-defence shot per threat at a time across an action group.
+                if w.kind == WeaponKind::Sam {
+                    let group = mates(d.id);
+                    let pd = world.resource::<PointDefence>();
+                    let taken = pd.shots.iter().any(|s| {
+                        s.threat == t.id
+                            && s.defender != d.id
+                            && group.contains(&s.defender)
+                            && catalog
+                                .get(&s.interceptor)
+                                .is_some_and(|k| k.kind == WeaponKind::Sam)
+                    });
+                    if taken {
+                        continue;
+                    }
                 }
                 if tick.0 < first.0 + reaction_time_s(w.kind) {
                     continue;

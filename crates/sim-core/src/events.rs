@@ -393,6 +393,23 @@ pub enum SimEventKind {
     WeatherEased {
         unit: UnitId,
     },
+    /// An action group's leader was lost or left; the first member leads now.
+    GroupLeaderChanged {
+        group: String,
+        leader: UnitId,
+    },
+    /// An action group lost its last unit.
+    GroupDissolved {
+        group: String,
+    },
+    UnitDetached {
+        unit: UnitId,
+        group: String,
+    },
+    UnitJoined {
+        unit: UnitId,
+        group: String,
+    },
     /// A side gained a track on another side's weapon in flight.
     WeaponDetected {
         side: SideId,

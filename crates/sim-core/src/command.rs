@@ -245,6 +245,25 @@ pub enum CommandPayload {
     SetPlanning {
         facilities: Vec<crate::planning::Facility>,
         zones: Vec<crate::planning::Zone>,
+        /// Surface action groups (omitted: the groups in play are kept).
+        #[serde(default)]
+        action_groups: Option<Vec<crate::planning::ActionGroup>>,
+    },
+    /// Gives an action group its one mission, run by its leader (`None` clears it).
+    AssignGroupMission {
+        group: String,
+        mission: Option<Mission>,
+    },
+    /// Takes a unit out of its action group (a leader is succeeded by the first member).
+    DetachFromGroup {
+        unit: UnitId,
+    },
+    /// Puts a unit into an action group at a station on the leader.
+    JoinGroup {
+        unit: UnitId,
+        group: String,
+        bearing_deg: f64,
+        range_m: f64,
     },
 }
 
@@ -261,7 +280,9 @@ impl CommandPayload {
             }
             | CommandPayload::Engage { shooter: unit, .. }
             | CommandPayload::AssignMission { unit, .. }
-            | CommandPayload::LayMines { unit, .. } => Some(*unit),
+            | CommandPayload::LayMines { unit, .. }
+            | CommandPayload::DetachFromGroup { unit }
+            | CommandPayload::JoinGroup { unit, .. } => Some(*unit),
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
             | CommandPayload::SetEnvironment { .. }
@@ -273,6 +294,7 @@ impl CommandPayload {
             | CommandPayload::Facilitate { .. }
             | CommandPayload::SetSeats { .. }
             | CommandPayload::SetPlanning { .. }
+            | CommandPayload::AssignGroupMission { .. }
             | CommandPayload::SetDoctrine { .. } => None,
         }
     }
@@ -380,8 +402,33 @@ impl CommandPayload {
             }
             CommandPayload::Facilitate { action } => action.validate(),
             CommandPayload::SetSeats { seats } => crate::seats::validate_seats(seats),
-            CommandPayload::SetPlanning { facilities, zones } => {
-                crate::planning::validate_planning(facilities, zones)
+            CommandPayload::SetPlanning {
+                facilities,
+                zones,
+                action_groups,
+            } => {
+                crate::planning::validate_planning(facilities, zones)?;
+                action_groups
+                    .as_deref()
+                    .map_or(Ok(()), crate::planning::validate_groups)
+            }
+            CommandPayload::AssignGroupMission { mission, .. } => {
+                mission.as_ref().map_or(Ok(()), Mission::validate)
+            }
+            CommandPayload::DetachFromGroup { .. } => Ok(()),
+            CommandPayload::JoinGroup {
+                group,
+                bearing_deg,
+                range_m,
+                ..
+            } => {
+                if group.trim().is_empty()
+                    || !(bearing_deg.is_finite() && range_m.is_finite() && *range_m > 0.0)
+                {
+                    Err("joining needs a group, a finite bearing and a range > 0".into())
+                } else {
+                    Ok(())
+                }
             }
             CommandPayload::SetEvents {
                 events,

@@ -60,6 +60,12 @@ export const commands = {
 	 *  any zone for the white cell).
 	 */
 	zoneCoverage: (zone: number) => typedError<ZoneCoverage | null, string>(__TAURI_INVOKE("zone_coverage", { zone })),
+	/**  Gives an action group its mission (run by its leader); `None` clears it. */
+	orderGroupMission: (group: string, mission: Mission_Deserialize | null) => typedError<null, string>(__TAURI_INVOKE("order_group_mission", { group, mission })),
+	/**  Takes a unit out of its action group. */
+	orderDetach: (unit: UnitId) => typedError<null, string>(__TAURI_INVOKE("order_detach", { unit })),
+	/**  Puts a unit into an action group at a station on its leader. */
+	orderJoin: (unit: UnitId, group: string, bearingDeg: number | null, rangeM: number | null) => typedError<null, string>(__TAURI_INVOKE("order_join", { unit, group, bearingDeg, rangeM })),
 	/**  Every weapon type, sorted by id. */
 	dbWeapons: () => typedError<DbWeaponRow[], string>(__TAURI_INVOKE("db_weapons")),
 	/**
@@ -149,14 +155,16 @@ export type AarView_Serialize = {
 };
 
 /**
- *  A surface action group: its members keep station on the leader, so ordering the leader moves
- *  the group. Built as escort missions on the leader.
+ *  A surface action group (`docs/models/planning-layer.md` §Surface action groups): the leader
+ *  runs the group's one mission, the members keep station on it, and the group shares its air
+ *  defence picture and deconflicts its area-defence fire.
  */
 export type ActionGroup = ActionGroup_Serialize | ActionGroup_Deserialize;
 
 /**
- *  A surface action group: its members keep station on the leader, so ordering the leader moves
- *  the group. Built as escort missions on the leader.
+ *  A surface action group (`docs/models/planning-layer.md` §Surface action groups): the leader
+ *  runs the group's one mission, the members keep station on it, and the group shares its air
+ *  defence picture and deconflicts its area-defence fire.
  */
 export type ActionGroup_Deserialize = {
 	name: string,
@@ -165,11 +173,14 @@ export type ActionGroup_Deserialize = {
 	members: GroupStation[],
 	/**  Group doctrine for the leader and members (they are put in a group of this name). */
 	doctrine?: Doctrine_Deserialize,
+	/**  The group's one mission, run by the leader (and handed to a successor). */
+	mission?: Mission_Deserialize | null,
 };
 
 /**
- *  A surface action group: its members keep station on the leader, so ordering the leader moves
- *  the group. Built as escort missions on the leader.
+ *  A surface action group (`docs/models/planning-layer.md` §Surface action groups): the leader
+ *  runs the group's one mission, the members keep station on it, and the group shares its air
+ *  defence picture and deconflicts its area-defence fire.
  */
 export type ActionGroup_Serialize = {
 	name: string,
@@ -178,6 +189,8 @@ export type ActionGroup_Serialize = {
 	members: GroupStation[],
 	/**  Group doctrine for the leader and members (they are put in a group of this name). */
 	doctrine?: Doctrine_Serialize,
+	/**  The group's one mission, run by the leader (and handed to a successor). */
+	mission?: Mission_Serialize,
 };
 
 /**  One override. */
@@ -1582,6 +1595,8 @@ export type SnapshotUpdate_Deserialize = {
 	posts: PostView_Deserialize[],
 	/**  The viewer's tracks on other sides' missiles and torpedoes. */
 	weapon_tracks: WeaponTrackView[],
+	/**  The viewer's surface action groups. */
+	action_groups: ActionGroup_Deserialize[],
 };
 
 /**
@@ -1620,6 +1635,8 @@ export type SnapshotUpdate_Serialize = {
 	posts: PostView_Serialize[],
 	/**  The viewer's tracks on other sides' missiles and torpedoes. */
 	weapon_tracks: WeaponTrackView[],
+	/**  The viewer's surface action groups. */
+	action_groups: ActionGroup_Serialize[],
 };
 
 /**  What a unit can still do. */

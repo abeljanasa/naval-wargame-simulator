@@ -1145,7 +1145,11 @@ fn planning(facilities: Vec<Facility>, zones: Vec<Zone>) -> Command {
         0,
         Issuer::Scenario,
         None,
-        CommandPayload::SetPlanning { facilities, zones },
+        CommandPayload::SetPlanning {
+            facilities,
+            zones,
+            action_groups: None,
+        },
     )
 }
 
@@ -1439,6 +1443,7 @@ fn only_privileged_issuers_set_the_planning_layer_and_bad_layers_are_refused() {
                 circle(ORIGIN, 1_000.0),
                 Doctrine::default(),
             )],
+            action_groups: None,
         },
     ))
     .unwrap();
@@ -2295,6 +2300,7 @@ fn denial_patrols_inside_the_choke_point_and_engages_only_inside_it() {
             CommandPayload::SetPlanning {
                 facilities: vec![],
                 zones: vec![z],
+                action_groups: None,
             },
         ))
         .unwrap();
@@ -2724,4 +2730,266 @@ fn a_hull_sonar_hears_an_incoming_torpedo() {
     let mut r = incoming(vec![radar()], &[], false, "T-TORP", 8_000.0);
     r.run_ticks(3);
     assert!(detections(&r).is_empty());
+}
+
+// ---- Surface action groups in the core (Phase 3 slice 16) ----
+
+fn sag(leader: u64, members: &[(u64, f64)]) -> ActionGroup {
+    ActionGroup {
+        name: "SAG 1".into(),
+        side: SideId(1),
+        leader: UnitId(leader),
+        members: members
+            .iter()
+            .map(|&(u, bearing_deg)| GroupStation {
+                unit: UnitId(u),
+                bearing_deg,
+                range_m: 2_000.0,
+            })
+            .collect(),
+        doctrine: Doctrine::default(),
+        mission: None,
+    }
+}
+
+fn set_groups(tick: u64, groups: Vec<ActionGroup>) -> Command {
+    cmd(
+        tick,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetPlanning {
+            facilities: vec![],
+            zones: vec![],
+            action_groups: Some(groups),
+        },
+    )
+}
+
+fn mission_of(sim: &mut Simulation, unit: u64) -> Option<Mission> {
+    unit_view(sim, unit).mission
+}
+
+#[test]
+fn a_group_runs_one_mission_and_a_member_takes_over_when_the_leader_is_lost() {
+    let mut sim = Simulation::new(1);
+    for (id, b) in [(1, 0.0), (2, 180.0), (3, 90.0)] {
+        sim.submit(unit(
+            id,
+            1,
+            direct(ORIGIN, b, 2_000.0).point,
+            vec![],
+            &[],
+            None,
+        ))
+        .unwrap();
+    }
+    sim.submit(set_groups(0, vec![sag(1, &[(2, 180.0), (3, 90.0)])]))
+        .unwrap();
+    let patrol = Mission::Patrol {
+        centre: ORIGIN,
+        radius_m: 10_000.0,
+    };
+    sim.submit(cmd(
+        1,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        CommandPayload::AssignGroupMission {
+            group: "SAG 1".into(),
+            mission: Some(patrol.clone()),
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(20);
+    assert_eq!(mission_of(&mut sim, 1), Some(patrol.clone()));
+    assert!(matches!(
+        mission_of(&mut sim, 2),
+        Some(Mission::Escort { escorted: 1, .. })
+    ));
+    // The leader is sunk: unit 2 leads, with the group's mission; unit 3 keeps station on it.
+    sim.submit(destroy(20, 1)).unwrap();
+    sim.run_ticks(20);
+    assert!(sim.events().iter().any(|e| matches!(
+        &e.kind,
+        SimEventKind::GroupLeaderChanged { leader, .. } if *leader == UnitId(2)
+    )));
+    assert_eq!(mission_of(&mut sim, 2), Some(patrol));
+    assert!(matches!(
+        mission_of(&mut sim, 3),
+        Some(Mission::Escort { escorted: 2, .. })
+    ));
+    let groups = sim.snapshot(Viewer::Side { side: SideId(1) }).action_groups;
+    assert_eq!(groups[0].leader, UnitId(2));
+    assert_eq!(groups[0].members.len(), 1);
+}
+
+#[test]
+fn units_detach_from_and_join_a_group_in_play() {
+    let mut sim = Simulation::new(1);
+    for id in 1..=4 {
+        sim.submit(unit(
+            id,
+            1,
+            direct(ORIGIN, 0.0, f64::from(id as u32) * 1_000.0).point,
+            vec![],
+            &[],
+            None,
+        ))
+        .unwrap();
+    }
+    sim.submit(unit(
+        9,
+        2,
+        direct(ORIGIN, 90.0, 50_000.0).point,
+        vec![],
+        &[],
+        None,
+    ))
+    .unwrap();
+    sim.submit(set_groups(0, vec![sag(1, &[(2, 180.0), (3, 90.0)])]))
+        .unwrap();
+    sim.run_ticks(11);
+    let player = |tick, payload| cmd(tick, Issuer::Player { seat: 1 }, Some(1), payload);
+    sim.submit(player(
+        11,
+        CommandPayload::DetachFromGroup { unit: UnitId(3) },
+    ))
+    .unwrap();
+    sim.submit(player(
+        11,
+        CommandPayload::JoinGroup {
+            unit: UnitId(4),
+            group: "SAG 1".into(),
+            bearing_deg: 270.0,
+            range_m: 3_000.0,
+        },
+    ))
+    .unwrap();
+    // Red cannot join a blue group; a unit cannot be in two groups.
+    sim.submit(cmd(
+        11,
+        umpire(),
+        None,
+        CommandPayload::JoinGroup {
+            unit: UnitId(9),
+            group: "SAG 1".into(),
+            bearing_deg: 0.0,
+            range_m: 1_000.0,
+        },
+    ))
+    .unwrap();
+    sim.submit(player(
+        12,
+        CommandPayload::JoinGroup {
+            unit: UnitId(2),
+            group: "SAG 1".into(),
+            bearing_deg: 0.0,
+            range_m: 1_000.0,
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(20);
+    assert_eq!(rejected(&sim).len(), 2, "{:?}", rejected(&sim));
+    let u3 = unit_view(&mut sim, 3);
+    assert_eq!((u3.mission, u3.group), (None, None));
+    let u4 = unit_view(&mut sim, 4);
+    assert_eq!(u4.group.as_deref(), Some("SAG 1"));
+    assert!(matches!(
+        u4.mission,
+        Some(Mission::Escort { escorted: 1, bearing_deg, .. }) if bearing_deg == 270.0
+    ));
+}
+
+/// Two blue ships 1 km apart with SAMs; red fires one ASM at unit 1 from 30 km.
+fn two_ship_raid(grouped: bool, silent_1: bool) -> Simulation {
+    let mut sim = Simulation::new(8);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![asm(), sam()],
+        },
+    ))
+    .unwrap();
+    for (id, at) in [(1, ORIGIN), (2, direct(ORIGIN, 0.0, 1_000.0).point)] {
+        let mut c = unit(id, 1, at, vec![radar()], &[("T-SAM", 8)], None);
+        if let CommandPayload::SpawnUnit(u) = &mut c.payload {
+            if silent_1 && id == 1 {
+                u.doctrine.emcon = Some(Emcon::Silent);
+            }
+        }
+        sim.submit(c).unwrap();
+    }
+    if grouped {
+        sim.submit(set_groups(0, vec![sag(1, &[(2, 0.0)])]))
+            .unwrap();
+    }
+    let at = direct(ORIGIN, 90.0, 30_000.0).point;
+    sim.submit(unit(5, 2, at, vec![radar()], &[("T-ASM", 4)], None))
+        .unwrap();
+    sim.run_ticks(1);
+    sim.submit(cmd(
+        1,
+        umpire(),
+        None,
+        CommandPayload::Engage {
+            shooter: UnitId(5),
+            contact: 1,
+            weapon: "T-ASM".into(),
+            rounds: 1,
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(150);
+    sim
+}
+
+fn shots_by(sim: &Simulation) -> Vec<(u64, UnitId)> {
+    sim.events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::PointDefenceShot { defender, .. } => Some((e.tick.0, defender)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_group_shares_its_air_picture_and_fires_one_sam_per_threat_at_a_time() {
+    // Ungrouped, both ships shoot at the first chance: two SAMs in the air at once.
+    let alone = shots_by(&two_ship_raid(false, false));
+    assert_eq!(alone[0].0, alone[1].0, "{alone:?}");
+    // Grouped: one SAM per threat at a time across the group.
+    let sim = two_ship_raid(true, false);
+    let together = shots_by(&sim);
+    assert!(!together.is_empty());
+    let first = together[0].0;
+    assert_eq!(
+        together.iter().filter(|s| s.0 == first).count(),
+        1,
+        "{together:?}"
+    );
+    // Unit 1 silent: alone it cannot see the missile; in the group its mate's radar track lets
+    // it fire.
+    let silent_alone = shots_by(&two_ship_raid(false, true));
+    assert!(
+        silent_alone.iter().all(|s| s.1 != UnitId(1)),
+        "{silent_alone:?}"
+    );
+    let shared = two_ship_raid(true, true);
+    let tracks: Vec<UnitId> = shared
+        .events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::WeaponDetected { by, .. } => Some(by),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tracks, vec![UnitId(2)], "only the radiating mate tracks it");
+    let fired = shots_by(&shared);
+    assert_eq!(
+        fired[0].1,
+        UnitId(1),
+        "the silent ship fires on its mate's track: {fired:?}"
+    );
 }

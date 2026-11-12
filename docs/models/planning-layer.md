@@ -118,15 +118,24 @@ The ranges are nominal: where a typical contact can be expected, not a guarantee
   "members": [{ "unit": 2, "bearing_deg": 180.0, "range_m": 3000 }] }
 ```
 
-- When the scenario is built, each member gets an **escort mission** on the leader at its station: bearing relative to the leader's heading, and range. Ordering the leader therefore moves the group.
-- The leader and members are put in a group named after the action group, under its `doctrine` (optional), so the group fights under one doctrine.
-- **Detach:** clear a member's mission (or give it another). **Add:** give a unit an escort mission on the leader.
+Action groups are engine objects (slice 16, [DL-0035](../design-log/DL-0035-action-groups.md)), sent with the planning layer, saved and hashed. The group moves and fights as one:
+- **Stations:** every AI period (10 s), each member that is not diverted (repair, fuel, weather) keeps station on the leader through an **escort mission**: bearing relative to the leader's heading, and range. Ordering the leader moves the group.
+- **One mission:** the group's `mission` (optional in the file; set in play with `AssignGroupMission`, or **Patrol here** on the leader in the desktop) is run by the leader. An order for the group's mission passes through the command posts like an order to its leader.
+- **Doctrine:** the leader and members are put in a group named after the action group, under its `doctrine` (optional).
+- **Succession:** when the leader is lost or leaves, the first member (in list order) leads and takes the group's mission (`GroupLeaderChanged`). The other members keep station on it. A group with no units left is dissolved (`GroupDissolved`).
+- **Detach and join in play:**
+  - `DetachFromGroup` takes a unit out: no mission, no group (`UnitDetached`).
+  - `JoinGroup` puts a unit of the side into a group at a station (`UnitJoined`). The desktop joins 3 km astern.
+  - A unit is in one group at most.
+- **Shared air-defence picture:** a member's point defence fires on a missile that any unit of the group tracks this tick. For example, a radar-silent ship fires on its mate's radar track.
+- **Fire deconfliction:** at most one **area-defence (SAM)** shot per threat is in the air from the group at a time. Members do not double up on the same missile, so their fire channels go further against a raid. Guns and CIWS still defend their own ship.
 - **Checks:**
   - the leader and members are units of the group's side;
   - a member is not the leader, and is in one group only;
   - a member has no mission of its own;
   - each member has a finite bearing and a range > 0.
-- After the start, a player can still give a member another mission; it then leaves its station.
+
+**Worked example:** two frigates, 1 km apart, each with SAMs and 2 fire channels, against one incoming missile. Apart, both fire at the first chance: two SAMs in the air. As a group, the first defender (unit-id order) fires and its mate holds, so the mate's channels stay free for the next threat.
 
 ## Desktop
 
@@ -152,4 +161,5 @@ The ranges are nominal: where a typical contact can be expected, not a guarantee
 - Facilities are not targets: they cannot be attacked or destroyed. Fixed command posts can be jammed ([comms.md](comms.md)) but not attacked.
 - Weather is one scenario-wide sea state; weather zones are Phase 4.
 - From the desktop, the white cell changes zone weapons control only. Other changes to the layer need the `SetPlanning` command (scenario scripts, batch).
-- Coverage uses nominal ranges against reference targets, from a scenario-wide sea state; it does not model terrain masking (Phase 4) or tasking. Assigned shooters engage, but there is no coordinated air defence across a group.
+- Coverage uses nominal ranges against reference targets, from a scenario-wide sea state; it does not model terrain masking (Phase 4) or tasking.
+- Action groups share their air-defence picture and deconflict SAM fire; they do not yet plan formations or assign sectors.
