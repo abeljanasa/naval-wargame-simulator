@@ -7,7 +7,7 @@
 - **The application targets Windows and macOS only** (client decision, 2026-11-12, ADR-0006).
   - No Linux installers. The release builds MSI/NSIS and `.app`/`.dmg`.
   - CI tests and checks determinism on Windows and macOS. The packaged-app test runs on Windows.
-  - Linux steps are removed from the workflows, the test script and the docs. Platform-neutral tooling still runs on Linux runners.
+  - Linux steps are removed from the workflows, the test script and the docs. The tooling jobs (format, cargo deny, database validation, benchmarks, offline build, front end) moved to Windows runners, so no CI job runs on Linux.
 
 ### Fixed
 

@@ -12,10 +12,15 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
 
+# No job runs on Linux (ADR-0006). Windows runners run the tooling jobs too, in bash, as written.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   fmt:
     name: Format
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
@@ -51,7 +56,7 @@ jobs:
   # Platform database validation suite (master prompt §9, ADR-0004).
   database:
     name: Platform database validation
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
@@ -89,7 +94,7 @@ jobs:
   determinism-compare:
     name: Determinism matrix agrees
     needs: determinism
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/download-artifact@v4
         with: { pattern: hashes-*, path: hashes }
@@ -110,19 +115,20 @@ jobs:
   # Dependency licences (no GPL/AGPL/LGPL), sources and security advisories (deny.toml).
   dependencies:
     name: Dependency audit (cargo deny)
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          command: check
+      # The cargo-deny action runs in a Linux container, so install the tool instead.
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - run: cargo install cargo-deny --locked
+      - run: cargo deny check
 
   # Performance budgets (master prompt §12). The budgets are defined for the reference laptop; the
   # CI gate checks the 1,000-unit budget, which has ~3x headroom on a developer machine, and records
   # the 10,000-unit figure for trend review. See docs/build/performance.md.
   performance:
     name: Performance budget
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
@@ -142,7 +148,7 @@ jobs:
   bench-regression:
     name: Benchmark regression (> 15 % fails)
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
         with:
@@ -163,12 +169,12 @@ jobs:
           if [ -d target/criterion ]; then
             cargo bench -p sim-scenario --bench engine -- --baseline base
           fi
-          python3 scripts/check_bench_regression.py target/criterion --threshold 0.15
+          python scripts/check_bench_regression.py target/criterion --threshold 0.15
 
   # Air-gapped build path: every dependency vendored, then built with no network.
   offline-build:
     name: Air-gapped build (vendored, offline)
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
@@ -183,9 +189,10 @@ jobs:
 
   frontend:
     name: Front end (typecheck, lint, build)
-    runs-on: ubuntu-24.04
+    runs-on: windows-2022
     defaults:
       run:
+        shell: bash
         working-directory: apps/desktop
     steps:
       - uses: actions/checkout@v4
@@ -213,6 +220,7 @@ jobs:
     runs-on: windows-2022
     defaults:
       run:
+        shell: bash
         working-directory: apps/desktop
     steps:
       - uses: actions/checkout@v4
