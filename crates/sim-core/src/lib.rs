@@ -66,10 +66,10 @@ pub use ids::{SideId, UnitId};
 pub use mines::{Minefield, Minefields, MINE_CHECK_PERIOD_TICKS};
 pub use optical::default_length_m;
 pub use planning::{
-    validate_planning, Diversion, DivertReason, Facility, FacilityKind, GapPolicy, Loadout,
-    PlanningLayer, QueuedOrder, ServiceState, Services, Zone, ZoneKind, ALONGSIDE_SPEED_MPS,
-    DEFAULT_HANDOVER_S, DEFAULT_TRANSFER_T_PER_H, RAS_LEAD_M, REARM_TICKS, REPAIR_FRACTION_PER_MIN,
-    SERVICE_PERIOD_TICKS,
+    validate_planning, weather_limit, Diversion, DivertReason, Facility, FacilityKind, GapPolicy,
+    Loadout, PlanningLayer, QueuedOrder, ServiceState, Services, Zone, ZoneKind,
+    ALONGSIDE_SPEED_MPS, DEFAULT_HANDOVER_S, DEFAULT_TRANSFER_T_PER_H, RAS_LEAD_M, REARM_TICKS,
+    REPAIR_FRACTION_PER_MIN, SERVICE_PERIOD_TICKS, UNDER_KEEL_CLEARANCE_M,
 };
 pub use point_defence::{PointDefence, Shot};
 pub use rng::{RngStreams, StreamId};

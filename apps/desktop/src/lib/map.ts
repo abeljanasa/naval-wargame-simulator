@@ -566,6 +566,8 @@ export interface MapFacility {
   kind: string;
   position: GeoPoint;
   radius_m: number | null;
+  /** The facility's water, drawn instead of its radius. */
+  area?: MapZone["area"] | null;
 }
 
 /** A sense or engage zone as drawn. */
@@ -637,7 +639,10 @@ export function planningLayers(
     new PathLayer<MapFacility>({
       id: `${id}-facility-rings`,
       data: facilities,
-      getPath: (f) => circleRing(f.position, n(f.radius_m)),
+      getPath: (f) =>
+        f.area
+          ? zoneRing({ name: f.name, kind: f.kind, area: f.area })
+          : circleRing(f.position, n(f.radius_m)),
       getColor: FACILITY_COLOUR,
       getWidth: 1,
       widthUnits: "pixels",

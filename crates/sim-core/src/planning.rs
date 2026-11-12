@@ -50,6 +50,8 @@ pub const DEFAULT_HANDOVER_S: f64 = 300.0;
 pub const DEFAULT_TRANSFER_T_PER_H: f64 = 300.0;
 /// A unit refuelling from an oiler under way steers for a point this far ahead of it, metres.
 pub const RAS_LEAD_M: f64 = 2_000.0;
+/// Water a unit needs under its keel, metres.
+pub const UNDER_KEEL_CLEARANCE_M: f64 = 1.0;
 
 /// What a facility is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -150,6 +152,19 @@ pub struct Facility {
     /// Refuelling: tonnes held at the start; `None` = unlimited (a depot ashore).
     #[serde(default)]
     pub fuel_t: Option<f64>,
+    /// The facility's water (ports, anchorages, fixed points): a polygon or circle used instead of
+    /// `radius_m` round `position`, which stays the point units steer for.
+    #[serde(default)]
+    pub area: Option<Area>,
+    /// Depth of water, metres: units whose draft plus 1 m clearance exceeds it cannot use it.
+    #[serde(default)]
+    pub depth_m: Option<f64>,
+    /// Holding limit: above this sea state units do not stay or come here.
+    #[serde(default)]
+    pub max_sea_state: Option<u8>,
+    /// Anchorages: AI-run units whose mission is complete hold here until tasked again.
+    #[serde(default)]
+    pub staging: bool,
 }
 
 /// What a zone governs.
@@ -293,6 +308,30 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         {
             return Err(format!(
                 "facility {:?}: only command posts and refuelling points are carried by a unit",
+                f.name
+            ));
+        }
+        if let Some(a) = &f.area {
+            a.validate()
+                .map_err(|e| format!("facility {:?} area: {e}", f.name))?;
+            if f.unit.is_some() {
+                return Err(format!(
+                    "facility {:?}: a facility carried by a unit has no fixed area",
+                    f.name
+                ));
+            }
+        }
+        if f.depth_m.is_some_and(|d| !(d.is_finite() && d > 0.0))
+            || f.max_sea_state.is_some_and(|s| s > 9)
+        {
+            return Err(format!(
+                "facility {:?} needs a depth > 0 and a holding limit of sea state 0-9",
+                f.name
+            ));
+        }
+        if f.staging && f.kind != FacilityKind::Anchorage {
+            return Err(format!(
+                "facility {:?}: only anchorages are staging areas",
                 f.name
             ));
         }
@@ -936,6 +975,46 @@ pub enum DivertReason {
     Repair,
     /// Below bingo fuel: refuel, then resume.
     Fuel,
+    /// Sea state at or above the unit's limit: shelter in port until it eases, then resume.
+    Weather,
+    /// Mission complete: hold at a staging anchorage until given a new mission.
+    Staging,
+}
+
+/// The sea state at which a surface unit of this length runs for shelter (original design:
+/// small craft at 5, medium ships at 7, large ships at 8).
+#[must_use]
+pub fn weather_limit(length_m: f64) -> u8 {
+    if length_m < 60.0 {
+        5
+    } else if length_m < 120.0 {
+        7
+    } else {
+        8
+    }
+}
+
+/// Whether `p` is in the facility: inside its area, or within its radius of where it is now
+/// (`at`; a carried facility always uses its radius).
+fn inside(f: &Facility, at: GeoPoint, p: GeoPoint) -> bool {
+    match (&f.area, f.unit) {
+        (Some(a), None) => a.contains(p),
+        _ => sim_geo::inverse(at, p).distance_m <= f.radius_m,
+    }
+}
+
+/// Whether a unit of this draft can use the facility: draft plus under-keel clearance within its
+/// depth. Unknown draft or depth always fits.
+fn fits(f: &Facility, draft_m: Option<f64>) -> bool {
+    match (f.depth_m, draft_m) {
+        (Some(depth), Some(d)) => d + UNDER_KEEL_CLEARANCE_M <= depth,
+        _ => true,
+    }
+}
+
+/// Whether the sea state exceeds the facility's holding limit.
+fn over_limit(f: &Facility, sea_state: u8) -> bool {
+    f.max_sea_state.is_some_and(|m| sea_state > m)
 }
 
 /// Units diverted, with their facility (where it is now) and its radius, for holding alongside.
@@ -953,26 +1032,88 @@ fn diverted_now(world: &World) -> Vec<(UnitId, Entity, Facility, GeoPoint)> {
         .collect()
 }
 
-/// Every [`SERVICE_PERIOD_TICKS`]: mission-killed units on a mission go to the nearest port of
-/// their side that repairs, and units on a mission below bingo fuel go to the nearest refuelling
-/// point of their side with fuel left (an oiler's moving point included). They stop alongside (or
-/// keep company with an oiler), and resume their mission once repaired or full.
+/// A surface unit at or above its weather limit.
+fn threatened(world: &World, e: Entity, sea_state: u8) -> bool {
+    let (Some(u), Some(sig)) = (
+        world.get::<Unit>(e),
+        world.get::<crate::detection::Signature>(e),
+    ) else {
+        return false;
+    };
+    let length = sig
+        .length_m
+        .unwrap_or_else(|| crate::optical::default_length_m(u.domain));
+    u.domain == crate::components::Domain::Surface && sea_state >= weather_limit(length)
+}
+
+/// Every [`SERVICE_PERIOD_TICKS`], AI-run units are sent to a facility of their side
+/// (`docs/models/planning-layer.md`, `docs/models/fuel.md`), in this order:
+/// - mission-killed units on a mission: the nearest port that repairs;
+/// - units on a mission below bingo fuel: the nearest refuelling point with fuel left;
+/// - surface units on a mission at or above their weather limit: the nearest sheltering port;
+/// - units whose mission is complete: the nearest staging anchorage.
+///
+/// Only facilities they fit (draft) and that are within their holding limit count. Units stop
+/// alongside (or keep company with an oiler) and resume their mission once repaired, full, or
+/// the weather eases; units holding at an anchorage stay until given a new mission.
 fn divert(world: &mut World, tick: Tick) {
-    divert_for(world, tick, DivertReason::Repair);
-    divert_for(world, tick, DivertReason::Fuel);
+    let sea = world.resource::<crate::detection::EnvState>().0.sea_state;
+    weather_changes(world, tick, sea);
+    for reason in [
+        DivertReason::Repair,
+        DivertReason::Fuel,
+        DivertReason::Weather,
+        DivertReason::Staging,
+    ] {
+        divert_for(world, tick, reason, sea);
+    }
     hold_alongside(world, tick);
 }
 
-fn divert_for(world: &mut World, tick: Tick, reason: DivertReason) {
+/// Weather eased: units sheltering resume. Weather worsened: units holding at a staging
+/// anchorage above its holding limit (or above their own limit) leave it, to shelter.
+fn weather_changes(world: &mut World, tick: Tick, sea: u8) {
+    let diverted: Vec<(UnitId, Entity, DivertReason, Option<Facility>)> = {
+        let layer = world.resource::<PlanningLayer>();
+        layer
+            .diverted
+            .iter()
+            .filter_map(|(id, d)| {
+                let e = *world.resource::<UnitIndex>().0.get(id)?;
+                Some((*id, e, d.reason, layer.facility(d.facility).cloned()))
+            })
+            .collect()
+    };
+    for (id, e, reason, f) in diverted {
+        match reason {
+            DivertReason::Weather if !threatened(world, e, sea) => {
+                resume(world, id, e, DivertReason::Weather);
+                world
+                    .resource_mut::<EventLog>()
+                    .push(tick, SimEventKind::WeatherEased { unit: id });
+            }
+            DivertReason::Staging
+                if threatened(world, e, sea) || f.as_ref().is_some_and(|f| over_limit(f, sea)) =>
+            {
+                world.resource_mut::<PlanningLayer>().diverted.remove(&id);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn divert_for(world: &mut World, tick: Tick, reason: DivertReason, sea: u8) {
     let points: Vec<(Facility, GeoPoint)> = {
         let layer = world.resource::<PlanningLayer>();
         layer
             .facilities
             .iter()
-            .filter(|f| f.kind != FacilityKind::CommandPost)
+            .filter(|f| f.kind != FacilityKind::CommandPost && !over_limit(f, sea))
             .filter(|f| match reason {
                 DivertReason::Repair => f.services.repair,
                 DivertReason::Fuel => f.services.refuel && layer.fuel_left(f) != Some(0.0),
+                DivertReason::Weather => f.kind == FacilityKind::ShelteringPort,
+                DivertReason::Staging => f.kind == FacilityKind::Anchorage && f.staging,
             })
             .filter_map(|f| post_position(world, f).map(|p| (f.clone(), p)))
             .collect()
@@ -980,7 +1121,7 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason) {
     if points.is_empty() {
         return;
     }
-    let mut candidates: Vec<(UnitId, Entity, SideId, GeoPoint)> = world
+    let mut candidates: Vec<(UnitId, Entity, SideId, GeoPoint, Option<f64>)> = world
         .query::<(
             Entity,
             &Unit,
@@ -997,18 +1138,23 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason) {
                     DivertReason::Fuel => {
                         h.status == Status::Operational && fuel.is_some_and(|f| f.low())
                     }
+                    DivertReason::Weather => true,
+                    DivertReason::Staging => h.status == Status::Operational && m.complete,
                 }
         })
-        .map(|(e, u, p, ..)| (u.id, e, u.side, p.point))
+        .map(|(e, u, p, ..)| (u.id, e, u.side, p.point, u.draft_m))
         .collect();
     candidates.sort_by_key(|c| c.0);
-    for (id, e, side, at) in candidates {
+    for (id, e, side, at, draft) in candidates {
         if world.resource::<PlanningLayer>().diverted.contains_key(&id) {
+            continue;
+        }
+        if reason == DivertReason::Weather && !threatened(world, e, sea) {
             continue;
         }
         let Some((point, to)) = points
             .iter()
-            .filter(|(f, _)| f.side == side && f.unit != Some(id))
+            .filter(|(f, _)| f.side == side && f.unit != Some(id) && fits(f, draft))
             .min_by(|(a, pa), (b, pb)| {
                 let da = sim_geo::inverse(at, *pa).distance_m;
                 let db = sim_geo::inverse(at, *pb).distance_m;
@@ -1018,9 +1164,14 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason) {
         else {
             continue;
         };
-        let mission = world
-            .get_mut::<MissionState>(e)
-            .and_then(|mut m| m.mission.take());
+        // A completed mission stays where it is (so the unit can stage); a live one is set aside.
+        let mission = world.get_mut::<MissionState>(e).and_then(|mut m| {
+            if m.complete {
+                None
+            } else {
+                m.mission.take()
+            }
+        });
         world.resource_mut::<PlanningLayer>().diverted.insert(
             id,
             Diversion {
@@ -1029,17 +1180,17 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason) {
                 reason,
             },
         );
-        set_route(world, e, id, to, tick);
-        ensure_moving(world, e, 0.7);
+        let already_there = inside(&point, to, at);
+        if !already_there {
+            set_route(world, e, id, to, tick);
+            ensure_moving(world, e, 0.7);
+        }
+        let facility = point.id;
         let kind = match reason {
-            DivertReason::Repair => SimEventKind::DivertedToPort {
-                unit: id,
-                facility: point.id,
-            },
-            DivertReason::Fuel => SimEventKind::DivertedForFuel {
-                unit: id,
-                facility: point.id,
-            },
+            DivertReason::Repair => SimEventKind::DivertedToPort { unit: id, facility },
+            DivertReason::Fuel => SimEventKind::DivertedForFuel { unit: id, facility },
+            DivertReason::Weather => SimEventKind::ShelteringFromWeather { unit: id, facility },
+            DivertReason::Staging => SimEventKind::HoldingAtAnchorage { unit: id, facility },
         };
         world.resource_mut::<EventLog>().push(tick, kind);
     }
@@ -1052,30 +1203,14 @@ fn hold_alongside(world: &mut World, tick: Tick) {
         let Some(here) = world.get::<Position>(e).map(|p| p.point) else {
             continue;
         };
-        let near = sim_geo::inverse(here, at).distance_m <= f.radius_m;
+        let near = inside(&f, at, here);
         let oiler = f
             .unit
             .and_then(|u| world.resource::<UnitIndex>().0.get(&u).copied())
             .and_then(|o| world.get::<Kinematics>(o).copied());
         match (near, oiler) {
-            (true, None) => {
-                if let Some(mut k) = world.get_mut::<Kinematics>(e) {
-                    k.ordered_speed_mps = 0.0;
-                }
-                if let Some(mut r) = world.get_mut::<Route>(e) {
-                    r.waypoints.clear();
-                    r.next = 0;
-                }
-            }
-            (true, Some(ok)) if ok.speed_mps <= ALONGSIDE_SPEED_MPS => {
-                if let Some(mut k) = world.get_mut::<Kinematics>(e) {
-                    k.ordered_speed_mps = 0.0;
-                }
-                if let Some(mut r) = world.get_mut::<Route>(e) {
-                    r.waypoints.clear();
-                    r.next = 0;
-                }
-            }
+            (true, None) => crate::ai::hold(world, e),
+            (true, Some(ok)) if ok.speed_mps <= ALONGSIDE_SPEED_MPS => crate::ai::hold(world, e),
             (true, Some(ok)) => {
                 let ahead = sim_geo::direct(at, ok.heading_deg, RAS_LEAD_M).point;
                 if let Some(mut r) = world.get_mut::<Route>(e) {
@@ -1090,7 +1225,15 @@ fn hold_alongside(world: &mut World, tick: Tick) {
                 set_route(world, e, id, at, tick);
                 ensure_moving(world, e, 0.7);
             }
-            (false, None) => {}
+            (false, None) => {
+                let idle = world
+                    .get::<Route>(e)
+                    .is_none_or(|r| r.next >= r.waypoints.len());
+                if idle {
+                    set_route(world, e, id, at, tick);
+                    ensure_moving(world, e, 0.7);
+                }
+            }
         }
     }
 }
@@ -1100,17 +1243,17 @@ fn alongside(
     world: &mut World,
     facilities: &[(Facility, GeoPoint, Option<f64>)],
 ) -> (BTreeMap<UnitId, (u32, Entity)>, BTreeMap<UnitId, u32>) {
-    let mut units: Vec<(UnitId, Entity, SideId, GeoPoint, f64)> = world
+    let mut units: Vec<(UnitId, Entity, SideId, GeoPoint, f64, Option<f64>)> = world
         .query::<(Entity, &Unit, &Position, &Kinematics)>()
         .iter(world)
-        .map(|(e, u, p, k)| (u.id, e, u.side, p.point, k.speed_mps))
+        .map(|(e, u, p, k)| (u.id, e, u.side, p.point, k.speed_mps, u.draft_m))
         .collect();
     units.sort_by_key(|u| u.0);
     let mut served: BTreeMap<UnitId, (u32, Entity)> = BTreeMap::new();
     let mut waiting: BTreeMap<UnitId, u32> = BTreeMap::new();
     for (f, at, carrier_speed) in facilities {
         let mut n = 0u32;
-        for &(id, e, side, here, speed) in &units {
+        for &(id, e, side, here, speed, draft) in &units {
             // At a fixed facility a unit must be nearly stopped; alongside an oiler it must keep
             // within 1 m/s of the oiler's speed.
             let slow = match carrier_speed {
@@ -1121,7 +1264,8 @@ fn alongside(
                 || f.unit == Some(id)
                 || !slow
                 || served.contains_key(&id)
-                || sim_geo::inverse(*at, here).distance_m > f.radius_m
+                || !fits(f, draft)
+                || !inside(f, *at, here)
             {
                 continue;
             }

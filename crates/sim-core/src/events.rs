@@ -384,6 +384,20 @@ pub enum SimEventKind {
         unit: UnitId,
         tonnes: f64,
     },
+    /// A surface unit at or above its weather limit was sent to a sheltering port.
+    ShelteringFromWeather {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// The weather eased: a sheltering unit resumes its mission.
+    WeatherEased {
+        unit: UnitId,
+    },
+    /// A unit whose mission is complete was sent to hold at a staging anchorage.
+    HoldingAtAnchorage {
+        unit: UnitId,
+        facility: u32,
+    },
     /// An order held while its command post was down was carried out.
     QueuedOrderApplied {
         seq: u64,

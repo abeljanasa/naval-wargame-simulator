@@ -45,6 +45,9 @@ pub struct Unit {
     /// Doctrine set on this unit; unset fields inherit from the group and the side.
     #[serde(default)]
     pub doctrine: Doctrine,
+    /// Draft, metres, for facility depth limits. From the spawn command, so not hashed.
+    #[serde(default)]
+    pub draft_m: Option<f64>,
 }
 
 /// Geodetic position. `altitude_m` is height above MSL; negative values are depth.

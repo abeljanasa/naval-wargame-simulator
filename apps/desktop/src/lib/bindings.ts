@@ -754,6 +754,17 @@ export type Facility_Deserialize = {
 	transfer_t_per_h?: number | null,
 	/**  Refuelling: tonnes held at the start; `None` = unlimited (a depot ashore). */
 	fuel_t?: number | null,
+	/**
+	 *  The facility's water (ports, anchorages, fixed points): a polygon or circle used instead of
+	 *  `radius_m` round `position`, which stays the point units steer for.
+	 */
+	area?: Area | null,
+	/**  Depth of water, metres: units whose draft plus 1 m clearance exceeds it cannot use it. */
+	depth_m?: number | null,
+	/**  Holding limit: above this sea state units do not stay or come here. */
+	max_sea_state?: number | null,
+	/**  Anchorages: AI-run units whose mission is complete hold here until tasked again. */
+	staging?: boolean,
 };
 
 /**  A planning-layer facility. */
@@ -802,6 +813,17 @@ export type Facility_Serialize = {
 	transfer_t_per_h: number | null,
 	/**  Refuelling: tonnes held at the start; `None` = unlimited (a depot ashore). */
 	fuel_t: number | null,
+	/**
+	 *  The facility's water (ports, anchorages, fixed points): a polygon or circle used instead of
+	 *  `radius_m` round `position`, which stays the point units steer for.
+	 */
+	area: Area | null,
+	/**  Depth of water, metres: units whose draft plus 1 m clearance exceeds it cannot use it. */
+	depth_m: number | null,
+	/**  Holding limit: above this sea state units do not stay or come here. */
+	max_sea_state: number | null,
+	/**  Anchorages: AI-run units whose mission is complete hold here until tasked again. */
+	staging: boolean,
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */

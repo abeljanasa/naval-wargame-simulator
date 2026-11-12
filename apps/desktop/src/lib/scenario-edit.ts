@@ -89,6 +89,14 @@ export interface DraftFacility {
   transfer_t_per_h?: number | null;
   /** Refuelling: tonnes held; none = unlimited. */
   fuel_t?: number | null;
+  /** The facility's water, used instead of the radius. */
+  area?: DraftArea | null;
+  /** Depth of water, metres (draft limit). */
+  depth_m?: number | null;
+  /** Holding limit: highest sea state units stay in. */
+  max_sea_state?: number | null;
+  /** Anchorages: units hold here between missions. */
+  staging?: boolean;
 }
 
 export interface DraftDoctrine {

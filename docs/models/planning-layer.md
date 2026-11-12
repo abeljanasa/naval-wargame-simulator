@@ -34,7 +34,22 @@ Each facility belongs to one side:
 | Kind | Effect |
 |---|---|
 | `command_post` | Orders route through the post (below). Ashore when fixed, or carried by a `unit` (a flagship afloat, an aircraft airborne, a land unit). |
-| `sheltering_port`, `anchorage`, `refuelling_point` | Serve the side's units that are **alongside**: within `radius_m` and at ≤ 0.5 m/s, with the `services` the facility offers. |
+| `sheltering_port`, `anchorage`, `refuelling_point` | Serve the side's units that are **alongside**: inside the facility's water and at ≤ 0.5 m/s, with the `services` the facility offers. |
+
+**Water, depth and holding limits** (slice 13, [DL-0032](../design-log/DL-0032-anchorages-weather.md)):
+- **`area`:** a polygon or circle that a fixed facility's water uses instead of `radius_m` round `position`. `position` stays the point units steer for, and the scenario check warns if it is outside the area. A facility carried by a unit (an oiler) always uses its radius.
+- **`depth_m`:** a unit whose draft (from the platform database) plus 1 m under-keel clearance exceeds the depth is neither served nor sent there. Units with no known draft fit anywhere. The planner enters the depth; bathymetry is Phase 4.
+- **`max_sea_state`:** the holding limit. Above it, no unit is sent there, and units holding there leave.
+- **`staging`** (anchorages): AI-run units whose mission is complete go to the nearest staging anchorage of their side that they fit (`HoldingAtAnchorage`). They hold there until they are given a new mission.
+
+**Weather.** Every 60 s, a surface unit with a mission whose sea state is at or above its **weather limit** goes to the nearest sheltering port it fits (`ShelteringFromWeather`):
+- under 60 m long: sea state 5;
+- 60–120 m: sea state 7;
+- 120 m and over: sea state 8.
+
+A live mission is set aside. When the sea state falls below the limit, the unit resumes it (`WeatherEased`). Submarines are not affected. Sea state is scenario-wide (weather zones are Phase 4).
+
+**Worked example:** at sea state 6, a 40 m patrol boat (limit 5) on patrol runs for the nearest port and takes up its patrol again when the sea state drops to 4. A 135 m frigate (limit 8) on the same patrol stays out.
 
 **Command posts.** Once a side has a command post, a **player's** order to a unit goes ahead only if:
 - the unit is commanded by a post that is up and has a comms link to it ([comms.md](comms.md): range `range_m`, default `radius_m`; radio horizon for VHF/UHF posts; jamming; relays) — a post commands its `subordinates`, or every unit of its side when the list is empty; or
@@ -46,7 +61,7 @@ A post carried by a unit is **down** once that unit, having been in play, is des
 
 Other refusals: *"U3 cannot be reached from Blue maritime HQ: out of range"* (or *link jammed*, *beyond the radio horizon*, *submerged too deep to receive*), *"U3's command posts are down"*, *"U3 is not assigned to a command post"*. White-cell, scenario, script and AI orders are never limited, and a side without command posts is not limited.
 
-**Diversion for repair.** Every 60 s, a mission-killed unit **with a mission** (AI-run) goes to the nearest port of its side that repairs (`DivertedToPort`). Its mission is set aside; it stops on arrival; once fully repaired it takes the mission up again. Units without a mission are left to their player.
+**Diversion for repair.** Every 60 s, a mission-killed unit **with a mission** (AI-run) goes to the nearest port of its side that repairs and that it fits (`DivertedToPort`). Its mission is set aside; it stops on arrival; once fully repaired it takes the mission up again, planning its route afresh. Units without a mission are left to their player. A new mission from a player or the white cell ends any diversion (repair, fuel, weather or staging).
 
 **Services**, checked every 60 s:
 - **Berths:** at most `berths` units are served at once (0 = no limit), lowest unit id first. Each unit is served by the first facility (by id) it is alongside.
@@ -104,16 +119,14 @@ A **choke point** is a sense zone round an engage zone, sharing a `choke_point` 
 
 ## Formats
 
-- **Scenario format 5** adds `facilities`, `zones` and `action_groups`. Formats 1–4 still load.
+- **Scenario format 5** adds `facilities`, `zones` and `action_groups`. Formats 1–4 still load. Facility `area`, `depth_m`, `max_sea_state` and `staging` (slice 13) are optional fields.
 - **Save format 17** adds the planning layer (with the units being served) and each unit's loadout. Older saves load with no layer and the loadout taken from the unit's current state.
 - The layer is set by the logged `SetPlanning` command (scenario or white cell only). It is hashed only when present, so scenarios without one keep their golden hashes.
 
 ## Limitations
 
-- No fuel model, so refuelling points refuel nothing yet (Phase 4, air operations).
-- No draft limits or runways: they need bathymetry (GEBCO) and air operations (backlog).
-- Facilities are not targets: they cannot be attacked or destroyed.
-- Command-post range is a plain radius: no comms model, relay, line of sight or jamming of the post. A post is lost only with the unit carrying it; fixed posts cannot be attacked.
-- Zone polygons are typed in the scenario file; the editor draws only circles.
+- Depths are entered by the planner. Depths from bathymetry, and runways, wait for GEBCO data and air operations (Phase 4).
+- Facilities are not targets: they cannot be attacked or destroyed. Fixed command posts can be jammed ([comms.md](comms.md)) but not attacked.
+- Weather is one scenario-wide sea state; weather zones are Phase 4.
 - From the desktop, the white cell changes zone weapons control only. Other changes to the layer need the `SetPlanning` command (scenario scripts, batch).
-- Anchorages serve units alongside but do not yet draw units to them between missions. Sense-zone coverage and gaps are not drawn. Assigned shooters engage, but there is no coordinated air defence across a group.
+- Sense-zone coverage and gaps are not drawn. Assigned shooters engage, but there is no coordinated air defence across a group.

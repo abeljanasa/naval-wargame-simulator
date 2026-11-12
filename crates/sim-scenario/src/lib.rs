@@ -600,6 +600,14 @@ impl Scenario {
                 )));
             }
         }
+        for f in &self.facilities {
+            if f.area.as_ref().is_some_and(|a| !a.contains(f.position)) {
+                issues.push(warning(format!(
+                    "facility {:?}: its point is outside its area, so units steer for a point                      outside the water it serves",
+                    f.name
+                )));
+            }
+        }
         issues.sort_by_key(|i| i.severity);
         issues
     }
@@ -895,6 +903,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
         stores,
         damage,
         fuel_basis,
+        draft_m,
     ) = match &u.platform {
         Some(pid) => {
             let p = db
@@ -966,6 +975,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
                     }
                     _ => None,
                 },
+                p.draft_m,
             )
         }
         // `validate` guarantees these are present when there is no platform.
@@ -983,6 +993,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
             None,
             None,
             BTreeMap::new(),
+            None,
             None,
             None,
         ),
@@ -1013,6 +1024,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
         stores,
         damage_profile: damage,
         mission: u.mission.clone(),
+        draft_m,
         fuel: fuel_basis
             .filter(|_| fuel)
             .map(|(capacity_t, endurance_m, cruise_mps)| FuelSpec {

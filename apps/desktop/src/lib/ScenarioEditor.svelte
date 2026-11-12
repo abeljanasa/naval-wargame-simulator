@@ -1098,6 +1098,50 @@
             {/if}
           </div>
           {#if f.kind !== "command_post"}
+            <div class="grid2">
+              <label>
+                Depth (m, blank: any draft)
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={f.depth_m ?? ""}
+                  onchange={(e) => {
+                    const v = e.currentTarget.value.trim();
+                    f.depth_m = v === "" ? null : Math.max(0.1, num(v));
+                    changed();
+                  }}
+                />
+              </label>
+              <label>
+                Holding limit (sea state, blank: none)
+                <input
+                  type="number"
+                  min="0"
+                  max="9"
+                  value={f.max_sea_state ?? ""}
+                  onchange={(e) => {
+                    const v = e.currentTarget.value.trim();
+                    f.max_sea_state =
+                      v === "" ? null : Math.min(9, Math.max(0, Math.round(num(v))));
+                    changed();
+                  }}
+                />
+              </label>
+              {#if f.kind === "anchorage"}
+                <label class="inline">
+                  <input
+                    type="checkbox"
+                    checked={f.staging ?? false}
+                    onchange={(e) => {
+                      f.staging = e.currentTarget.checked;
+                      changed();
+                    }}
+                  />
+                  Staging: units hold here between missions
+                </label>
+              {/if}
+            </div>
             <div class="row">
               {#each SERVICES as sv (sv)}
                 <label class="inline">
@@ -1120,6 +1164,31 @@
             >
               Move on the map
             </button>
+            {#if f.kind !== "command_post" && f.unit == null}
+              <button
+                onclick={() => {
+                  f.area = { shape: "polygon", points: [] };
+                  editor.pick(
+                    `Click the corners of ${f.name}'s area, then Done`,
+                    (p) => {
+                      if (f.area?.shape === "polygon") f.area.points = [...f.area.points, p];
+                    },
+                    true,
+                  );
+                }}>Draw area</button
+              >
+              {#if f.area}
+                <span class="dim"
+                  >{f.area.shape === "polygon" ? f.area.points.length : 0} corners</span
+                >
+                <button
+                  onclick={() => {
+                    f.area = null;
+                    changed();
+                  }}>Use the radius</button
+                >
+              {/if}
+            {/if}
             <button
               class="danger"
               onclick={() => {
@@ -1167,9 +1236,7 @@
                 />
               </label>
             {:else}
-              <p class="dim">
-                Polygon ({z.area.points.length} points): edit the file to change it.
-              </p>
+              <p class="dim">Polygon ({z.area.points.length} corners).</p>
             {/if}
             <label>
               Weapons control
@@ -1252,6 +1319,28 @@
               >
                 Centre on the map
               </button>
+            {/if}
+            <button
+              onclick={() => {
+                z.area = { shape: "polygon", points: [] };
+                editor.pick(
+                  `Click the corners of ${z.name}, then Done`,
+                  (p) => {
+                    if (z.area.shape === "polygon") z.area.points = [...z.area.points, p];
+                  },
+                  true,
+                );
+              }}>Draw polygon</button
+            >
+            {#if z.area.shape === "polygon"}
+              {@const pts = z.area.points}
+              <button
+                onclick={() => {
+                  const c = pts[0] ?? d.units[0]?.position ?? { lat_deg: 0, lon_deg: 0 };
+                  z.area = { shape: "circle", centre: c, radius_m: 10_000 };
+                  changed();
+                }}>Make a circle</button
+              >
             {/if}
             <button
               class="danger"

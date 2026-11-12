@@ -125,6 +125,7 @@ fn unit(
             damage_profile: damage,
             mission: None,
             fuel: None,
+            draft_m: None,
         }),
     )
 }
@@ -1130,6 +1131,10 @@ fn facility(
         relays: Vec::new(),
         transfer_t_per_h: None,
         fuel_t: None,
+        area: None,
+        depth_m: None,
+        max_sea_state: None,
+        staging: false,
     }
 }
 
@@ -2316,4 +2321,170 @@ fn denial_patrols_inside_the_choke_point_and_engages_only_inside_it() {
     // The zone is elsewhere: the red ship is not engaged.
     let sim = run(direct(ORIGIN, 0.0, 30_000.0).point);
     assert!(mission_events(&sim).2.is_empty());
+}
+
+// ---- Anchorages and weather (Phase 3 slice 13; docs/models/planning-layer.md) ----
+
+fn square(centre: GeoPoint, half_m: f64) -> Area {
+    Area::Polygon {
+        points: [315.0, 45.0, 135.0, 225.0]
+            .iter()
+            .map(|b| direct(centre, *b, half_m * std::f64::consts::SQRT_2).point)
+            .collect(),
+    }
+}
+
+fn anchorage(id: u32, at: GeoPoint, depth_m: Option<f64>) -> Facility {
+    let mut a = facility(id, FacilityKind::Anchorage, at, Services::default(), 0);
+    a.area = Some(square(at, 1_500.0));
+    a.depth_m = depth_m;
+    a.staging = true;
+    a
+}
+
+fn sea_state(tick: u64, sea_state: u8) -> Command {
+    cmd(
+        tick,
+        umpire(),
+        None,
+        CommandPayload::SetEnvironment {
+            environment: Environment {
+                sea_state,
+                ..Environment::default()
+            },
+        },
+    )
+}
+
+fn ship(id: u64, at: GeoPoint, mission: Mission, draft_m: f64, length_m: f64) -> Command {
+    let mut c = with_mission(unit(id, 1, at, vec![], &[], None), mission);
+    if let CommandPayload::SpawnUnit(s) = &mut c.payload {
+        s.draft_m = Some(draft_m);
+        s.length_m = Some(length_m);
+    }
+    c
+}
+
+#[test]
+fn units_hold_at_the_nearest_staging_anchorage_they_fit_between_missions() {
+    // Two staging anchorages: 6 m of water 10 km north, 20 m 15 km south. A ship of 7 m draft
+    // ferries 5 km east, then goes to the deeper one although it is further.
+    let shallow = anchorage(1, direct(ORIGIN, 0.0, 10_000.0).point, Some(6.0));
+    let deep_at = direct(ORIGIN, 180.0, 15_000.0).point;
+    let deep = anchorage(2, deep_at, Some(20.0));
+    let mut sim = Simulation::new(1);
+    sim.submit(planning(vec![shallow, deep.clone()], vec![]))
+        .unwrap();
+    sim.submit(ship(
+        1,
+        ORIGIN,
+        Mission::Ferry {
+            destination: direct(ORIGIN, 90.0, 5_000.0).point,
+        },
+        7.0,
+        135.0,
+    ))
+    .unwrap();
+    sim.run_ticks(4_000);
+    let held = fired(&sim, |k| {
+        matches!(k, SimEventKind::HoldingAtAnchorage { facility: 2, .. })
+    });
+    assert_eq!(held.len(), 1, "to the deeper anchorage, once");
+    let u = unit_view(&mut sim, 1);
+    assert!(
+        deep.area.as_ref().unwrap().contains(u.position),
+        "inside the polygon"
+    );
+    assert_eq!(u.speed_mps, 0.0);
+    // A new mission takes it away from the anchorage.
+    sim.submit(assign(
+        4_000,
+        umpire(),
+        None,
+        1,
+        Some(Mission::Ferry {
+            destination: ORIGIN,
+        }),
+    ))
+    .unwrap();
+    sim.run_ticks(300);
+    assert!(unit_view(&mut sim, 1).speed_mps > 1.0);
+}
+
+#[test]
+fn heavy_weather_sends_ships_to_shelter_and_they_resume_when_it_eases() {
+    let mut port = facility(
+        1,
+        FacilityKind::ShelteringPort,
+        direct(ORIGIN, 270.0, 8_000.0).point,
+        Services::default(),
+        0,
+    );
+    port.depth_m = Some(12.0);
+    let patrol = Mission::Patrol {
+        centre: ORIGIN,
+        radius_m: 3_000.0,
+    };
+    let mut sim = Simulation::new(2);
+    sim.submit(planning(vec![port], vec![])).unwrap();
+    // A 135 m frigate (limit sea state 8) and a 40 m patrol boat (limit 5).
+    sim.submit(ship(1, ORIGIN, patrol.clone(), 5.0, 135.0))
+        .unwrap();
+    sim.submit(ship(2, ORIGIN, patrol.clone(), 2.0, 40.0))
+        .unwrap();
+    sim.submit(sea_state(100, 6)).unwrap();
+    sim.run_until(Tick(1_500));
+    let sheltering: Vec<UnitId> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::ShelteringFromWeather { unit, facility: 1 } => Some(unit),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        sheltering,
+        vec![UnitId(2)],
+        "only the patrol boat runs at sea state 6"
+    );
+    assert_eq!(unit_view(&mut sim, 2).mission, None, "mission set aside");
+    assert_eq!(unit_view(&mut sim, 1).mission, Some(patrol.clone()));
+    sim.submit(sea_state(1_500, 3)).unwrap();
+    sim.run_until(Tick(1_600));
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::WeatherEased { unit } if unit == UnitId(2))));
+    assert_eq!(unit_view(&mut sim, 2).mission, Some(patrol));
+}
+
+#[test]
+fn facility_areas_and_limits_are_checked() {
+    let mut carried = anchorage(1, ORIGIN, None);
+    carried.kind = FacilityKind::RefuellingPoint;
+    carried.staging = false;
+    carried.unit = Some(UnitId(1));
+    let mut staging_port = facility(
+        2,
+        FacilityKind::ShelteringPort,
+        ORIGIN,
+        Services::default(),
+        0,
+    );
+    staging_port.staging = true;
+    let mut rough = anchorage(3, ORIGIN, Some(10.0));
+    rough.max_sea_state = Some(12);
+    let mut dry = anchorage(4, ORIGIN, Some(0.0));
+    dry.staging = false;
+    for bad in [carried, staging_port, rough, dry] {
+        assert!(
+            Simulation::new(1)
+                .submit(planning(vec![bad], vec![]))
+                .is_err(),
+            "refused"
+        );
+    }
+    assert_eq!(weather_limit(40.0), 5);
+    assert_eq!(weather_limit(90.0), 7);
+    assert_eq!(weather_limit(135.0), 8);
 }

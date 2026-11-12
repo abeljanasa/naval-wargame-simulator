@@ -839,6 +839,33 @@ impl<'a> Builder<'a> {
                     format!("{name} delivered {tonnes:.0} t of cargo"),
                 );
             }
+            SimEventKind::ShelteringFromWeather { unit, facility } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} sheltering from the weather at facility {facility}"),
+                );
+            }
+            SimEventKind::WeatherEased { unit } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} leaves shelter: the weather has eased"),
+                );
+            }
+            SimEventKind::HoldingAtAnchorage { unit, facility } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} holding at anchorage {facility}"),
+                );
+            }
             SimEventKind::FuelExhausted { unit } => {
                 let name = self.unit_name(*unit);
                 self.note(

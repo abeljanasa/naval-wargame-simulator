@@ -35,6 +35,7 @@ fn spawn(id: u64, side: u16, lat: f64, lon: f64, route: Vec<GeoPoint>) -> Comman
             damage_profile: None,
             mission: None,
             fuel: None,
+            draft_m: None,
         }),
     }
 }

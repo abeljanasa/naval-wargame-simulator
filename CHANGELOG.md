@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 13: anchorages and weather)
+
+- **Facility water and limits** (`docs/models/planning-layer.md`, DL-0032):
+  - A polygon or circle `area` that replaces the radius.
+  - `depth_m` against each unit's draft (from the platform database) plus 1 m clearance.
+  - A holding limit, `max_sea_state`.
+- **Staging anchorages:** AI-run units whose mission is complete hold at the nearest one they fit until tasked again (`HoldingAtAnchorage`).
+- **Sheltering from weather:** surface units with a mission at or above their weather limit go to the nearest sheltering port they fit (`ShelteringFromWeather`). They resume when the sea state eases (`WeatherEased`). The limit is sea state 5, 7 or 8 by length.
+- **Desktop scenario editor:**
+  - Draw polygon areas for facilities.
+  - Draw polygon zones, or turn a polygon back into a circle.
+  - Facility depth, holding limit and staging.
+- **Map:** facility areas are drawn as polygons.
+- **Scenario check:** a warning when a facility's point is outside its area.
+
+### Changed (slice 13)
+
+- **Diversions:** a new mission ends any diversion. A unit resuming plans its route afresh.
+- **Save format 21.**
+
 ### Added (Phase 3, slice 12: more missions)
 
 - **Six missions** (`docs/models/missions.md`, DL-0031):

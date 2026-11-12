@@ -62,7 +62,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   Older saves load with none.
 /// * 20: missions gain support, mining, mine clearing, cargo, barrier patrol and denial, and a
 ///   mission's progress (phase and start tick). Older saves load at phase 0.
-pub const SAVE_FORMAT_VERSION: u32 = 20;
+/// * 21: facility areas, depth, holding limits and staging; unit draft; weather and staging
+///   diversions. Older saves load without them.
+pub const SAVE_FORMAT_VERSION: u32 = 21;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]

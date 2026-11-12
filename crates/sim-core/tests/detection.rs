@@ -67,6 +67,7 @@ fn spawn(
             damage_profile: None,
             mission: None,
             fuel: None,
+            draft_m: None,
         }),
     }
 }

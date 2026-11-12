@@ -1167,6 +1167,8 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
         }
         CommandPayload::AssignMission { unit, mission } => {
             let entity = authorised_entity(world, cmd, *unit)?;
+            // A new mission ends any diversion (repair, fuel, weather, staging).
+            world.resource_mut::<PlanningLayer>().diverted.remove(unit);
             let mut m = world
                 .get_mut::<MissionState>(entity)
                 .ok_or_else(|| format!("{unit} cannot take missions"))?;
@@ -1278,6 +1280,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 category: s.category.clone(),
                 group: s.group.clone(),
                 doctrine: s.doctrine,
+                draft_m: s.draft_m,
             },
             Position {
                 point: s.position,
