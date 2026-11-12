@@ -8,7 +8,8 @@
 # Environment (all optional):
 #   GEBCO_DATASET  ERDDAP dataset id (default GEBCO_2020). Set a newer one to update the map.
 #   GEBCO_CREDIT   the credit its licence asks for (default: the GEBCO 2020 credit).
-#   ERDDAP         the ERDDAP server (default https://coastwatch.pfeg.noaa.gov/erddap).
+#   ERDDAP         ERDDAP servers to try, in order, space-separated (default: NOAA SWFSC's
+#                  coastwatch, then upwell, which both serve GEBCO).
 #   NWS_BATCH      the nws-batch binary (default target/release/nws-batch).
 #   GEBCO_FILE     use this already-downloaded netCDF file instead of downloading (offline
 #                  rebuilds, tests). It must be the same query.
@@ -20,7 +21,9 @@ set -euo pipefail
 out="${1:?usage: world-layer.sh <output folder>}"
 dataset="${GEBCO_DATASET:-GEBCO_2020}"
 credit="${GEBCO_CREDIT:-GEBCO Compilation Group (2020) GEBCO 2020 Grid (doi:10.5285/a29c5465-b138-234d-e053-6c86abc040b9)}"
-server="${ERDDAP:-https://coastwatch.pfeg.noaa.gov/erddap}"
+servers="${ERDDAP:-https://coastwatch.pfeg.noaa.gov/erddap https://upwell.pfeg.noaa.gov/erddap}"
+# A plain, honest client name; some data servers refuse requests without one.
+agent="nws-terrain-build/1 (curl)"
 batch="${NWS_BATCH:-target/release/nws-batch}"
 # GEBCO_2020 -> gebco2020-global-4m
 name="$(printf '%s' "$dataset" | tr 'A-Z' 'a-z' | tr -d '_')-global-4m"
@@ -31,14 +34,26 @@ trap 'rm -rf "$work"' EXIT
 
 # Every 8th 15-arc-second cell (2'), averaged 2 x 2 below to 4'. About 117 MB.
 query="elevation[(-89.99):8:(89.99)][(-179.99):8:(179.99)]"
-url="$server/griddap/$dataset.nc?$query"
 if [ -n "${GEBCO_FILE:-}" ]; then
+  url="${servers%% *}/griddap/$dataset.nc?$query"
   echo "using $GEBCO_FILE (not downloaded)"
   cp "$GEBCO_FILE" "$work/world.nc"
 else
-  echo "downloading $url"
-  # The server sometimes answers 503 while it prepares the subset: retry.
-  curl -fgLsS --retry 5 --retry-all-errors --retry-delay 30 --max-time 3600 -o "$work/world.nc" "$url"
+  got=""
+  for server in $servers; do
+    url="$server/griddap/$dataset.nc?$query"
+    echo "downloading $url"
+    # The server sometimes answers 503 while it prepares the subset: retry.
+    if curl -fgLsS -A "$agent" --retry 4 --retry-all-errors --retry-delay 30 --max-time 3600       -o "$work/world.nc" "$url"; then
+      got=1
+      break
+    fi
+    # Show what the server says (a refusal page explains itself), then try the next one.
+    echo "refused by $server; it answers:"
+    curl -gsS -A "$agent" --max-time 60 "$server/griddap/$dataset.das" | head -c 800 || true
+    echo
+  done
+  [ -n "$got" ] || { echo "no server gave the grid" >&2; exit 1; }
 fi
 
 if command -v sha256sum >/dev/null; then sum="sha256sum"; else sum="shasum -a 256"; fi
