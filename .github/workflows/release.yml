@@ -88,6 +88,22 @@ jobs:
       - name: Release scan
         run: cargo run --release --locked -p sim-db -- scan target/release/bundle data
 
+      # Shipped scenarios travel with the installers (only the Phase 1 demo is built in), and
+      # every file gets a SHA-256 sum for the air-gapped installation check
+      # (docs/gate3/pilot-kit/installation-check.md). Runs after signing, so sums match what ships.
+      - name: Scenarios and SHA-256 sums
+        shell: bash
+        run: |
+          mkdir -p release-extra/scenarios
+          cp data/scenarios/*.json release-extra/scenarios/
+          if command -v sha256sum >/dev/null; then sum="sha256sum"; else sum="shasum -a 256"; fi
+          {
+            find target/release/bundle -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' \
+              -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) -print0
+            find release-extra/scenarios -type f -name '*.json' -print0
+          } | sort -z | xargs -0 $sum > "release-extra/SHA256SUMS-${{ matrix.os }}.txt"
+          cat "release-extra/SHA256SUMS-${{ matrix.os }}.txt"
+
       - name: SBOMs (CycloneDX)
         shell: bash
         run: |
@@ -108,6 +124,7 @@ jobs:
             target/release/bundle/appimage/*.AppImage
             target/release/bundle/deb/*.deb
             target/release/bundle/rpm/*.rpm
+            release-extra/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:

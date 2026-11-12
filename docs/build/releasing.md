@@ -10,10 +10,11 @@
    - **Linux:** AppImage, `.deb` and `.rpm`.
 2. Signs the installers, **only if the signing secrets are configured**; otherwise the run warns `UNSIGNED`. The secret names are below.
 3. Runs the **release scan** (`sim-db scan target/release/bundle data`). The release fails if any database file is not on `data/db/release-allowlist.txt`, or if any record or JSON `classification` is not `UNCLASSIFIED` (master prompt §3).
-4. Writes **SBOMs** in CycloneDX JSON: one per Rust crate (`cargo cyclonedx`) and one for the desktop front end (`npm sbom`).
-5. Uploads the installers and SBOMs as artefacts.
+4. Copies the shipped scenarios to `release-extra/scenarios/`, since only the Phase 1 demo is built into the app. Writes `release-extra/SHA256SUMS-<os>.txt` with a SHA-256 sum for every installer and scenario, after signing, so the sums match what ships. The [installation check](../gate3/pilot-kit/installation-check.md) verifies them on the target machine.
+5. Writes **SBOMs** in CycloneDX JSON: one per Rust crate (`cargo cyclonedx`) and one for the desktop front end (`npm sbom`).
+6. Uploads the installers, scenarios, sums and SBOMs as artefacts.
 
-The app needs no data files. The open platform database and the demo scenario are compiled into the binary, and the offline map is bundled. The installed app makes no network calls: there is no updater and no tile server.
+The app needs no data files. The open platform database and the Phase 1 demo scenario are compiled into the binary, and the offline map is bundled. The installed app makes no network calls: there is no updater and no tile server.
 
 ## Signing secrets
 

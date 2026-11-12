@@ -3,10 +3,10 @@
 Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** This page maps each part of the definition of done to its evidence, and lists what is still open, so the review panel can decide.
 
 - **Branch:** `phase-3/ttx-release` (PR #3). Plan: [docs/plan/phase-3.md](../plan/phase-3.md).
-- **Status (2026-11-12):** all nineteen Phase 3 slices are built.
+- **Status (2026-11-12):** all twenty Phase 3 slices are built.
   - **Slices 1–9:** the TTX release.
   - **Slices 10–17:** close the in-phase P1 gaps the first version of this pack listed.
-  - **Slices 18–19:** this pack brought up to date, and a pilot scenario that uses the whole planning layer.
+  - **Slices 18–20:** this pack brought up to date; a pilot scenario that uses the whole planning layer; the printed pilot kit.
   - **Moved to Phase 4 at the client's choice (2026-11-12),** because they need outside data or a Phase 4 subsystem (§7 below):
     - satellite imagery;
     - terrain and bathymetry data, and what depends on them;
@@ -77,7 +77,8 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
 | 16 Action groups in the core | [DL-0035](../design-log/DL-0035-action-groups.md) | [planning-layer.md](../models/planning-layer.md) | `5aaea45` |
 | 17 Editing and facilitation | [DL-0036](../design-log/DL-0036-desktop-facilitation.md) | [scenario-editor.md](../models/scenario-editor.md) | `cb7bdbb` |
 | 18 Pack update | — | this page, the manuals, the backlog | `3846541` |
-| 19 Pilot scenario | — | [ttx-pilot-plan.md](ttx-pilot-plan.md) §4 | this commit |
+| 19 Pilot scenario | — | [ttx-pilot-plan.md](ttx-pilot-plan.md) §4 | `04adeb8` |
+| 20 Pilot kit | — | [pilot-kit/](pilot-kit/README.md): installation check, seat card, white-cell run sheet, observer's log, questionnaire; release artefacts carry the scenarios and SHA-256 sums | this commit |
 
 ## Whole-system checks
 

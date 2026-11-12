@@ -134,7 +134,7 @@ A hot wash usually goes:
 
 ## 6. Running the TTX pilot
 
-The Gate 3 pilot plan is [docs/gate3/ttx-pilot-plan.md](../gate3/ttx-pilot-plan.md).
+The Gate 3 pilot plan is [docs/gate3/ttx-pilot-plan.md](../gate3/ttx-pilot-plan.md). Print the [pilot kit](../gate3/pilot-kit/README.md) for the day. Its white-cell run sheet walks through the *Kent passage pilot* decision by decision.
 
 ## 7. Editing scenarios
 

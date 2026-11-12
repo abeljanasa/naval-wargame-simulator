@@ -27,7 +27,8 @@ The last Gate 3 criterion: **a navy staff runs a TTX on the release build** (mas
 ## 3. Equipment
 
 - **Machine:** one Windows, macOS or Linux machine meeting the [user manual](../manuals/user-manual.md) requirements, with three screens (or two and a projector). A second machine as a cold spare, with the same installer.
-- **No network connection.** Install from removable media with the release's SHA-256 sums.
+- **No network connection.** Install from removable media with the release's SHA-256 sums, following the [installation check](pilot-kit/installation-check.md). The scenarios travel with the installers, in `release-extra/scenarios/`.
+- **Handouts:** the [pilot kit](pilot-kit/README.md): seat cards, the white-cell run sheet, the observer's log and the questionnaire.
 - **Shipped content only:** the open generic platform database and the shipped scenarios, or a client scenario built with the editor on the day before.
 
 ## 4. Scenario
@@ -88,8 +89,8 @@ Back-ups:
 | The exercise record (`.nwsrec`) | **Save record** at ENDEX |
 | AAR tables | **Save CSV**, or `nws-batch aar <record> --out <folder>` |
 | Replay check | `nws-batch aar` prints `"verified": true`; the app shows *"Replay: matches the recorded run"* |
-| Problems and requests | Observer's log: time, seat, what happened, what was expected |
-| Usability | Questionnaire: SUS (10 items) plus 5 open questions on the white-cell tasks |
+| Problems and requests | [Observer's log](pilot-kit/observer-log.md): time, seat, what happened, what was expected, severity |
+| Usability | [Questionnaire](pilot-kit/questionnaire.md): SUS (10 items) plus 5 open questions |
 
 All records stay with the client. They are unclassified, because the build has no classified data, but the client's handling rules apply to what the staff types.
 

@@ -60,3 +60,4 @@ Draft limits do not wait for bathymetry: a port's or anchorage's depth is entere
 | 17 ✅ | **Desktop: editing and facilitation** | Forms for event triggers, conditions and actions; polygon drawing for zones and areas; white-cell editing of the planning layer during play; day/night shading on the map |
 | 18 ✅ | **Gate 3 pack update** | Manuals, the Gate 3 pack and the backlog brought up to date |
 | 19 ✅ | **Pilot scenario** | `phase3-pilot.json`: the whole planning layer in one TTX (comms jamming and handover, fuel and an oiler, mining and mine clearing, barrier, denial and cargo missions, an anchorage, dusk and a gale), with its golden replay and a test that every decision point in the pilot plan is reached |
+| 20 ✅ | **Pilot kit** | Printable handouts (installation check, seat card, white-cell run sheet, observer's log, SUS questionnaire). The release artefacts carry the shipped scenarios and SHA-256 sums for the air-gapped check |

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 20: pilot kit)
+
+- **`docs/gate3/pilot-kit/`**, printable handouts for the TTX pilot:
+  - the air-gapped installation check;
+  - a seat card for players;
+  - the white-cell run sheet for the Kent passage pilot;
+  - the observer's log;
+  - the questionnaire (SUS and five open questions).
+- **Release workflow:** artefacts now carry the shipped scenarios (`release-extra/scenarios/`) and `SHA256SUMS-<os>.txt` for every installer and scenario, written after signing.
+
 ### Added (planning)
 
 - **Draft Phase 4 plan** (`docs/plan/phase-4.md`) for the Gate 3 panel. It covers 14 slices, the client decisions they need (region, imagery licence, historical engagements, data pack size, MOEs) and the risks. It is linked from the Gate 3 pack and the backlog.
