@@ -95,3 +95,13 @@ Run `cargo run -p sim-db -- validate`. Add `--strict` to treat warnings as error
 | `damage.fractions` | error | Damage points ≤ 0 or fractions outside [0, 1] |
 | `signature.value` | error | Negative signature value |
 | `platform.no_rcs` / `platform.no_acoustic` | warning | Missing signature; detection will fall back to a default |
+
+## Terrain and bathymetry sources (Phase 4 slice 2, ADR-0007)
+
+| Source | Use | Terms | Credit to show |
+|---|---|---|---|
+| GEBCO 2020 Grid, 15 arc-seconds, served by NOAA CoastWatch ERDDAP (`griddap/GEBCO_2020`) | Elevation of sea floor and land: the Philippine-area pack (3–27°N, 111–137°E, full resolution) and the coarse global layer | Free to use and redistribute; not for legal use (it may contain inaccuracies); no warranty (dataset licence text) | "GEBCO Compilation Group (2020) GEBCO 2020 Grid (doi:10.5285/a29c5465-b138-234d-e053-6c86abc040b9)" |
+| SRTM15+ (`griddap/srtm15plus`) | Land heights inside GEBCO (GEBCO's land is SRTM15+); a cross-check only | Public domain (US Government) | "SRTM15+ (Tozer et al., 2019)" |
+
+- **Not in the repository.** The raw downloads and the built packs live outside it (`%USERPROFILE%\nws-data\`), and the packs ship as separate files with SHA-256 sums.
+- **Not for navigation.** Depths are for planning at TTX scale, not for navigation, as the GEBCO licence says.
