@@ -142,6 +142,12 @@ enum TerrainCmd {
         /// Average `N × N` cells into one (a coarser, smaller pack).
         #[arg(long, default_value_t = 1)]
         average: u32,
+        /// The data set the file came from, recorded in the pack.
+        #[arg(long, default_value = terrain::GEBCO_2020_SOURCE)]
+        source: String,
+        /// The credit its licence asks for, shown with the map.
+        #[arg(long, default_value = terrain::GEBCO_2020_CREDIT)]
+        credit: String,
         /// Output file (`.nwsterrain`).
         #[arg(long)]
         out: PathBuf,
@@ -239,9 +245,11 @@ fn main() -> Result<()> {
                     input,
                     name,
                     average,
+                    source,
+                    credit,
                     out,
                 } => {
-                    let (h, bytes) = terrain::build(&input, &name, average)?;
+                    let (h, bytes) = terrain::build(&input, &name, average, &source, &credit)?;
                     let sha = terrain::write(&out, &bytes)?;
                     serde_json::json!({
                         "out": out,

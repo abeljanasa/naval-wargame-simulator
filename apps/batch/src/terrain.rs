@@ -230,7 +230,13 @@ fn axis(values: &[f64], what: &str) -> Result<(i64, i64)> {
 
 /// Builds a pack from a GEBCO download: `elevation[latitude][longitude]`, both axes ascending.
 /// `average` > 1 averages `average × average` blocks into one cell (coarser, smaller pack).
-pub fn build(input: &Path, name: &str, average: u32) -> Result<(PackHeader, Vec<u8>)> {
+pub fn build(
+    input: &Path,
+    name: &str,
+    average: u32,
+    source: &str,
+    credit: &str,
+) -> Result<(PackHeader, Vec<u8>)> {
     ensure!(average >= 1, "--average must be at least 1");
     let nc = NetCdf::open(input)?;
     let lat = nc.f64s("latitude")?;
@@ -282,8 +288,8 @@ pub fn build(input: &Path, name: &str, average: u32) -> Result<(PackHeader, Vec<
     }
     let header = PackHeader {
         name: name.to_owned(),
-        source: GEBCO_2020_SOURCE.to_owned(),
-        credit: GEBCO_2020_CREDIT.to_owned(),
+        source: source.to_owned(),
+        credit: credit.to_owned(),
         lat0: to_i32(lat0 + offset / 2)?,
         lon0: to_i32(lon0)?,
         cell: u32::try_from(dlat * i64::from(average))?,
@@ -452,7 +458,7 @@ mod tests {
         let input = dir.join("tiny.nc");
         std::fs::write(&input, tiny_nc(&lat, &lon, &elev)).unwrap();
 
-        let (h, bytes) = build(&input, "tiny", 1).unwrap();
+        let (h, bytes) = build(&input, "tiny", 1, GEBCO_2020_SOURCE, GEBCO_2020_CREDIT).unwrap();
         assert_eq!((h.rows, h.cols, h.cell), (4, 4, 150));
         assert_eq!((h.lat0, h.lon0), (10 * 36_000 + 75, 120 * 36_000 + 75));
         assert_eq!((h.min_m, h.max_m), (-100, 50));
@@ -462,7 +468,8 @@ mod tests {
         assert_eq!(pack.height_m(GeoPoint::new(lat[1], lon[0])), Some(-60.0));
 
         // 2 × 2 averaging: centres move to the middle of each block.
-        let (h2, bytes2) = build(&input, "tiny-avg", 2).unwrap();
+        let (h2, bytes2) =
+            build(&input, "tiny-avg", 2, GEBCO_2020_SOURCE, GEBCO_2020_CREDIT).unwrap();
         assert_eq!((h2.rows, h2.cols, h2.cell), (2, 2, 300));
         assert_eq!(h2.lat0, 10 * 36_000 + 150);
         let pack2 = TerrainPack::decode(&bytes2).unwrap();

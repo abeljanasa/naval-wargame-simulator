@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added (release: world terrain layer from its online source)
+
+- **The installers carry the 4′ world terrain layer**, built by each release from GEBCO on NOAA ERDDAP (`scripts/terrain/world-layer.sh`, the new `terrain` job in the release workflow), so the map stays current.
+  - A manual release run takes the GEBCO dataset id and credit, so a newer grid is a run away.
+  - The pack also ships beside the installers, in `release-extra/terrain/`, with its `.sha256`, the download's SHA-256 and the date (`SOURCE.txt`).
+- **`nws-batch terrain build --source --credit`** records the data set and its credit in the pack.
+
 ### Added (Phase 4, slice 3: shallow water and depths)
 
 - **Routing by draft:**

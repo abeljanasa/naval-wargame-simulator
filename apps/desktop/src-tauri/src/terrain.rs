@@ -132,6 +132,20 @@ pub fn load(dirs: &TerrainDirs) -> Loaded {
         files.sort();
         for f in files {
             match load_one(&f) {
+                // A pack shipped with the app supersedes an installed one of the same name (an
+                // older copy of the world layer), so a release with newer data replaces it.
+                Ok(p)
+                    if !bundled
+                        && out.packs.iter().any(|(q, b)| {
+                            *b && q.header().name == p.header().name && q.id() != p.id()
+                        }) =>
+                {
+                    out.problems.push(format!(
+                        "{}: superseded by the {} shipped with the app",
+                        f.file_name().unwrap_or_default().to_string_lossy(),
+                        p.header().name
+                    ));
+                }
                 Ok(p) => {
                     if !out.packs.iter().any(|(q, _)| q.id() == p.id()) {
                         out.packs.push((Arc::new(p), bundled));
@@ -235,6 +249,37 @@ mod tests {
         let loaded = load(&dirs);
         assert!(loaded.packs.is_empty());
         assert!(loaded.problems[0].contains("damaged or altered"));
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn the_layer_shipped_with_the_app_supersedes_an_older_installed_copy() {
+        let root = std::env::temp_dir().join(format!("nws-terrain-ship-{}", std::process::id()));
+        let dirs = TerrainDirs {
+            bundled: Some(root.join("bundled")),
+            installed: root.join("installed"),
+        };
+        std::fs::create_dir_all(root.join("bundled")).unwrap();
+        std::fs::write(
+            root.join("bundled/world.nwsterrain"),
+            pack_bytes("world", -100),
+        )
+        .unwrap();
+        let old = pack_bytes("world", -90);
+        install(&dirs, &old, &sha256_hex(&old)).unwrap();
+        let other = pack_bytes("region", -20);
+        install(&dirs, &other, &sha256_hex(&other)).unwrap();
+        let loaded = load(&dirs);
+        let names: Vec<(String, bool)> = loaded
+            .infos()
+            .into_iter()
+            .map(|i| (i.name, i.bundled))
+            .collect();
+        assert_eq!(
+            names,
+            vec![("region".to_owned(), false), ("world".to_owned(), true)]
+        );
+        assert!(loaded.problems[0].contains("superseded"));
         std::fs::remove_dir_all(&root).ok();
     }
 }

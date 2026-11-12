@@ -33,7 +33,7 @@ A pack is a regular latitude/longitude grid of heights in whole metres, positive
 | `gebco2020-global-4m` | The world | 4′ (≈ 7.4 km) | 5,400 × 2,700 | 17.5 MB | 29.2 MB |
 | `gebco2020-global-2m` (measured, not used) | The world | 2′ | 10,800 × 5,400 | 64.5 MB | 116.6 MB |
 
-The 4′ global layer is the one meant for the installer (decision 4 of the [Phase 4 plan](../plan/phase-4.md)). The 2′ layer is about four times larger for detail the regional pack already gives where it matters.
+The 4′ global layer is built into the installers (decision 4 of the [Phase 4 plan](../plan/phase-4.md)). Each release builds it from its online source with `scripts/terrain/world-layer.sh` ([releasing](../build/releasing.md)). The 2′ layer is about four times larger for detail the regional pack already gives where it matters.
 
 ## Building a pack
 

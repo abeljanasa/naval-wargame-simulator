@@ -2,18 +2,27 @@
 
 ## What the release workflow does
 
-`.github/workflows/release.yml` runs on a `v*` tag or manually. On Windows and macOS (the application's platforms, ADR-0006) it:
+`.github/workflows/release.yml` runs on a `v*` tag or manually.
 
-1. Builds the desktop app with `npx tauri build`, which produces:
+First, the **world terrain layer** job (on Windows) builds the 4′ terrain pack from its online source, so every release carries the current GEBCO grid:
+- **Download:** `scripts/terrain/world-layer.sh` downloads the world grid from GEBCO on NOAA CoastWatch ERDDAP. It is a 2′ subset, about 117 MB.
+- **Build:** it builds the pack with `nws-batch terrain build --average 2`, about 17.5 MB, and writes `SOURCE.txt`: the query, the download's SHA-256 and the date.
+- **Updating the map:** a manual run takes `gebco_dataset` and `gebco_credit`. When a newer GEBCO grid is on ERDDAP, run the workflow with its dataset id and credit. A tag build uses GEBCO 2020.
+- **Reproducible:** the pack holds no date, so the same data always gives the same pack and the same pack id. Records made with one release's layer replay on another's when the data has not changed.
+- **Not in the repository:** the pack is not kept in the repository.
+
+Then, on Windows and macOS (the application's platforms, ADR-0006), it:
+
+1. Builds the desktop app with `npx tauri build --config src-tauri/tauri.terrain.json`. The overlay bundles the world layer as the app's built-in terrain folder. The build produces:
    - **Windows:** MSI (WiX) and NSIS `.exe` installers.
    - **macOS:** `.app` and `.dmg`.
 2. Signs the installers, **only if the signing secrets are configured**; otherwise the run warns `UNSIGNED`. The secret names are below.
 3. Runs the **release scan** (`sim-db scan target/release/bundle data`). The release fails if any database file is not on `data/db/release-allowlist.txt`, or if any record or JSON `classification` is not `UNCLASSIFIED` (master prompt §3).
-4. Copies the shipped scenarios to `release-extra/scenarios/`, since only the Phase 1 demo is built into the app. Writes `release-extra/SHA256SUMS-<os>.txt` with a SHA-256 sum for every installer and scenario, after signing, so the sums match what ships. The [installation check](../gate3/pilot-kit/installation-check.md) verifies them on the target machine.
+4. Copies the shipped scenarios to `release-extra/scenarios/`, since only the Phase 1 demo is built into the app, and the world layer with its `.sha256` and `SOURCE.txt` to `release-extra/terrain/`. Writes `release-extra/SHA256SUMS-<os>.txt` with a SHA-256 sum for every installer and scenario, after signing, so the sums match what ships. The [installation check](../gate3/pilot-kit/installation-check.md) verifies them on the target machine.
 5. Writes **SBOMs** in CycloneDX JSON: one per Rust crate (`cargo cyclonedx`) and one for the desktop front end (`npm sbom`).
 6. Uploads the installers, scenarios, sums and SBOMs as artefacts.
 
-The app needs no data files. The open platform database and the Phase 1 demo scenario are compiled into the binary, and the offline map is bundled. The installed app makes no network calls: there is no updater and no tile server.
+The app needs no data files. The open platform database and the Phase 1 demo scenario are compiled into the binary, and the offline map and the world terrain layer are bundled. The installed app makes no network calls: there is no updater and no tile server. Regional terrain packs (the Philippine area at 15″) are installed separately with *File › Install terrain pack…*.
 
 ## Signing secrets
 
@@ -68,6 +77,14 @@ cd apps/desktop
 npm ci
 npx tauri build      # installers in target/release/bundle/
 cargo run --release -p sim-db -- scan ../../target/release/bundle ../../data
+```
+
+Without the overlay, the installers have no built-in terrain layer. To bundle it locally, as a release does:
+
+```sh
+cargo build --release -p nws-batch
+scripts/terrain/world-layer.sh apps/desktop/src-tauri/terrain      # needs the internet
+cd apps/desktop && npx tauri build --config src-tauri/tauri.terrain.json
 ```
 
 On Windows the first `tauri build` downloads the WiX and NSIS toolsets. For air-gapped build machines, see [air-gapped.md](air-gapped.md).

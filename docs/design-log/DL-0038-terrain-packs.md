@@ -38,9 +38,11 @@
   - The colours are original.
 - **A new exercise picks the packs up.** The exercise on screen takes newly read packs only while it is still at its starting picture. A running exercise keeps the terrain it started with, so its record stays replayable.
 
-## Open
+## The world layer in the installer (decided 2026-11-13)
 
-- **Bundling the 4′ layer into the installer** needs the pack at build time.
-  - The packs are not in the repository: they are large, generated, and the repository is public.
-  - The release workflow can fetch the pack, check it against a pinned SHA-256, and place it in `src-tauri/terrain/`. That needs a place to host it, which is the client's decision.
-  - Until then, both packs are installed with *File › Install terrain pack…*. The app already reads a bundled `terrain/` folder.
+- **Built from the online source on every release**, at the client's request: "host the 4′ world layer from its online source so we can have updated map".
+  - The release workflow downloads the GEBCO grid from NOAA ERDDAP and builds the pack.
+  - It bundles the pack with a Tauri config overlay, and also ships it beside the installers with its sum and `SOURCE.txt` (the query, the download's SHA-256 and the date).
+- **Not a pinned SHA-256:** a pinned sum would stop the map from updating. Instead the dataset id and credit are inputs of the workflow, and every build records what it downloaded.
+- **No date in the pack**, so unchanged data gives an unchanged pack id, and records stay replayable across releases.
+- **Bundled only by release builds.** CI and local builds have no built-in layer unless built with the overlay. The repository stays free of generated data.

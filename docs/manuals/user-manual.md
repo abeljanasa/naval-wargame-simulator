@@ -30,7 +30,7 @@ Your workstation needs:
 
 **Terrain packs.** With a terrain pack installed, the map shades the sea by depth, pale inshore and dark offshore. It also draws depth contours, fewer as you zoom out, and hill shading over land. Each layer can be turned off in the **View** menu. The status bar shows the depth or height under the cursor. **View › Terrain packs…** lists the packs, what they cover, and whether this exercise runs with them. Depths are for planning, not for navigation.
 
-- **Packs:** a regional pack (the Philippine area at 15″, about 460 m) and a world layer at 4′, about 7.4 km. Where both cover, the regional pack is used.
+- **Packs:** a world layer at 4′ (about 7.4 km) comes with the app, built from the current GEBCO grid for each release. A regional pack (the Philippine area at 15″, about 460 m) is installed separately. Where both cover, the regional pack is used. An older copy of the world layer installed by hand is set aside in favour of the one shipped with the app.
 - **Installing one:** the white cell installs a pack with **File › Install terrain pack…**, choosing the `.nwsterrain` file **and** its `.sha256` file together.
   - The app checks the pack against the `.sha256` file before copying it in, and refuses a damaged or altered copy.
   - No network is used.
