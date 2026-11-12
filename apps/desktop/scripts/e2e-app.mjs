@@ -180,6 +180,22 @@ try {
   await shot("00-record-editor");
   await click(await byText("button", "Discard changes"));
   await click(await byText("button", "Close editor"));
+  // Weapons (and sensors) open straight in the editor, from their own source file.
+  await click(await byText("button", "Weapons"));
+  await click(
+    await until("the weapons list", () =>
+      find("xpath", '//button[.//span[normalize-space()="WPN-GUN-30"]]'),
+    ),
+  );
+  const weaponEditor = await until("the weapon editor", async () => {
+    const t = await text(await el('[aria-label="Edit database record"]'));
+    return t.includes("weapons.json") ? t : false;
+  });
+  check(
+    weaponEditor.includes("Edit WPN-GUN-30"),
+    "weapon records open in the editor from weapons.json",
+  );
+  await click(await byText("button", "Platforms"));
   await click(await el('[aria-label="Close the database"]'));
 
   // 3. A scenario file loads through the File › Open picker (the hidden file input).

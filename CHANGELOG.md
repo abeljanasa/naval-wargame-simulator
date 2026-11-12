@@ -22,11 +22,16 @@
 - **The review scrubber ran past the panel's edge** and added a horizontal scrollbar.
 - **Typing in a text area triggered keyboard shortcuts.** A space paused or ran the clock, a digit changed the compression, and the character was lost. That affected Lua scripts, event JSON and more. Shortcuts now ignore every text entry. Found while testing the record editor.
 
+### Added (database editing)
+
+- **Sensors and weapons are editable too:** **View › Platform database…** has a Platforms / Sensors / Weapons switch. Sensors and weapons open straight in the record editor and save to `sensors.json` or `weapons.json` (`sim_db::edit::RecordKind`).
+
 ### Added (signing, ADR-0008)
 
 - **`scripts/signing/new-selfsigned-codesign.ps1`** makes the self-signed Windows code-signing certificate (`CN=Naval Wargame Simulator`, 3 years). It exports the PFX and the public `.cer`, and sets the Actions secrets. The client types the password; it is never printed.
 - **Release:** the Windows signing step deletes the PFX even when signing fails, then checks that every installer carries a signature. macOS builds are ad-hoc signed.
 - **Docs:** trusting the certificate on exercise machines (Group Policy or `Import-Certificate`) is in `releasing.md` and the installation check.
+- **First signed release** ([run 43222859373](https://github.com/abeljanasa/naval-wargame-simulator/actions/runs/43222859373)): the MSI and NSIS installers are signed by `CN=Naval Wargame Simulator` and timestamped; the macOS app is ad-hoc signed.
 
 ### Decided (Phase 4, ADR-0007)
 

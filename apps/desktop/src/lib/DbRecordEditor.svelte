@@ -7,7 +7,11 @@
   import { lineDiff, readProvenance, setProvenance } from "./db-edit";
   import { download } from "./files";
 
-  let { id, onclose }: { id: string; onclose: () => void } = $props();
+  let {
+    kind = "platform",
+    id,
+    onclose,
+  }: { kind?: "platform" | "sensor" | "weapon"; id: string; onclose: () => void } = $props();
 
   let file = $state("");
   let original = $state("");
@@ -27,7 +31,7 @@
   );
 
   $effect(() => {
-    void commands.dbRecordSource(id).then((res) => {
+    void commands.dbRecordSource(kind, id).then((res) => {
       if (res.status === "error") error = res.error;
       else {
         file = res.data.file;
@@ -43,7 +47,7 @@
     if (!original) return;
     checking = true;
     const timer = setTimeout(() => {
-      void commands.dbCheckRecord(id, t).then((c) => {
+      void commands.dbCheckRecord(kind, id, t).then((c) => {
         if (t === text) {
           check = c;
           checking = false;
@@ -63,7 +67,7 @@
   }
 
   async function save() {
-    const res = await commands.dbApplyRecord(id, text);
+    const res = await commands.dbApplyRecord(kind, id, text);
     if (res.status === "error") {
       error = res.error;
       return;
@@ -75,7 +79,7 @@
   }
 </script>
 
-<section class="editor" aria-label="Edit platform record">
+<section class="editor" aria-label="Edit database record">
   <h3>Edit {id} <span class="dim">· {file}</span></h3>
 
   <fieldset>

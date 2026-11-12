@@ -107,9 +107,9 @@ Only the white cell (and the main window) controls time. In a seat window the bu
 - Each record shows its figures, its source citation, its confidence and its classification marking.
 - The shipped database is generic: its figures are illustrative, not real.
 
-**Editing a platform record** (for the data manager):
+**Editing a record** (for the data manager):
 
-1. Open the record and choose **Edit record**.
+1. Choose **Platforms**, **Sensors** or **Weapons** at the top of the browser. Open a platform and choose **Edit record**; a sensor or weapon opens straight in the editor.
 2. Set the record's **Source citation**, **Confidence** (A–E) and **Updated** date. Leave a field empty to use the file's default.
 3. Edit the record's figures in **Record (JSON)**. It is the text of the source file, so field names and units are as in `docs/db/data-dictionary.md`.
 4. Watch the check under the editor. Every change is checked against the whole database, as `sim-db validate` does:

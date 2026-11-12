@@ -297,14 +297,27 @@ fn issue(i: sim_db::Issue) -> DbIssue {
     }
 }
 
-/// Edits `id` to `text` in a copy of the sources and checks the copy: the load error, or every
-/// error plus the warnings on the edited record.
+/// `platform`, `sensor` or `weapon`.
+fn record_kind(kind: &str) -> Result<sim_db::edit::RecordKind, String> {
+    sim_db::edit::RecordKind::parse(kind).ok_or_else(|| format!("unknown record kind {kind:?}"))
+}
+
+/// A record in the sources: id and name.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbSourceRow {
+    pub id: String,
+    pub name: String,
+}
+
+/// Edits record `id` of `kind` to `text` in a copy of the sources and checks the copy: the load
+/// error, or every error plus the warnings on the edited record.
 fn check_edit(
     set: &sim_db::source::SourceSet,
+    kind: sim_db::edit::RecordKind,
     id: &str,
     text: &str,
 ) -> (Option<sim_db::source::SourceSet>, String, DbCheck) {
-    let (edited, file) = match sim_db::edit::replace_platform(set, id, text) {
+    let (edited, file) = match sim_db::edit::replace_record(set, kind, id, text) {
         Ok(x) => x,
         Err(e) => {
             return (
@@ -350,12 +363,29 @@ fn check_edit(
     }
 }
 
-/// The authored JSON of a platform record, from the sources with this session's edits.
+/// Every record of `kind` (`platform`, `sensor` or `weapon`) in the sources, with this
+/// session's edits.
 #[tauri::command]
 #[specta::specta]
-fn db_record_source(src: State<'_, DbSources>, id: String) -> Result<DbRecordSource, String> {
-    let r = sim_db::edit::platform_record(&sources(&src), &id)
-        .ok_or_else(|| format!("no platform record {id} in the sources"))?;
+fn db_source_records(src: State<'_, DbSources>, kind: String) -> Result<Vec<DbSourceRow>, String> {
+    Ok(
+        sim_db::edit::record_ids(&sources(&src), record_kind(&kind)?)
+            .into_iter()
+            .map(|(id, name)| DbSourceRow { id, name })
+            .collect(),
+    )
+}
+
+/// The authored JSON of a record, from the sources with this session's edits.
+#[tauri::command]
+#[specta::specta]
+fn db_record_source(
+    src: State<'_, DbSources>,
+    kind: String,
+    id: String,
+) -> Result<DbRecordSource, String> {
+    let r = sim_db::edit::record(&sources(&src), record_kind(&kind)?, &id)
+        .ok_or_else(|| format!("no {kind} record {id} in the sources"))?;
     Ok(DbRecordSource {
         file: r.file,
         text: r.text,
@@ -365,8 +395,14 @@ fn db_record_source(src: State<'_, DbSources>, id: String) -> Result<DbRecordSou
 /// Checks an edited record against the whole database (live, while the user types).
 #[tauri::command]
 #[specta::specta]
-fn db_check_record(src: State<'_, DbSources>, id: String, text: String) -> DbCheck {
-    check_edit(&sources(&src), &id, &text).2
+fn db_check_record(src: State<'_, DbSources>, kind: String, id: String, text: String) -> DbCheck {
+    match record_kind(&kind) {
+        Ok(k) => check_edit(&sources(&src), k, &id, &text).2,
+        Err(e) => DbCheck {
+            error: Some(e),
+            issues: vec![],
+        },
+    }
 }
 
 /// Keeps an edited record for this session and returns its whole source file, to save. Refused
@@ -375,11 +411,13 @@ fn db_check_record(src: State<'_, DbSources>, id: String, text: String) -> DbChe
 #[specta::specta]
 fn db_apply_record(
     src: State<'_, DbSources>,
+    kind: String,
     id: String,
     text: String,
 ) -> Result<DbSourceFile, String> {
+    let kind = record_kind(&kind)?;
     let mut set = sources(&src);
-    let (edited, file, check) = check_edit(&set, &id, &text);
+    let (edited, file, check) = check_edit(&set, kind, &id, &text);
     if let Some(e) = check.error {
         return Err(e);
     }
@@ -390,6 +428,7 @@ fn db_apply_record(
     let out = edited
         .platforms
         .iter()
+        .chain([&edited.sensors, &edited.weapons])
         .find(|f| f.name == file)
         .map(|f| DbSourceFile {
             name: f.name.clone(),
@@ -931,6 +970,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             db_search,
             db_platform,
             db_issues,
+            db_source_records,
             db_record_source,
             db_check_record,
             db_apply_record,
@@ -1151,16 +1191,25 @@ mod db_edit_tests {
         let old = sim_db::edit::platform_record(&set, "GEN-OPV").unwrap().text;
         // A clean edit checks clean.
         let good = old.replacen("\"max_speed_kn\": 21", "\"max_speed_kn\": 22", 1);
-        let (edited, file, check) = check_edit(&set, "GEN-OPV", &good);
+        let p = sim_db::edit::RecordKind::Platform;
+        let (edited, file, check) = check_edit(&set, p, "GEN-OPV", &good);
         assert!(check.error.is_none() && check.issues.iter().all(|i| i.severity != "error"));
         assert_eq!(file, "platforms/surface-combatants.json");
         assert!(edited.is_some());
         // A typo does not load, and says why.
         let bad = old.replacen("\"max_speed_kn\"", "\"max_sped_kn\"", 1);
-        let (edited, _, check) = check_edit(&set, "GEN-OPV", &bad);
+        let (edited, _, check) = check_edit(&set, p, "GEN-OPV", &bad);
         assert!(edited.is_none());
         assert!(check.error.unwrap().contains("max_sped_kn"));
         // Not JSON at all.
-        assert!(check_edit(&set, "GEN-OPV", "{").2.error.is_some());
+        assert!(check_edit(&set, p, "GEN-OPV", "{").2.error.is_some());
+        // A weapon edit lands in weapons.json.
+        let w = sim_db::edit::record(&set, sim_db::edit::RecordKind::Weapon, "WPN-GUN-30")
+            .unwrap()
+            .text;
+        let (_, file, check) = check_edit(&set, sim_db::edit::RecordKind::Weapon, "WPN-GUN-30", &w);
+        assert_eq!(file, "weapons.json");
+        assert!(check.error.is_none());
+        assert!(record_kind("ship").is_err());
     }
 }

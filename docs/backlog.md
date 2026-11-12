@@ -58,7 +58,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [x] Scenarios reference database platforms (`"platform": "GEN-FFG"`) (DL-0007).
 - [x] In-app database browser: search, record detail with source citation, confidence and marking, and validation feedback (DL-0009).
 - [x] In-app database *editing* for platform records: record diff, citation entry, live validation while typing. It writes the JSON source (ADR-0004, DL-0037).
-- [ ] Editing sensors and weapons in the app (they are still edited in `data/db/open/` and checked with `sim-db validate`).
+- [x] Editing sensors and weapons in the app, in the same record editor (`sensors.json`, `weapons.json`).
 - [ ] Planning-layer facility attributes still to do: runways (air operations, Phase 4). Berths, repair, rearm, fuel and draft limits (planner-entered depth, DL-0032) are done.
 - [x] Release scan (`sim-db scan`), run in the release workflow.
 - [x] Installers, signed when secrets are configured, plus SBOMs and a `cargo deny` licence audit (docs/build/releasing.md).

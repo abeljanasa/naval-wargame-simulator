@@ -21,15 +21,20 @@ export const commands = {
 	dbPlatform: (id: string) => typedError<DbPlatformDetail_Serialize, string>(__TAURI_INVOKE("db_platform", { id })),
 	/**  Every validation finding on the loaded database (warnings only: errors stop it loading). */
 	dbIssues: () => typedError<DbIssue[], string>(__TAURI_INVOKE("db_issues")),
-	/**  The authored JSON of a platform record, from the sources with this session's edits. */
-	dbRecordSource: (id: string) => typedError<DbRecordSource, string>(__TAURI_INVOKE("db_record_source", { id })),
+	/**
+	 *  Every record of `kind` (`platform`, `sensor` or `weapon`) in the sources, with this
+	 *  session's edits.
+	 */
+	dbSourceRecords: (kind: string) => typedError<DbSourceRow[], string>(__TAURI_INVOKE("db_source_records", { kind })),
+	/**  The authored JSON of a record, from the sources with this session's edits. */
+	dbRecordSource: (kind: string, id: string) => typedError<DbRecordSource, string>(__TAURI_INVOKE("db_record_source", { kind, id })),
 	/**  Checks an edited record against the whole database (live, while the user types). */
-	dbCheckRecord: (id: string, text: string) => __TAURI_INVOKE<DbCheck_Serialize>("db_check_record", { id, text }),
+	dbCheckRecord: (kind: string, id: string, text: string) => __TAURI_INVOKE<DbCheck_Serialize>("db_check_record", { kind, id, text }),
 	/**
 	 *  Keeps an edited record for this session and returns its whole source file, to save. Refused
 	 *  while the edit does not load or has errors.
 	 */
-	dbApplyRecord: (id: string, text: string) => typedError<DbSourceFile, string>(__TAURI_INVOKE("db_apply_record", { id, text })),
+	dbApplyRecord: (kind: string, id: string, text: string) => typedError<DbSourceFile, string>(__TAURI_INVOKE("db_apply_record", { kind, id, text })),
 	/**  Runs or pauses the clock (white-cell windows only). */
 	setPaused: (paused: boolean) => typedError<null, string>(__TAURI_INVOKE("set_paused", { paused })),
 	/**  Sets time compression (white-cell windows only). */
@@ -574,6 +579,12 @@ export type DbSensorRow = {
 export type DbSourceFile = {
 	name: string,
 	text: string,
+};
+
+/**  A record in the sources: id and name. */
+export type DbSourceRow = {
+	id: string,
+	name: string,
 };
 
 /**  A weapon type in the platform database (for the scenario editor's pickers). */
