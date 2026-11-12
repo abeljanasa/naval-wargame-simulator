@@ -111,6 +111,7 @@ pub fn run(
     end: Tick,
     threads: usize,
     open_db: &(dyn Fn() -> Result<sim_db::PlatformDb> + Sync),
+    terrain: Option<&std::sync::Arc<sim_geo::terrain::Terrain>>,
 ) -> Result<Vec<RunMoes>> {
     let next = AtomicUsize::new(0);
     let results = Mutex::new(Vec::with_capacity(seeds.len()));
@@ -126,6 +127,7 @@ pub fn run(
                             return Ok(());
                         };
                         let mut sim = scenario.build(Some(seed), &db)?;
+                        sim.set_terrain(terrain.cloned());
                         sim.run_until(end);
                         let r = measure(scenario, &mut sim, seed, end);
                         results
@@ -358,8 +360,8 @@ mod tests {
         let open = || sim_db::embedded::open_platform_db().map_err(anyhow::Error::from);
         let seeds = [1, 2, 3, 4];
         let end = Tick(1200);
-        let one = run(&scenario, &seeds, end, 1, &open).unwrap();
-        let four = run(&scenario, &seeds, end, 4, &open).unwrap();
+        let one = run(&scenario, &seeds, end, 1, &open, None).unwrap();
+        let four = run(&scenario, &seeds, end, 4, &open, None).unwrap();
         assert_eq!(one, four);
         assert_eq!(one.iter().map(|r| r.seed).collect::<Vec<_>>(), seeds);
         assert!(one[0].moes.contains_key("cargo_delivered_t"));

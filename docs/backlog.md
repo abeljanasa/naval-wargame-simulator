@@ -34,9 +34,9 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [ ] Satellite imagery layers (needs a licensed imagery source).
 - [ ] Terrain elevation and bathymetry packs (GEBCO/SRTM), then:
   - radar terrain masking;
-  - depths for ports and anchorages from bathymetry;
+  - ~~depths for ports and anchorages from bathymetry~~ (Phase 4 slice 3, DL-0039);
   - choke points that inherit depth and shipping lanes;
-  - shallow-water routing.
+  - ~~shallow-water routing~~ (Phase 4 slice 3, DL-0039).
 - [ ] Airbases and air operations: aircraft fuel and tanking, aircraft loadout choice, runways at facilities.
 - [ ] Automatic sense-zone sensor placement and tasking (§7.1, analysis phase).
 
@@ -77,7 +77,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [x] Turn-rate / turning-circle limits on movement (geodesy-and-movement model doc §Turning).
 - [ ] Turn performance as platform-database fields (generic class values are derived in scenario resolution today).
 - [x] Land blocking with route planning round the coastline (DL-0008, land-avoidance model doc).
-- [ ] Shallow water and draft limits (needs bundled GEBCO bathymetry).
+- [x] Shallow water and draft limits: routing by draft, shoal guard, chart depths (Phase 4 slice 3, [DL-0039](design-log/DL-0039-shallow-water.md)).
 - [x] Snapshot diffs on the UI stream: full picture first and after seat/scenario changes, then changed units + removed ids.
 - [x] Scenario loading from file in the desktop app (webview reads the file; engine validates; 5 MB limit; no filesystem permission).
 - [x] Front-end unit tests (Vitest, 8 tests) and an end-to-end smoke test of the real UI against a mocked backend (Playwright, 11 checks); both in CI.

@@ -37,6 +37,12 @@ Your workstation needs:
 - **When a pack takes effect:** an exercise that has not started takes the pack at once; otherwise the next scenario you open does. A running exercise keeps the terrain it started with, so its record still replays.
 - **Records and terrain:** a record made with terrain packs replays only on a machine with the same packs installed. The app names the packs it needs.
 
+**Shallow water.** With terrain packs, ships and submarines are routed round water shallower than their draft plus 1 m. Harbour approaches, the first and last few kilometres of a leg, are left to your waypoints.
+- **No deep-enough route:** the order still goes through, routed round land only, and the status bar warns you: "*X*: no route deep enough for its draft…".
+- **Off its planned route:** a ship off its planned route (none, finished, or not planned for its draft) stops rather than steam into water shallower than its draft. The status bar says so ("*X* stopped: 5 m of water ahead…"); the white cell decides any damage.
+- **The unit panel's *Water* row** shows the depth under the unit, the least depth on the rest of its route and how far ahead, and its draft. A small profile shows the sea bed against a dashed draft line, and the row turns amber when the water ahead is too shallow.
+- **Ports and anchorages:** they take their depth from the chart (the deepest water in their area) unless the planner sets one. In the white cell's Planning tab, each shows its chart depth; type a depth to override it, or clear the box to go back to the chart.
+
 ## 3. Your seat
 
 - A **seat** is a player position: one side's commander, or a white-cell seat.

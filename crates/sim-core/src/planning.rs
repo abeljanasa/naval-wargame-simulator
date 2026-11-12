@@ -1334,6 +1334,76 @@ fn inside(f: &Facility, at: GeoPoint, p: GeoPoint) -> bool {
     }
 }
 
+/// Sample points across a facility's water (each way), for its chart depth.
+const CHART_GRID: u32 = 9;
+
+/// A fixed facility's depth from the terrain packs: the deepest water among a 9 × 9 grid over
+/// its area (its polygon or circle, else `radius_m` round its position) and its position, as a
+/// port or anchorage has its berths in its best water. `None` for a facility on a unit, or where
+/// no pack covers. The planner's `depth_m`, when set, is used instead
+/// (`docs/models/shallow-water.md`).
+#[must_use]
+pub fn chart_depth_m(terrain: &sim_geo::terrain::Terrain, f: &Facility) -> Option<f64> {
+    if f.unit.is_some() {
+        return None;
+    }
+    let area = f.area.clone().unwrap_or(Area::Circle {
+        centre: f.position,
+        radius_m: f.radius_m.max(1.0),
+    });
+    let (south, west, north, east) = match &area {
+        Area::Circle { centre, radius_m } => {
+            let dlat = radius_m / 111_320.0;
+            let dlon = radius_m / (111_320.0 * libm::cos(centre.lat_deg.to_radians()).max(0.01));
+            (
+                centre.lat_deg - dlat,
+                centre.lon_deg - dlon,
+                centre.lat_deg + dlat,
+                centre.lon_deg + dlon,
+            )
+        }
+        Area::Polygon { points } => points.iter().fold(
+            (f64::MAX, f64::MAX, f64::MIN, f64::MIN),
+            |(s, w, n, e), p| {
+                (
+                    s.min(p.lat_deg),
+                    w.min(p.lon_deg),
+                    n.max(p.lat_deg),
+                    e.max(p.lon_deg),
+                )
+            },
+        ),
+    };
+    let mut deepest: Option<f64> = terrain.depth_m(f.position);
+    for i in 0..CHART_GRID {
+        for j in 0..CHART_GRID {
+            let t = |k: u32| f64::from(k) / f64::from(CHART_GRID - 1);
+            let p = GeoPoint::new(
+                (south + t(i) * (north - south)).clamp(-90.0, 90.0),
+                west + t(j) * (east - west),
+            );
+            if !area.contains(p) {
+                continue;
+            }
+            if let Some(d) = terrain.depth_m(p) {
+                deepest = Some(deepest.map_or(d, |x: f64| x.max(d)));
+            }
+        }
+    }
+    deepest
+}
+
+/// The facility as the engine uses it: the planner's depth if set, else its chart depth.
+fn charted(world: &World, f: &Facility) -> Facility {
+    let mut f = f.clone();
+    if f.depth_m.is_none() {
+        if let Some(t) = &world.resource::<crate::sim::TerrainRes>().0 {
+            f.depth_m = chart_depth_m(t, &f);
+        }
+    }
+    f
+}
+
 /// Whether a unit of this draft can use the facility: draft plus under-keel clearance within its
 /// depth. Unknown draft or depth always fits.
 fn fits(f: &Facility, draft_m: Option<f64>) -> bool {
@@ -1446,7 +1516,7 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason, sea: u8) {
                 DivertReason::Weather => f.kind == FacilityKind::ShelteringPort,
                 DivertReason::Staging => f.kind == FacilityKind::Anchorage && f.staging,
             })
-            .filter_map(|f| post_position(world, f).map(|p| (f.clone(), p)))
+            .filter_map(|f| post_position(world, f).map(|p| (charted(world, f), p)))
             .collect()
     };
     if points.is_empty() {
@@ -1547,6 +1617,7 @@ fn hold_alongside(world: &mut World, tick: Tick) {
                 if let Some(mut r) = world.get_mut::<Route>(e) {
                     r.waypoints = vec![ahead];
                     r.next = 0;
+                    r.charted = false;
                 }
                 if let Some(mut k) = world.get_mut::<Kinematics>(e) {
                     k.ordered_speed_mps = ok.speed_mps.min(k.max_speed_mps);
@@ -1625,7 +1696,7 @@ fn serve(world: &mut World, tick: Tick) {
                 .and_then(|u| world.resource::<UnitIndex>().0.get(&u).copied())
                 .and_then(|o| world.get::<Kinematics>(o))
                 .map(|k| k.speed_mps);
-            Some((f.clone(), at, carrier))
+            Some((charted(world, f), at, carrier))
         })
         .collect();
     let (alongside, waiting) = alongside(world, &facilities);

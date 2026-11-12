@@ -80,20 +80,53 @@ pub(crate) struct LandMaskRes(pub(crate) Option<Arc<LandMask>>);
 #[derive(Debug, Default, Clone, Resource)]
 pub(crate) struct TerrainRes(pub(crate) Option<Arc<Terrain>>);
 
-/// Plans `waypoints` from `from` around land for ships and submarines. Returns the route to store
-/// and, when legs were replanned, how many.
+/// A route as planned: the waypoints to store, legs replanned, and legs with no route deep
+/// enough for the unit's draft (planned round land only).
+pub(crate) struct SeaRoute {
+    pub(crate) waypoints: Vec<GeoPoint>,
+    pub(crate) replanned: usize,
+    pub(crate) shallow_legs: usize,
+    /// Every leg was planned deep enough for the unit's draft.
+    pub(crate) charted: bool,
+}
+
+/// Plans `waypoints` from `from` round land for ships and submarines, and, with terrain packs
+/// and a known draft, out of water shallower than the draft plus under-keel clearance
+/// (`docs/models/shallow-water.md`).
 pub(crate) fn plan_sea_route(
     world: &World,
     domain: Domain,
+    draft_m: Option<f64>,
     from: GeoPoint,
     waypoints: &[GeoPoint],
-) -> Result<(Vec<GeoPoint>, usize), String> {
+) -> Result<SeaRoute, String> {
     let mask = world.resource::<LandMaskRes>().0.clone();
+    let terrain = world.resource::<TerrainRes>().0.clone();
     match (mask, domain) {
-        (Some(mask), Domain::Surface | Domain::Subsurface) if !waypoints.is_empty() => mask
-            .plan_route(from, waypoints)
-            .map_err(|e| format!("route refused: {e}")),
-        _ => Ok((waypoints.to_vec(), 0)),
+        (Some(mask), Domain::Surface | Domain::Subsurface) if !waypoints.is_empty() => {
+            let limit = match (&terrain, draft_m) {
+                (Some(t), Some(d)) if d > 0.0 => Some(sim_geo::land::DepthLimit {
+                    terrain: t,
+                    min_depth_m: d + crate::planning::UNDER_KEEL_CLEARANCE_M,
+                }),
+                _ => None,
+            };
+            let charted = limit.is_some();
+            mask.plan_route_for(from, waypoints, limit)
+                .map(|p| SeaRoute {
+                    charted: charted && p.shallow_legs == 0,
+                    waypoints: p.waypoints,
+                    replanned: p.replanned,
+                    shallow_legs: p.shallow_legs,
+                })
+                .map_err(|e| format!("route refused: {e}"))
+        }
+        _ => Ok(SeaRoute {
+            waypoints: waypoints.to_vec(),
+            replanned: 0,
+            shallow_legs: 0,
+            charted: false,
+        }),
     }
 }
 
@@ -188,6 +221,26 @@ impl Simulation {
     #[must_use]
     pub fn terrain(&self) -> Option<&Arc<Terrain>> {
         self.world.resource::<TerrainRes>().0.as_ref()
+    }
+
+    /// The water under `unit` and along the rest of its route, from the terrain packs, when
+    /// `viewer` sees the unit as its own (any unit for the white cell). `None` without terrain.
+    #[must_use]
+    pub fn route_depths(&self, unit: UnitId, viewer: Viewer) -> Option<crate::depths::RouteDepths> {
+        let terrain = self.terrain()?;
+        let e = *self.world.resource::<UnitIndex>().0.get(&unit)?;
+        let u = self.world.get::<Unit>(e)?;
+        if let Viewer::Side { side } = viewer {
+            if u.side != side {
+                return None;
+            }
+        }
+        Some(crate::depths::route_depths(
+            terrain,
+            u,
+            self.world.get::<Position>(e)?,
+            self.world.get::<Route>(e)?,
+        ))
     }
 
     #[must_use]
@@ -1102,17 +1155,24 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
         }
         CommandPayload::SetRoute { unit, waypoints } => {
             let entity = authorised_entity(world, cmd, *unit)?;
-            let (domain, from) = match (world.get::<Unit>(entity), world.get::<Position>(entity)) {
-                (Some(u), Some(p)) => (u.domain, p.point),
-                _ => return Err(format!("{unit} has no position")),
-            };
-            let (planned, replanned) = plan_sea_route(world, domain, from, waypoints)?;
+            let (domain, draft, from) =
+                match (world.get::<Unit>(entity), world.get::<Position>(entity)) {
+                    (Some(u), Some(p)) => (u.domain, u.draft_m, p.point),
+                    _ => return Err(format!("{unit} has no position")),
+                };
+            let SeaRoute {
+                waypoints: planned,
+                replanned,
+                shallow_legs,
+                charted,
+            } = plan_sea_route(world, domain, draft, from, waypoints)?;
             let count = planned.len();
             let mut route = world
                 .get_mut::<Route>(entity)
                 .ok_or_else(|| format!("{unit} has no route component"))?;
             route.waypoints = planned;
             route.next = 0;
+            route.charted = charted;
             if replanned > 0 {
                 let tick = world.resource::<SimClock>().tick;
                 #[allow(clippy::cast_possible_truncation)]
@@ -1122,6 +1182,17 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
                         unit: *unit,
                         legs: replanned as u32,
                         waypoints: count as u32,
+                    },
+                );
+            }
+            if shallow_legs > 0 {
+                let tick = world.resource::<SimClock>().tick;
+                #[allow(clippy::cast_possible_truncation)]
+                world.resource_mut::<EventLog>().push(
+                    tick,
+                    SimEventKind::RouteShallow {
+                        unit: *unit,
+                        legs: shallow_legs as u32,
                     },
                 );
             }
@@ -1350,19 +1421,26 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
     // A scenario route that crosses land is planned round it; one that cannot be planned is dropped
     // (the unit still spawns, holding its course) and the reason is logged.
     let tick = world.resource::<SimClock>().tick;
-    let (route, route_note) = match plan_sea_route(world, s.domain, s.position, &s.route) {
-        Ok((planned, 0)) => (planned, None),
-        #[allow(clippy::cast_possible_truncation)]
-        Ok((planned, legs)) => {
-            let n = planned.len() as u32;
-            (
-                planned,
-                Some(SimEventKind::RouteReplanned {
+    let mut shallow_note = None;
+    let mut charted = false;
+    let (route, route_note) = match plan_sea_route(world, s.domain, s.draft_m, s.position, &s.route)
+    {
+        Ok(planned) => {
+            charted = planned.charted;
+            #[allow(clippy::cast_possible_truncation)]
+            if planned.shallow_legs > 0 {
+                shallow_note = Some(SimEventKind::RouteShallow {
                     unit: s.id,
-                    legs: legs as u32,
-                    waypoints: n,
-                }),
-            )
+                    legs: planned.shallow_legs as u32,
+                });
+            }
+            #[allow(clippy::cast_possible_truncation)]
+            let note = (planned.replanned > 0).then_some(SimEventKind::RouteReplanned {
+                unit: s.id,
+                legs: planned.replanned as u32,
+                waypoints: planned.waypoints.len() as u32,
+            });
+            (planned.waypoints, note)
         }
         Err(reason) => (
             Vec::new(),
@@ -1421,6 +1499,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             Route {
                 waypoints: route,
                 next: 0,
+                charted,
             },
         ))
         .id();
@@ -1433,7 +1512,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
     world
         .resource_mut::<EventLog>()
         .push(tick, SimEventKind::UnitSpawned { unit: s.id });
-    if let Some(note) = route_note {
+    for note in [route_note, shallow_note].into_iter().flatten() {
         world.resource_mut::<EventLog>().push(tick, note);
     }
     Ok(())

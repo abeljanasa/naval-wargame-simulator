@@ -13,6 +13,7 @@ mod command;
 mod comms;
 mod components;
 mod coverage;
+mod depths;
 mod detection;
 mod error;
 mod esm;
@@ -52,6 +53,7 @@ pub use command::{
 pub use comms::{CommsView, PostView};
 pub use components::{Domain, Kinematics, Position, Route, Unit};
 pub use coverage::{CoverageCell, ZoneCoverage, GRID as COVERAGE_GRID};
+pub use depths::{DepthSample, RouteDepths};
 pub use detection::{
     clutter_background, default_rcs_m2, detection_range_m, domain_speed_bound_mps, pd_per_scan,
     sensor_height_m, target_height_m, Contact, ContactRecord, EnvState, Jammer, SensorKind,
@@ -71,11 +73,11 @@ pub use mines::{Minefield, Minefields, MINE_CHECK_PERIOD_TICKS};
 pub use optical::default_length_m;
 pub use outcomes::{Outcome, OutcomeFeed, OutcomeKind};
 pub use planning::{
-    group_of, validate_groups, validate_planning, weather_limit, ActionGroup, Diversion,
-    DivertReason, Facility, FacilityKind, GapPolicy, GroupStation, Loadout, PlanningLayer,
-    QueuedOrder, ServiceState, Services, Zone, ZoneKind, ZoneLayer, ALONGSIDE_SPEED_MPS,
-    DEFAULT_HANDOVER_S, DEFAULT_TRANSFER_T_PER_H, RAS_LEAD_M, REARM_TICKS, REPAIR_FRACTION_PER_MIN,
-    SERVICE_PERIOD_TICKS, UNDER_KEEL_CLEARANCE_M,
+    chart_depth_m, group_of, validate_groups, validate_planning, weather_limit, ActionGroup,
+    Diversion, DivertReason, Facility, FacilityKind, GapPolicy, GroupStation, Loadout,
+    PlanningLayer, QueuedOrder, ServiceState, Services, Zone, ZoneKind, ZoneLayer,
+    ALONGSIDE_SPEED_MPS, DEFAULT_HANDOVER_S, DEFAULT_TRANSFER_T_PER_H, RAS_LEAD_M, REARM_TICKS,
+    REPAIR_FRACTION_PER_MIN, SERVICE_PERIOD_TICKS, UNDER_KEEL_CLEARANCE_M,
 };
 pub use point_defence::{PointDefence, Shot};
 pub use rng::{RngStreams, StreamId};

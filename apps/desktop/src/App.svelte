@@ -23,6 +23,7 @@
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
+  import { commands } from "./lib/bindings";
   import type {
     Audience,
     CommsView,
@@ -44,9 +45,13 @@
     coversText,
     heightText,
     installTerrainPack,
+    profilePaths,
     terrainStatus,
+    waterText,
+    waterTight,
     type TerrainStatus,
     type TerrainView,
+    type WaterView,
   } from "./lib/terrain";
 
   let mapEl: HTMLElement;
@@ -87,6 +92,42 @@
   /** White cell: the kind and radius of a zone to add on the map. */
   let newZoneKind = $state<"sense" | "engage">("sense");
   let newZoneKm = $state(20);
+
+  // Depth under the selected unit and along its route (terrain packs), refreshed as it moves.
+  let water = $state<WaterView | null>(null);
+  $effect(() => {
+    const id = sim.selected;
+    const key = `${String(sim.selectedUnit?.route?.next)}|${String(sim.selectedUnit?.route?.waypoints.length)}`;
+    void key;
+    water = null;
+    if (id === null || (terrain?.packs.length ?? 0) === 0) return;
+    let live = true;
+    const load = async () => {
+      const r = await commands.routeDepths(id);
+      if (live && sim.selected === id) water = r.status === "ok" ? r.data : null;
+    };
+    void load();
+    const timer = setInterval(() => void load(), 5000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  });
+  const waterProfile = $derived(water ? profilePaths(water, 240, 48) : null);
+
+  // Charted depths of the facilities, for the white cell's Planning tab.
+  let chartDepths = $state<Map<number, number | null>>(new Map());
+  $effect(() => {
+    const n = (sim.session?.facilities ?? []).length;
+    const packs = terrain?.packs.length ?? 0;
+    void n;
+    if (rightTab !== "planning" || packs === 0) return;
+    void commands.facilityDepths().then((r) => {
+      if (r.status === "ok") {
+        chartDepths = new Map(r.data.map((d) => [d.facility, d.chart_m]));
+      }
+    });
+  });
 
   function editPlanning(change: (f: Facility[], z: Zone[]) => void) {
     const facilities = structuredClone($state.snapshot(sim.session?.facilities ?? []));
@@ -938,6 +979,31 @@
                     none
                   {/if}
                 </dd>
+                {#if water && (u.domain === "surface" || u.domain === "subsurface")}
+                  <dt>Water</dt>
+                  <dd class:hurt={waterTight(water)}>
+                    {waterText(water)}
+                    {#if waterProfile && waterProfile.bed}
+                      <svg
+                        class="water-profile"
+                        viewBox="0 0 240 48"
+                        role="img"
+                        aria-label="Depth along the route"
+                      >
+                        <path class="bed" d={waterProfile.bed} />
+                        {#if waterProfile.draftY !== null}
+                          <line
+                            class="draft"
+                            x1="0"
+                            x2="240"
+                            y1={waterProfile.draftY}
+                            y2={waterProfile.draftY}
+                          />
+                        {/if}
+                      </svg>
+                    {/if}
+                  </dd>
+                {/if}
                 <dt>Condition</dt>
                 <dd class:hurt={u.status !== "operational"}>
                   {u.status.replaceAll("_", " ")} · {Math.round(n(u.damage_fraction) * 100)} % damage{u.fires >
@@ -1295,6 +1361,38 @@
               {#each sim.session?.facilities ?? [] as f, i (f.id)}
                 <li class="stacked">
                   <span>{f.name} <span class="dim">({f.kind.replaceAll("_", " ")})</span></span>
+                  {#if f.kind !== "command_post" && f.unit == null}
+                    <span class="row tight">
+                      <label class="inline">
+                        Depth (m)
+                        <input
+                          class="depth"
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          placeholder={chartDepths.get(f.id) != null
+                            ? `chart ${Math.round(chartDepths.get(f.id) ?? 0)}`
+                            : "any"}
+                          value={f.depth_m ?? ""}
+                          aria-label={`Depth at ${f.name} (blank: from the chart)`}
+                          onchange={(e) => {
+                            const v = e.currentTarget.value.trim();
+                            editPlanning((fs) => {
+                              const x = fs[i];
+                              if (x) x.depth_m = v === "" ? null : Math.max(0.1, Number(v));
+                            });
+                          }}
+                        />
+                      </label>
+                      <span class="dim">
+                        {f.depth_m != null
+                          ? "set by the planner"
+                          : chartDepths.get(f.id) != null
+                            ? "from the chart"
+                            : "no limit"}
+                      </span>
+                    </span>
+                  {/if}
                   <span class="row tight">
                     {#if f.kind !== "command_post"}
                       {#each ["repair", "rearm", "refuel"] as const as sv (sv)}
@@ -1983,6 +2081,26 @@
   }
 
   /* Status bar: what needs your attention, or what the keys do. */
+  .water-profile {
+    display: block;
+    width: 100%;
+    max-width: 240px;
+    height: 48px;
+    margin-top: 4px;
+    background: color-mix(in srgb, #2b6f8a 35%, transparent);
+    border-radius: 2px;
+  }
+  .water-profile .bed {
+    fill: #8a7356;
+  }
+  .water-profile .draft {
+    stroke: var(--warn);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+  }
+  input.depth {
+    width: 6em;
+  }
   .statusbar .terrain-readout {
     margin-left: auto;
     padding-left: 16px;

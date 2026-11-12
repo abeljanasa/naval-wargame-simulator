@@ -110,6 +110,10 @@ export const commands = {
 	aarCsv: (table: AarTable) => typedError<string, string>(__TAURI_INVOKE("aar_csv", { table })),
 	/**  The terrain packs on this machine and the ones the current exercise uses. */
 	terrainStatus: () => __TAURI_INVOKE<TerrainStatus_Serialize>("terrain_status"),
+	/**  The water under a unit and along the rest of its route (`None` without terrain packs). */
+	routeDepths: (unit: UnitId) => typedError<RouteDepths_Serialize | null, string>(__TAURI_INVOKE("route_depths", { unit })),
+	/**  Each facility's charted depth, for the white cell's planning tab. */
+	facilityDepths: () => typedError<FacilityDepth_Serialize[], string>(__TAURI_INVOKE("facility_depths")),
 };
 
 /** Events */
@@ -596,6 +600,25 @@ export type DbWeaponRow = {
 	kind: string,
 };
 
+/**  Water depth at one point along a route. */
+export type DepthSample = DepthSample_Serialize | DepthSample_Deserialize;
+
+/**  Water depth at one point along a route. */
+export type DepthSample_Deserialize = {
+	/**  Along the route from the unit, metres. */
+	distance_m: number | null,
+	/**  Water depth, metres (0 on land); `None` where no terrain pack covers. */
+	depth_m?: number | null,
+};
+
+/**  Water depth at one point along a route. */
+export type DepthSample_Serialize = {
+	/**  Along the route from the unit, metres. */
+	distance_m: number | null,
+	/**  Water depth, metres (0 on land); `None` where no terrain pack covers. */
+	depth_m: number | null,
+};
+
 /**  One contact held by one side. */
 export type DetectionRow = DetectionRow_Serialize | DetectionRow_Deserialize;
 
@@ -784,6 +807,30 @@ export type Facilitation =
 
 /**  A planning-layer facility. */
 export type Facility = Facility_Serialize | Facility_Deserialize;
+
+/**
+ *  A facility's depth from the terrain packs (`chart_m`, `None` where no pack covers or for a
+ *  facility on a unit). The planner's `depth_m`, when set, is used instead.
+ */
+export type FacilityDepth = FacilityDepth_Serialize | FacilityDepth_Deserialize;
+
+/**
+ *  A facility's depth from the terrain packs (`chart_m`, `None` where no pack covers or for a
+ *  facility on a unit). The planner's `depth_m`, when set, is used instead.
+ */
+export type FacilityDepth_Deserialize = {
+	facility: number,
+	chart_m?: number | null,
+};
+
+/**
+ *  A facility's depth from the terrain packs (`chart_m`, `None` where no pack covers or for a
+ *  facility on a unit). The planner's `depth_m`, when set, is used instead.
+ */
+export type FacilityDepth_Serialize = {
+	facility: number,
+	chart_m: number | null,
+};
 
 /**  What a facility is. */
 export type FacilityKind = "command_post" | "refuelling_point" | "sheltering_port" | "anchorage";
@@ -1315,6 +1362,37 @@ export type ResolvedDoctrine_Serialize = {
 	wcs: Wcs_Serialize,
 	emcon: Emcon,
 	engage_unfriendly: boolean,
+};
+
+/**  The water under a unit and along the rest of its route. */
+export type RouteDepths = RouteDepths_Serialize | RouteDepths_Deserialize;
+
+/**  The water under a unit and along the rest of its route. */
+export type RouteDepths_Deserialize = {
+	draft_m?: number | null,
+	/**  Depth where the unit is now. */
+	here_m?: number | null,
+	/**  The rest of the route, from the unit (empty without a route). */
+	profile: DepthSample_Deserialize[],
+	/**  The shallowest sample on the rest of the route, and how far ahead it is. */
+	least_m?: number | null,
+	least_at_m?: number | null,
+	/**  The route was planned deep enough for the draft (the unit is on the navigable graph). */
+	charted: boolean,
+};
+
+/**  The water under a unit and along the rest of its route. */
+export type RouteDepths_Serialize = {
+	draft_m: number | null,
+	/**  Depth where the unit is now. */
+	here_m: number | null,
+	/**  The rest of the route, from the unit (empty without a route). */
+	profile: DepthSample_Serialize[],
+	/**  The shallowest sample on the rest of the route, and how far ahead it is. */
+	least_m: number | null,
+	least_at_m: number | null,
+	/**  The route was planned deep enough for the draft (the unit is on the navigable graph). */
+	charted: boolean,
 };
 
 export type RouteView = {

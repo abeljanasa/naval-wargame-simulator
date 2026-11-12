@@ -251,6 +251,64 @@ export function heightText(h: number): string {
   return h < 0 ? `Depth ${Math.round(-h).toLocaleString("en-GB")} m` : `Height ${Math.round(h)} m`;
 }
 
+/** Under-keel clearance the engine plans with, metres (sim-core `UNDER_KEEL_CLEARANCE_M`). */
+export const UNDER_KEEL_CLEARANCE_M = 1;
+
+/** The water under a unit and ahead of it, as the engine reports it (`route_depths`). */
+export interface WaterView {
+  draft_m: number | null;
+  here_m: number | null;
+  least_m: number | null;
+  least_at_m: number | null;
+  charted: boolean;
+  profile: { distance_m: number | null; depth_m: number | null }[];
+}
+
+const metres = (v: number) => `${Math.round(v).toLocaleString("en-GB")} m`;
+const nm = (m: number) => `${(m / 1852).toFixed(1)} nm`;
+
+/** True when the least water ahead (or here) is less than the draft plus clearance. */
+export function waterTight(w: WaterView): boolean {
+  if (w.draft_m == null) return false;
+  const need = w.draft_m + UNDER_KEEL_CLEARANCE_M;
+  return (w.least_m != null && w.least_m < need) || (w.here_m != null && w.here_m < need);
+}
+
+/** One line on the water: here, the least ahead and where, and the draft. */
+export function waterText(w: WaterView): string {
+  const parts: string[] = [];
+  parts.push(w.here_m == null ? "no chart here" : `${metres(w.here_m)} here`);
+  // The least water is worth a mention only when it is ahead, not where the unit is now.
+  if (w.least_m != null && w.least_at_m != null && w.least_at_m >= 200 && w.profile.length > 0) {
+    parts.push(`least ${metres(w.least_m)}, ${nm(w.least_at_m)} ahead`);
+  }
+  if (w.draft_m != null) parts.push(`draft ${w.draft_m.toFixed(1)} m`);
+  if (w.profile.length > 0 && !w.charted) parts.push("route not charted for its draft");
+  return parts.join(" · ");
+}
+
+/**
+ * The route's depth profile as SVG paths in a `width × height` box: the sea bed (filled below)
+ * and the draft line. Depths are scaled to the larger of 4 × draft and 50 m; deeper water sits
+ * on the bottom edge, so the shallow parts that matter have the room.
+ */
+export function profilePaths(
+  w: WaterView,
+  width: number,
+  height: number,
+): { bed: string; draftY: number | null } {
+  const cap = Math.max(50, 4 * (w.draft_m ?? 0));
+  const last = w.profile[w.profile.length - 1]?.distance_m ?? 0;
+  const span = last > 0 ? last : 1;
+  const y = (d: number) => (Math.min(Math.max(d, 0), cap) / cap) * height;
+  const pts = w.profile.map((s) => {
+    const x = ((s.distance_m ?? 0) / span) * width;
+    return `${x.toFixed(1)},${y(s.depth_m ?? cap).toFixed(1)}`;
+  });
+  const bed = pts.length ? `M0,${height} L${pts.join(" L")} L${width},${height} Z` : "";
+  return { bed, draftY: w.draft_m == null ? null : y(w.draft_m) };
+}
+
 // ---- Talking to the host ----
 
 export async function terrainStatus(): Promise<TerrainStatus> {

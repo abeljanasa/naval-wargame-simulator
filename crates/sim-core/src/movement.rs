@@ -9,15 +9,17 @@
 //! 4. Without a route, it dead-reckons along its heading.
 //!
 //! Land: routes are planned round the coastline when ordered (`sim_geo::land`), and a ship or
-//! submarine that would still move onto land stops instead (`LandAhead`).
+//! submarine that would still move onto land stops instead (`LandAhead`). With terrain packs, one
+//! that would move into water shallower than its draft stops too (`ShoalAhead`,
+//! `docs/models/shallow-water.md`).
 //! Fuel (`docs/models/fuel.md`): a unit with a fuel model burns fuel by speed after it moves; out
 //! of fuel, its ordered speed counts as zero and it coasts to a stop.
-//! Not yet modelled (see `docs/backlog.md`): shallow water and draft limits, sea-state penalties.
+//! Not yet modelled (see `docs/backlog.md`): sea-state penalties.
 
 use crate::components::{Domain, Kinematics, Position, Route, Unit};
 use crate::events::{EventLog, SimEventKind};
 use crate::fuel::{burn_t_per_s, Fuel};
-use crate::sim::LandMaskRes;
+use crate::sim::{LandMaskRes, TerrainRes};
 use crate::time::{SimClock, TICK_SECONDS};
 use bevy_ecs::prelude::*;
 use sim_geo::{direct, inverse};
@@ -38,6 +40,7 @@ type MovingUnit = (
 pub(crate) fn movement_system(
     clock: Res<SimClock>,
     land: Res<LandMaskRes>,
+    terrain: Res<TerrainRes>,
     mut log: ResMut<EventLog>,
     mut units: Query<MovingUnit>,
 ) {
@@ -81,6 +84,32 @@ pub(crate) fn movement_system(
                 kin.speed_mps = 0.0;
                 kin.ordered_speed_mps = 0.0;
                 log.push(tick, SimEventKind::LandAhead { unit: unit.id });
+            }
+        }
+        // Shoal guard (terrain packs), off the navigable graph only: a ship or submarine with no
+        // charted route (none, finished, uncharted, or one with a shallow leg) that would move
+        // into water shallower than its draft, and shallower than where it was, stops at its last
+        // position. It can still leave shallow water it is already in towards deeper water. A
+        // charted route is trusted, including its harbour ends, which the planner exempts because
+        // the bathymetry is coarsest at the coast.
+        let on_graph = route.charted && route.is_active();
+        if let (Some(t), Some(draft), Domain::Surface | Domain::Subsurface, false) =
+            (&terrain.0, unit.draft_m, unit.domain, on_graph)
+        {
+            if let (Some(now), Some(was)) = (t.depth_m(pos.point), t.depth_m(before.0.point)) {
+                if now < draft && now < was {
+                    *pos = before.0;
+                    kin.heading_deg = before.1;
+                    kin.speed_mps = 0.0;
+                    kin.ordered_speed_mps = 0.0;
+                    log.push(
+                        tick,
+                        SimEventKind::ShoalAhead {
+                            unit: unit.id,
+                            depth_m: now,
+                        },
+                    );
+                }
             }
         }
         if dry && !finished {
@@ -274,6 +303,7 @@ mod tests {
         let mut r = Route {
             waypoints: vec![wp],
             next: 0,
+            charted: false,
         };
         step_unit(&mut p, &mut k, &mut r, |_, _| {});
         // One second at 1.4324°/s: it cannot reverse course instantly.
@@ -358,6 +388,7 @@ mod tests {
         let mut r = Route {
             waypoints: vec![w1, w2],
             next: 0,
+            charted: false,
         };
         let mut arrivals = vec![];
         step_unit(&mut p, &mut k, &mut r, |i, d| arrivals.push((i, d)));
@@ -384,6 +415,7 @@ mod tests {
         let mut r = Route {
             waypoints: vec![wp],
             next: 0,
+            charted: false,
         };
         let mut ticks = 0;
         while r.is_active() {

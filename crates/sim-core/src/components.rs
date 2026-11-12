@@ -84,6 +84,11 @@ pub struct Kinematics {
 pub struct Route {
     pub waypoints: Vec<GeoPoint>,
     pub next: usize,
+    /// Planned deep enough for the unit's draft on the terrain packs: the unit is on the
+    /// navigable graph while it follows it, and the shoal guard leaves it alone
+    /// (`docs/models/shallow-water.md`).
+    #[serde(default)]
+    pub charted: bool,
 }
 
 impl Route {

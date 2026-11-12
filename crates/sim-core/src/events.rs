@@ -81,6 +81,18 @@ pub enum SimEventKind {
     LandAhead {
         unit: UnitId,
     },
+    /// No route deep enough for the unit's draft: `legs` legs were planned round land only and
+    /// may cross water too shallow for it (terrain packs, `docs/models/shallow-water.md`).
+    RouteShallow {
+        unit: UnitId,
+        legs: u32,
+    },
+    /// A ship or submarine stopped rather than run into water shallower than its draft
+    /// (`depth_m` there, from the terrain packs).
+    ShoalAhead {
+        unit: UnitId,
+        depth_m: f64,
+    },
     /// One ESM intercept draw against one emitter, with every model input.
     EsmIntercept {
         observer: UnitId,

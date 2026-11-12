@@ -69,7 +69,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 24: surface action groups in the planning layer. Older saves load with none.
 /// * 25: the recent weapon-outcome feed (display only, not hashed), so a replay that seeks to a
 ///   keyframe shows the same hit and miss markers as a straight run. Older saves load with none.
-pub const SAVE_FORMAT_VERSION: u32 = 25;
+/// * 26: a route records whether it was charted (planned deep enough for the unit's draft).
+///   Older saves load with uncharted routes.
+pub const SAVE_FORMAT_VERSION: u32 = 26;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,7 +175,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=16 | SAVE_FORMAT_VERSION => {
+            1..=16 | 25 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

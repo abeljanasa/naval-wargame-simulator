@@ -14,7 +14,10 @@ import {
   mercatorLat,
   mercatorLats,
   mercatorY,
+  profilePaths,
   reliefPixels,
+  waterText,
+  waterTight,
   type TerrainGrid,
 } from "./terrain";
 
@@ -122,5 +125,44 @@ describe("terrain on the map", () => {
     expect(cellText(240)).toBe("4′");
     expect(coversText([-90, -180, 90, 180])).toBe("the world");
     expect(coversText([3, 111, 27, 137])).toBe("3°N–27°N, 111°E–137°E");
+  });
+});
+
+describe("water along a route", () => {
+  const w = {
+    draft_m: 6.5,
+    here_m: 346,
+    least_m: 23,
+    least_at_m: 26_300,
+    charted: true,
+    profile: [
+      { distance_m: 0, depth_m: 346 },
+      { distance_m: 13_000, depth_m: 23 },
+      { distance_m: 26_000, depth_m: null },
+    ],
+  };
+
+  it("says what is under the keel and ahead", () => {
+    expect(waterText(w)).toBe("346 m here · least 23 m, 14.2 nm ahead · draft 6.5 m");
+    expect(waterText({ ...w, least_m: 346, least_at_m: 0 })).toBe("346 m here · draft 6.5 m");
+    expect(waterTight(w)).toBe(false);
+    expect(waterTight({ ...w, least_m: 7 })).toBe(true);
+    expect(waterText({ ...w, charted: false, here_m: null })).toBe(
+      "no chart here · least 23 m, 14.2 nm ahead · draft 6.5 m · route not charted for its draft",
+    );
+    expect(waterText({ ...w, profile: [], least_m: null, least_at_m: null })).toBe(
+      "346 m here · draft 6.5 m",
+    );
+  });
+
+  it("draws the bed against the draft, with deep and uncharted water on the bottom", () => {
+    const p = profilePaths(w, 100, 50);
+    // Cap 50 m: 346 m and no data sit on the bottom; 23 m is 23/50 of the way down.
+    expect(p.bed).toBe("M0,50 L0.0,50.0 L50.0,23.0 L100.0,50.0 L100,50 Z");
+    expect(p.draftY).toBeCloseTo(6.5);
+    expect(profilePaths({ ...w, draft_m: null, profile: [] }, 100, 50)).toEqual({
+      bed: "",
+      draftY: null,
+    });
   });
 });

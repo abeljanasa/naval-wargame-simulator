@@ -331,6 +331,21 @@ pub fn info(path: &Path) -> Result<serde_json::Value> {
     }))
 }
 
+/// Loads packs for a run (`--terrain`). `None` for none.
+pub fn load(
+    packs: &[std::path::PathBuf],
+) -> Result<Option<std::sync::Arc<sim_geo::terrain::Terrain>>> {
+    let loaded = packs
+        .iter()
+        .map(|p| {
+            TerrainPack::load(p)
+                .map(std::sync::Arc::new)
+                .with_context(|| format!("reading {}", p.display()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(sim_geo::terrain::Terrain::new(loaded).map(std::sync::Arc::new))
+}
+
 /// Height at a point from one or more packs (finest first), for `terrain sample`.
 pub fn sample(packs: &[std::path::PathBuf], lat: f64, lon: f64) -> Result<serde_json::Value> {
     let loaded = packs

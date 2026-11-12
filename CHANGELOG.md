@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 3: shallow water and depths)
+
+- **Routing by draft:**
+  - With terrain packs, ships and submarines are routed round water shallower than their draft plus 1 m: 3 × 3 samples per cell of the 1/30° planning grid, with a one-cell clearance like the coast's.
+  - Harbour ends of a leg (2 cells) are left to the planner's waypoints.
+  - When no route is deep enough, the order still stands, routed round land only, with a `RouteShallow` warning to the seat.
+- **Shoal guard, off the navigable graph:**
+  - A unit with no charted route (none, finished, uncharted, or with a shallow leg) stops rather than move into water shallower than its draft (`ShoalAhead`).
+  - A unit on a charted route is trusted.
+  - Seats now see "stopped: land ahead" and "stopped: N m of water ahead" warnings for their own units.
+- **Chart depths for ports and anchorages:** the deepest water in the facility's area, used for draft checks unless the planner sets a depth.
+  - The white cell's Planning tab shows each chart depth and takes an override.
+- **Depth along the route:** `Simulation::route_depths`, shown in the unit panel as a *Water* row and a profile against the draft.
+- **`nws-batch run | mc | aar --terrain <pack>…`** runs, and replays, with terrain packs.
+- **Save format 26** (`Route::charted`); format 25 saves still load.
+- **Unchanged:** without packs, everything behaves as before, and the golden replays are unchanged.
+
 ### Added (Phase 4, slice 2: terrain and bathymetry packs)
 
 - **Terrain packs** (`.nwsterrain`):

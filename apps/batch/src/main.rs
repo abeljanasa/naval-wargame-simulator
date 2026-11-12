@@ -50,6 +50,10 @@ enum Cmd {
         /// embedded in this binary.
         #[arg(long)]
         db: Option<PathBuf>,
+        /// Terrain packs (`.nwsterrain`) to run with: depths for routing by draft and the
+        /// shoal guard. Their id joins the state hash.
+        #[arg(long)]
+        terrain: Vec<PathBuf>,
     },
     /// After-action review: replay an exercise record (or run a scenario and record it), check
     /// the replay against the recorded hash, and write the AAR tables as CSV files.
@@ -69,6 +73,9 @@ enum Cmd {
         /// Open platform database file. Defaults to the embedded database.
         #[arg(long)]
         db: Option<PathBuf>,
+        /// Terrain packs to run (or replay) with. A record made with terrain needs the same packs.
+        #[arg(long)]
+        terrain: Vec<PathBuf>,
     },
     /// Monte Carlo: run a scenario for many seeds in parallel and summarise its measures of
     /// effectiveness (mean, SD, 95 % CI, median, range, histogram). Writes `runs.csv`,
@@ -94,6 +101,10 @@ enum Cmd {
         /// Open platform database file. Defaults to the embedded database.
         #[arg(long)]
         db: Option<PathBuf>,
+        /// Terrain packs (`.nwsterrain`) to run with: depths for routing by draft and the
+        /// shoal guard. Their id joins the state hash.
+        #[arg(long)]
+        terrain: Vec<PathBuf>,
     },
     /// Terrain and bathymetry packs: build one from a GEBCO download, describe one, or sample it.
     Terrain {
@@ -167,8 +178,10 @@ fn main() -> Result<()> {
             ticks,
             out,
             db,
+            terrain,
         } => {
             let platforms = platforms(db.as_deref())?;
+            let terrain = terrain::load(&terrain)?;
             let mut results = vec![];
             for path in &scenarios {
                 let scenario =
@@ -185,6 +198,7 @@ fn main() -> Result<()> {
                 let end = ticks.map_or_else(|| scenario.duration_ticks(), Tick);
                 for seed in run_seeds {
                     let mut sim = scenario.build(Some(seed), &platforms)?;
+                    sim.set_terrain(terrain.clone());
                     sim.run_until(end);
                     let r = RunResult {
                         scenario: name.clone(),
@@ -210,7 +224,15 @@ fn main() -> Result<()> {
             seed,
             ticks,
             db,
-        } => aar(&input, &out, seed, ticks, db.as_deref()),
+            terrain,
+        } => aar(
+            &input,
+            &out,
+            seed,
+            ticks,
+            db.as_deref(),
+            terrain::load(&terrain)?,
+        ),
         Cmd::Terrain { command } => {
             let out = match command {
                 TerrainCmd::Build {
@@ -247,7 +269,9 @@ fn main() -> Result<()> {
             ticks,
             out,
             db,
+            terrain,
         } => {
+            let terrain = terrain::load(&terrain)?;
             let s = Scenario::load(&scenario)
                 .with_context(|| format!("loading {}", scenario.display()))?;
             let first = seed.unwrap_or(s.seed);
@@ -257,7 +281,7 @@ fn main() -> Result<()> {
                 std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
             });
             let open = || platforms(db.as_deref());
-            let results = mc::run(&s, &seeds, end, threads, &open)?;
+            let results = mc::run(&s, &seeds, end, threads, &open, terrain.as_ref())?;
             let stats = mc::summarise(&results);
             mc::write(&out, &s.name, &results, &stats)?;
             println!(
@@ -313,6 +337,7 @@ fn aar(
     seed: Option<u64>,
     ticks: Option<u64>,
     db: Option<&Path>,
+    terrain: Option<std::sync::Arc<sim_geo::terrain::Terrain>>,
 ) -> Result<()> {
     let bytes = std::fs::read(input).with_context(|| format!("reading {}", input.display()))?;
     std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
@@ -324,6 +349,7 @@ fn aar(
             let scenario = Scenario::from_json(&text)
                 .with_context(|| format!("loading {}", input.display()))?;
             let mut sim = scenario.build(seed, &platforms(db)?)?;
+            sim.set_terrain(terrain.clone());
             sim.run_until(ticks.map_or_else(|| scenario.duration_ticks(), Tick));
             let record = ExerciseRecord::capture(&mut sim, &scenario.name, text);
             let path = out.join("record.nwsrec");
@@ -339,7 +365,7 @@ fn aar(
         .iter()
         .map(|s| (s.id, s.name.clone()))
         .collect();
-    let replay = Replay::open(record, &sides)?;
+    let replay = Replay::open_with_terrain(record, &sides, terrain)?;
     let report = replay.report();
     for table in AarTable::ALL {
         let path = out.join(format!("{}.csv", table.file_stem()));

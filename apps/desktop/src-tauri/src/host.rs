@@ -162,6 +162,14 @@ impl Station {
     }
 }
 
+/// A facility's depth from the terrain packs (`chart_m`, `None` where no pack covers or for a
+/// facility on a unit). The planner's `depth_m`, when set, is used instead.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct FacilityDepth {
+    pub facility: u32,
+    pub chart_m: Option<f64>,
+}
+
 pub struct Host {
     pub scenario: Scenario,
     platforms: sim_db::PlatformDb,
@@ -272,6 +280,40 @@ impl Host {
             }
             Err(_) => false,
         }
+    }
+
+    /// The water under a unit and along the rest of its route, as this window's seat sees it
+    /// (its own units; any unit for the white cell). `None` without terrain packs.
+    pub fn route_depths(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+    ) -> Result<Option<sim_core::RouteDepths>, String> {
+        let viewer = viewer_of(self.seat_of(label)?);
+        let sim = match &mut self.replay {
+            Some(r) => r.sim_mut(),
+            None => &mut self.sim,
+        };
+        Ok(sim.route_depths(unit, viewer))
+    }
+
+    /// Each fixed facility's depth from the terrain packs (white cell only): what the engine
+    /// uses when the planner has not set one.
+    pub fn facility_depths(&self, label: &str) -> Result<Vec<FacilityDepth>, String> {
+        if !matches!(self.seat_of(label)?.role, SeatRole::WhiteCell) {
+            return Err("only the white cell sees the planning layer".into());
+        }
+        let Some(t) = self.sim.terrain() else {
+            return Ok(Vec::new());
+        };
+        Ok(self
+            .facilities
+            .iter()
+            .map(|f| FacilityDepth {
+                facility: f.id,
+                chart_m: sim_core::chart_depth_m(t, f),
+            })
+            .collect())
     }
 
     /// The terrain id the live exercise (or the replay under review) runs with.
@@ -986,14 +1028,35 @@ impl Host {
     }
 }
 
-/// Reasons a station's orders were refused since the last call.
-fn refusals(sim: &Simulation, st: &mut Station) -> Vec<String> {
+/// Reasons a station's orders were refused since the last call, and warnings about the units it
+/// sees as its own (`units`): routes with no water deep enough, and stops for land or shoal water.
+fn refusals(sim: &Simulation, st: &mut Station, units: &[UnitView]) -> Vec<String> {
     let events = sim.events();
+    let name = |id: &UnitId| units.iter().find(|u| u.id == *id).map(|u| u.name.clone());
     let mut out = Vec::new();
     for e in &events[st.events_seen.min(events.len())..] {
         match &e.kind {
             SimEventKind::CommandRejected { seq, reason } if st.pending.remove(seq) => {
                 out.push(reason.clone());
+            }
+            SimEventKind::RouteShallow { unit, .. } => {
+                if let Some(n) = name(unit) {
+                    out.push(format!(
+                        "{n}: no route deep enough for its draft. It is routed round land only and may meet shoal water"
+                    ));
+                }
+            }
+            SimEventKind::ShoalAhead { unit, depth_m } => {
+                if let Some(n) = name(unit) {
+                    out.push(format!(
+                        "{n} stopped: {depth_m:.0} m of water ahead, less than its draft"
+                    ));
+                }
+            }
+            SimEventKind::LandAhead { unit } => {
+                if let Some(n) = name(unit) {
+                    out.push(format!("{n} stopped: land ahead"));
+                }
             }
             SimEventKind::CommandApplied { seq } => {
                 st.pending.remove(seq);
@@ -1007,7 +1070,16 @@ fn refusals(sim: &Simulation, st: &mut Station) -> Vec<String> {
 
 fn update_station(sim: &mut Simulation, viewer: Viewer, st: &mut Station) -> SnapshotUpdate {
     let snap = sim.snapshot(viewer);
-    let refusals = refusals(sim, st);
+    let own: Vec<UnitView> = snap
+        .units
+        .iter()
+        .filter(|u| match viewer {
+            Viewer::WhiteCell => true,
+            Viewer::Side { side } => u.side == side,
+        })
+        .cloned()
+        .collect();
+    let refusals = refusals(sim, st, &own);
     let update = match &st.last_sent {
         Some(prev) if prev.viewer == snap.viewer => {
             let old: BTreeMap<UnitId, &UnitView> = prev.units.iter().map(|u| (u.id, u)).collect();

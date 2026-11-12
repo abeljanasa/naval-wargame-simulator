@@ -55,6 +55,27 @@ fn terrain_status_of(t: &TerrainState, h: &Host) -> terrain::TerrainStatus {
     }
 }
 
+/// The water under a unit and along the rest of its route (`None` without terrain packs).
+#[tauri::command]
+#[specta::specta]
+fn route_depths(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+) -> Result<Option<sim_core::RouteDepths>, String> {
+    lock(&host).route_depths(window.label(), unit)
+}
+
+/// Each facility's charted depth, for the white cell's planning tab.
+#[tauri::command]
+#[specta::specta]
+fn facility_depths(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+) -> Result<Vec<host::FacilityDepth>, String> {
+    lock(&host).facility_depths(window.label())
+}
+
 /// The terrain packs on this machine and the ones the current exercise uses.
 #[tauri::command]
 #[specta::specta]
@@ -1106,6 +1127,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             get_aar,
             aar_csv,
             terrain_status,
+            route_depths,
+            facility_depths,
         ])
         .events(collect_events![FrameEvent])
 }
