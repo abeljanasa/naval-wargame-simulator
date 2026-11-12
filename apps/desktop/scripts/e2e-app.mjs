@@ -92,9 +92,21 @@ try {
   };
 
   // 1. The app starts on its built-in scenario, with the real engine behind it.
-  await until("the built-in scenario", async () =>
-    (await bodyText()).includes("Phase 1 — Strait transit"),
-  );
+  // A cold start (first WebKitGTK launch under a virtual display) can take a while.
+  await until(
+    "the built-in scenario",
+    async () => (await bodyText()).includes("Phase 1 — Strait transit"),
+    90_000,
+  ).catch(async (e) => {
+    // Show what the page holds, to tell a blank render from a script error.
+    const state = await wd("POST", `${s}/execute/sync`, {
+      script: "return [document.readyState, document.title, document.body?.innerHTML.length ?? 0];",
+      args: [],
+    }).catch((x) => String(x));
+    console.log("page state:", JSON.stringify(state));
+    console.log("page text:", JSON.stringify((await bodyText().catch(() => "")).slice(0, 400)));
+    throw e;
+  });
   check(true, "app starts and shows the built-in scenario");
   // The host runs the first second on load, which places the units.
   check(seconds(await clock()) === 1, "opens after the first second (D+0 00:00:01)");
