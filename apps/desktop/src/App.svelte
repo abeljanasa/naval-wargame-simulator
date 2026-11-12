@@ -4,6 +4,8 @@
   import type { MapboxOverlay } from "@deck.gl/mapbox";
   import {
     createMap,
+    declutter,
+    labelCandidates,
     buildLayers,
     coverageLayers,
     nightLayers,
@@ -203,6 +205,16 @@
       if (sim.deliverPick(p)) return;
       if (sim.draft) sim.addWaypoint(p);
     });
+    // Re-place labels as the map moves, at most once a frame.
+    let queued = false;
+    map.on("move", () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        relayout();
+      });
+    });
     sim.start().catch((e: unknown) => {
       startError = `Cannot connect to the simulation engine: ${String(e)}`;
     });
@@ -227,6 +239,33 @@
       ],
       { padding: 80, maxZoom: 9, duration: 0 },
     );
+  });
+
+  // Label declutter (map.ts): where labels would overlap on screen, the lower priority hides until
+  // the user zooms in. Recomputed when the picture changes and as the map moves.
+  let hiddenLabels = $state(new Set<string>());
+  function relayout() {
+    const m = map;
+    if (!m || editor.open) return;
+    hiddenLabels = declutter(
+      labelCandidates({
+        units: sim.units,
+        contacts: sim.contacts,
+        minefields: sim.minefields ?? [],
+        facilities: sim.session?.facilities ?? [],
+        zones: sim.session?.zones ?? [],
+        points: sim.session?.reference_points ?? [],
+        selected: sim.selected,
+        gameTimeS: n(clock?.game_time_s ?? 0),
+      }),
+      (p) => {
+        const q = m.project(p);
+        return [q.x, q.y];
+      },
+    );
+  }
+  $effect(() => {
+    relayout();
   });
 
   // Redraw the dynamic layers whenever the frame, the selection or the draft changes.
@@ -256,7 +295,12 @@
           ? nightLayers(n(sim.environment?.start_unix_s ?? 0) + n(clock?.game_time_s ?? 0))
           : []),
         ...coverageLayers(sim.coverage),
-        ...planningLayers(sim.session?.facilities ?? [], sim.session?.zones ?? []),
+        ...planningLayers(
+          sim.session?.facilities ?? [],
+          sim.session?.zones ?? [],
+          "planning",
+          hiddenLabels,
+        ),
         ...buildLayers({
           units: sim.units,
           contacts: sim.contacts,
@@ -269,8 +313,9 @@
           selected: sim.selected,
           draft: sim.draft,
           onPickUnit: (id) => sim.select(id),
+          hiddenLabels,
         }),
-        ...referenceLayers(sim.session?.reference_points ?? []),
+        ...referenceLayers(sim.session?.reference_points ?? [], undefined, hiddenLabels),
       ],
     });
   });

@@ -150,6 +150,8 @@ export interface SceneInput {
   selected: number | null;
   draft: GeoPoint[] | null;
   onPickUnit: (id: number) => void;
+  /** Label keys hidden by `declutter` (none if absent). */
+  hiddenLabels?: Set<string>;
 }
 
 /** Phase 1 has no postures (Phase 2, sim-c2): own side is shown as friend and every other side as unknown. */
@@ -214,18 +216,183 @@ export function contactKind(c: ContactView): string {
   return c.platform ?? c.category?.replaceAll("_", " ") ?? c.domain ?? "unknown";
 }
 
-/** Length a bearing line is drawn on the map, metres. */
-export const BEARING_DRAW_M = 150_000;
+/** Length a bearing line is drawn on the map, metres: long enough to show the direction and to
+ * cross another ship's line, short enough not to cut across the whole picture. */
+export const BEARING_DRAW_M = 40_000;
+
+/** How far another unit's route is drawn (its next leg only); the selected unit shows all of it. */
+export const ROUTE_STUB_M = 15_000;
+
+/**
+ * Label decluttering: where two labels would overlap on screen, the lower priority is hidden
+ * until the user zooms in. Selected unit, then units, contacts, facilities, minefields, zones,
+ * reference points.
+ */
+export const LABEL_PRIORITY = {
+  selected: 1000,
+  unit: 500,
+  contact: 400,
+  facility: 300,
+  minefield: 250,
+  zone: 200,
+  point: 100,
+} as const;
+
+/** A label to place on screen: its key, anchor, pixel offset, font size, text and priority. */
+export interface LabelCandidate {
+  key: string;
+  at: LonLat;
+  dy: number;
+  size: number;
+  text: string;
+  priority: number;
+}
+
+/**
+ * Keeps labels in priority order and hides any whose box would overlap one already kept, in
+ * screen pixels. `project` maps a lon/lat to pixels (the map's projection). Box: about 0.58 em
+ * per character, plus a little padding. Returns the keys to hide.
+ */
+export function declutter(
+  candidates: LabelCandidate[],
+  project: (p: LonLat) => [number, number],
+): Set<string> {
+  const kept: [number, number, number, number][] = [];
+  const hidden = new Set<string>();
+  const order = [...candidates].sort((a, b) => b.priority - a.priority);
+  for (const c of order) {
+    const [x, y0] = project(c.at);
+    const y = y0 + c.dy;
+    const w = c.text.length * c.size * 0.58 + 6;
+    const h = c.size + 4;
+    const box: [number, number, number, number] = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
+    const clash = kept.some(
+      (k) => box[0] < k[2] && box[2] > k[0] && box[1] < k[3] && box[3] > k[1],
+    );
+    if (clash) hidden.add(c.key);
+    else kept.push(box);
+  }
+  return hidden;
+}
+
+export const unitLabel = (u: UnitView) => u.name;
+export const contactLabel = (c: ContactView, gameTimeS: number) =>
+  `C${c.number} · ${contactKind(c)} · ${contactAge(gameTimeS, c)}`;
+export const minefieldLabel = (f: Minefield) => `M${f.id} · ${f.mines} mines`;
+export const zoneLabel = (z: MapZone) => (z.layer ? `${z.name} (${z.layer})` : z.name);
+export const facilityLabel = (f: MapFacility) => `${FACILITY_CODE[f.kind] ?? "?"} ${f.name}`;
+
+/** Every label the picture would draw, as declutter candidates. */
+export function labelCandidates(s: {
+  units: UnitView[];
+  contacts: ContactView[];
+  minefields: Minefield[];
+  facilities: MapFacility[];
+  zones: MapZone[];
+  points: MapPoint[];
+  selected: number | null;
+  gameTimeS: number;
+}): LabelCandidate[] {
+  const P = LABEL_PRIORITY;
+  const unitsShown =
+    s.units.length <= LABEL_LIMIT ? s.units : s.units.filter((u) => u.id === s.selected);
+  return [
+    ...unitsShown.map((u) => ({
+      key: `u:${u.id}`,
+      at: pt(u.position),
+      dy: 24,
+      size: 12,
+      text: unitLabel(u),
+      priority: u.id === s.selected ? P.selected : P.unit,
+    })),
+    ...s.contacts.map((c) => ({
+      key: `c:${c.number}`,
+      at: pt(c.position),
+      dy: 20,
+      size: 12,
+      text: contactLabel(c, s.gameTimeS),
+      priority: P.contact,
+    })),
+    ...s.facilities.map((f) => ({
+      key: `f:${f.name}`,
+      at: pt(f.position),
+      dy: 0,
+      size: 12,
+      text: facilityLabel(f),
+      priority: P.facility,
+    })),
+    ...s.minefields.map((f) => ({
+      key: `m:${f.id}`,
+      at: pt(f.centre),
+      dy: 0,
+      size: 12,
+      text: minefieldLabel(f),
+      priority: P.minefield,
+    })),
+    ...s.zones.map((z) => ({
+      key: `z:${z.name}`,
+      at: zoneAnchor(z),
+      dy: -10,
+      size: 11,
+      text: zoneLabel(z),
+      priority: P.zone,
+    })),
+    ...s.points.map((q) => ({
+      key: `p:${q.name}`,
+      at: pt(q.position),
+      dy: -14,
+      size: 12,
+      text: q.name,
+      priority: P.point,
+    })),
+  ];
+}
+
+/** Great-circle distance, metres (spherical; for drawing only). */
+export function distanceM(a: GeoPoint, b: GeoPoint): number {
+  const r = 6_371_000;
+  const f1 = (n(a.lat_deg) * Math.PI) / 180;
+  const f2 = (n(b.lat_deg) * Math.PI) / 180;
+  const df = f2 - f1;
+  const dl = ((n(b.lon_deg) - n(a.lon_deg)) * Math.PI) / 180;
+  const h = Math.sin(df / 2) ** 2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl / 2) ** 2;
+  return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** At most `max_m` of the way from `a` toward `b` (straight in lon/lat; for drawing only). */
+function clip(a: GeoPoint, b: GeoPoint, max_m: number): LonLat {
+  const d = distanceM(a, b);
+  if (d <= max_m) return pt(b);
+  const t = max_m / d;
+  return [
+    n(a.lon_deg) + (n(b.lon_deg) - n(a.lon_deg)) * t,
+    n(a.lat_deg) + (n(b.lat_deg) - n(a.lat_deg)) * t,
+  ];
+}
 
 export function buildLayers(s: SceneInput): Layer[] {
+  // The selected unit's whole route; for the others only a short stub of the next leg, so long
+  // transits (a ferry 100 km away) do not draw lines across the whole picture.
   const routes = s.units
     .filter((u) => u.route && u.route.next < u.route.waypoints.length)
-    .map((u) => ({
-      id: u.id,
-      path: [pt(u.position), ...(u.route?.waypoints.slice(u.route.next) ?? []).map(pt)],
-      colour: AFFILIATION_COLOUR[affiliation(u, s.viewer)],
-    }));
-  const waypoints = routes.flatMap((r) => r.path.slice(1).map((p) => ({ p, colour: r.colour })));
+    .map((u) => {
+      const ahead = u.route?.waypoints.slice(u.route.next) ?? [];
+      const selected = u.id === s.selected;
+      const next = ahead[0];
+      return {
+        id: u.id,
+        selected,
+        path: selected
+          ? [pt(u.position), ...ahead.map(pt)]
+          : next
+            ? [pt(u.position), clip(u.position, next, ROUTE_STUB_M)]
+            : [],
+        colour: AFFILIATION_COLOUR[affiliation(u, s.viewer)],
+      };
+    });
+  const waypoints = routes
+    .filter((r) => r.selected)
+    .flatMap((r) => r.path.slice(1).map((p) => ({ p, colour: r.colour })));
   // Leader: where the unit will be in 6 minutes at its current speed and heading.
   // Decluttered like labels above LABEL_LIMIT units (selected unit only).
   const leaders = s.units
@@ -250,8 +417,8 @@ export function buildLayers(s: SceneInput): Layer[] {
       id: "routes",
       data: routes,
       getPath: (d) => d.path,
-      getColor: (d) => rgba(d.colour, 140),
-      getWidth: 2,
+      getColor: (d) => rgba(d.colour, d.selected ? 170 : 90),
+      getWidth: (d) => (d.selected ? 2 : 1.5),
       widthUnits: "pixels",
       getDashArray: [6, 4],
     }),
@@ -318,12 +485,15 @@ export function buildLayers(s: SceneInput): Layer[] {
       id: "labels",
       // Declutter: past LABEL_LIMIT units, labels overlap into noise and re-laying them out on every
       // snapshot costs the frame budget, so only the selected unit keeps its label.
-      data: s.units.length <= LABEL_LIMIT ? s.units : s.units.filter((u) => u.id === s.selected),
+      data: (s.units.length <= LABEL_LIMIT
+        ? s.units
+        : s.units.filter((u) => u.id === s.selected)
+      ).filter((u) => !s.hiddenLabels?.has(`u:${u.id}`)),
       getPosition: (u) => pt(u.position),
-      getText: (u) => u.name,
+      getText: unitLabel,
       getSize: 12,
       getColor: [220, 230, 238, 255],
-      getPixelOffset: [0, 22],
+      getPixelOffset: [0, 24],
       fontFamily: "system-ui, sans-serif",
       outlineWidth: 2,
       outlineColor: [11, 27, 43, 255],
@@ -346,9 +516,9 @@ export function buildLayers(s: SceneInput): Layer[] {
     }),
     new TextLayer<Minefield>({
       id: "minefield-labels",
-      data: s.minefields ?? [],
+      data: (s.minefields ?? []).filter((f) => !s.hiddenLabels?.has(`m:${f.id}`)),
       getPosition: (f) => pt(f.centre),
-      getText: (f) => `M${f.id} · ${f.mines} mines`,
+      getText: minefieldLabel,
       getSize: 12,
       getColor: [230, 120, 220, 255],
       fontFamily: "system-ui, sans-serif",
@@ -425,9 +595,9 @@ export function buildLayers(s: SceneInput): Layer[] {
     }),
     new TextLayer<ContactView>({
       id: "contact-labels",
-      data: s.contacts,
+      data: s.contacts.filter((c) => !s.hiddenLabels?.has(`c:${c.number}`)),
       getPosition: (c) => pt(c.position),
-      getText: (c) => `C${c.number} · ${contactKind(c)} · ${contactAge(s.gameTimeS, c)}`,
+      getText: (c) => contactLabel(c, s.gameTimeS),
       getSize: 12,
       getColor: [255, 240, 150, 255],
       getPixelOffset: [0, 20],
@@ -456,7 +626,11 @@ export interface MapPoint {
 const POINT_COLOUR: RGBA = [120, 220, 160, 255];
 
 /** Reference points: a small ring and the name. */
-export function referenceLayers(points: MapPoint[], id = "reference-points"): Layer[] {
+export function referenceLayers(
+  points: MapPoint[],
+  id = "reference-points",
+  hidden?: Set<string>,
+): Layer[] {
   return [
     new ScatterplotLayer<MapPoint>({
       id,
@@ -472,7 +646,7 @@ export function referenceLayers(points: MapPoint[], id = "reference-points"): La
     }),
     new TextLayer<MapPoint>({
       id: `${id}-labels`,
-      data: points,
+      data: points.filter((q) => !hidden?.has(`p:${q.name}`)),
       getPosition: (p) => pt(p.position),
       getText: (p) => p.name,
       getSize: 12,
@@ -711,9 +885,18 @@ export function zoneRing(z: MapZone): LonLat[] {
 }
 
 /** Where a zone's label goes: the circle's centre, or the polygon's first point. */
-function zoneAnchor(z: MapZone): LonLat {
-  if (z.area.shape === "circle") return pt(z.area.centre);
-  return z.area.points[0] ? pt(z.area.points[0]) : [0, 0];
+/** Where a zone's name goes: its northern edge (a circle's top, a polygon's northernmost
+ * corner), clear of the reference points and units that sit at its centre. */
+export function zoneAnchor(z: MapZone): LonLat {
+  if (z.area.shape === "circle") {
+    const c = z.area.centre;
+    return project(n(c.lat_deg), n(c.lon_deg), 0, n(z.area.radius_m));
+  }
+  const top = z.area.points.reduce<GeoPoint | null>(
+    (best, q) => (best === null || n(q.lat_deg) > n(best.lat_deg) ? q : best),
+    null,
+  );
+  return top ? pt(top) : [0, 0];
 }
 
 const SENSE_COLOUR: RGBA = [110, 190, 255, 200];
@@ -726,6 +909,7 @@ export function planningLayers(
   facilities: MapFacility[],
   zones: MapZone[],
   id = "planning",
+  hidden?: Set<string>,
 ): Layer[] {
   const label = {
     fontFamily: "system-ui, sans-serif",
@@ -745,12 +929,12 @@ export function planningLayers(
     }),
     new TextLayer<MapZone>({
       id: `${id}-zone-labels`,
-      data: zones,
+      data: zones.filter((z) => !hidden?.has(`z:${z.name}`)),
       getPosition: zoneAnchor,
-      getText: (z) => (z.layer ? `${z.name} (${z.layer})` : z.name),
+      getText: zoneLabel,
       getSize: 11,
       getColor: (z) => (z.kind === "engage" ? ENGAGE_COLOUR : SENSE_COLOUR),
-      getPixelOffset: (z) => [0, z.kind === "engage" ? 14 : -14],
+      getPixelOffset: [0, -10],
       ...label,
     }),
     new PathLayer<MapFacility>({
@@ -766,9 +950,9 @@ export function planningLayers(
     }),
     new TextLayer<MapFacility>({
       id: `${id}-facilities`,
-      data: facilities,
+      data: facilities.filter((f) => !hidden?.has(`f:${f.name}`)),
       getPosition: (f) => pt(f.position),
-      getText: (f) => `${FACILITY_CODE[f.kind] ?? "?"} ${f.name}`,
+      getText: facilityLabel,
       getSize: 12,
       getColor: FACILITY_COLOUR,
       ...label,

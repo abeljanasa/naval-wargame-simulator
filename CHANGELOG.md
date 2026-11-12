@@ -55,6 +55,11 @@
 
 ### Changed (map)
 
+- **Less clutter, found in the rehearsal screenshots:**
+  - **Overlapping labels** are decluttered on screen, by priority. The order is the selected unit, units, contacts, facilities, minefields, zones, reference points. The hidden ones show as you zoom in.
+  - **Zone names** sit on the zone's northern edge instead of its centre, where they collided with reference points ("Pakent passagene").
+  - **Routes:** the selected unit's whole route; every other unit's next leg as a 15 km stub.
+  - **ESM bearing lines** are drawn 40 km long, down from 150 km.
 - **Function codes inside unit and contact symbols:** `DDG`, `FFG`, `SSK`, `MV`, `F`, `H` and so on, from the platform class, or the category for a contact classified only that far. An unclassified contact shows the frame alone. The spec is in `docs/behaviour-specs/symbology.md`. Every generic class has a code, and a test checks it.
 - **The map frames the units a seat sees** when a scenario's first picture arrives, and again when the seat changes. It used to open at a fixed zoom, where the pilot's units were an unreadable cluster of labels.
 

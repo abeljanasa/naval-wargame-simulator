@@ -13,6 +13,11 @@ import {
   CONTAINMENT_95,
   ellipseRing,
   LABEL_LIMIT,
+  ROUTE_STUB_M,
+  declutter,
+  distanceM,
+  labelCandidates,
+  zoneAnchor,
 } from "./map";
 import type { ContactView, UnitView } from "./bindings";
 // @ts-expect-error: plain ES module without type declarations
@@ -135,6 +140,92 @@ describe("map layers", () => {
     const units = Array.from({ length: LABEL_LIMIT }, (_, i) => unit(i + 1));
     expect(layer(scene(units), "labels").props.data).toHaveLength(LABEL_LIMIT);
     expect(layer(scene(units), "leaders").props.data).toHaveLength(LABEL_LIMIT);
+  });
+
+  it("draws the selected unit's whole route and only a stub of the others", () => {
+    const routed = (id: number) =>
+      unit(id, {
+        route: {
+          waypoints: [
+            { lat_deg: -39.6, lon_deg: 146.0 },
+            { lat_deg: -39.6, lon_deg: 145.0 },
+          ],
+          next: 0,
+        },
+      } as Partial<UnitView>);
+    const layers = scene([routed(1), routed(2)], 1);
+    const routes = layer(layers, "routes").props.data as { id: number; path: number[][] }[];
+    expect(routes.find((r) => r.id === 1)?.path).toHaveLength(3);
+    const stub = routes.find((r) => r.id === 2)?.path ?? [];
+    expect(stub).toHaveLength(2);
+    const [a = [0, 0], b = [0, 0]] = stub;
+    const m = distanceM(
+      { lat_deg: a[1] ?? 0, lon_deg: a[0] ?? 0 },
+      { lat_deg: b[1] ?? 0, lon_deg: b[0] ?? 0 },
+    );
+    expect(m).toBeLessThanOrEqual(ROUTE_STUB_M * 1.01);
+    // Waypoint dots only for the selected unit.
+    expect(layer(layers, "waypoints").props.data).toHaveLength(2);
+  });
+
+  it("puts a zone's name at its northern edge; labels share one collision group", () => {
+    const circle = zoneAnchor({
+      name: "S",
+      kind: "sense",
+      area: { shape: "circle", centre: { lat_deg: 0, lon_deg: 0 }, radius_m: 111_195 },
+    } as never);
+    expect(circle[1]).toBeCloseTo(1, 2);
+    const poly = zoneAnchor({
+      name: "E",
+      kind: "engage",
+      area: {
+        shape: "polygon",
+        points: [
+          { lat_deg: 1, lon_deg: 1 },
+          { lat_deg: 3, lon_deg: 2 },
+          { lat_deg: 2, lon_deg: 3 },
+        ],
+      },
+    } as never);
+    expect(poly).toEqual([2, 3]);
+  });
+
+  it("declutters labels by priority in screen space", () => {
+    // Identity projection: lon/lat are pixels.
+    const at = (x: number, y: number): [number, number] => [x, y];
+    const c = (key: string, x: number, priority: number) => ({
+      key,
+      at: at(x, 100),
+      dy: 0,
+      size: 12,
+      text: "ten chars.",
+      priority,
+    });
+    // Two overlapping labels: the lower priority hides; a distant one stays.
+    const hidden = declutter(
+      [c("zone", 100, 200), c("unit", 110, 500), c("far", 400, 100)],
+      (p) => [p[0], p[1]],
+    );
+    expect([...hidden]).toEqual(["zone"]);
+    // The candidates cover every label kind the picture draws.
+    const keys = labelCandidates({
+      units: [unit(1)],
+      contacts: [],
+      minefields: [],
+      facilities: [
+        {
+          name: "Port",
+          kind: "sheltering_port",
+          position: { lat_deg: 0, lon_deg: 0 },
+          radius_m: 1,
+        },
+      ],
+      zones: [],
+      points: [{ name: "RV", position: { lat_deg: 0, lon_deg: 0 } }],
+      selected: 1,
+      gameTimeS: 0,
+    }).map((x) => `${x.key}:${x.priority}`);
+    expect(keys).toEqual(["u:1:1000", "f:Port:300", "p:RV:100"]);
   });
 
   it("labels only the selected unit above the limit, but draws every symbol", () => {
