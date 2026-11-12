@@ -1,7 +1,8 @@
 <script lang="ts">
-  // Platform database browser: search, record detail with provenance, and validation feedback.
-  // Read-only. Records are edited in the JSON sources under data/db (docs/db/data-dictionary.md).
+  // Platform database browser: search, record detail with provenance, validation feedback, and
+  // an editor for a record's JSON source (DbRecordEditor; ADR-0004).
   import { commands, type DbIssue, type DbPlatformDetail, type DbPlatformRow } from "./bindings";
+  import DbRecordEditor from "./DbRecordEditor.svelte";
   import { knots } from "./format";
 
   let query = $state("");
@@ -9,6 +10,7 @@
   let detail = $state<DbPlatformDetail | null>(null);
   let issues = $state<DbIssue[]>([]);
   let error = $state<string | null>(null);
+  let editing = $state<string | null>(null);
 
   const recordIssues = $derived(
     detail ? issues.filter((i) => i.location.endsWith(`/${detail?.row.id}`)) : [],
@@ -26,7 +28,10 @@
   async function open(id: string) {
     const res = await commands.dbPlatform(id);
     if (res.status === "error") error = res.error;
-    else detail = res.data;
+    else {
+      detail = res.data;
+      editing = null;
+    }
   }
 
   $effect(() => {
@@ -105,6 +110,11 @@
     {#each recordIssues as i (i.rule + i.location)}
       <p class="warning">{i.rule}: {i.message}</p>
     {/each}
+    {#if editing === d.row.id}
+      <DbRecordEditor id={d.row.id} onclose={() => (editing = null)} />
+    {:else}
+      <button type="button" class="edit" onclick={() => (editing = d.row.id)}>Edit record</button>
+    {/if}
   {/if}
 </section>
 
@@ -177,5 +187,8 @@
   .warning {
     color: var(--warn);
     font-size: 12px;
+  }
+  .edit {
+    margin-top: 8px;
   }
 </style>

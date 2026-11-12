@@ -135,6 +135,51 @@ try {
     (db.match(/GEN-[A-Z0-9-]+/g) ?? []).length >= 10,
     "platform database lists generic records",
   );
+  // 2a. Editing a record's JSON source: a live check against the whole database, a diff, and
+  //     no save while the edit does not load.
+  await click(await find("xpath", '//button[.//span[starts-with(normalize-space(),"GEN-OPV ·")]]'));
+  await click(await until("the record detail", () => byText("button", "Edit record")));
+  // Typing JSON (spaces, digits, dots) must not reach the run/pause and compression shortcuts.
+  const json = await until("the record source", async () => {
+    const v = await wd("GET", `${s}/element/${await el("#record-json")}/property/value`);
+    return v.includes('"GEN-OPV"') ? v : false;
+  });
+  const setJson = async (t) => {
+    const id = await el("#record-json");
+    await wd("POST", `${s}/element/${id}/clear`, {});
+    await wd("POST", `${s}/element/${id}/value`, { text: t });
+  };
+  await setJson(json.replace('"max_speed_kn": 21', '"max_speed_kn": 22'));
+  // The unedited record also "checks pass", so wait for the diff of this edit first.
+  const changes = await until("the diff of the edit", async () => {
+    const t = await text(await el('[aria-label="Changes from the original"]'));
+    return t.includes('"max_speed_kn": 22') ? t : false;
+  });
+  await until("the edit to check clean", async () => {
+    const b = await bodyText();
+    return b.includes("Checks pass") && !b.includes("Checking against");
+  });
+  check(
+    changes.includes('"max_speed_kn": 21'),
+    "record editor checks an edit clean and shows its diff",
+  );
+  const typed = await wd("GET", `${s}/element/${await el("#record-json")}/property/value`);
+  check(
+    typed.length === json.length && (await clock()) === "D+0 00:00:01",
+    "typing in the editor keeps every character and leaves the clock alone",
+  );
+  await setJson(json.replace('"max_speed_kn"', '"max_sped_kn"'));
+  await until("the bad edit to be reported", async () =>
+    (await bodyText()).includes("Does not load"),
+  );
+  const saveEnabled = await wd(
+    "GET",
+    `${s}/element/${await byText("button", "Save to source file")}/enabled`,
+  );
+  check(!saveEnabled, "an edit that does not load is reported and cannot be saved");
+  await shot("00-record-editor");
+  await click(await byText("button", "Discard changes"));
+  await click(await byText("button", "Close editor"));
   await click(await el('[aria-label="Close the database"]'));
 
   // 3. A scenario file loads through the File › Open picker (the hidden file input).

@@ -103,9 +103,23 @@ Only the white cell (and the main window) controls time. In a seat window the bu
 
 ## 9. The platform database
 
-- **View › Platform database…** opens a read-only browser. Search by id, name or category.
+- **View › Platform database…** opens the database browser. Search by id, name or category.
 - Each record shows its figures, its source citation, its confidence and its classification marking.
 - The shipped database is generic: its figures are illustrative, not real.
+
+**Editing a platform record** (for the data manager):
+
+1. Open the record and choose **Edit record**.
+2. Set the record's **Source citation**, **Confidence** (A–E) and **Updated** date. Leave a field empty to use the file's default.
+3. Edit the record's figures in **Record (JSON)**. It is the text of the source file, so field names and units are as in `docs/db/data-dictionary.md`.
+4. Watch the check under the editor. Every change is checked against the whole database, as `sim-db validate` does:
+   - **Does not load:** a typo in a field name, or broken JSON. The message gives the line.
+   - **Errors**, such as a weapon that does not exist: these block saving.
+   - **Warnings** on the record, which do not block saving.
+5. **Changes** lists the lines you changed.
+6. **Save to source file** saves the whole JSON file (for example `surface-combatants.json`). Put it in `data/db/open/platforms/` for review.
+   - The running app keeps its built-in database until it is rebuilt with the file, so an exercise in progress is not changed.
+   - **Discard changes** restores the record.
 
 ## 10. After the exercise
 

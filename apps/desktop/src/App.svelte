@@ -284,7 +284,11 @@
   });
 
   function onKey(e: KeyboardEvent) {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+    // Keys typed into any text entry are text, not shortcuts (a space in a Lua script or a record's
+    // JSON must not pause the clock, nor a digit change the compression).
+    const t = e.target;
+    if (t instanceof HTMLElement && (t.isContentEditable || t.closest("input, select, textarea")))
+      return;
     if (!sim.controlsTime && (e.key === " " || e.key === "." || (e.key >= "1" && e.key <= "7")))
       return;
     if (e.key === " ") {

@@ -252,6 +252,154 @@ fn db_issues(host: State<'_, SharedHost>) -> Result<Vec<DbIssue>, String> {
         .collect())
 }
 
+/// The platform database's JSON sources with this session's edits. The editor edits the source,
+/// not the built database (ADR-0004); saved files go back into `data/db/open/` through review.
+pub struct DbSources(Mutex<sim_db::source::SourceSet>);
+
+fn sources(s: &DbSources) -> MutexGuard<'_, sim_db::source::SourceSet> {
+    s.0.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// A platform record as authored in its JSON source file.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbRecordSource {
+    /// Source file, e.g. `platforms/surface-combatants.json`.
+    pub file: String,
+    pub text: String,
+}
+
+/// The result of checking an edited record against the whole database.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbCheck {
+    /// Why the edited sources do not load (bad JSON, an unknown field, a wrong type), if so.
+    pub error: Option<String>,
+    /// Every error, and the warnings on the edited record.
+    pub issues: Vec<DbIssue>,
+}
+
+/// A whole source file, to save.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct DbSourceFile {
+    pub name: String,
+    pub text: String,
+}
+
+fn issue(i: sim_db::Issue) -> DbIssue {
+    DbIssue {
+        severity: match i.severity {
+            sim_db::validate::Severity::Error => "error",
+            sim_db::validate::Severity::Warning => "warning",
+        }
+        .to_owned(),
+        rule: i.rule.to_owned(),
+        location: i.location,
+        message: i.message,
+    }
+}
+
+/// Edits `id` to `text` in a copy of the sources and checks the copy: the load error, or every
+/// error plus the warnings on the edited record.
+fn check_edit(
+    set: &sim_db::source::SourceSet,
+    id: &str,
+    text: &str,
+) -> (Option<sim_db::source::SourceSet>, String, DbCheck) {
+    let (edited, file) = match sim_db::edit::replace_platform(set, id, text) {
+        Ok(x) => x,
+        Err(e) => {
+            return (
+                None,
+                String::new(),
+                DbCheck {
+                    error: Some(e.to_string()),
+                    issues: vec![],
+                },
+            )
+        }
+    };
+    let new_id = serde_json::from_str::<serde_json::Value>(text)
+        .ok()
+        .and_then(|v| v.get("id").and_then(|x| x.as_str()).map(str::to_owned))
+        .unwrap_or_else(|| id.to_owned());
+    match sim_db::edit::check(edited.clone()) {
+        Err(e) => (
+            None,
+            file,
+            DbCheck {
+                error: Some(e.to_string()),
+                issues: vec![],
+            },
+        ),
+        Ok(all) => {
+            let issues = all
+                .into_iter()
+                .filter(|i| {
+                    i.severity == sim_db::validate::Severity::Error || i.location.contains(&new_id)
+                })
+                .map(issue)
+                .collect();
+            (
+                Some(edited),
+                file,
+                DbCheck {
+                    error: None,
+                    issues,
+                },
+            )
+        }
+    }
+}
+
+/// The authored JSON of a platform record, from the sources with this session's edits.
+#[tauri::command]
+#[specta::specta]
+fn db_record_source(src: State<'_, DbSources>, id: String) -> Result<DbRecordSource, String> {
+    let r = sim_db::edit::platform_record(&sources(&src), &id)
+        .ok_or_else(|| format!("no platform record {id} in the sources"))?;
+    Ok(DbRecordSource {
+        file: r.file,
+        text: r.text,
+    })
+}
+
+/// Checks an edited record against the whole database (live, while the user types).
+#[tauri::command]
+#[specta::specta]
+fn db_check_record(src: State<'_, DbSources>, id: String, text: String) -> DbCheck {
+    check_edit(&sources(&src), &id, &text).2
+}
+
+/// Keeps an edited record for this session and returns its whole source file, to save. Refused
+/// while the edit does not load or has errors.
+#[tauri::command]
+#[specta::specta]
+fn db_apply_record(
+    src: State<'_, DbSources>,
+    id: String,
+    text: String,
+) -> Result<DbSourceFile, String> {
+    let mut set = sources(&src);
+    let (edited, file, check) = check_edit(&set, &id, &text);
+    if let Some(e) = check.error {
+        return Err(e);
+    }
+    if check.issues.iter().any(|i| i.severity == "error") {
+        return Err("fix the errors before saving".into());
+    }
+    let edited = edited.ok_or("the edit did not load")?;
+    let out = edited
+        .platforms
+        .iter()
+        .find(|f| f.name == file)
+        .map(|f| DbSourceFile {
+            name: f.name.clone(),
+            text: f.text.clone(),
+        })
+        .ok_or("the edited file is missing")?;
+    *set = edited;
+    Ok(out)
+}
+
 fn session_info(h: &Host, label: &str) -> Result<SessionInfo, String> {
     Ok(SessionInfo {
         scenario_name: h.scenario.name.clone(),
@@ -783,6 +931,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             db_search,
             db_platform,
             db_issues,
+            db_record_source,
+            db_check_record,
+            db_apply_record,
             set_paused,
             set_time_compression,
             set_seat,
@@ -911,6 +1062,7 @@ pub fn run() {
     let result = tauri::Builder::default()
         .invoke_handler(builder.invoke_handler())
         .manage(host.clone())
+        .manage(DbSources(Mutex::new(sim_db::embedded::source_set())))
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 lock(window.state::<SharedHost>().inner()).unbind(window.label());
@@ -986,5 +1138,29 @@ mod tests {
             .issues
             .iter()
             .all(|i| i.severity == sim_scenario::Severity::Warning));
+    }
+}
+
+#[cfg(test)]
+mod db_edit_tests {
+    use super::*;
+
+    #[test]
+    fn checking_and_applying_a_record_edit() {
+        let set = sim_db::embedded::source_set();
+        let old = sim_db::edit::platform_record(&set, "GEN-OPV").unwrap().text;
+        // A clean edit checks clean.
+        let good = old.replacen("\"max_speed_kn\": 21", "\"max_speed_kn\": 22", 1);
+        let (edited, file, check) = check_edit(&set, "GEN-OPV", &good);
+        assert!(check.error.is_none() && check.issues.iter().all(|i| i.severity != "error"));
+        assert_eq!(file, "platforms/surface-combatants.json");
+        assert!(edited.is_some());
+        // A typo does not load, and says why.
+        let bad = old.replacen("\"max_speed_kn\"", "\"max_sped_kn\"", 1);
+        let (edited, _, check) = check_edit(&set, "GEN-OPV", &bad);
+        assert!(edited.is_none());
+        assert!(check.error.unwrap().contains("max_sped_kn"));
+        // Not JSON at all.
+        assert!(check_edit(&set, "GEN-OPV", "{").2.error.is_some());
     }
 }

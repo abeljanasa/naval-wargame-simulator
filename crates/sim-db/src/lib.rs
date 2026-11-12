@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 mod db;
+pub mod edit;
 pub mod embedded;
 mod error;
 pub mod migrate;

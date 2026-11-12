@@ -20,6 +20,15 @@
 
 - **White-cell actions sent while paused did nothing until the clock ran.** That covered injects, messages, overrides, and planning and zone edits, which the run sheet uses during pauses for decisions. The host now runs one second when the white cell acts while paused, so the action shows at once. Player orders still wait for the clock. Found by rehearsing the run sheet.
 - **The review scrubber ran past the panel's edge** and added a horizontal scrollbar.
+- **Typing in a text area triggered keyboard shortcuts.** A space paused or ran the clock, a digit changed the compression, and the character was lost. That affected Lua scripts, event JSON and more. Shortcuts now ignore every text entry. Found while testing the record editor.
+
+### Added (database editing)
+
+- **Edit a platform record in the app** (**View › Platform database… › Edit record**, DL-0037). It covers:
+  - provenance fields (citation, confidence, date) and the record's JSON;
+  - live validation against the whole database, the same checks as `sim-db validate`;
+  - a diff against the original.
+- **Save to source file** downloads the edited JSON source file for review. Only the edited record's text changes in it (`sim_db::edit`). The running app keeps its built-in database until it is rebuilt.
 
 ### Changed (map)
 

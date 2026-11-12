@@ -57,7 +57,8 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [x] `sim-db`: SQLite schema, forward-only migrations, `cargo run -p sim-db -- validate`, and 50 generic platform types with citations, confidence and classification fields (DL-0005).
 - [x] Scenarios reference database platforms (`"platform": "GEN-FFG"`) (DL-0007).
 - [x] In-app database browser: search, record detail with source citation, confidence and marking, and validation feedback (DL-0009).
-- [ ] In-app database *editing* (record diff, citation entry, live validation while typing). It writes the JSON source (ADR-0004). Phase 2; until then records are edited in `data/db/open/` and checked with `sim-db validate`.
+- [x] In-app database *editing* for platform records: record diff, citation entry, live validation while typing. It writes the JSON source (ADR-0004, DL-0037).
+- [ ] Editing sensors and weapons in the app (they are still edited in `data/db/open/` and checked with `sim-db validate`).
 - [ ] Planning-layer facility attributes still to do: runways (air operations, Phase 4). Berths, repair, rearm, fuel and draft limits (planner-entered depth, DL-0032) are done.
 - [x] Release scan (`sim-db scan`), run in the release workflow.
 - [x] Installers, signed when secrets are configured, plus SBOMs and a `cargo deny` licence audit (docs/build/releasing.md).

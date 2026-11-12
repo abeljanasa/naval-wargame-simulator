@@ -133,7 +133,7 @@ export function functionCode(platform?: string | null, category?: string | null)
 /** The code as SVG text, centred in the frame's interior for the domain. */
 function codeSvg(code: string, domain: Domain): string {
   if (!code) return "";
-  const size = code.length <= 2 ? 24 : code.length === 3 ? 19 : 15;
+  const size = code.length <= 2 ? 24 : code.length === 3 ? 17 : 13;
   // Interior centre: full frames 32; the air half-frame sits higher, the subsurface one lower.
   const y = domain === "air" ? 34 : domain === "subsurface" ? 31 : 33;
   return `<text x="32" y="${y}" text-anchor="middle" dominant-baseline="central" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="${size}" fill="#0b1b2b" stroke="none">${code}</text>`;

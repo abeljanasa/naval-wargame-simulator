@@ -21,6 +21,15 @@ export const commands = {
 	dbPlatform: (id: string) => typedError<DbPlatformDetail_Serialize, string>(__TAURI_INVOKE("db_platform", { id })),
 	/**  Every validation finding on the loaded database (warnings only: errors stop it loading). */
 	dbIssues: () => typedError<DbIssue[], string>(__TAURI_INVOKE("db_issues")),
+	/**  The authored JSON of a platform record, from the sources with this session's edits. */
+	dbRecordSource: (id: string) => typedError<DbRecordSource, string>(__TAURI_INVOKE("db_record_source", { id })),
+	/**  Checks an edited record against the whole database (live, while the user types). */
+	dbCheckRecord: (id: string, text: string) => __TAURI_INVOKE<DbCheck_Serialize>("db_check_record", { id, text }),
+	/**
+	 *  Keeps an edited record for this session and returns its whole source file, to save. Refused
+	 *  while the edit does not load or has errors.
+	 */
+	dbApplyRecord: (id: string, text: string) => typedError<DbSourceFile, string>(__TAURI_INVOKE("db_apply_record", { id, text })),
 	/**  Runs or pauses the clock (white-cell windows only). */
 	setPaused: (paused: boolean) => typedError<null, string>(__TAURI_INVOKE("set_paused", { paused })),
 	/**  Sets time compression (white-cell windows only). */
@@ -479,6 +488,25 @@ export type CoverageCell = {
 	covered: boolean,
 };
 
+/**  The result of checking an edited record against the whole database. */
+export type DbCheck = DbCheck_Serialize | DbCheck_Deserialize;
+
+/**  The result of checking an edited record against the whole database. */
+export type DbCheck_Deserialize = {
+	/**  Why the edited sources do not load (bad JSON, an unknown field, a wrong type), if so. */
+	error?: string | null,
+	/**  Every error, and the warnings on the edited record. */
+	issues: DbIssue[],
+};
+
+/**  The result of checking an edited record against the whole database. */
+export type DbCheck_Serialize = {
+	/**  Why the edited sources do not load (bad JSON, an unknown field, a wrong type), if so. */
+	error: string | null,
+	/**  Every error, and the warnings on the edited record. */
+	issues: DbIssue[],
+};
+
 /**  A validation finding on the platform database. */
 export type DbIssue = {
 	/**  `error` or `warning`. */
@@ -527,12 +555,25 @@ export type DbPlatformRow = {
 	max_speed_mps: number | null,
 };
 
+/**  A platform record as authored in its JSON source file. */
+export type DbRecordSource = {
+	/**  Source file, e.g. `platforms/surface-combatants.json`. */
+	file: string,
+	text: string,
+};
+
 /**  A fitted sensor as shown in the browser. */
 export type DbSensorRow = {
 	sensor_id: string,
 	kind: string,
 	mount_height_m: number | null,
 	max_range_m: number | null,
+};
+
+/**  A whole source file, to save. */
+export type DbSourceFile = {
+	name: string,
+	text: string,
 };
 
 /**  A weapon type in the platform database (for the scenario editor's pickers). */

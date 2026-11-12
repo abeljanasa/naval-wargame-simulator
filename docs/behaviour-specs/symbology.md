@@ -37,7 +37,7 @@ The code comes from what the viewing side knows:
 | ASM, SAM, RDR | Coastal anti-ship missile battery, SAM batteries, radar site | `shore_battery` BTY, `sensor_site` RDR |
 | AB, PT | Air bases and airfields, ports | `airbase` AB, `port` PT |
 
-- **Size:** a code of up to two characters is drawn at 24 px on the 64 px symbol, three characters at 19 px, and four at 15 px. On the map the symbol is 36 px for units (up from 28) and 30 px for contacts (up from 24), so the code is readable.
+- **Size:** a code of up to two characters is drawn at 24 px on the 64 px symbol, three characters at 17 px, and four at 13 px. On the map the symbol is 36 px for units (up from 28) and 30 px for contacts (up from 24), so the code is readable.
 - **Other platforms:** classes outside this table, such as regional or accredited records, fall back to their category, then to no code.
 - **Every generic class has a code.** `ui.test.ts` checks the platform database for this, so a new class needs a code in the same change.
 
