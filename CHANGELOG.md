@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A loaded scenario showed an empty map until the clock ran.** The scenario's units and settings are tick-0 commands, so before Run or Step the white cell saw no units and the default sea state.
+  - The desktop now runs the first second when it loads a scenario. It opens at `D+0 00:00:01`, with the starting picture, and time-zero events have fired.
+  - The review scrubber starts there too.
+  - Determinism, records and replays are unchanged: it is the tick a straight run starts with.
+  - Found by the new packaged-app test.
+
+### Added (packaged-app test)
+
+- **`npm run e2e:app`** drives the built app over WebDriver (tauri-driver), with no new dependencies. It covers the real engine, database, map, scenario loading, the white-cell seat and running at Max. CI runs it on Windows and Linux (*Packaged app end to end*); see `docs/build/releasing.md`.
+
 ### Added (Phase 3, slice 20: pilot kit)
 
 - **`docs/gate3/pilot-kit/`**, printable handouts for the TTX pilot:

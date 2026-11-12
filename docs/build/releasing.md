@@ -43,3 +43,25 @@ cargo run --release -p sim-db -- scan ../../target/release/bundle ../../data
 ```
 
 On Windows the first `tauri build` downloads the WiX and NSIS toolsets. For air-gapped build machines, see [air-gapped.md](air-gapped.md).
+
+## Packaged-app test
+
+`npm run e2e:app` (`apps/desktop/scripts/e2e-app.mjs`) drives the built binary over WebDriver, through tauri-driver. It tests the real engine, the embedded database and the bundled map, where `npm run e2e` uses a mocked backend. It checks that:
+- the app starts on its built-in scenario;
+- the database opens from the menu bar;
+- the pilot scenario loads from a file;
+- the white-cell seat sees both sides;
+- the engine runs at Max and the scenario events send messages.
+
+CI runs it on Windows and Linux (job *Packaged app end to end*). macOS has no WebDriver for its webview.
+
+```sh
+cargo install tauri-driver --locked
+cd apps/desktop
+npx tauri build --no-bundle          # the binary in target/release/
+npm run e2e:app                      # Linux: xvfb-run -a npm run e2e:app
+```
+
+- **Windows:** needs `msedgedriver` of the same version as the WebView2 runtime, on the `PATH` or in `NATIVE_DRIVER`. The version is under `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}` (value `pv`). Download it from `https://msedgedriver.microsoft.com/<version>/edgedriver_win64.zip`.
+- **Linux:** needs `WebKitWebDriver` (package `webkit2gtk-driver`).
+- **Another build:** set `NWS_APP` to its binary.
