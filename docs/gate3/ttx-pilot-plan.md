@@ -65,6 +65,35 @@ The times below are from the reference run (seed 20261113, no player orders); `p
 | any | Optional: the flagship is lost (**Destroy**, reason "inject: mine strike") | Watch command pass to the maritime HQ after 5 minutes |
 | 04:00 | ENDEX | **Save record**; replay and AAR |
 
+### Philippine-area variant: *Mindoro Strait pilot*
+
+`data/scenarios/phase3-pilot-mindoro.json` is the same exercise in familiar waters, in the Philippine Area of Responsibility ([ADR-0007](../adr/0007-phase-4-region-and-data.md)).
+- **Setting:** Blue holds the Mindoro Strait between Mindoro and the Calamian Islands.
+  - The maritime HQ is ashore at San Jose.
+  - The sheltering port is off Coron, and the staging anchorage is east of Busuanga.
+  - The SAG and the oiler are on the Sulu Sea side.
+- **Red** is a fictional force that comes south from the West Philippine Sea. Its command post is afloat on one of its corvettes.
+- **Weather:** a tropical-depression bulletin replaces the gale.
+- **Platforms:** generic only; no real navy or state is represented.
+
+Use this variant if the staff prefer to rehearse on their own waters. Use Kent passage if the panel wants the reference exercise. The [run sheet](pilot-kit/white-cell-run-sheet.md) steps are the same; only the times and names change. `mindoro_pilot_reaches_every_decision_point` checks the order.
+
+| Game time | What happens |
+|---|---|
+| 00:00 | STARTEX; *Warden* below bingo fuel, diverts to the oiler |
+| 00:10 | Inject *Minelayer sighted* (automatic) |
+| ~00:35–01:00 | The Red corvettes enter the Mindoro Strait (logged); sense-zone alerts |
+| 00:54 | *Tally* loads 800 t at Coron |
+| ~01:25 | Red inside the engage zone. Send *Jamming warning*; rule on contested shots |
+| ~01:27 | Dusk (sunset); *Ember* lays 12 mines on the northern approach |
+| ~01:50 | Flagship net jammed by *Cinder*; the San Jose HQ takes over after 5 minutes |
+| ~02:10–02:25 | Both Red corvettes sunk; the flagship net comes back. Optional: *Fishing fleet* (i04) |
+| 02:06 | *Warden* refuelled |
+| 02:30 / 02:40 | *Weather bulletin* (automatic); sea state 5: *Sieve* runs for shelter at Coron. Decision point, as on the Kent run sheet |
+| 03:04 | *Tally* delivers its cargo, then waits: the anchorage is closed above sea state 4 |
+| 03:20 | Weather eases; *Tally* goes to the Busuanga anchorage |
+| 04:00 | ENDEX |
+
 Back-ups:
 - `data/scenarios/phase3-planning-demo.json` (*Choke point planning*): the same passage, smaller, with no fuel, comms jamming or weather. Use it if the staff has less than an hour.
 - `data/scenarios/phase3-ttx-demo.json`: an escalation exercise with scripted events and injects.

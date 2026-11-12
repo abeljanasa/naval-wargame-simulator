@@ -22,6 +22,10 @@
 - **The review scrubber ran past the panel's edge** and added a horizontal scrollbar.
 - **Typing in a text area triggered keyboard shortcuts.** A space paused or ran the clock, a digit changed the compression, and the character was lost. That affected Lua scripts, event JSON and more. Shortcuts now ignore every text entry. Found while testing the record editor.
 
+### Added (scenarios)
+
+- **`data/scenarios/phase3-pilot-mindoro.json`**, *Mindoro Strait pilot*: the pilot exercise in the Philippine Area of Responsibility (ADR-0007). It has the same planning-layer features and decision points as Kent passage. Red is a fictional force with generic platforms. It has a golden replay and `mindoro_pilot_reaches_every_decision_point`, and is in the clean-scenario check. The pilot plan §4 and the run sheet cover it.
+
 ### Added (database editing)
 
 - **Sensors and weapons are editable too:** **View › Platform database…** has a Platforms / Sensors / Weapons switch. Sensors and weapons open straight in the record editor and save to `sensors.json` or `weapons.json` (`sim_db::edit::RecordKind`).

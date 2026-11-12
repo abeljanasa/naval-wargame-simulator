@@ -1,6 +1,15 @@
 # White-cell run sheet: Kent passage pilot
 
-Scenario `data/scenarios/phase3-pilot.json`: 4 hours of game time, about 75 minutes of play. The times are from the reference run. Player orders and your rulings move them, so watch the **Messages** and **Log** tabs rather than the clock.
+Scenario `data/scenarios/phase3-pilot.json`: 4 hours of game time, about 75 minutes of play. The times are from the reference run.
+
+**Mindoro Strait variant** (`phase3-pilot-mindoro.json`): the same steps, with these names:
+- Mindoro Strait for Kent passage;
+- San Jose HQ for the maritime HQ;
+- Coron for Refuge Cove;
+- Busuanga anchorage;
+- *Fishing fleet* for *Media report*.
+
+The times are in the [pilot plan](../ttx-pilot-plan.md) §4, *Philippine-area variant*: Red reaches the engage zone at about 01:25, and the jamming comes at about 01:50. Player orders and your rulings move them, so watch the **Messages** and **Log** tabs rather than the clock.
 
 ## Before STARTEX (10:15)
 

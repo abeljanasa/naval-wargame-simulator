@@ -1454,6 +1454,7 @@ mod tests {
             "phase3-ttx-demo",
             "phase3-planning-demo",
             "phase3-pilot",
+            "phase3-pilot-mindoro",
         ] {
             let path = Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../data/scenarios")

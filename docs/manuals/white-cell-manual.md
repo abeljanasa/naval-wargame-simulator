@@ -17,6 +17,7 @@ The default seats are **White cell**, plus one seat per side, named after it. Ad
 
 - Load a scenario file under **Scenario**, or build one in the scenario editor (§7).
 - The shipped demonstrators are in `data/scenarios/`:
+  - `phase3-pilot-mindoro.json`: the same pilot exercise in the Mindoro Strait, in the Philippine area (pilot plan §4, *Philippine-area variant*);
   - `phase3-pilot.json`: the Gate 3 pilot exercise. A choke point under jamming, fuel and an oiler, a minefield and a mine countermeasures vessel, cargo, an anchorage, dusk and a gale. Its decision points are in the [pilot plan](../gate3/ttx-pilot-plan.md) §4;
   - `phase3-ttx-demo.json`: an escalation exercise with events, injects and a scripted umpire brief;
   - `phase3-planning-demo.json`: a choke point with sense and engage zones, a command post afloat with an alternate ashore, ports and a surface action group.

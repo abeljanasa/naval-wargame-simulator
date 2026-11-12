@@ -304,3 +304,39 @@ fn pilot_scenario_reaches_every_decision_point() {
     let at: Vec<usize> = order.iter().map(|n| first(n)).collect();
     assert!(at.windows(2).all(|w| w[0] <= w[1]), "out of order: {at:?}");
 }
+
+/// The Philippine-area pilot (Mindoro Strait) reaches the same decision points, in order
+/// (docs/gate3/ttx-pilot-plan.md §4).
+#[test]
+fn mindoro_pilot_reaches_every_decision_point() {
+    let (s, text) = load("phase3-pilot-mindoro.json");
+    let db = sim_db::embedded::open_platform_db().unwrap();
+    let mut sim = s.build(None, &db).unwrap();
+    sim.run_until(s.duration_ticks());
+    let record = ExerciseRecord::capture(&mut sim, &s.name, &text);
+    let replay = Replay::open(record, &sides(&s)).unwrap();
+    assert!(replay.verified());
+    let timeline = &replay.report().timeline;
+    let first = |needle: &str| {
+        timeline
+            .iter()
+            .position(|e| e.text.contains(needle))
+            .unwrap_or_else(|| panic!("no timeline entry contains {needle:?}"))
+    };
+    let order = [
+        "Warden diverted to facility 4 to refuel",
+        "Tally loaded 800 t of cargo",
+        "event e04-engage-zone fired",
+        "Ember laid 12 mines",
+        "command post 6 is down: link jammed",
+        "Cinder destroyed",
+        "command post 6 is back up",
+        "event e06-weather fired",
+        "Sieve sheltering from the weather",
+        "Tally delivered 800 t of cargo",
+        "event e07-weather-eases fired",
+        "Tally holding at anchorage 3",
+    ];
+    let at: Vec<usize> = order.iter().map(|n| first(n)).collect();
+    assert!(at.windows(2).all(|w| w[0] <= w[1]), "out of order: {at:?}");
+}

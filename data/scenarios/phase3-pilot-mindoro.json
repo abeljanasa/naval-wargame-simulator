@@ -1,0 +1,683 @@
+{
+  "format": "nws-scenario",
+  "format_version": 6,
+  "name": "Phase 3 — Mindoro Strait pilot",
+  "description": "TTX pilot scenario in the Philippine Area of Responsibility: the whole planning layer in one exercise, in the Mindoro Strait between Mindoro and the Calamian Islands. Blue holds the strait with a sense zone and a polygon engage zone; a surface action group covers the Sulu Sea side and a corvette holds the passage as the zone's assigned shooter. Blue commands from the destroyer over a line-of-sight net relayed by the corvette, with the maritime HQ ashore at San Jose as the alternate (5-minute handover, orders queued). Red, a fictional opposing force, sends two corvettes south through the strait, one carrying a jammer, while a landing ship lays mines on the northern approach and a patrol boat runs a barrier patrol behind them. Blue has a mine countermeasures vessel sweeping that approach, an oiler on the Sulu Sea side, a patrol vessel low on fuel on a denial patrol, and a supply ship carrying stores from Coron that then stages at the Busuanga anchorage. Fuel is on. Dusk falls about 85 minutes in; a tropical-depression bulletin raises the sea state to 5 from 02:40 to 03:20. No real-world navy or state is represented: all platforms are generic database classes with no real-world values.",
+  "seed": 20261114,
+  "duration_s": 14400,
+  "fuel": true,
+  "environment": {
+    "sea_state": 3,
+    "start_unix_s": 1794297600,
+    "visibility_km": 20.0
+  },
+  "sides": [
+    {
+      "id": 1,
+      "name": "Blue",
+      "postures": [
+        {
+          "toward": 2,
+          "posture": "unfriendly"
+        }
+      ],
+      "doctrine": {
+        "wcs": "tight",
+        "emcon": "active",
+        "engage_unfriendly": false
+      }
+    },
+    {
+      "id": 2,
+      "name": "Red",
+      "postures": [
+        {
+          "toward": 1,
+          "posture": "unfriendly"
+        }
+      ],
+      "doctrine": {
+        "wcs": "tight",
+        "emcon": "active"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": 1,
+      "name": "Blue destroyer (DDG) — Anvil",
+      "side": 1,
+      "platform": "GEN-DDG",
+      "position": {
+        "lat_deg": 12.03,
+        "lon_deg": 120.6
+      },
+      "heading_deg": 0.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 12.08,
+          "lon_deg": 120.62
+        },
+        "radius_m": 8000
+      }
+    },
+    {
+      "id": 2,
+      "name": "Blue frigate (FFG) — Bastion",
+      "side": 1,
+      "platform": "GEN-FFG",
+      "position": {
+        "lat_deg": 12.0,
+        "lon_deg": 120.6
+      },
+      "heading_deg": 0.0
+    },
+    {
+      "id": 3,
+      "name": "Blue corvette (FFL) — Coral",
+      "side": 1,
+      "platform": "GEN-FFL",
+      "position": {
+        "lat_deg": 12.35,
+        "lon_deg": 120.55
+      },
+      "heading_deg": 0.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 12.35,
+          "lon_deg": 120.55
+        },
+        "radius_m": 5000
+      }
+    },
+    {
+      "id": 4,
+      "name": "Blue MCM vessel (MCMV) — Sieve",
+      "side": 1,
+      "platform": "GEN-MCMV",
+      "position": {
+        "lat_deg": 12.55,
+        "lon_deg": 120.45
+      },
+      "heading_deg": 330.0,
+      "mission": {
+        "kind": "mine_clearing",
+        "centre": {
+          "lat_deg": 12.9,
+          "lon_deg": 120.3
+        },
+        "radius_m": 3000
+      }
+    },
+    {
+      "id": 5,
+      "name": "Blue patrol vessel (OPV) — Warden",
+      "side": 1,
+      "platform": "GEN-OPV",
+      "position": {
+        "lat_deg": 12.25,
+        "lon_deg": 120.7
+      },
+      "heading_deg": 0.0,
+      "fuel_level": 0.29,
+      "mission": {
+        "kind": "denial",
+        "choke_point": "Mindoro Strait"
+      }
+    },
+    {
+      "id": 6,
+      "name": "Blue oiler (AOR) — Wellspring",
+      "side": 1,
+      "platform": "GEN-AOR",
+      "position": {
+        "lat_deg": 11.88,
+        "lon_deg": 120.72
+      },
+      "heading_deg": 0.0,
+      "mission": {
+        "kind": "support",
+        "station": {
+          "lat_deg": 11.9,
+          "lon_deg": 120.75
+        },
+        "radius_m": 3000
+      }
+    },
+    {
+      "id": 7,
+      "name": "Blue supply ship (OSV) — Tally",
+      "side": 1,
+      "platform": "GEN-MV-OSV",
+      "position": {
+        "lat_deg": 12.0,
+        "lon_deg": 120.3
+      },
+      "heading_deg": 90.0,
+      "mission": {
+        "kind": "cargo",
+        "origin": {
+          "lat_deg": 11.99,
+          "lon_deg": 120.22
+        },
+        "destination": {
+          "lat_deg": 11.98,
+          "lon_deg": 120.5
+        },
+        "tonnes": 800.0
+      }
+    },
+    {
+      "id": 11,
+      "name": "Red corvette (FFL) — Cinder",
+      "side": 2,
+      "platform": "GEN-FFL",
+      "position": {
+        "lat_deg": 12.8,
+        "lon_deg": 120.25
+      },
+      "heading_deg": 150.0,
+      "jammer": {
+        "jn_db_at_1km": 60.0
+      },
+      "mission": {
+        "kind": "ferry",
+        "destination": {
+          "lat_deg": 11.4,
+          "lon_deg": 120.9
+        }
+      }
+    },
+    {
+      "id": 12,
+      "name": "Red corvette (FFL) — Dross",
+      "side": 2,
+      "platform": "GEN-FFL",
+      "position": {
+        "lat_deg": 12.88,
+        "lon_deg": 120.18
+      },
+      "heading_deg": 150.0,
+      "mission": {
+        "kind": "ferry",
+        "destination": {
+          "lat_deg": 11.4,
+          "lon_deg": 121.0
+        }
+      }
+    },
+    {
+      "id": 13,
+      "name": "Red landing ship / minelayer (LST) — Ember",
+      "side": 2,
+      "platform": "GEN-LST",
+      "position": {
+        "lat_deg": 13.2,
+        "lon_deg": 120.3
+      },
+      "heading_deg": 180.0,
+      "mission": {
+        "kind": "mining",
+        "centre": {
+          "lat_deg": 12.9,
+          "lon_deg": 120.3
+        },
+        "radius_m": 1500,
+        "mines": 12
+      }
+    },
+    {
+      "id": 14,
+      "name": "Red patrol boat (PGG) — Flint",
+      "side": 2,
+      "platform": "GEN-PGG",
+      "position": {
+        "lat_deg": 13.1,
+        "lon_deg": 120.0
+      },
+      "heading_deg": 90.0,
+      "mission": {
+        "kind": "barrier_patrol",
+        "start": {
+          "lat_deg": 13.1,
+          "lon_deg": 119.9
+        },
+        "end": {
+          "lat_deg": 13.1,
+          "lon_deg": 120.55
+        }
+      }
+    }
+  ],
+  "facilities": [
+    {
+      "id": 1,
+      "name": "Blue maritime HQ (San Jose)",
+      "side": 1,
+      "kind": "command_post",
+      "position": {
+        "lat_deg": 12.35,
+        "lon_deg": 121.07
+      },
+      "radius_m": 1000,
+      "range_m": 300000,
+      "anti_jam_db": 20
+    },
+    {
+      "id": 2,
+      "name": "Coron",
+      "side": 1,
+      "kind": "sheltering_port",
+      "position": {
+        "lat_deg": 11.99,
+        "lon_deg": 120.22
+      },
+      "radius_m": 3000,
+      "berths": 2,
+      "depth_m": 9,
+      "services": {
+        "repair": true,
+        "rearm": true,
+        "refuel": true
+      }
+    },
+    {
+      "id": 3,
+      "name": "Busuanga anchorage",
+      "side": 1,
+      "kind": "anchorage",
+      "position": {
+        "lat_deg": 12.125,
+        "lon_deg": 120.43
+      },
+      "area": {
+        "shape": "polygon",
+        "points": [
+          {
+            "lat_deg": 12.1,
+            "lon_deg": 120.4
+          },
+          {
+            "lat_deg": 12.1,
+            "lon_deg": 120.46
+          },
+          {
+            "lat_deg": 12.15,
+            "lon_deg": 120.46
+          },
+          {
+            "lat_deg": 12.15,
+            "lon_deg": 120.4
+          }
+        ]
+      },
+      "radius_m": 4000,
+      "depth_m": 15,
+      "max_sea_state": 4,
+      "staging": true
+    },
+    {
+      "id": 4,
+      "name": "Oiler Wellspring",
+      "side": 1,
+      "kind": "refuelling_point",
+      "position": {
+        "lat_deg": 11.88,
+        "lon_deg": 120.72
+      },
+      "radius_m": 1500,
+      "unit": 6,
+      "berths": 1,
+      "fuel_t": 3000,
+      "transfer_t_per_h": 400,
+      "services": {
+        "refuel": true
+      }
+    },
+    {
+      "id": 5,
+      "name": "Red afloat command",
+      "side": 2,
+      "kind": "command_post",
+      "position": {
+        "lat_deg": 12.88,
+        "lon_deg": 120.18
+      },
+      "radius_m": 500,
+      "range_m": 400000,
+      "unit": 12
+    },
+    {
+      "id": 6,
+      "name": "Blue flagship command",
+      "side": 1,
+      "kind": "command_post",
+      "position": {
+        "lat_deg": 12.03,
+        "lon_deg": 120.6
+      },
+      "radius_m": 500,
+      "range_m": 150000,
+      "unit": 1,
+      "line_of_sight": true,
+      "relays": [
+        3
+      ],
+      "alternate": 1,
+      "handover_s": 300,
+      "orders_in_gap": "queue"
+    }
+  ],
+  "zones": [
+    {
+      "id": 1,
+      "name": "Strait sense zone",
+      "side": 1,
+      "kind": "sense",
+      "area": {
+        "shape": "circle",
+        "centre": {
+          "lat_deg": 12.35,
+          "lon_deg": 120.55
+        },
+        "radius_m": 45000
+      },
+      "doctrine": {
+        "emcon": "active"
+      },
+      "choke_point": "Mindoro Strait"
+    },
+    {
+      "id": 2,
+      "name": "Strait engage zone",
+      "side": 1,
+      "kind": "engage",
+      "area": {
+        "shape": "polygon",
+        "points": [
+          {
+            "lat_deg": 12.2,
+            "lon_deg": 120.3
+          },
+          {
+            "lat_deg": 12.2,
+            "lon_deg": 120.8
+          },
+          {
+            "lat_deg": 12.5,
+            "lon_deg": 120.8
+          },
+          {
+            "lat_deg": 12.5,
+            "lon_deg": 120.3
+          }
+        ]
+      },
+      "doctrine": {
+        "wcs": "free",
+        "engage_unfriendly": true
+      },
+      "choke_point": "Mindoro Strait",
+      "shooters": [
+        3
+      ]
+    }
+  ],
+  "action_groups": [
+    {
+      "name": "SAG 1",
+      "side": 1,
+      "leader": 1,
+      "members": [
+        {
+          "unit": 2,
+          "bearing_deg": 180.0,
+          "range_m": 3000
+        }
+      ],
+      "doctrine": {
+        "emcon": "active"
+      }
+    }
+  ],
+  "reference_points": [
+    {
+      "name": "Mindoro Strait",
+      "position": {
+        "lat_deg": 12.35,
+        "lon_deg": 120.55
+      }
+    },
+    {
+      "name": "RV Bravo",
+      "position": {
+        "lat_deg": 11.9,
+        "lon_deg": 120.75
+      },
+      "side": 1
+    },
+    {
+      "name": "Northern approach",
+      "position": {
+        "lat_deg": 12.9,
+        "lon_deg": 120.3
+      },
+      "side": 1
+    }
+  ],
+  "seats": [
+    {
+      "id": 1,
+      "name": "White cell",
+      "role": "white_cell"
+    },
+    {
+      "id": 2,
+      "name": "Blue command",
+      "role": "side",
+      "side": 1
+    },
+    {
+      "id": 3,
+      "name": "Red command",
+      "role": "side",
+      "side": 2
+    }
+  ],
+  "injects": [
+    {
+      "id": "i01-minelayer",
+      "title": "Minelayer sighted",
+      "from": "Fleet intelligence",
+      "to": "side",
+      "side": 1,
+      "text": "A Red landing ship fitted with mine rails is heading for the northern approach to the Mindoro Strait. Expect a field there within the hour.",
+      "note": "Sent at 10 min by e02. Watch whether Blue protects or redirects the MCM vessel."
+    },
+    {
+      "id": "i02-jamming",
+      "title": "Jamming warning",
+      "from": "Fleet HQ",
+      "to": "side",
+      "side": 1,
+      "text": "Red corvettes carry communications jammers. If the flagship net fails, the maritime HQ at San Jose takes command after five minutes; orders in the gap are queued.",
+      "note": "Send when Cinder enters the sense zone, before the flagship net drops."
+    },
+    {
+      "id": "i03-weather",
+      "title": "Weather bulletin",
+      "from": "Weather service",
+      "to": "all",
+      "text": "Tropical depression bulletin for the Mindoro Strait and the Calamian Islands: sea state 5 from 02:40, easing from 03:20.",
+      "note": "Sent at 02:30 by e05. Small craft (under 60 m) run for shelter at sea state 5."
+    },
+    {
+      "id": "i04-fishing",
+      "title": "Fishing fleet",
+      "to": "all",
+      "text": "Local fishing boats in the strait are asking the coast guard whether to stay in port.",
+      "note": "Optional pressure inject after the first engagement."
+    }
+  ],
+  "events": [
+    {
+      "id": "e01-startex",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "time",
+        "at_s": 0
+      },
+      "actions": [
+        {
+          "type": "message",
+          "to": "all",
+          "text": "STARTEX. Postures unfriendly. Blue: hold the Mindoro Strait; weapons free inside the engage zone only. Fuel states are live."
+        }
+      ]
+    },
+    {
+      "id": "e02-intel",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "time",
+        "at_s": 600
+      },
+      "actions": [
+        {
+          "type": "send_inject",
+          "inject": "i01-minelayer"
+        }
+      ]
+    },
+    {
+      "id": "e03-first-contact",
+      "name": "Maritime operations centre",
+      "trigger": {
+        "type": "contact_gained",
+        "side": 1,
+        "target_side": 2
+      },
+      "actions": [
+        {
+          "type": "message",
+          "to": "side",
+          "side": 1,
+          "text": "First contact on Red units. Classify and report."
+        }
+      ]
+    },
+    {
+      "id": "e04-engage-zone",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "area_entered",
+        "side": 2,
+        "area": {
+          "shape": "polygon",
+          "points": [
+            {
+              "lat_deg": 12.2,
+              "lon_deg": 120.3
+            },
+            {
+              "lat_deg": 12.2,
+              "lon_deg": 120.8
+            },
+            {
+              "lat_deg": 12.5,
+              "lon_deg": 120.8
+            },
+            {
+              "lat_deg": 12.5,
+              "lon_deg": 120.3
+            }
+          ]
+        }
+      },
+      "actions": [
+        {
+          "type": "message",
+          "to": "white_cell",
+          "text": "A Red unit is inside the engage zone. Decision point: adjudicate contested shots."
+        }
+      ]
+    },
+    {
+      "id": "e05-weather-bulletin",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "time",
+        "at_s": 9000
+      },
+      "actions": [
+        {
+          "type": "send_inject",
+          "inject": "i03-weather"
+        }
+      ]
+    },
+    {
+      "id": "e06-weather",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "time",
+        "at_s": 9600
+      },
+      "actions": [
+        {
+          "type": "set_environment",
+          "environment": {
+            "sea_state": 5,
+            "start_unix_s": 1794297600,
+            "visibility_km": 8.0
+          }
+        },
+        {
+          "type": "message",
+          "to": "all",
+          "text": "Tropical depression: sea state 5."
+        }
+      ]
+    },
+    {
+      "id": "e07-weather-eases",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "time",
+        "at_s": 12000
+      },
+      "actions": [
+        {
+          "type": "set_environment",
+          "environment": {
+            "sea_state": 3,
+            "start_unix_s": 1794297600,
+            "visibility_km": 20.0
+          }
+        },
+        {
+          "type": "message",
+          "to": "all",
+          "text": "Weather easing: sea state 3."
+        }
+      ]
+    },
+    {
+      "id": "e08-red-loss",
+      "name": "Exercise control",
+      "trigger": {
+        "type": "unit_destroyed",
+        "side": 2
+      },
+      "actions": [
+        {
+          "type": "message",
+          "to": "white_cell",
+          "text": "A Red unit has been lost. Consider the fishing-fleet inject (i04)."
+        }
+      ]
+    }
+  ]
+}
