@@ -750,6 +750,10 @@ export type Facility_Deserialize = {
 	anti_jam_db?: number | null,
 	/**  Command posts: units of its side that relay its traffic when the direct link fails. */
 	relays?: UnitId[],
+	/**  Refuelling: tonnes per hour transferred to one unit (default 300). */
+	transfer_t_per_h?: number | null,
+	/**  Refuelling: tonnes held at the start; `None` = unlimited (a depot ashore). */
+	fuel_t?: number | null,
 };
 
 /**  A planning-layer facility. */
@@ -794,6 +798,10 @@ export type Facility_Serialize = {
 	anti_jam_db: number | null,
 	/**  Command posts: units of its side that relay its traffic when the direct link fails. */
 	relays: UnitId[],
+	/**  Refuelling: tonnes per hour transferred to one unit (default 300). */
+	transfer_t_per_h: number | null,
+	/**  Refuelling: tonnes held at the start; `None` = unlimited (a depot ashore). */
+	fuel_t: number | null,
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */
@@ -1177,6 +1185,8 @@ export type ScenarioUnit_Deserialize = {
 	mission?: Mission | null,
 	/**  Held off the board until an event's `spawn_reserve` action brings it in. */
 	reserve?: boolean,
+	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
+	fuel_level?: number | null,
 };
 
 /**  A unit as written in a scenario file. */
@@ -1208,6 +1218,8 @@ export type ScenarioUnit_Serialize = {
 	mission?: Mission,
 	/**  Held off the board until an event's `spawn_reserve` action brings it in. */
 	reserve?: boolean,
+	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
+	fuel_level?: number | null,
 };
 
 export type Scenario_Deserialize = {
@@ -1243,6 +1255,8 @@ export type Scenario_Deserialize = {
 	zones?: Zone_Deserialize[],
 	/**  Surface action groups: members keep station on the leader (format 5). */
 	action_groups?: ActionGroup_Deserialize[],
+	/**  The fuel model for ships and submarines (format 6; `docs/models/fuel.md`). */
+	fuel?: boolean,
 };
 
 export type Scenario_Serialize = {
@@ -1278,6 +1292,8 @@ export type Scenario_Serialize = {
 	zones?: Zone_Serialize[],
 	/**  Surface action groups: members keep station on the leader (format 5). */
 	action_groups?: ActionGroup_Serialize[],
+	/**  The fuel model for ships and submarines (format 6; `docs/models/fuel.md`). */
+	fuel?: boolean,
 };
 
 /**  A player position. */
@@ -1303,7 +1319,7 @@ export type Services_Deserialize = {
 	repair?: boolean,
 	/**  Restores the unit's weapons to its loadout after [`REARM_TICKS`] alongside. */
 	rearm?: boolean,
-	/**  Refuelling (recorded; fuel is not modelled until air operations, Phase 4). */
+	/**  Refuels ships and submarines that carry a fuel model (`docs/models/fuel.md`). */
 	refuel?: boolean,
 };
 
@@ -1313,7 +1329,7 @@ export type Services_Serialize = {
 	repair: boolean,
 	/**  Restores the unit's weapons to its loadout after [`REARM_TICKS`] alongside. */
 	rearm: boolean,
-	/**  Refuelling (recorded; fuel is not modelled until air operations, Phase 4). */
+	/**  Refuels ships and submarines that carry a fuel model (`docs/models/fuel.md`). */
 	refuel: boolean,
 };
 
@@ -1626,6 +1642,8 @@ export type UnitView_Deserialize = {
 	stores: StoreView[],
 	mission?: Mission | null,
 	mission_complete: boolean,
+	/**  Fraction of fuel left, for units with a fuel model. */
+	fuel_fraction?: number | null,
 };
 
 export type UnitView_Serialize = {
@@ -1658,6 +1676,8 @@ export type UnitView_Serialize = {
 	stores: StoreView[],
 	mission: Mission | null,
 	mission_complete: boolean,
+	/**  Fraction of fuel left, for units with a fuel model. */
+	fuel_fraction: number | null,
 };
 
 /**  Whose picture a snapshot shows. */

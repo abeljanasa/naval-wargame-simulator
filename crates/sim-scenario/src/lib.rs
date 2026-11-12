@@ -13,6 +13,8 @@
 //! * v4: `reference_points` (named map points for planning and briefing). Older files still load.
 //! * v5: the planning layer: `facilities`, `zones` and surface `action_groups`
 //!   (`docs/models/planning-layer.md`). Older files still load.
+//! * v6: logistics: `fuel` (the fuel model for ships and submarines) and unit `fuel_level`
+//!   (`docs/models/fuel.md`). Older files still load, without fuel.
 
 #![forbid(unsafe_code)]
 
@@ -21,16 +23,16 @@ pub mod synthetic;
 use serde::{Deserialize, Serialize};
 use sim_core::{
     Carrier, Command, CommandPayload, DamageProfile, Doctrine, DoctrineScope, Domain, EmitterEntry,
-    Environment, Facility, GeoPoint, Guidance, Inject, Issuer, JammerSpec, Mission, Posture,
-    ScenarioEvent, Seat, SeatRole, SensorKind, SensorSpec, SideId, Simulation, Tick, UnitId,
-    UnitSpawn, WeaponKind, WeaponSpec, Zone,
+    Environment, Facility, FuelSpec, GeoPoint, Guidance, Inject, Issuer, JammerSpec, Mission,
+    Posture, ScenarioEvent, Seat, SeatRole, SensorKind, SensorSpec, SideId, Simulation, Tick,
+    UnitId, UnitSpawn, WeaponKind, WeaponSpec, Zone, FUEL_FRACTION_OF_DISPLACEMENT,
 };
 use sim_db::PlatformDb;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 pub const SCENARIO_FORMAT: &str = "nws-scenario";
-pub const SCENARIO_FORMAT_VERSION: u32 = 5;
+pub const SCENARIO_FORMAT_VERSION: u32 = 6;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ScenarioError {
@@ -142,6 +144,9 @@ pub struct ScenarioUnit {
     /// Held off the board until an event's `spawn_reserve` action brings it in.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reserve: bool,
+    /// Fraction of fuel at the start, with the fuel model on (default full; format 6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fuel_level: Option<f64>,
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -191,6 +196,9 @@ pub struct Scenario {
     /// Surface action groups: members keep station on the leader (format 5).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub action_groups: Vec<ActionGroup>,
+    /// The fuel model for ships and submarines (format 6; `docs/models/fuel.md`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fuel: bool,
 }
 
 /// A surface action group: its members keep station on the leader, so ordering the leader moves
@@ -343,6 +351,14 @@ impl Scenario {
             }
             if !sides.contains(&u.side) {
                 out.push(format!("unit {} is on undeclared side {}", u.id, u.side));
+            }
+            if u.fuel_level
+                .is_some_and(|f| !(f.is_finite() && (0.0..=1.0).contains(&f)))
+            {
+                out.push(format!(
+                    "unit {}: fuel_level must be a fraction from 0 to 1",
+                    u.id
+                ));
             }
             if u.platform.is_none()
                 && (u.domain.is_none() || u.max_speed_mps.is_none() || u.accel_mps2.is_none())
@@ -524,7 +540,7 @@ impl Scenario {
         let mut issues: Vec<ScenarioIssue> =
             self.structural_issues().into_iter().map(error).collect();
         for u in &self.units {
-            if let Err(e) = resolve_unit(u, db) {
+            if let Err(e) = resolve_unit(u, db, self.fuel) {
                 issues.push(error(match e {
                     ScenarioError::Invalid(m) => m,
                     e => format!("unit {}: {e}", u.id),
@@ -701,7 +717,10 @@ impl Scenario {
 
     /// Resolves every unit against the platform database into a spawn command payload.
     pub fn resolve(&self, db: &PlatformDb) -> Result<Vec<UnitSpawn>, ScenarioError> {
-        self.units.iter().map(|u| resolve_unit(u, db)).collect()
+        self.units
+            .iter()
+            .map(|u| resolve_unit(u, db, self.fuel))
+            .collect()
     }
 
     /// Builds a simulation at tick 0, with the initial units queued as scenario commands.
@@ -860,7 +879,7 @@ impl Scenario {
     }
 }
 
-fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, ScenarioError> {
+fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpawn, ScenarioError> {
     let invalid = |msg: String| ScenarioError::Invalid(format!("unit {}: {msg}", u.id));
     let (
         domain,
@@ -875,6 +894,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         length,
         stores,
         damage,
+        fuel_basis,
     ) = match &u.platform {
         Some(pid) => {
             let p = db
@@ -934,6 +954,18 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
                         fire_susceptibility: fire,
                         flooding_susceptibility: flood,
                     }),
+                // (capacity t, endurance m, cruise m/s) for ships and submarines with figures.
+                match (p.endurance_m, p.displacement_t) {
+                    (Some(e), Some(d))
+                        if matches!(db_domain, Domain::Surface | Domain::Subsurface)
+                            && e > 0.0
+                            && d > 0.0
+                            && p.cruise_speed_mps > 0.0 =>
+                    {
+                        Some((d * FUEL_FRACTION_OF_DISPLACEMENT, e, p.cruise_speed_mps))
+                    }
+                    _ => None,
+                },
             )
         }
         // `validate` guarantees these are present when there is no platform.
@@ -951,6 +983,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
             None,
             None,
             BTreeMap::new(),
+            None,
             None,
         ),
     };
@@ -980,6 +1013,15 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb) -> Result<UnitSpawn, Scenario
         stores,
         damage_profile: damage,
         mission: u.mission.clone(),
+        fuel: fuel_basis
+            .filter(|_| fuel)
+            .map(|(capacity_t, endurance_m, cruise_mps)| FuelSpec {
+                capacity_t,
+                endurance_m,
+                cruise_mps,
+                level: u.fuel_level.unwrap_or(1.0),
+                bingo: None,
+            }),
     })
 }
 
@@ -1433,6 +1475,40 @@ mod tests {
                 .collect();
             assert!(errors.is_empty(), "{name}: {errors:?}");
         }
+    }
+
+    #[test]
+    fn the_fuel_model_is_opt_in_and_sized_from_the_database() {
+        let json = r#"{
+            "format": "nws-scenario", "format_version": 6, "name": "t", "seed": 1,
+            "duration_s": 60, "fuel": true,
+            "sides": [{"id": 1, "name": "Blue"}],
+            "units": [
+                {"id": 1, "name": "F", "side": 1, "platform": "GEN-FFG", "fuel_level": 0.4,
+                 "position": {"lat_deg": -39.0, "lon_deg": 146.0}},
+                {"id": 2, "name": "N", "side": 1, "platform": "GEN-SSN",
+                 "position": {"lat_deg": -39.1, "lon_deg": 146.0}}
+            ]
+        }"#;
+        let s = Scenario::from_json(json).unwrap();
+        let spawns = s.resolve(&db()).unwrap();
+        let f = spawns[0].fuel.unwrap();
+        // GEN-FFG: 5 000 t full load, 4 500 nm at 16 kn.
+        assert!((f.capacity_t - 500.0).abs() < 1e-9);
+        assert!((f.endurance_m - 4_500.0 * 1_852.0).abs() < 1e-6);
+        assert!((f.cruise_mps - 16.0 * 1_852.0 / 3_600.0).abs() < 1e-9);
+        assert!((f.level - 0.4).abs() < 1e-12);
+        assert_eq!(
+            spawns[1].fuel, None,
+            "no endurance in the database: no fuel model"
+        );
+        // Off by default, and out-of-range levels are refused.
+        let off = Scenario::from_json(&json.replace(r#""fuel": true,"#, "")).unwrap();
+        assert!(off.resolve(&db()).unwrap().iter().all(|u| u.fuel.is_none()));
+        assert!(matches!(
+            Scenario::from_json(&json.replace("0.4", "1.4")),
+            Err(ScenarioError::Invalid(_))
+        ));
     }
 
     #[test]

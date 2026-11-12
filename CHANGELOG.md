@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 11: fuel and refuelling)
+
+- **Fuel for ships and submarines** (`docs/models/fuel.md`, DL-0030):
+  - Opt-in per scenario (`"fuel": true`, scenario format 6).
+  - Sized from the platform database: capacity 10 % of displacement; endurance and cruise speed from the database.
+  - Burn by speed (cube law plus a 10 % hotel load). Out of fuel means no propulsion (`FuelExhausted`).
+- **Refuelling:**
+  - **Bingo:** AI-run units below 30 % go to the nearest refuelling point of their side with fuel left (`DivertedForFuel`), and resume their mission when full (`UnitRefuelled`).
+  - **Points:** each has a transfer rate (`transfer_t_per_h`, default 300 t/h) and a stock (`fuel_t`; none means unlimited).
+  - **Oilers:** a refuelling point carried by a unit. It refuels ships under way, which keep company 2 km ahead.
+  - **Queues:** berths make queues (`WaitingForBerth`).
+- **Desktop:**
+  - A Fuel line in the unit panel.
+  - Scenario editor: the fuel-model switch, each unit's starting fuel, and refuelling points' carrier, stock and rate.
+- **Platform database API:** `PlatformSummary` gains `draft_m`, `endurance_m` and `displacement_t`.
+
+### Changed (slice 11)
+
+- **Formats:** save format 19, scenario format 6. Older files load.
+- **Resuming a mission:** a unit resuming after repair now clears its route and speed, so the mission AI plans afresh.
+
 ### Added (Phase 3, slice 10: comms links and disruption)
 
 - **Comms links from command posts** (`docs/models/comms.md`, DL-0029):

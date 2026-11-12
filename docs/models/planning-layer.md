@@ -55,7 +55,7 @@ Other refusals: *"U3 cannot be reached from Blue maritime HQ: out of range"* (or
   - Damage falls by 2 % of the unit's damage points a minute, so a frigate at 120 DP of 300 is repaired in 20 minutes.
   - When the damage reaches zero, critical hits are cleared and the sensors and maximum speed lost to them are restored from the unit's **loadout** (what it had when it entered the exercise). `UnitRepaired` is logged.
 - **Rearm:** after 30 minutes alongside, the unit's magazine is restored to its loadout, once per visit. `UnitRearmed` is logged.
-- **Refuel:** recorded only. Ships have no fuel model; fuel arrives with air operations (Phase 4).
+- **Refuel:** ships and submarines with a fuel model take fuel at the point's transfer rate, from its stock; units on a mission below bingo divert to the nearest refuelling point, and a refuelling point carried by a unit is an oiler that serves under way ([fuel.md](fuel.md)).
 - A unit that moves off (above 0.5 m/s, or out of the radius) stops being served; its 30 minutes start again on its next visit.
 
 ## Zones

@@ -789,6 +789,42 @@ impl<'a> Builder<'a> {
                 None,
                 format!("command post {facility} is down: {}", status.describe()),
             ),
+            SimEventKind::FuelExhausted { unit } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} ran out of fuel"),
+                );
+            }
+            SimEventKind::DivertedForFuel { unit, facility } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} diverted to facility {facility} to refuel"),
+                );
+            }
+            SimEventKind::UnitRefuelled { unit, facility } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} refuelled at facility {facility}"),
+                );
+            }
+            SimEventKind::WaitingForBerth { unit, facility } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} waiting for a berth at facility {facility}"),
+                );
+            }
             SimEventKind::CommandPostRestored { facility } => self.note(
                 t,
                 TimelineKind::Event,

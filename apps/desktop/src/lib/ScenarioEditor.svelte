@@ -248,6 +248,17 @@
             }}
           />
         </label>
+        <label class="inline">
+          <input
+            type="checkbox"
+            checked={d.fuel ?? false}
+            onchange={(e) => {
+              editor.draft.fuel = e.currentTarget.checked;
+              changed();
+            }}
+          />
+          Fuel model (ships and submarines)
+        </label>
         <label>
           Weather loss (dB)
           <input
@@ -405,6 +416,23 @@
                 }}
               />
             </label>
+            {#if d.fuel}
+              <label>
+                Fuel at start (%)
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={Math.round((u.fuel_level ?? 1) * 100)}
+                  onchange={(e) => {
+                    const v = Math.min(100, Math.max(0, num(e.currentTarget.value, 100)));
+                    if (v === 100) delete u.fuel_level;
+                    else u.fuel_level = v / 100;
+                    changed();
+                  }}
+                />
+              </label>
+            {/if}
             <label>
               Speed (kn, blank: cruise)
               <input
@@ -886,6 +914,51 @@
                   }}
                 />
               </label>
+              {#if f.kind === "refuelling_point"}
+                <label>
+                  Carried by (oiler)
+                  <select
+                    value={f.unit ?? ""}
+                    onchange={(e) => {
+                      const v = e.currentTarget.value;
+                      f.unit = v === "" ? null : Number(v);
+                      changed();
+                    }}
+                  >
+                    <option value="">nothing (fixed)</option>
+                    {#each d.units.filter((u) => u.side === f.side) as u (u.id)}
+                      <option value={u.id}>{u.name}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
+              {#if f.services?.refuel}
+                <label>
+                  Fuel held (t, blank: unlimited)
+                  <input
+                    type="number"
+                    min="0"
+                    value={f.fuel_t ?? ""}
+                    onchange={(e) => {
+                      const v = e.currentTarget.value.trim();
+                      f.fuel_t = v === "" ? null : Math.max(0, num(v));
+                      changed();
+                    }}
+                  />
+                </label>
+                <label>
+                  Transfer (t/h)
+                  <input
+                    type="number"
+                    min="1"
+                    value={f.transfer_t_per_h ?? 300}
+                    onchange={(e) => {
+                      f.transfer_t_per_h = Math.max(1, num(e.currentTarget.value, 300));
+                      changed();
+                    }}
+                  />
+                </label>
+              {/if}
             {/if}
           </div>
           {#if f.kind !== "command_post"}

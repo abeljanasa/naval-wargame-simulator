@@ -337,6 +337,25 @@ pub enum SimEventKind {
     CommandPostRestored {
         facility: u32,
     },
+    /// A unit ran out of fuel: no propulsion until refuelled.
+    FuelExhausted {
+        unit: UnitId,
+    },
+    /// A unit on a mission below bingo fuel was sent to a refuelling point.
+    DivertedForFuel {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// A unit was filled up at a refuelling point.
+    UnitRefuelled {
+        unit: UnitId,
+        facility: u32,
+    },
+    /// A unit is waiting for a free berth at a facility.
+    WaitingForBerth {
+        unit: UnitId,
+        facility: u32,
+    },
     /// An order held while its command post was down was carried out.
     QueuedOrderApplied {
         seq: u64,

@@ -46,6 +46,10 @@ pub const REPAIR_FRACTION_PER_MIN: f64 = 0.02;
 pub const REARM_TICKS: u64 = 1_800;
 /// Default delay before an alternate command post takes over, seconds.
 pub const DEFAULT_HANDOVER_S: f64 = 300.0;
+/// Default fuel transfer rate of a refuelling point, tonnes per hour.
+pub const DEFAULT_TRANSFER_T_PER_H: f64 = 300.0;
+/// A unit refuelling from an oiler under way steers for a point this far ahead of it, metres.
+pub const RAS_LEAD_M: f64 = 2_000.0;
 
 /// What a facility is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -81,7 +85,7 @@ pub struct Services {
     /// Restores the unit's weapons to its loadout after [`REARM_TICKS`] alongside.
     #[serde(default)]
     pub rearm: bool,
-    /// Refuelling (recorded; fuel is not modelled until air operations, Phase 4).
+    /// Refuels ships and submarines that carry a fuel model (`docs/models/fuel.md`).
     #[serde(default)]
     pub refuel: bool,
 }
@@ -140,6 +144,12 @@ pub struct Facility {
     /// Command posts: units of its side that relay its traffic when the direct link fails.
     #[serde(default)]
     pub relays: Vec<UnitId>,
+    /// Refuelling: tonnes per hour transferred to one unit (default 300).
+    #[serde(default)]
+    pub transfer_t_per_h: Option<f64>,
+    /// Refuelling: tonnes held at the start; `None` = unlimited (a depot ashore).
+    #[serde(default)]
+    pub fuel_t: Option<f64>,
 }
 
 /// What a zone governs.
@@ -180,13 +190,18 @@ pub struct ServiceState {
     pub facility: u32,
     pub since: Tick,
     pub rearmed: bool,
+    /// Filled up on this visit (logged once; topping up continues).
+    #[serde(default)]
+    pub refuelled: bool,
 }
 
-/// A mission-killed unit sent to a port, with the mission it resumes once repaired.
+/// A unit sent to a facility, with the mission it resumes once repaired or refuelled.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Diversion {
     pub facility: u32,
     pub mission: Option<Mission>,
+    #[serde(default)]
+    pub reason: DivertReason,
 }
 
 /// A player's order held while its command post is down.
@@ -235,6 +250,12 @@ pub struct PlanningLayer {
     /// (choke point, unit): other sides' units inside a choke point now.
     #[serde(default)]
     pub inside: BTreeSet<(String, UnitId)>,
+    /// Tonnes of fuel each facility has issued.
+    #[serde(default)]
+    pub issued: BTreeMap<u32, f64>,
+    /// Units waiting for a berth, and where.
+    #[serde(default)]
+    pub waiting: BTreeMap<UnitId, u32>,
 }
 
 /// Checks a planning layer before it is set.
@@ -261,6 +282,26 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         {
             return Err(format!(
                 "facility {:?} has an invalid antenna height or anti-jam margin",
+                f.name
+            ));
+        }
+        if f.unit.is_some()
+            && !matches!(
+                f.kind,
+                FacilityKind::CommandPost | FacilityKind::RefuellingPoint
+            )
+        {
+            return Err(format!(
+                "facility {:?}: only command posts and refuelling points are carried by a unit",
+                f.name
+            ));
+        }
+        if f.transfer_t_per_h
+            .is_some_and(|r| !(r.is_finite() && r > 0.0))
+            || f.fuel_t.is_some_and(|t| !(t.is_finite() && t >= 0.0))
+        {
+            return Err(format!(
+                "facility {:?} needs a transfer rate > 0 and fuel >= 0",
                 f.name
             ));
         }
@@ -320,6 +361,7 @@ impl PlanningLayer {
         let kept: BTreeSet<u32> = facilities.iter().map(|f| f.id).collect();
         self.service.retain(|_, s| kept.contains(&s.facility));
         self.diverted.retain(|_, d| kept.contains(&d.facility));
+        self.waiting.retain(|_, f| kept.contains(f));
         self.down.retain(|f, _| kept.contains(f));
         self.disrupted.retain(|f, _| kept.contains(f));
         self.manned.retain(|f| kept.contains(f));
@@ -360,6 +402,13 @@ impl PlanningLayer {
             Some(z) => c2.doctrine_over(unit, &z.doctrine),
             None => self.doctrine_for(c2, unit, at),
         }
+    }
+
+    /// Fuel a refuelling point has left; `None` = unlimited.
+    #[must_use]
+    pub fn fuel_left(&self, f: &Facility) -> Option<f64> {
+        f.fuel_t
+            .map(|t| (t - self.issued.get(&f.id).copied().unwrap_or(0.0)).max(0.0))
     }
 
     fn facility(&self, id: u32) -> Option<&Facility> {
@@ -878,36 +927,91 @@ fn choke_transits(world: &mut World, tick: Tick) {
     }
 }
 
-/// Mission-killed units on a mission go to the nearest port of their side that repairs; they
-/// stop there, and resume their mission once fully repaired.
-fn divert(world: &mut World, tick: Tick) {
-    let ports: Vec<Facility> = world
-        .resource::<PlanningLayer>()
-        .facilities
+/// Why a unit was sent to a facility.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DivertReason {
+    /// Mission-killed: repair, then resume.
+    #[default]
+    Repair,
+    /// Below bingo fuel: refuel, then resume.
+    Fuel,
+}
+
+/// Units diverted, with their facility (where it is now) and its radius, for holding alongside.
+fn diverted_now(world: &World) -> Vec<(UnitId, Entity, Facility, GeoPoint)> {
+    let layer = world.resource::<PlanningLayer>();
+    layer
+        .diverted
         .iter()
-        .filter(|f| f.kind != FacilityKind::CommandPost && f.services.repair)
-        .cloned()
-        .collect();
-    if ports.is_empty() {
+        .filter_map(|(id, d)| {
+            let f = layer.facility(d.facility)?.clone();
+            let at = post_position(world, &f)?;
+            let e = *world.resource::<UnitIndex>().0.get(id)?;
+            Some((*id, e, f, at))
+        })
+        .collect()
+}
+
+/// Every [`SERVICE_PERIOD_TICKS`]: mission-killed units on a mission go to the nearest port of
+/// their side that repairs, and units on a mission below bingo fuel go to the nearest refuelling
+/// point of their side with fuel left (an oiler's moving point included). They stop alongside (or
+/// keep company with an oiler), and resume their mission once repaired or full.
+fn divert(world: &mut World, tick: Tick) {
+    divert_for(world, tick, DivertReason::Repair);
+    divert_for(world, tick, DivertReason::Fuel);
+    hold_alongside(world, tick);
+}
+
+fn divert_for(world: &mut World, tick: Tick, reason: DivertReason) {
+    let points: Vec<(Facility, GeoPoint)> = {
+        let layer = world.resource::<PlanningLayer>();
+        layer
+            .facilities
+            .iter()
+            .filter(|f| f.kind != FacilityKind::CommandPost)
+            .filter(|f| match reason {
+                DivertReason::Repair => f.services.repair,
+                DivertReason::Fuel => f.services.refuel && layer.fuel_left(f) != Some(0.0),
+            })
+            .filter_map(|f| post_position(world, f).map(|p| (f.clone(), p)))
+            .collect()
+    };
+    if points.is_empty() {
         return;
     }
     let mut candidates: Vec<(UnitId, Entity, SideId, GeoPoint)> = world
-        .query::<(Entity, &Unit, &Position, &Health, &MissionState)>()
+        .query::<(
+            Entity,
+            &Unit,
+            &Position,
+            &Health,
+            &MissionState,
+            Option<&crate::fuel::Fuel>,
+        )>()
         .iter(world)
-        .filter(|(_, _, _, h, m)| h.status == Status::MissionKilled && m.mission.is_some())
-        .map(|(e, u, p, _, _)| (u.id, e, u.side, p.point))
+        .filter(|(_, _, _, h, m, fuel)| {
+            m.mission.is_some()
+                && match reason {
+                    DivertReason::Repair => h.status == Status::MissionKilled,
+                    DivertReason::Fuel => {
+                        h.status == Status::Operational && fuel.is_some_and(|f| f.low())
+                    }
+                }
+        })
+        .map(|(e, u, p, ..)| (u.id, e, u.side, p.point))
         .collect();
     candidates.sort_by_key(|c| c.0);
     for (id, e, side, at) in candidates {
         if world.resource::<PlanningLayer>().diverted.contains_key(&id) {
             continue;
         }
-        let Some(port) = ports
+        let Some((point, to)) = points
             .iter()
-            .filter(|f| f.side == side)
-            .min_by(|a, b| {
-                let da = sim_geo::inverse(at, a.position).distance_m;
-                let db = sim_geo::inverse(at, b.position).distance_m;
+            .filter(|(f, _)| f.side == side && f.unit != Some(id))
+            .min_by(|(a, pa), (b, pb)| {
+                let da = sim_geo::inverse(at, *pa).distance_m;
+                let db = sim_geo::inverse(at, *pb).distance_m;
                 da.total_cmp(&db).then(a.id.cmp(&b.id))
             })
             .cloned()
@@ -920,95 +1024,173 @@ fn divert(world: &mut World, tick: Tick) {
         world.resource_mut::<PlanningLayer>().diverted.insert(
             id,
             Diversion {
-                facility: port.id,
+                facility: point.id,
                 mission,
+                reason,
             },
         );
-        set_route(world, e, id, port.position, tick);
-        ensure_moving(world, e, 0.5);
-        world.resource_mut::<EventLog>().push(
-            tick,
-            SimEventKind::DivertedToPort {
+        set_route(world, e, id, to, tick);
+        ensure_moving(world, e, 0.7);
+        let kind = match reason {
+            DivertReason::Repair => SimEventKind::DivertedToPort {
                 unit: id,
-                facility: port.id,
+                facility: point.id,
             },
-        );
+            DivertReason::Fuel => SimEventKind::DivertedForFuel {
+                unit: id,
+                facility: point.id,
+            },
+        };
+        world.resource_mut::<EventLog>().push(tick, kind);
     }
-    // Diverted units that have arrived stop alongside.
-    let arrived: Vec<(UnitId, Entity)> = {
-        let layer = world.resource::<PlanningLayer>();
-        layer
-            .diverted
-            .iter()
-            .filter_map(|(id, d)| {
-                let f = layer.facility(d.facility)?;
-                let e = *world.resource::<UnitIndex>().0.get(id)?;
-                let at = world.get::<Position>(e)?.point;
-                (sim_geo::inverse(at, f.position).distance_m <= f.radius_m).then_some((*id, e))
-            })
-            .collect()
-    };
-    for (_, e) in arrived {
-        if let Some(mut k) = world.get_mut::<Kinematics>(e) {
-            k.ordered_speed_mps = 0.0;
-        }
-        if let Some(mut r) = world.get_mut::<Route>(e) {
-            r.waypoints.clear();
-            r.next = 0;
+}
+
+/// Diverted units that have arrived stop alongside a fixed facility, or keep company with an
+/// oiler: its speed, steering for a point 2 km ahead of it. Those not there yet steer for it.
+fn hold_alongside(world: &mut World, tick: Tick) {
+    for (id, e, f, at) in diverted_now(world) {
+        let Some(here) = world.get::<Position>(e).map(|p| p.point) else {
+            continue;
+        };
+        let near = sim_geo::inverse(here, at).distance_m <= f.radius_m;
+        let oiler = f
+            .unit
+            .and_then(|u| world.resource::<UnitIndex>().0.get(&u).copied())
+            .and_then(|o| world.get::<Kinematics>(o).copied());
+        match (near, oiler) {
+            (true, None) => {
+                if let Some(mut k) = world.get_mut::<Kinematics>(e) {
+                    k.ordered_speed_mps = 0.0;
+                }
+                if let Some(mut r) = world.get_mut::<Route>(e) {
+                    r.waypoints.clear();
+                    r.next = 0;
+                }
+            }
+            (true, Some(ok)) if ok.speed_mps <= ALONGSIDE_SPEED_MPS => {
+                if let Some(mut k) = world.get_mut::<Kinematics>(e) {
+                    k.ordered_speed_mps = 0.0;
+                }
+                if let Some(mut r) = world.get_mut::<Route>(e) {
+                    r.waypoints.clear();
+                    r.next = 0;
+                }
+            }
+            (true, Some(ok)) => {
+                let ahead = sim_geo::direct(at, ok.heading_deg, RAS_LEAD_M).point;
+                if let Some(mut r) = world.get_mut::<Route>(e) {
+                    r.waypoints = vec![ahead];
+                    r.next = 0;
+                }
+                if let Some(mut k) = world.get_mut::<Kinematics>(e) {
+                    k.ordered_speed_mps = ok.speed_mps.min(k.max_speed_mps);
+                }
+            }
+            (false, Some(_)) => {
+                set_route(world, e, id, at, tick);
+                ensure_moving(world, e, 0.7);
+            }
+            (false, None) => {}
         }
     }
 }
 
-fn serve(world: &mut World, tick: Tick) {
-    let facilities: Vec<Facility> = world
-        .resource::<PlanningLayer>()
-        .facilities
-        .iter()
-        .filter(|f| f.services.repair || f.services.rearm)
-        .cloned()
-        .collect();
-    // Units that could be alongside, in id order.
+/// Units alongside each facility this period, and those waiting for a berth.
+fn alongside(
+    world: &mut World,
+    facilities: &[(Facility, GeoPoint, Option<f64>)],
+) -> (BTreeMap<UnitId, (u32, Entity)>, BTreeMap<UnitId, u32>) {
     let mut units: Vec<(UnitId, Entity, SideId, GeoPoint, f64)> = world
         .query::<(Entity, &Unit, &Position, &Kinematics)>()
         .iter(world)
         .map(|(e, u, p, k)| (u.id, e, u.side, p.point, k.speed_mps))
         .collect();
     units.sort_by_key(|u| u.0);
-    let mut alongside: BTreeMap<UnitId, (u32, Entity, Services)> = BTreeMap::new();
-    for f in &facilities {
-        let mut served = 0u32;
-        for &(id, e, side, at, speed) in &units {
+    let mut served: BTreeMap<UnitId, (u32, Entity)> = BTreeMap::new();
+    let mut waiting: BTreeMap<UnitId, u32> = BTreeMap::new();
+    for (f, at, carrier_speed) in facilities {
+        let mut n = 0u32;
+        for &(id, e, side, here, speed) in &units {
+            // At a fixed facility a unit must be nearly stopped; alongside an oiler it must keep
+            // within 1 m/s of the oiler's speed.
+            let slow = match carrier_speed {
+                None => speed <= ALONGSIDE_SPEED_MPS,
+                Some(v) => (speed - v).abs() <= 1.0,
+            };
             if side != f.side
-                || speed > ALONGSIDE_SPEED_MPS
-                || alongside.contains_key(&id)
-                || sim_geo::inverse(f.position, at).distance_m > f.radius_m
+                || f.unit == Some(id)
+                || !slow
+                || served.contains_key(&id)
+                || sim_geo::inverse(*at, here).distance_m > f.radius_m
             {
                 continue;
             }
-            if f.berths > 0 && served >= f.berths {
-                break;
+            if f.berths > 0 && n >= f.berths {
+                waiting.entry(id).or_insert(f.id);
+                continue;
             }
-            served += 1;
-            alongside.insert(id, (f.id, e, f.services));
+            n += 1;
+            served.insert(id, (f.id, e));
+            waiting.remove(&id);
         }
     }
-    // Units that left (or whose facility changed) start again.
-    {
+    (served, waiting)
+}
+
+fn serve(world: &mut World, tick: Tick) {
+    let facilities: Vec<(Facility, GeoPoint, Option<f64>)> = world
+        .resource::<PlanningLayer>()
+        .facilities
+        .iter()
+        .filter(|f| f.services.repair || f.services.rearm || f.services.refuel)
+        .filter_map(|f| {
+            let at = post_position(world, f)?;
+            let carrier = f
+                .unit
+                .and_then(|u| world.resource::<UnitIndex>().0.get(&u).copied())
+                .and_then(|o| world.get::<Kinematics>(o))
+                .map(|k| k.speed_mps);
+            Some((f.clone(), at, carrier))
+        })
+        .collect();
+    let (alongside, waiting) = alongside(world, &facilities);
+    // Units that left (or whose facility changed) start again; newly waiting units are logged.
+    let newly_waiting: Vec<(UnitId, u32)> = {
         let mut layer = world.resource_mut::<PlanningLayer>();
         layer
             .service
             .retain(|id, s| alongside.get(id).is_some_and(|a| a.0 == s.facility));
-        for (id, (fac, _, _)) in &alongside {
+        for (id, (fac, _)) in &alongside {
             layer.service.entry(*id).or_insert(ServiceState {
                 facility: *fac,
                 since: tick,
                 rearmed: false,
+                refuelled: false,
             });
         }
+        let new: Vec<(UnitId, u32)> = waiting
+            .iter()
+            .filter(|(id, f)| layer.waiting.get(id) != Some(f))
+            .map(|(id, f)| (*id, *f))
+            .collect();
+        layer.waiting = waiting;
+        new
+    };
+    for (unit, facility) in newly_waiting {
+        world
+            .resource_mut::<EventLog>()
+            .push(tick, SimEventKind::WaitingForBerth { unit, facility });
     }
-    for (id, (fac, e, services)) in alongside {
+    for (id, (fac, e)) in alongside {
+        let Some((f, _, _)) = facilities.iter().find(|(f, _, _)| f.id == fac) else {
+            continue;
+        };
+        let services = f.services;
         if services.repair {
             repair(world, id, e, fac, tick);
+        }
+        if services.refuel {
+            refuel(world, id, e, f, tick);
         }
         if services.rearm {
             let due = world
@@ -1033,6 +1215,81 @@ fn serve(world: &mut World, tick: Tick) {
                     },
                 );
             }
+        }
+    }
+}
+
+/// One service period of fuel transfer: the facility's rate, up to the unit's capacity and the
+/// facility's stock. A unit filled up is logged and, if it was sent here for fuel, resumes.
+#[allow(clippy::cast_precision_loss)]
+fn refuel(world: &mut World, id: UnitId, e: Entity, f: &Facility, tick: Tick) {
+    let Some(fuel) = world.get::<crate::fuel::Fuel>(e).copied() else {
+        return;
+    };
+    let room = fuel.capacity_t - fuel.fuel_t;
+    if room <= 0.0 {
+        return;
+    }
+    let rate = f.transfer_t_per_h.unwrap_or(DEFAULT_TRANSFER_T_PER_H) / 3_600.0;
+    let left = world.resource::<PlanningLayer>().fuel_left(f);
+    let amount = room
+        .min(rate * SERVICE_PERIOD_TICKS as f64)
+        .min(left.unwrap_or(f64::INFINITY));
+    if amount <= 0.0 {
+        return;
+    }
+    if let Some(mut fl) = world.get_mut::<crate::fuel::Fuel>(e) {
+        fl.fuel_t = if amount >= room {
+            fl.capacity_t
+        } else {
+            fl.fuel_t + amount
+        };
+    }
+    *world
+        .resource_mut::<PlanningLayer>()
+        .issued
+        .entry(f.id)
+        .or_insert(0.0) += amount;
+    if amount < room {
+        return;
+    }
+    let first = world
+        .resource_mut::<PlanningLayer>()
+        .service
+        .get_mut(&id)
+        .is_some_and(|s| !std::mem::replace(&mut s.refuelled, true));
+    if !first {
+        return;
+    }
+    world.resource_mut::<EventLog>().push(
+        tick,
+        SimEventKind::UnitRefuelled {
+            unit: id,
+            facility: f.id,
+        },
+    );
+    resume(world, id, e, DivertReason::Fuel);
+}
+
+/// A unit sent to a facility for `reason` takes up its mission again: its route and speed are
+/// cleared, so the mission AI plans afresh.
+fn resume(world: &mut World, id: UnitId, e: Entity, reason: DivertReason) {
+    let mut layer = world.resource_mut::<PlanningLayer>();
+    if layer.diverted.get(&id).is_none_or(|d| d.reason != reason) {
+        return;
+    }
+    let resumed = layer.diverted.remove(&id);
+    if let Some(mission) = resumed.and_then(|d| d.mission) {
+        if let Some(mut m) = world.get_mut::<MissionState>(e) {
+            m.mission = Some(mission);
+            m.complete = false;
+        }
+        if let Some(mut r) = world.get_mut::<Route>(e) {
+            r.waypoints.clear();
+            r.next = 0;
+        }
+        if let Some(mut k) = world.get_mut::<Kinematics>(e) {
+            k.ordered_speed_mps = 0.0;
         }
     }
 }
@@ -1068,12 +1325,5 @@ fn repair(world: &mut World, id: UnitId, e: Entity, facility: u32, tick: Tick) {
     world
         .resource_mut::<EventLog>()
         .push(tick, SimEventKind::UnitRepaired { unit: id, facility });
-    // A unit sent here for repair takes up its mission again.
-    let resumed = world.resource_mut::<PlanningLayer>().diverted.remove(&id);
-    if let Some(mission) = resumed.and_then(|d| d.mission) {
-        if let Some(mut m) = world.get_mut::<MissionState>(e) {
-            m.mission = Some(mission);
-            m.complete = false;
-        }
-    }
+    resume(world, id, e, DivertReason::Repair);
 }

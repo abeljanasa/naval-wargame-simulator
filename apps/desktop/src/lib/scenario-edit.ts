@@ -7,7 +7,7 @@ import templates from "./event-templates.json";
 import { n } from "./format";
 
 export const SCENARIO_FORMAT = "nws-scenario";
-export const SCENARIO_FORMAT_VERSION = 5;
+export const SCENARIO_FORMAT_VERSION = 6;
 
 export interface DraftPosture {
   toward: number;
@@ -39,6 +39,8 @@ export interface DraftUnit {
   jammer?: unknown;
   mission?: Mission;
   reserve?: boolean;
+  /** Fraction of fuel at the start (scenarios with the fuel model). */
+  fuel_level?: number;
 }
 
 export interface DraftMinefield {
@@ -83,6 +85,10 @@ export interface DraftFacility {
   anti_jam_db?: number | null;
   /** Command posts: units that relay the post's traffic. */
   relays?: number[];
+  /** Refuelling: tonnes per hour (default 300). */
+  transfer_t_per_h?: number | null;
+  /** Refuelling: tonnes held; none = unlimited. */
+  fuel_t?: number | null;
 }
 
 export interface DraftDoctrine {
@@ -148,6 +154,8 @@ export interface DraftScenario {
   facilities?: DraftFacility[];
   zones?: DraftZone[];
   action_groups?: DraftActionGroup[];
+  /** Fuel model for ships and submarines (format 6). */
+  fuel?: boolean;
   [other: string]: unknown;
 }
 

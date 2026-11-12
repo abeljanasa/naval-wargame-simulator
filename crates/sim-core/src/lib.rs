@@ -16,6 +16,7 @@ mod detection;
 mod error;
 mod esm;
 mod events;
+mod fuel;
 mod hash;
 mod ids;
 mod mines;
@@ -57,14 +58,18 @@ pub use esm::{
     BearingRecord, BearingTable, BearingView, EmitterLibrary, BEARING_MAX_AGE_TICKS, JAMMER_EMITTER,
 };
 pub use events::{SimEvent, SimEventKind};
+pub use fuel::{
+    burn_t_per_s, Fuel, FuelSpec, DEFAULT_BINGO, FUEL_FRACTION_OF_DISPLACEMENT, HOTEL_FRACTION,
+};
 pub use hash::StateHash;
 pub use ids::{SideId, UnitId};
 pub use mines::{Minefield, Minefields, MINE_CHECK_PERIOD_TICKS};
 pub use optical::default_length_m;
 pub use planning::{
-    validate_planning, Diversion, Facility, FacilityKind, GapPolicy, Loadout, PlanningLayer,
-    QueuedOrder, ServiceState, Services, Zone, ZoneKind, ALONGSIDE_SPEED_MPS, DEFAULT_HANDOVER_S,
-    REARM_TICKS, REPAIR_FRACTION_PER_MIN, SERVICE_PERIOD_TICKS,
+    validate_planning, Diversion, DivertReason, Facility, FacilityKind, GapPolicy, Loadout,
+    PlanningLayer, QueuedOrder, ServiceState, Services, Zone, ZoneKind, ALONGSIDE_SPEED_MPS,
+    DEFAULT_HANDOVER_S, DEFAULT_TRANSFER_T_PER_H, RAS_LEAD_M, REARM_TICKS, REPAIR_FRACTION_PER_MIN,
+    SERVICE_PERIOD_TICKS,
 };
 pub use point_defence::{PointDefence, Shot};
 pub use rng::{RngStreams, StreamId};

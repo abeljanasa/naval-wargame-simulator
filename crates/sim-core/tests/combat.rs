@@ -124,6 +124,7 @@ fn unit(
                 .collect::<BTreeMap<_, _>>(),
             damage_profile: damage,
             mission: None,
+            fuel: None,
         }),
     )
 }
@@ -1127,6 +1128,8 @@ fn facility(
         antenna_m: None,
         anti_jam_db: None,
         relays: Vec::new(),
+        transfer_t_per_h: None,
+        fuel_t: None,
     }
 }
 
@@ -1877,4 +1880,189 @@ fn deep_submarines_and_knocked_out_comms_cannot_receive() {
     sim.step();
     assert_eq!(comms_of(&mut sim, 3).status, LinkStatus::Submerged);
     assert_eq!(comms_of(&mut sim, 1).status, LinkStatus::Up);
+}
+
+// ---- Fuel and refuelling (Phase 3 slice 11; docs/models/fuel.md) ----
+
+fn fuelled(mut c: Command, capacity_t: f64, endurance_m: f64, level: f64) -> Command {
+    if let CommandPayload::SpawnUnit(s) = &mut c.payload {
+        s.fuel = Some(FuelSpec {
+            capacity_t,
+            endurance_m,
+            cruise_mps: 10.0,
+            level,
+            bingo: None,
+        });
+    }
+    c
+}
+
+fn with_mission(mut c: Command, mission: Mission) -> Command {
+    if let CommandPayload::SpawnUnit(s) = &mut c.payload {
+        s.mission = Some(mission);
+    }
+    c
+}
+
+fn unit_view(sim: &mut Simulation, unit: u64) -> UnitView {
+    sim.snapshot(Viewer::WhiteCell)
+        .units
+        .into_iter()
+        .find(|u| u.id == UnitId(unit))
+        .unwrap()
+}
+
+fn fired(sim: &Simulation, f: impl Fn(&SimEventKind) -> bool) -> Vec<u64> {
+    sim.events()
+        .iter()
+        .filter(|e| f(&e.kind))
+        .map(|e| e.tick.0)
+        .collect()
+}
+
+#[test]
+fn fuel_burns_by_speed_and_a_dry_ship_coasts_to_a_stop() {
+    // 1 t for 10 km at a 10 m/s cruise: 0.001 t/s at cruise, so empty after 1 000 s.
+    let mut sim = Simulation::new(1);
+    let mut c = fuelled(unit(1, 1, ORIGIN, vec![], &[], None), 1.0, 10_000.0, 1.0);
+    if let CommandPayload::SpawnUnit(s) = &mut c.payload {
+        s.speed_mps = 10.0;
+    }
+    sim.submit(c).unwrap();
+    sim.run_ticks(500);
+    let f = unit_view(&mut sim, 1).fuel_fraction.unwrap();
+    assert!((f - 0.5).abs() < 1e-9, "{f}");
+    sim.run_until(Tick(1_001));
+    let dry = fired(&sim, |k| matches!(k, SimEventKind::FuelExhausted { .. }));
+    assert_eq!(dry.len(), 1);
+    assert!((998..=1_000).contains(&dry[0]), "{dry:?}");
+    // It decelerates at 0.1 m/s² from 10 m/s: stopped 100 s later, its order kept.
+    sim.run_until(Tick(1_150));
+    let u = unit_view(&mut sim, 1);
+    assert_eq!(u.speed_mps, 0.0);
+    assert_eq!(u.ordered_speed_mps, 10.0);
+    assert_eq!(u.fuel_fraction, Some(0.0));
+}
+
+#[test]
+fn below_bingo_a_unit_refuels_at_the_nearest_depot_and_resumes_its_mission() {
+    let mut depot = facility(
+        1,
+        FacilityKind::RefuellingPoint,
+        direct(ORIGIN, 0.0, 5_000.0).point,
+        Services {
+            refuel: true,
+            ..Services::default()
+        },
+        0,
+    );
+    depot.transfer_t_per_h = Some(3_600.0); // 60 t a service period
+    depot.fuel_t = Some(1_000.0);
+    let patrol = Mission::Patrol {
+        centre: ORIGIN,
+        radius_m: 1_000.0,
+    };
+    let mut sim = Simulation::new(1);
+    sim.submit(planning(vec![depot], vec![])).unwrap();
+    // 100 t at 20 %: below the 30 % bingo.
+    sim.submit(with_mission(
+        fuelled(unit(1, 1, ORIGIN, vec![], &[], None), 100.0, 1.0e9, 0.2),
+        patrol.clone(),
+    ))
+    .unwrap();
+    sim.run_until(Tick(1_800));
+    let diverted = fired(
+        &sim,
+        |k| matches!(k, SimEventKind::DivertedForFuel { unit, facility: 1 } if *unit == UnitId(1)),
+    );
+    assert_eq!(diverted, vec![0], "checked every 60 s, from tick 0");
+    let full = fired(&sim, |k| matches!(k, SimEventKind::UnitRefuelled { .. }));
+    assert_eq!(full.len(), 1, "refuelled once");
+    let u = unit_view(&mut sim, 1);
+    assert_eq!(u.mission, Some(patrol), "mission resumed");
+    assert!(u.fuel_fraction.unwrap() > 0.999);
+    // About 80 t issued (20 % → 100 %, plus what it burned on the way).
+    let save = sim.save();
+    let issued = save.planning.issued[&1];
+    assert!((80.0..81.0).contains(&issued), "{issued}");
+}
+
+#[test]
+fn an_oiler_under_way_refuels_one_ship_at_a_time_and_the_other_waits() {
+    // Oiler (unit 5) steaming north at 6 m/s, one berth; two ships at 20 % 3 km astern.
+    let mut ras = facility(
+        1,
+        FacilityKind::RefuellingPoint,
+        ORIGIN,
+        Services {
+            refuel: true,
+            ..Services::default()
+        },
+        1,
+    );
+    ras.unit = Some(UnitId(5));
+    ras.radius_m = 1_500.0;
+    ras.transfer_t_per_h = Some(3_600.0);
+    let mut sim = Simulation::new(1);
+    sim.submit(planning(vec![ras], vec![])).unwrap();
+    let mut oiler = unit(5, 1, ORIGIN, vec![], &[], None);
+    if let CommandPayload::SpawnUnit(s) = &mut oiler.payload {
+        s.speed_mps = 6.0;
+        s.route = vec![direct(ORIGIN, 0.0, 200_000.0).point];
+    }
+    sim.submit(oiler).unwrap();
+    let astern = direct(ORIGIN, 180.0, 3_000.0).point;
+    for id in [3, 4] {
+        let at = direct(astern, 90.0, f64::from(id as u32 - 3) * 300.0).point;
+        sim.submit(with_mission(
+            fuelled(unit(id, 1, at, vec![], &[], None), 100.0, 1.0e9, 0.2),
+            Mission::Ferry {
+                destination: direct(ORIGIN, 0.0, 300_000.0).point,
+            },
+        ))
+        .unwrap();
+    }
+    sim.run_until(Tick(3_600));
+    let refuelled: Vec<(u64, UnitId)> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::UnitRefuelled { unit, facility: 1 } => Some((e.tick.0, unit)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(refuelled.len(), 2, "{refuelled:?}");
+    assert_eq!(refuelled[0].1, UnitId(3), "lowest id first");
+    assert!(refuelled[0].0 < refuelled[1].0);
+    let waited = fired(
+        &sim,
+        |k| matches!(k, SimEventKind::WaitingForBerth { unit, .. } if *unit == UnitId(4)),
+    );
+    assert!(!waited.is_empty());
+    // Both under way the whole time, at the oiler's speed.
+    let u3 = unit_view(&mut sim, 3);
+    assert!(u3.speed_mps > 5.0, "{}", u3.speed_mps);
+}
+
+#[test]
+fn fuel_survives_save_and_resume() {
+    let build = || {
+        let mut sim = Simulation::new(7);
+        let mut c = fuelled(unit(1, 1, ORIGIN, vec![], &[], None), 5.0, 50_000.0, 0.9);
+        if let CommandPayload::SpawnUnit(s) = &mut c.payload {
+            s.speed_mps = 12.0;
+        }
+        sim.submit(c).unwrap();
+        sim
+    };
+    let mut a = build();
+    a.run_ticks(300);
+    let mut b = Simulation::from_save(a.save()).unwrap();
+    a.run_ticks(300);
+    b.run_ticks(300);
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert_eq!(
+        unit_view(&mut a, 1).fuel_fraction,
+        unit_view(&mut b, 1).fuel_fraction
+    );
 }

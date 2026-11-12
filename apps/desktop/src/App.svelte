@@ -443,6 +443,12 @@
             <dt>Comms</dt>
             <dd class:hurt={c.status !== "up"}>{commsText(c)}</dd>
           {/each}
+          {#if u.fuel_fraction != null}
+            <dt>Fuel</dt>
+            <dd class:hurt={u.fuel_fraction < 0.3}>
+              {Math.round(u.fuel_fraction * 100)} %{u.fuel_fraction <= 0 ? " · no propulsion" : ""}
+            </dd>
+          {/if}
           <dt>Mission</dt>
           <dd>
             {u.mission ? missionText(u.mission) : "none"}{u.mission_complete ? " (complete)" : ""}

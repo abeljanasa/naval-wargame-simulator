@@ -69,6 +69,8 @@ pub struct UnitView {
     pub stores: Vec<StoreView>,
     pub mission: Option<Mission>,
     pub mission_complete: bool,
+    /// Fraction of fuel left, for units with a fuel model.
+    pub fuel_fraction: Option<f64>,
 }
 
 /// Rounds of one weapon carried.

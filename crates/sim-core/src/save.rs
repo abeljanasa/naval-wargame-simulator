@@ -58,7 +58,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   Older saves load with no planning layer, and each unit's loadout taken from its state.
 /// * 18: command posts gain comms-link fields (line of sight, antenna, anti-jam margin, relays)
 ///   and the planning layer records disrupted posts. Older saves load with the defaults.
-pub const SAVE_FORMAT_VERSION: u32 = 18;
+/// * 19: unit fuel, and the planning layer's issued fuel, waiting units and diversion reasons.
+///   Older saves load with none.
+pub const SAVE_FORMAT_VERSION: u32 = 19;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,6 +86,9 @@ pub struct UnitRecord {
     /// `None` in saves before format 17.
     #[serde(default)]
     pub loadout: Option<crate::planning::Loadout>,
+    /// `None` for units without a fuel model, and in saves before format 19.
+    #[serde(default)]
+    pub fuel: Option<crate::fuel::Fuel>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

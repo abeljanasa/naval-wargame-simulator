@@ -250,10 +250,11 @@ impl Simulation {
             &Health,
             &MissionState,
             Option<&Loadout>,
+            Option<&crate::fuel::Fuel>,
         )>();
         let mut v: Vec<UnitRecord> = q
             .iter(&self.world)
-            .map(|(u, p, k, r, s, sig, j, m, hl, ms, lo)| UnitRecord {
+            .map(|(u, p, k, r, s, sig, j, m, hl, ms, lo, fu)| UnitRecord {
                 unit: u.clone(),
                 position: *p,
                 kinematics: *k,
@@ -265,6 +266,7 @@ impl Simulation {
                 health: Some(hl.clone()),
                 mission: ms.clone(),
                 loadout: lo.cloned(),
+                fuel: fu.copied(),
             })
             .collect();
         v.sort_by_key(|r| r.unit.id);
@@ -308,6 +310,7 @@ impl Simulation {
                     flooding: r.health.as_ref().is_some_and(|h| h.flooding),
                     mission: r.mission.mission.clone(),
                     mission_complete: r.mission.complete,
+                    fuel_fraction: r.fuel.map(|f| f.fraction()),
                     stores: r
                         .magazine
                         .0
@@ -534,6 +537,14 @@ impl Simulation {
                 h.u8(u8::from(s.active));
             }
             h.opt_f64(r.jammer.map(|j| j.jn_db_at_1km));
+            // Hashed only when present, so units without fuel keep their hashes.
+            if let Some(f) = &r.fuel {
+                h.f64(f.capacity_t);
+                h.f64(f.endurance_m);
+                h.f64(f.cruise_mps);
+                h.f64(f.fuel_t);
+                h.f64(f.bingo);
+            }
         }
         let catalog = self.world.resource::<WeaponCatalog>();
         h.u64(catalog.0.len() as u64);
@@ -824,6 +835,7 @@ impl Simulation {
                 max_speed_mps: r.kinematics.max_speed_mps,
                 stores: r.magazine.0.clone(),
             });
+            let fuel = r.fuel;
             let e = sim
                 .world
                 .spawn((
@@ -840,6 +852,9 @@ impl Simulation {
                     loadout,
                 ))
                 .id();
+            if let Some(f) = fuel {
+                sim.world.entity_mut(e).insert(f);
+            }
             if index.insert(id, e).is_some() {
                 return Err(SimError::CorruptSave(format!("duplicate unit {id}")));
             }
@@ -1260,6 +1275,11 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             },
         ))
         .id();
+    if let Some(f) = &s.fuel {
+        world
+            .entity_mut(entity)
+            .insert(crate::fuel::Fuel::from_spec(f));
+    }
     world.resource_mut::<UnitIndex>().0.insert(s.id, entity);
     world
         .resource_mut::<EventLog>()

@@ -120,6 +120,9 @@ pub struct UnitSpawn {
     /// Mission at start, if any.
     #[serde(default)]
     pub mission: Option<Mission>,
+    /// Fuel, for ships and submarines in scenarios with the fuel model (`docs/models/fuel.md`).
+    #[serde(default)]
+    pub fuel: Option<crate::fuel::FuelSpec>,
 }
 
 /// One emitter type and the platform classes known to carry it.
@@ -309,6 +312,9 @@ impl CommandPayload {
                 }
                 if let Some(m) = &s.mission {
                     m.validate()?;
+                }
+                if let Some(f) = &s.fuel {
+                    f.validate()?;
                 }
                 if s.length_m.is_some_and(|l| !(l.is_finite() && l >= 0.0)) {
                     return Err("length_m must be finite and >= 0".into());

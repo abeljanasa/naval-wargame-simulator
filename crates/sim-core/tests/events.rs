@@ -41,6 +41,7 @@ fn spawn(id: u64, side: u16, at: GeoPoint, speed_mps: f64, route: Vec<GeoPoint>)
         stores: Default::default(),
         damage_profile: None,
         mission: None,
+        fuel: None,
     }
 }
 
