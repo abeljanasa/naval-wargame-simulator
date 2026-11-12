@@ -9,7 +9,7 @@ The last Gate 3 criterion: **a navy staff runs a TTX on the release build** (mas
 **Objectives:**
 1. Install the signed release on the exercise machines, air-gapped.
 2. Run a multi-seat exercise: a white cell, Blue and Red seats, injects and at least one override.
-3. Use the planning layer: command posts, a choke point with sense and engage zones, a surface action group.
+3. Use the planning layer: command posts and comms, a choke point with sense and engage zones, a surface action group, fuel and an oiler, mines and mine clearing, an anchorage.
 4. Debrief from the replay and AAR tables, and keep the exercise record.
 5. Collect what the staff needs changed before release 1.0 is accepted.
 
@@ -32,20 +32,41 @@ The last Gate 3 criterion: **a navy staff runs a TTX on the release build** (mas
 
 ## 4. Scenario
 
-Primary: `data/scenarios/phase3-planning-demo.json`, *Choke point planning*. It runs 3 hours of game time, about 60 minutes of play at 3–5× with pauses.
+Primary: `data/scenarios/phase3-pilot.json`, *Kent passage pilot*. It uses the whole planning layer in one exercise:
+- comms with jamming, a relay and a handover;
+- fuel, with an oiler;
+- minelaying and mine clearing;
+- barrier-patrol, denial and cargo missions;
+- an anchorage;
+- dusk;
+- a gale.
 
-| Game time | Decision point | White-cell action |
+It runs 4 hours of game time, about 75 minutes of play at 4–6× with pauses. Its seats are **White cell**, **Blue command** and **Red command**.
+
+The times below are from the reference run (seed 20261113, no player orders); `pilot_scenario_reaches_every_decision_point` checks that every decision point still happens, in this order. Player orders and white-cell rulings move them.
+
+| Game time | What happens | White-cell action |
 |---|---|---|
-| 00:00 | STARTEX, postures unfriendly, weapons tight outside the engage zone | Brief; open seat windows |
-| ~00:15 | Red enters the choke point (logged transit) | Inject: intelligence report |
-| ~00:30 | Blue sense-zone alert on the first Red corvette | Pause; Blue reports |
-| ~01:00 | Second alert; Red closes the engage zone | Optional: close the engage zone (**Zone rules**, weapons safe) and ask Blue for a decision |
-| ~01:25 | First engagements in the engage zone | Decide hit or miss on a contested missile (**Hit** or **Miss**, with a reason) |
-| ~01:50 | The corvette in the passage fires as the zone's assigned shooter | — |
-| any | Optional: the flagship is lost (**Destroy**, reason "inject: mine strike") | Watch command pass to the maritime HQ after 5 minutes; Blue orders in the gap are queued |
-| end | ENDEX | **Save record**; replay and AAR |
+| 00:00 | STARTEX. Postures unfriendly, weapons tight outside the engage zone. The patrol vessel *Warden* is below bingo fuel and diverts to the oiler | Brief; open the seat windows; point Blue at the fuel state in the unit panel |
+| 00:10 | Inject *Minelayer sighted* (automatic) | Watch whether Blue protects or redirects the MCM vessel *Sieve* |
+| ~00:15–00:35 | The Red corvettes enter the Kent passage (logged); sense-zone alerts | Pause; Blue reports |
+| 00:49 | The supply ship *Tally* loads 800 t at Refuge Cove | — |
+| ~00:55 | Dusk (sunset): optical sensors lose range; night shading on the map | — |
+| 01:10 | The Red landing ship *Ember* lays 12 mines on the eastern approach, where *Sieve* is sweeping | Ask Blue what it knows: the field is not in Blue's picture |
+| ~01:30 | Red inside the engage zone | Send *Jamming warning* (i02). Decide hit or miss on a contested missile (**Hit** or **Miss**, with a reason) |
+| ~01:45 | The flagship net is jammed by *Cinder*: command post down; the maritime HQ takes over after 5 minutes; Blue orders in the gap are queued | Show **Command posts** in the console; ask Blue how it would restore the net |
+| ~01:50–02:10 | Both Red corvettes sunk in the engage zone; the flagship net comes back | Optional: *Media report* (i04) |
+| 02:20 | *Warden* refuelled; back on its denial patrol | — |
+| 02:30 | Inject *Gale warning* (automatic) | — |
+| 02:40 | Sea state 5: *Sieve* (under 60 m) runs for shelter at Refuge Cove, through the approach Red has mined | Decision point: let it go, hold it with a new order, or rule on a mine strike (in the reference run it strikes a mine at 02:46) |
+| 03:07 | *Tally* delivers its cargo, then waits: the anchorage is closed above sea state 4 | — |
+| 03:20 | Gale eases; *Tally* goes to the staging anchorage | — |
+| any | Optional: the flagship is lost (**Destroy**, reason "inject: mine strike") | Watch command pass to the maritime HQ after 5 minutes |
+| 04:00 | ENDEX | **Save record**; replay and AAR |
 
-Back-up: `data/scenarios/phase3-ttx-demo.json` (escalation with scripted events and injects).
+Back-ups:
+- `data/scenarios/phase3-planning-demo.json` (*Choke point planning*): the same passage, smaller, with no fuel, comms jamming or weather. Use it if the staff has less than an hour.
+- `data/scenarios/phase3-ttx-demo.json`: an escalation exercise with scripted events and injects.
 
 ## 5. Timeline (one day)
 
@@ -92,7 +113,7 @@ Non-critical issues go to the backlog with the Phase 4 plan.
 | Installers unsigned (no certificates yet) | Pilot with signed builds only. If the panel agrees, a supervised unsigned run is an option, recorded as such. |
 | Exercise machine below specification | Check against the user manual a week before; bring the spare. |
 | Staff unfamiliar with the controls | Familiarisation session; the user manual at each seat; keyboard shortcuts on one page. |
-| A P1 gap blocks a staff decision (fuel, comms) | White-cell adjudication covers it (move, repair, set stores), with a reason. Record each case as a requirement. |
+| A staff decision needs something the build does not model (air operations, bathymetry) | White-cell adjudication covers it (move, repair, set stores), with a reason. Record each case as a requirement. |
 | Crash during play | Save a record at each pause: **Save record** keeps the exercise so far. Reopen it on the spare to review; for a restart, reload the scenario and re-issue orders from the record's timeline. |
 
 ## 9. After the pilot

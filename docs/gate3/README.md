@@ -3,9 +3,10 @@
 Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** This page maps each part of the definition of done to its evidence, and lists what is still open, so the review panel can decide.
 
 - **Branch:** `phase-3/ttx-release` (PR #3). Plan: [docs/plan/phase-3.md](../plan/phase-3.md).
-- **Status (2026-11-12):** all seventeen Phase 3 slices are built.
+- **Status (2026-11-12):** all nineteen Phase 3 slices are built.
   - **Slices 1–9:** the TTX release.
   - **Slices 10–17:** close the in-phase P1 gaps the first version of this pack listed.
+  - **Slices 18–19:** this pack brought up to date, and a pilot scenario that uses the whole planning layer.
   - **Moved to Phase 4 at the client's choice (2026-11-12),** because they need outside data or a Phase 4 subsystem (§7 below):
     - satellite imagery;
     - terrain and bathymetry data, and what depends on them;
@@ -24,7 +25,7 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
 | A white cell can run a multi-seat exercise with injects, overrides and AAR | [white-cell manual](../manuals/white-cell-manual.md); models: [multi-seat](../models/multi-seat.md), [injects](../models/injects.md), [adjudication](../models/adjudication.md), [replay-aar](../models/replay-aar.md); host tests and e2e | **Done**, now with live planning-layer edits (slice 17) |
 | Signed installers for Windows, macOS and Linux | Release workflow (`.github/workflows/release.yml`); macOS re-enabled; [releasing.md](../build/releasing.md) | **Waiting for the client's certificates.** Installers build unsigned until the Actions secrets are set. Linux packages ship with SHA-256 sums. |
 | Installers run air-gapped | [air-gapped.md](../build/air-gapped.md): Phase 1 Windows bundle built and run with networking blocked; the app makes no network calls | **To repeat** on the release build, on a disconnected machine, for all three OSes |
-| All CI checks are green | PR #3 checks (Windows, Linux, macOS) | To confirm on the push of slices 10–18 |
+| All CI checks are green | PR #3 checks (Windows, Linux, macOS) | **Green** on the push of slices 10–18 and the desktop layout (2026-11-12) |
 | Manuals are complete | [User manual](../manuals/user-manual.md), [white-cell manual](../manuals/white-cell-manual.md), [scripting reference](../manuals/scripting-reference.md) (examples checked by `sim-scenario/tests/docs.rs`) | **Done**, updated for slices 10–17 (review at the pilot) |
 | A navy staff has run a TTX pilot on the release build | [TTX pilot plan](ttx-pilot-plan.md) | **Planned**: needs the client's staff and the signed build |
 
@@ -75,7 +76,8 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
 | 15 Weapons as sensor targets | [DL-0034](../design-log/DL-0034-weapon-tracks.md) | [weapons-damage.md](../models/weapons-damage.md) | `0808fa2` |
 | 16 Action groups in the core | [DL-0035](../design-log/DL-0035-action-groups.md) | [planning-layer.md](../models/planning-layer.md) | `5aaea45` |
 | 17 Editing and facilitation | [DL-0036](../design-log/DL-0036-desktop-facilitation.md) | [scenario-editor.md](../models/scenario-editor.md) | `cb7bdbb` |
-| 18 Pack update | — | this page, the manuals, the backlog | this commit |
+| 18 Pack update | — | this page, the manuals, the backlog | `3846541` |
+| 19 Pilot scenario | — | [ttx-pilot-plan.md](ttx-pilot-plan.md) §4 | this commit |
 
 ## Whole-system checks
 
@@ -83,6 +85,7 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
 |---|---|
 | `every_scenario_is_deterministic_per_seed`, golden replays, CI determinism matrix | Every shipped scenario gives identical hashes on every OS. The planning demonstrator's golden was re-blessed in slices 10, 11, 13, 14 and 16, each time with its timeline checked (the reasons are in each design log) |
 | `ttx_demo_*` (sim-scenario) and `ttx_demo_timeline_shows_events` (sim-aar) | The TTX demonstrator's events fire once each; the AAR shows them |
+| `pilot_scenario_reaches_every_decision_point` (sim-aar), `a_clean_scenario_has_only_warnings_and_builds` | The pilot scenario reaches every decision point of the pilot plan in order, replays exactly, and has no editor warnings |
 | `record_round_trips_and_replays_exactly`, `seeking_matches_a_straight_run`, `a_tampered_record_is_reported` | Records replay exactly; the scrubber matches a straight run; tampering is caught |
 | `report_accounts_for_every_shot_and_loss` | The AAR counts every launch, hit, intercept and loss |
 | `planning_layer_and_action_groups_load_build_and_hold_station`, planning tests in `sim-core/tests/combat.rs` | Every planning behaviour, by hand-checkable scenarios: comms, fuel, missions, anchorages and weather, coverage, weapon tracks, action groups (52 engine tests in that file) |

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 19: pilot scenario)
+
+- **`data/scenarios/phase3-pilot.json`**, *Kent passage pilot*: the Gate 3 pilot exercise, with three seats, four injects and eight events. It uses:
+  - comms jamming of the flagship net, with a relay and a handover to the HQ ashore;
+  - fuel, with an oiler that refuels a patrol vessel below bingo;
+  - Red minelaying and Blue mine clearing on the eastern approach;
+  - barrier-patrol, denial and cargo missions;
+  - a staging anchorage with a sea-state limit, dusk, and a gale that sends small craft to shelter.
+- **Golden replay** for it. The existing golden hashes are unchanged.
+- **Tests:** `pilot_scenario_reaches_every_decision_point` checks the pilot plan's decision points in order. The clean-scenario check now covers both planning scenarios.
+- **Pilot plan** §4 rewritten around it. The planning demonstrator is now the short back-up.
+
 ### Changed (desktop layout)
 
 - **Menu bar** (File, View, Exercise, Help) for occasional actions. The platform database opens in a dialog.

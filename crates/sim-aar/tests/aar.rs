@@ -267,3 +267,40 @@ fn ttx_demo_timeline_shows_events() {
         .count();
     assert_eq!(fired, 1);
 }
+
+/// The Gate 3 pilot scenario reaches every decision point its pilot plan relies on
+/// (docs/gate3/ttx-pilot-plan.md §4), in the order the plan gives them.
+#[test]
+fn pilot_scenario_reaches_every_decision_point() {
+    let (s, text) = load("phase3-pilot.json");
+    let db = sim_db::embedded::open_platform_db().unwrap();
+    let mut sim = s.build(None, &db).unwrap();
+    sim.run_until(s.duration_ticks());
+    let record = ExerciseRecord::capture(&mut sim, &s.name, &text);
+    let replay = Replay::open(record, &sides(&s)).unwrap();
+    assert!(replay.verified());
+    let timeline = &replay.report().timeline;
+    let first = |needle: &str| {
+        timeline
+            .iter()
+            .position(|e| e.text.contains(needle))
+            .unwrap_or_else(|| panic!("no timeline entry contains {needle:?}"))
+    };
+    let order = [
+        "Warden diverted to facility 4 to refuel",
+        "Tally loaded 800 t of cargo",
+        "Ember laid 12 mines",
+        "event e04-engage-zone fired",
+        "command post 6 is down: link jammed",
+        "Cinder destroyed",
+        "command post 6 is back up",
+        "Warden refuelled at facility 4",
+        "event e06-gale fired",
+        "Sieve sheltering from the weather",
+        "Tally delivered 800 t of cargo",
+        "event e07-gale-eases fired",
+        "Tally holding at anchorage 3",
+    ];
+    let at: Vec<usize> = order.iter().map(|n| first(n)).collect();
+    assert!(at.windows(2).all(|w| w[0] <= w[1]), "out of order: {at:?}");
+}
