@@ -70,7 +70,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [ ] Rerun the map and engine benchmarks on the actual reference laptop at the Gate 1 review.
 - [x] Full Windows desktop bundle built from vendored sources with every network path blocked (docs/build/air-gapped.md).
 - [x] Offline install on a physically disconnected Windows machine, with the signed release (2026-11-12).
-- [ ] The same on macOS (Apple Silicon). Linux is no longer a target (ADR-0006).
+- [ ] The same on macOS (Apple Silicon). Skipped for Gate 3 by the client's decision (2026-11-12); run it if the panel asks. Linux is no longer a target (ADR-0006).
 - [x] npm licence audit of production dependencies (`npm run licenses`, in CI). 52 packages, 0 rejected.
 - [x] A basic detection model for Gate 1: the interim radar model (DL-0006).
 - [x] Desktop app shows contacts: covered by the end-to-end smoke test (Contacts panel) and engine tests.
