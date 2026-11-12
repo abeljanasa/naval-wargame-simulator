@@ -56,7 +56,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 16: hit rolls record the firing unit and side. Older saves load with neither.
 /// * 17: adds the planning layer (facilities, zones, units being served) and unit loadouts.
 ///   Older saves load with no planning layer, and each unit's loadout taken from its state.
-pub const SAVE_FORMAT_VERSION: u32 = 17;
+/// * 18: command posts gain comms-link fields (line of sight, antenna, anti-jam margin, relays)
+///   and the planning layer records disrupted posts. Older saves load with the defaults.
+pub const SAVE_FORMAT_VERSION: u32 = 18;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]

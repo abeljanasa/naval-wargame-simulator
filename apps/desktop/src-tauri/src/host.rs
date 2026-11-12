@@ -14,10 +14,10 @@
 use serde::{Deserialize, Serialize};
 use sim_aar::{AarReport, AarTable, ExerciseRecord, Replay};
 use sim_core::{
-    Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, ContactView, Doctrine,
-    DoctrineScope, Environment, EventStatus, Facilitation, GeoPoint, InjectStatus, Issuer, Message,
-    Minefield, Mission, Seat, SeatRole, SideId, SimEventKind, Simulation, Snapshot, Tick, UnitId,
-    UnitView, Viewer, WeaponView,
+    Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, CommsView, ContactView,
+    Doctrine, DoctrineScope, Environment, EventStatus, Facilitation, GeoPoint, InjectStatus,
+    Issuer, Message, Minefield, Mission, PostView, Seat, SeatRole, SideId, SimEventKind,
+    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponView,
 };
 use sim_scenario::Scenario;
 use std::collections::{BTreeMap, BTreeSet};
@@ -85,6 +85,10 @@ pub struct SnapshotUpdate {
     pub injects: Vec<InjectStatus>,
     /// White cell only: every scenario event's state.
     pub scenario_events: Vec<EventStatus>,
+    /// The comms link of each of the viewer's units (when its side has command posts).
+    pub comms: Vec<CommsView>,
+    /// The viewer's command posts and whether each is up.
+    pub posts: Vec<PostView>,
 }
 
 /// Clock status sent with every frame.
@@ -930,6 +934,8 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
         messages: snap.messages.clone(),
         injects: snap.injects.clone(),
         scenario_events: snap.scenario_events.clone(),
+        comms: snap.comms.clone(),
+        posts: snap.posts.clone(),
     }
 }
 

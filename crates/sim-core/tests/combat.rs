@@ -1123,6 +1123,10 @@ fn facility(
         alternate: None,
         handover_s: DEFAULT_HANDOVER_S,
         orders_in_gap: GapPolicy::Lose,
+        line_of_sight: false,
+        antenna_m: None,
+        anti_jam_db: None,
+        relays: Vec::new(),
     }
 }
 
@@ -1288,7 +1292,10 @@ fn command_posts_limit_player_orders_to_units_in_range() {
     sim.step();
     let r = rejected(&sim);
     assert_eq!(r.len(), 1, "the white cell is not limited: {r:?}");
-    assert!(r[0].contains("out of range of every command post"));
+    assert!(
+        r[0].contains("cannot be reached from F1: out of range"),
+        "{r:?}"
+    );
 }
 
 #[test]
@@ -1694,4 +1701,180 @@ fn a_mission_killed_unit_diverts_to_port_is_repaired_and_resumes_its_mission() {
     let u1 = save.units.iter().find(|r| r.unit.id == UnitId(1)).unwrap();
     assert_eq!(u1.mission.mission, Some(patrol));
     assert!(save.planning.diverted.is_empty());
+}
+
+// ---- Comms links (Phase 3 slice 10; docs/models/comms.md) ----
+
+fn post(id: u32, at: GeoPoint, range_m: f64) -> Facility {
+    let mut f = facility(id, FacilityKind::CommandPost, at, Services::default(), 0);
+    f.range_m = Some(range_m);
+    f
+}
+
+fn comms_of(sim: &mut Simulation, unit: u64) -> CommsView {
+    sim.snapshot(Viewer::Side { side: SideId(1) })
+        .comms
+        .into_iter()
+        .find(|c| c.unit == UnitId(unit))
+        .unwrap()
+}
+
+fn with_jammer(mut c: Command, jn_db_at_1km: f64) -> Command {
+    if let CommandPayload::SpawnUnit(s) = &mut c.payload {
+        s.jammer = Some(JammerSpec { jn_db_at_1km });
+    }
+    c
+}
+
+#[test]
+fn a_line_of_sight_post_reaches_only_inside_the_radio_horizon_or_through_a_relay() {
+    // Post ashore (30 m antenna) 60 km north of unit 1 (25 m mast): horizon
+    // 4.12 km × (√30 + √25) = 43.2 km, so the direct link fails.
+    let at = direct(ORIGIN, 0.0, 60_000.0).point;
+    let mut los = post(1, at, 200_000.0);
+    los.line_of_sight = true;
+    let mut sim = planned_scene(30_000.0, vec![los.clone()], vec![]);
+    let c = comms_of(&mut sim, 1);
+    assert_eq!(c.status, LinkStatus::BeyondHorizon);
+    sim.submit(speed_order(1, 1)).unwrap();
+    sim.step();
+    let r = rejected(&sim);
+    assert!(
+        r.last().unwrap().contains("beyond the radio horizon"),
+        "{r:?}"
+    );
+
+    // The default link (HF or satellite) is not horizon-limited.
+    let mut sim = planned_scene(30_000.0, vec![post(1, at, 200_000.0)], vec![]);
+    assert_eq!(comms_of(&mut sim, 1).status, LinkStatus::Up);
+
+    // A relay 30 km north is within 43 km of both: the order goes through it.
+    los.relays = vec![UnitId(3)];
+    let mut sim = planned_scene(30_000.0, vec![los], vec![]);
+    let mut relay = unit(3, 1, direct(ORIGIN, 0.0, 30_000.0).point, vec![], &[], None);
+    relay.tick = Tick(1);
+    sim.submit(relay).unwrap();
+    sim.step();
+    let c = comms_of(&mut sim, 1);
+    assert_eq!((c.status, c.via), (LinkStatus::Up, Some(UnitId(3))));
+    sim.submit(speed_order(2, 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim).is_empty(), "{:?}", rejected(&sim));
+}
+
+#[test]
+fn jamming_cuts_links_and_a_jammed_post_hands_over_then_comes_back() {
+    // Blue post 100 km north of unit 1; a red jammer (60 dB at 1 km) 30 km east of unit 1.
+    // J/S at unit 1 = 60 − 60 − 10 + 20·log10(100 / 30) = +0.46 dB: jammed.
+    let at = direct(ORIGIN, 0.0, 100_000.0).point;
+    let mut sim = Simulation::new(1);
+    sim.submit(planning(vec![post(1, at, 150_000.0)], vec![]))
+        .unwrap();
+    sim.submit(unit(1, 1, ORIGIN, vec![], &[], None)).unwrap();
+    sim.submit(with_jammer(
+        unit(
+            2,
+            2,
+            direct(ORIGIN, 90.0, 30_000.0).point,
+            vec![],
+            &[],
+            None,
+        ),
+        60.0,
+    ))
+    .unwrap();
+    sim.step();
+    assert_eq!(comms_of(&mut sim, 1).status, LinkStatus::Jammed);
+    sim.submit(speed_order(1, 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim).last().unwrap().contains("link jammed"));
+    // At 40 km: −10 + 20·log10(100 / 40) = −2.04 dB, so the link holds.
+    sim.submit(cmd(
+        2,
+        umpire(),
+        None,
+        CommandPayload::Adjudicate {
+            reason: "test".into(),
+            action: Adjudication::MoveUnit {
+                unit: UnitId(2),
+                position: direct(ORIGIN, 90.0, 40_000.0).point,
+                altitude_m: None,
+            },
+        },
+    ))
+    .unwrap();
+    sim.step();
+    assert_eq!(comms_of(&mut sim, 1).status, LinkStatus::Up);
+
+    // Now jam the post itself: 20 km from it, J/S at the post for a unit at the edge of its
+    // 150 km range = −10 + 20·log10(150 / 20) = +7.5 dB. It goes down.
+    let mut alt = post(2, direct(ORIGIN, 180.0, 50_000.0).point, 150_000.0);
+    alt.subordinates = vec![UnitId(99)];
+    let mut main = post(1, at, 150_000.0);
+    main.alternate = Some(2);
+    main.handover_s = 60.0;
+    let mut sim = Simulation::new(1);
+    sim.submit(planning(vec![main, alt], vec![])).unwrap();
+    sim.submit(unit(1, 1, ORIGIN, vec![], &[], None)).unwrap();
+    sim.submit(with_jammer(
+        unit(2, 2, direct(at, 90.0, 20_000.0).point, vec![], &[], None),
+        60.0,
+    ))
+    .unwrap();
+    sim.run_ticks(2);
+    assert!(sim.events().iter().any(|e| matches!(
+        e.kind,
+        SimEventKind::CommandPostDisrupted {
+            facility: 1,
+            status: LinkStatus::Jammed
+        }
+    )));
+    let posts = sim.snapshot(Viewer::Side { side: SideId(1) }).posts;
+    assert!(!posts[0].up && posts[0].status == LinkStatus::Jammed);
+    sim.submit(speed_order(2, 1)).unwrap();
+    sim.step();
+    assert!(rejected(&sim)
+        .last()
+        .unwrap()
+        .contains("command passes to F2"));
+    // After the handover the alternate commands unit 1.
+    sim.run_until(Tick(61));
+    sim.submit(speed_order(61, 1)).unwrap();
+    sim.step();
+    assert_eq!(rejected(&sim).len(), 1);
+    // The jammer falls silent: the post comes back.
+    sim.submit(cmd(
+        62,
+        umpire(),
+        None,
+        CommandPayload::SetDoctrine {
+            scope: DoctrineScope::Unit { unit: UnitId(2) },
+            doctrine: Doctrine {
+                emcon: Some(Emcon::Silent),
+                ..Doctrine::default()
+            },
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(2);
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::CommandPostRestored { facility: 1 })));
+    assert!(sim.snapshot(Viewer::WhiteCell).posts[0].up);
+}
+
+#[test]
+fn deep_submarines_and_knocked_out_comms_cannot_receive() {
+    let mut sim = planned_scene(30_000.0, vec![post(1, ORIGIN, 100_000.0)], vec![]);
+    let mut sub = unit(3, 1, direct(ORIGIN, 0.0, 10_000.0).point, vec![], &[], None);
+    if let CommandPayload::SpawnUnit(s) = &mut sub.payload {
+        s.domain = Domain::Subsurface;
+        s.altitude_m = -100.0;
+    }
+    sub.tick = Tick(1);
+    sim.submit(sub).unwrap();
+    sim.step();
+    assert_eq!(comms_of(&mut sim, 3).status, LinkStatus::Submerged);
+    assert_eq!(comms_of(&mut sim, 1).status, LinkStatus::Up);
 }

@@ -37,14 +37,14 @@ Each facility belongs to one side:
 | `sheltering_port`, `anchorage`, `refuelling_point` | Serve the side's units that are **alongside**: within `radius_m` and at ≤ 0.5 m/s, with the `services` the facility offers. |
 
 **Command posts.** Once a side has a command post, a **player's** order to a unit goes ahead only if:
-- the unit is commanded by a post that is up and has the unit within its `range_m` (default `radius_m`) — a post commands its `subordinates`, or every unit of its side when the list is empty; or
-- that post is down and its `alternate` (another command post of the side, up) has taken over, `handover_s` (default 300 s) after the post went down, and has the unit in range.
+- the unit is commanded by a post that is up and has a comms link to it ([comms.md](comms.md): range `range_m`, default `radius_m`; radio horizon for VHF/UHF posts; jamming; relays) — a post commands its `subordinates`, or every unit of its side when the list is empty; or
+- that post is down and its `alternate` (another command post of the side, up) has taken over, `handover_s` (default 300 s) after the post went down, and has a link to the unit.
 
-A post carried by a unit is **down** once that unit, having been in play, is destroyed or removed (`CommandPostDown` is logged). In the gap before the alternate takes over, the order is:
+A post carried by a unit is **down** once that unit, having been in play, is destroyed or removed (`CommandPostDown` is logged). A post is also down while it is jammed or its carrier's comms are knocked out, and comes back afterwards ([comms.md](comms.md)). In the gap before the alternate takes over, the order is:
 - `orders_in_gap: "lose"` (default): refused, *"Blue flagship command is down; command passes to Blue maritime HQ at 00:47:10"*;
 - `"queue"`: refused for now (*"queued: …"*), held, and carried out when the alternate takes over if the unit is then in its range (`QueuedOrderApplied`, or `QueuedOrderDropped` with the reason).
 
-Other refusals: *"U3 is out of range of every command post"*, *"U3's command posts are down"*, *"U3 is not assigned to a command post"*. White-cell, scenario, script and AI orders are never limited, and a side without command posts is not limited.
+Other refusals: *"U3 cannot be reached from Blue maritime HQ: out of range"* (or *link jammed*, *beyond the radio horizon*, *submerged too deep to receive*), *"U3's command posts are down"*, *"U3 is not assigned to a command post"*. White-cell, scenario, script and AI orders are never limited, and a side without command posts is not limited.
 
 **Diversion for repair.** Every 60 s, a mission-killed unit **with a mission** (AI-run) goes to the nearest port of its side that repairs (`DivertedToPort`). Its mission is set aside; it stops on arrival; once fully repaired it takes the mission up again. Units without a mission are left to their player.
 

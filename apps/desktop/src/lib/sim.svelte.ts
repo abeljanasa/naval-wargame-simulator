@@ -10,6 +10,7 @@ import {
   events,
   type BearingView,
   type ClockStatus,
+  type CommsView,
   type ContactView,
   type Doctrine,
   type Environment,
@@ -21,6 +22,7 @@ import {
   type Message,
   type Minefield,
   type Mission,
+  type PostView,
   type SessionInfo,
   type TimeCompression,
   type UnitView,
@@ -61,6 +63,10 @@ class SimSession {
   injects = $state<InjectStatus[]>([]);
   /** White cell: every scenario event's state. */
   scenarioEvents = $state<EventStatus[]>([]);
+  /** Comms link of each of the seat's units (sides with command posts). */
+  comms = $state<CommsView[]>([]);
+  /** The seat's command posts and whether each is up. */
+  posts = $state<PostView[]>([]);
   /** Latest clock from the engine. */
   clock = $state<ClockStatus | null>(null);
   /** The viewer's picture, kept up to date from full and diff updates. */
@@ -104,6 +110,8 @@ class SimSession {
     this.messages = u.messages;
     this.injects = u.injects;
     this.scenarioEvents = u.scenario_events;
+    this.comms = u.comms;
+    this.posts = u.posts;
     if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 

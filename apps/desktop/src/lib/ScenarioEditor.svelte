@@ -800,6 +800,79 @@
                   <option value="queue">queued for the alternate</option>
                 </select>
               </label>
+              <label>
+                Link
+                <select
+                  value={f.line_of_sight ? "los" : "blos"}
+                  onchange={(e) => {
+                    f.line_of_sight = e.currentTarget.value === "los";
+                    changed();
+                  }}
+                >
+                  <option value="blos">HF / satellite (beyond line of sight)</option>
+                  <option value="los">VHF / UHF (radio horizon)</option>
+                </select>
+              </label>
+              {#if f.unit == null}
+                <label>
+                  Antenna (m)
+                  <input
+                    type="number"
+                    min="0"
+                    value={f.antenna_m ?? 30}
+                    onchange={(e) => {
+                      f.antenna_m = Math.max(0, num(e.currentTarget.value, 30));
+                      changed();
+                    }}
+                  />
+                </label>
+              {/if}
+              <label>
+                Anti-jam margin (dB)
+                <input
+                  type="number"
+                  value={f.anti_jam_db ?? 10}
+                  onchange={(e) => {
+                    f.anti_jam_db = num(e.currentTarget.value, 10);
+                    changed();
+                  }}
+                />
+              </label>
+              <label>
+                Subordinates (none: every unit of the side)
+                <select
+                  multiple
+                  size="4"
+                  onchange={(e) => {
+                    f.subordinates = [...e.currentTarget.selectedOptions].map((o) =>
+                      Number(o.value),
+                    );
+                    changed();
+                  }}
+                >
+                  {#each d.units.filter((u) => u.side === f.side) as u (u.id)}
+                    <option value={u.id} selected={(f.subordinates ?? []).includes(u.id)}
+                      >{u.name}</option
+                    >
+                  {/each}
+                </select>
+              </label>
+              <label>
+                Relays
+                <select
+                  multiple
+                  size="4"
+                  onchange={(e) => {
+                    f.relays = [...e.currentTarget.selectedOptions].map((o) => Number(o.value));
+                    changed();
+                  }}
+                >
+                  {#each d.units.filter((u) => u.side === f.side && u.id !== f.unit) as u (u.id)}
+                    <option value={u.id} selected={(f.relays ?? []).includes(u.id)}>{u.name}</option
+                    >
+                  {/each}
+                </select>
+              </label>
             {:else}
               <label>
                 Berths (0: no limit)

@@ -783,6 +783,18 @@ impl<'a> Builder<'a> {
                 None,
                 format!("command post {facility} is down"),
             ),
+            SimEventKind::CommandPostDisrupted { facility, status } => self.note(
+                t,
+                TimelineKind::Event,
+                None,
+                format!("command post {facility} is down: {}", status.describe()),
+            ),
+            SimEventKind::CommandPostRestored { facility } => self.note(
+                t,
+                TimelineKind::Event,
+                None,
+                format!("command post {facility} is back up"),
+            ),
             SimEventKind::ZoneEngage {
                 zone,
                 unit,

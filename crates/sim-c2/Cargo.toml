@@ -13,6 +13,7 @@ specta = ["dep:specta", "sim-sensors/specta"]
 [dependencies]
 sim-sensors.workspace = true
 serde.workspace = true
+libm.workspace = true
 specta = { workspace = true, optional = true }
 
 [dev-dependencies]

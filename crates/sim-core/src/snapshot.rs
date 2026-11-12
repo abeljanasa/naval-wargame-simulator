@@ -163,4 +163,9 @@ pub struct Snapshot {
     pub injects: Vec<InjectStatus>,
     /// White cell only: every scenario event's state.
     pub scenario_events: Vec<EventStatus>,
+    /// Side viewer: the comms link of each of its units, when it has command posts. White cell:
+    /// every side's.
+    pub comms: Vec<crate::comms::CommsView>,
+    /// Side viewer: its command posts and whether each is up. White cell: every side's.
+    pub posts: Vec<crate::comms::PostView>,
 }

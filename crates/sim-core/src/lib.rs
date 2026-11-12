@@ -10,6 +10,7 @@ mod ai;
 mod c2;
 mod combat;
 mod command;
+mod comms;
 mod components;
 mod detection;
 mod error;
@@ -44,6 +45,7 @@ pub use command::{
     Command, CommandPayload, DoctrineScope, EmitterEntry, Issuer, LoggedCommand, UnitSpawn,
     PROTOCOL_VERSION,
 };
+pub use comms::{CommsView, PostView};
 pub use components::{Domain, Kinematics, Position, Route, Unit};
 pub use detection::{
     clutter_background, default_rcs_m2, detection_range_m, domain_speed_bound_mps, pd_per_scan,
@@ -74,6 +76,7 @@ pub use scenario_events::{
 pub use seats::{validate_seats, Seat, SeatRole, Seats};
 pub use sim::Simulation;
 pub use sim_ai::{Mission, AI_PERIOD_TICKS};
+pub use sim_c2::comms::LinkStatus;
 pub use sim_c2::{Doctrine, Emcon, Posture, ResolvedDoctrine, Wcs};
 pub use sim_events::{
     validate_events, Area, Audience, Cmp, Condition, DoctrineTarget, EventAction, EventRuntime,

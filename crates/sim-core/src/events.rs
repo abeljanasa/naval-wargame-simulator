@@ -328,6 +328,15 @@ pub enum SimEventKind {
     CommandPostDown {
         facility: u32,
     },
+    /// A command post went down while jammed or with its comms knocked out.
+    CommandPostDisrupted {
+        facility: u32,
+        status: sim_c2::comms::LinkStatus,
+    },
+    /// A disrupted command post is back up.
+    CommandPostRestored {
+        facility: u32,
+    },
     /// An order held while its command post was down was carried out.
     QueuedOrderApplied {
         seq: u64,

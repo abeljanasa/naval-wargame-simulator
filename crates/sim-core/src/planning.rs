@@ -17,6 +17,7 @@ use crate::ai::{engage_first_weapon, ensure_moving, set_route, MissionState};
 use crate::c2::C2State;
 use crate::combat::{Health, Magazine, WeaponsInFlight};
 use crate::command::{Command, Issuer};
+use crate::comms;
 use crate::components::{Kinematics, Position, Route, Unit};
 use crate::detection::{ContactTable, SensorSuite};
 use crate::events::{EventLog, SimEventKind};
@@ -28,6 +29,7 @@ use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use sim_ai::{Mission, AI_PERIOD_TICKS};
+use sim_c2::comms::LinkStatus;
 use sim_c2::{Doctrine, ResolvedDoctrine};
 use sim_events::{Area, Audience};
 use sim_geo::GeoPoint;
@@ -125,6 +127,19 @@ pub struct Facility {
     /// Command posts: orders issued in the gap are lost or queued.
     #[serde(default)]
     pub orders_in_gap: GapPolicy,
+    /// Command posts: the link is VHF/UHF only, so limited by the radio horizon. Default: beyond
+    /// line of sight (HF or satellite).
+    #[serde(default)]
+    pub line_of_sight: bool,
+    /// Command posts ashore: antenna height, m (default 30).
+    #[serde(default)]
+    pub antenna_m: Option<f64>,
+    /// Command posts: the link's anti-jam margin, dB (default 10).
+    #[serde(default)]
+    pub anti_jam_db: Option<f64>,
+    /// Command posts: units of its side that relay its traffic when the direct link fails.
+    #[serde(default)]
+    pub relays: Vec<UnitId>,
 }
 
 /// What a zone governs.
@@ -205,6 +220,9 @@ pub struct PlanningLayer {
     /// Command posts that are down, and since when.
     #[serde(default)]
     pub down: BTreeMap<u32, Tick>,
+    /// Posts down while jammed or with comms knocked out (they come back); lost posts are not here.
+    #[serde(default)]
+    pub disrupted: BTreeMap<u32, LinkStatus>,
     /// Command posts carried by a unit that has been in play (only those can be lost).
     #[serde(default)]
     pub manned: BTreeSet<u32>,
@@ -237,6 +255,20 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         }
         if f.range_m.is_some_and(|r| !(r.is_finite() && r > 0.0)) {
             return Err(format!("facility {:?} has a range that is not > 0", f.name));
+        }
+        if f.antenna_m.is_some_and(|h| !(h.is_finite() && h >= 0.0))
+            || f.anti_jam_db.is_some_and(|a| !a.is_finite())
+        {
+            return Err(format!(
+                "facility {:?} has an invalid antenna height or anti-jam margin",
+                f.name
+            ));
+        }
+        if !f.relays.is_empty() && f.kind != FacilityKind::CommandPost {
+            return Err(format!(
+                "facility {:?}: only command posts have relays",
+                f.name
+            ));
         }
         if !(f.handover_s.is_finite() && f.handover_s >= 0.0) {
             return Err(format!(
@@ -289,6 +321,7 @@ impl PlanningLayer {
         self.service.retain(|_, s| kept.contains(&s.facility));
         self.diverted.retain(|_, d| kept.contains(&d.facility));
         self.down.retain(|f, _| kept.contains(f));
+        self.disrupted.retain(|f, _| kept.contains(f));
         self.manned.retain(|f| kept.contains(f));
         self.facilities = facilities;
         self.zones = zones;
@@ -392,49 +425,35 @@ pub(crate) enum Authority {
     Queued { release: Tick, reason: String },
 }
 
-/// Command-post authority for a player's order to a unit: it must be within range of a post
-/// that commands it and is up, or of that post's alternate once the handover delay has passed.
-/// Sides without command posts, and orders not from a player, are not limited.
-pub(crate) fn command_authority(world: &World, cmd: &Command) -> Authority {
-    if !matches!(cmd.issuer, Issuer::Player { .. }) {
-        return Authority::Ok;
-    }
-    let (Some(side), Some(unit)) = (cmd.side, cmd.payload.target_unit()) else {
-        return Authority::Ok;
-    };
-    let layer = world.resource::<PlanningLayer>();
-    let posts: Vec<&Facility> = layer
+/// The posts that can command `unit` now: each post that commands it and is up, or the
+/// alternate of one that is down once the handover delay has passed. Also the earliest pending
+/// handover, and whether every commanding post is down. `None`: no post of the side commands it.
+#[allow(clippy::type_complexity)]
+fn acting_posts<'a>(
+    world: &World,
+    layer: &'a PlanningLayer,
+    side: SideId,
+    unit: UnitId,
+    now: Tick,
+) -> Option<(
+    Vec<&'a Facility>,
+    Option<(Tick, &'a Facility, &'a Facility)>,
+    bool,
+)> {
+    let commanding: Vec<&Facility> = layer
         .facilities
         .iter()
         .filter(|f| f.side == side && f.kind == FacilityKind::CommandPost)
-        .collect();
-    if posts.is_empty() {
-        return Authority::Ok;
-    }
-    let Some(at) = position_of(world, unit) else {
-        return Authority::Ok; // the order itself reports the unknown unit
-    };
-    let now = world.resource::<SimClock>().tick;
-    let in_range = |f: &Facility| {
-        post_position(world, f)
-            .is_some_and(|p| sim_geo::inverse(p, at).distance_m <= f.range_m.unwrap_or(f.radius_m))
-    };
-    let commanding: Vec<&Facility> = posts
-        .iter()
-        .copied()
         .filter(|f| f.subordinates.is_empty() || f.subordinates.contains(&unit))
         .collect();
     if commanding.is_empty() {
-        return Authority::Refused(format!("{unit} is not assigned to a command post"));
+        return None;
     }
+    let mut acting = Vec::new();
     let mut pending: Option<(Tick, &Facility, &Facility)> = None;
     for p in &commanding {
         match down_since(world, layer, p, now) {
-            None => {
-                if in_range(p) {
-                    return Authority::Ok;
-                }
-            }
+            None => acting.push(*p),
             Some(since) => {
                 let Some(alt) = p.alternate.and_then(|a| layer.facility(a)) else {
                     continue;
@@ -444,13 +463,51 @@ pub(crate) fn command_authority(world: &World, cmd: &Command) -> Authority {
                 }
                 let at_tick = handover_tick(since, p);
                 if now >= at_tick {
-                    if in_range(alt) {
-                        return Authority::Ok;
-                    }
+                    acting.push(alt);
                 } else if pending.is_none_or(|(t, _, _)| at_tick < t) {
                     pending = Some((at_tick, p, alt));
                 }
             }
+        }
+    }
+    let all_down = commanding
+        .iter()
+        .all(|p| down_since(world, layer, p, now).is_some());
+    Some((acting, pending, all_down))
+}
+
+/// Command-post authority for a player's order to a unit: a post that commands it and is up (or
+/// that post's alternate once the handover delay has passed) must have a comms link to it
+/// (`docs/models/comms.md`). Sides without command posts, and orders not from a player, are not
+/// limited.
+pub(crate) fn command_authority(world: &World, cmd: &Command) -> Authority {
+    if !matches!(cmd.issuer, Issuer::Player { .. }) {
+        return Authority::Ok;
+    }
+    let (Some(side), Some(unit)) = (cmd.side, cmd.payload.target_unit()) else {
+        return Authority::Ok;
+    };
+    let layer = world.resource::<PlanningLayer>();
+    let has_posts = layer
+        .facilities
+        .iter()
+        .any(|f| f.side == side && f.kind == FacilityKind::CommandPost);
+    if !has_posts || position_of(world, unit).is_none() {
+        return Authority::Ok; // an unknown unit is reported by the order itself
+    }
+    let now = world.resource::<SimClock>().tick;
+    let Some((acting, pending, all_down)) = acting_posts(world, layer, side, unit, now) else {
+        return Authority::Refused(format!("{unit} is not assigned to a command post"));
+    };
+    let jammers = comms::jammers(world);
+    let mut failure: Option<(LinkStatus, &Facility)> = None;
+    for p in acting {
+        let (status, _) = comms::link(world, &jammers, p, unit);
+        if status == LinkStatus::Up {
+            return Authority::Ok;
+        }
+        if failure.is_none() {
+            failure = Some((status, p));
         }
     }
     if let Some((release, p, alt)) = pending {
@@ -465,13 +522,94 @@ pub(crate) fn command_authority(world: &World, cmd: &Command) -> Authority {
             GapPolicy::Lose => Authority::Refused(reason),
         };
     }
-    if commanding
-        .iter()
-        .all(|p| down_since(world, layer, p, now).is_some())
-    {
+    if let Some((status, p)) = failure {
+        return Authority::Refused(format!(
+            "{unit} cannot be reached from {}: {}",
+            p.name,
+            status.describe()
+        ));
+    }
+    if all_down {
         return Authority::Refused(format!("{unit}'s command posts are down"));
     }
-    Authority::Refused(format!("{unit} is out of range of every command post"))
+    Authority::Refused(format!("{unit} cannot be reached from any command post"))
+}
+
+/// The comms of each of `side`'s units, when the side has command posts (unit-id order).
+pub(crate) fn comms_views(world: &World, side: SideId) -> Vec<comms::CommsView> {
+    let layer = world.resource::<PlanningLayer>();
+    if !layer
+        .facilities
+        .iter()
+        .any(|f| f.side == side && f.kind == FacilityKind::CommandPost)
+    {
+        return Vec::new();
+    }
+    let now = world.resource::<SimClock>().tick;
+    let jammers = comms::jammers(world);
+    let units: Vec<UnitId> = world
+        .resource::<UnitIndex>()
+        .0
+        .iter()
+        .filter(|(_, e)| world.get::<Unit>(**e).is_some_and(|u| u.side == side))
+        .map(|(id, _)| *id)
+        .collect();
+    units
+        .into_iter()
+        .map(|unit| {
+            let mut view = comms::CommsView {
+                unit,
+                status: LinkStatus::NoPost,
+                post: None,
+                via: None,
+            };
+            let Some((acting, _, _)) = acting_posts(world, layer, side, unit, now) else {
+                return view;
+            };
+            for p in acting {
+                let (status, via) = comms::link(world, &jammers, p, unit);
+                if view.post.is_none() || status == LinkStatus::Up {
+                    view = comms::CommsView {
+                        unit,
+                        status,
+                        post: Some(p.id),
+                        via,
+                    };
+                }
+                if status == LinkStatus::Up {
+                    break;
+                }
+            }
+            view
+        })
+        .collect()
+}
+
+/// Command posts of `side` (every side: `None`) and whether each is up.
+pub(crate) fn post_views(world: &World, side: Option<SideId>) -> Vec<comms::PostView> {
+    let layer = world.resource::<PlanningLayer>();
+    let now = world.resource::<SimClock>().tick;
+    layer
+        .facilities
+        .iter()
+        .filter(|f| f.kind == FacilityKind::CommandPost && side.is_none_or(|s| s == f.side))
+        .map(|f| {
+            let since = down_since(world, layer, f, now);
+            comms::PostView {
+                facility: f.id,
+                up: since.is_none(),
+                status: match since {
+                    None => LinkStatus::Up,
+                    Some(_) => layer
+                        .disrupted
+                        .get(&f.id)
+                        .copied()
+                        .unwrap_or(LinkStatus::NoPost),
+                },
+                since_s: since.map(Tick::seconds),
+            }
+        })
+        .collect()
 }
 
 /// Each tick: command posts lost with their units, queued orders, and alerts for contacts gained
@@ -519,10 +657,50 @@ fn posts_down(world: &mut World, tick: Tick) {
     };
     world.resource_mut::<PlanningLayer>().manned.extend(manned);
     for id in lost {
-        world.resource_mut::<PlanningLayer>().down.insert(id, tick);
+        let mut layer = world.resource_mut::<PlanningLayer>();
+        layer.disrupted.remove(&id);
+        layer.down.entry(id).or_insert(tick);
         world
             .resource_mut::<EventLog>()
             .push(tick, SimEventKind::CommandPostDown { facility: id });
+    }
+    // Jamming and comms criticals: posts go down and come back.
+    let jammers = comms::jammers(world);
+    let changes: Vec<(u32, Option<LinkStatus>)> = {
+        let layer = world.resource::<PlanningLayer>();
+        layer
+            .facilities
+            .iter()
+            .filter(|f| f.kind == FacilityKind::CommandPost)
+            .filter(|f| post_position(world, f).is_some())
+            .filter_map(|f| {
+                let now = comms::disruption(world, &jammers, f);
+                let was = layer.disrupted.get(&f.id).copied();
+                (now != was).then_some((f.id, now))
+            })
+            .collect()
+    };
+    for (id, now) in changes {
+        let mut layer = world.resource_mut::<PlanningLayer>();
+        let kind = match now {
+            Some(status) => {
+                let first = layer.disrupted.insert(id, status).is_none();
+                layer.down.entry(id).or_insert(tick);
+                if !first {
+                    continue; // still down, now for another reason
+                }
+                SimEventKind::CommandPostDisrupted {
+                    facility: id,
+                    status,
+                }
+            }
+            None => {
+                layer.disrupted.remove(&id);
+                layer.down.remove(&id);
+                SimEventKind::CommandPostRestored { facility: id }
+            }
+        };
+        world.resource_mut::<EventLog>().push(tick, kind);
     }
 }
 

@@ -403,12 +403,23 @@ impl Scenario {
         if let Err(e) = sim_core::validate_planning(&self.facilities, &self.zones) {
             out.push(e);
         }
+        let side_of: BTreeMap<UnitId, SideId> = self.units.iter().map(|u| (u.id, u.side)).collect();
         for f in &self.facilities {
             if !sides.contains(&f.side) {
                 out.push(format!(
                     "facility {:?} is on undeclared side {}",
                     f.name, f.side
                 ));
+            }
+            for (what, list) in [("subordinate", &f.subordinates), ("relay", &f.relays)] {
+                for u in list {
+                    if side_of.get(u) != Some(&f.side) {
+                        out.push(format!(
+                            "facility {:?}: {what} {u} is not a unit of its side",
+                            f.name
+                        ));
+                    }
+                }
             }
         }
         for z in &self.zones {

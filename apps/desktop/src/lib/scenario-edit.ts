@@ -77,6 +77,12 @@ export interface DraftFacility {
   alternate?: number | null;
   handover_s?: number;
   orders_in_gap?: "lose" | "queue";
+  /** Command posts: VHF/UHF only (radio horizon); default beyond line of sight. */
+  line_of_sight?: boolean;
+  antenna_m?: number | null;
+  anti_jam_db?: number | null;
+  /** Command posts: units that relay the post's traffic. */
+  relays?: number[];
 }
 
 export interface DraftDoctrine {

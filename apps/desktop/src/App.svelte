@@ -16,7 +16,7 @@
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
-  import type { Audience, Emcon, Mission, Seat, Wcs } from "./lib/bindings";
+  import type { Audience, CommsView, Emcon, Mission, Seat, Wcs } from "./lib/bindings";
   import AarPanel from "./lib/AarPanel.svelte";
   import ScenarioEditor from "./lib/ScenarioEditor.svelte";
   import { editor } from "./lib/editor.svelte";
@@ -72,6 +72,16 @@
     if (a.to === "all") return "all";
     if (a.to === "white_cell") return "white cell";
     return sim.session?.sides.find((s) => s.id === a.side)?.name ?? `side ${a.side}`;
+  }
+
+  function facilityName(id: number): string {
+    return (sim.session?.facilities ?? []).find((f) => f.id === id)?.name ?? `facility ${id}`;
+  }
+
+  function commsText(c: CommsView): string {
+    const post = c.post == null ? "" : ` (${facilityName(c.post)})`;
+    if (c.status === "up") return `link up${post}${c.via == null ? "" : ` via ${unitName(c.via)}`}`;
+    return `${c.status.replaceAll("_", " ")}${post}: orders will not get through`;
   }
 
   function unitName(id: number): string {
@@ -429,6 +439,10 @@
               ? ` · lost: ${u.criticals.join(", ").replaceAll("_", " ")}`
               : ""}
           </dd>
+          {#each sim.comms.filter((c) => c.unit === u.id) as c (c.unit)}
+            <dt>Comms</dt>
+            <dd class:hurt={c.status !== "up"}>{commsText(c)}</dd>
+          {/each}
           <dt>Mission</dt>
           <dd>
             {u.mission ? missionText(u.mission) : "none"}{u.mission_complete ? " (complete)" : ""}
@@ -681,6 +695,19 @@
           />
           <button type="submit">Send</button>
         </form>
+        {#if sim.posts.length > 0}
+          <h3>Command posts</h3>
+          <ul class="zones" aria-label="Command posts">
+            {#each sim.posts as p (p.facility)}
+              <li>
+                <span>{facilityName(p.facility)}</span>
+                <span class:hurt={!p.up}
+                  >{p.up ? "up" : `down: ${p.status.replaceAll("_", " ")}`}</span
+                >
+              </li>
+            {/each}
+          </ul>
+        {/if}
         {#if (sim.session?.zones ?? []).length > 0}
           <h3>Zone rules</h3>
           <ul class="zones" aria-label="Zone rules">

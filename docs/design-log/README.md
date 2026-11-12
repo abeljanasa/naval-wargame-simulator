@@ -33,6 +33,7 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
 | [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
 | [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0029](DL-0029-comms.md) | Comms links and their disruption | Project spec §7, §7.1, §8 + free-space propagation + original design |
 | [DL-0028](DL-0028-planning-layer.md) | Operational planning layer | Project spec §7.1 + original design |
 | [DL-0027](DL-0027-scenario-editor.md) | Scenario editor | Project spec §7, §13 + original design |
 | [DL-0026](DL-0026-replay-aar.md) | Replay and after-action review | Project spec §13 + RFC 4180 + original design |

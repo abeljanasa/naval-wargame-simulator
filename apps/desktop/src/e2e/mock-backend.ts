@@ -455,6 +455,8 @@ const frame = (): FrameEvent => {
       messages,
       injects: viewer.kind === "white_cell" ? injects : [],
       scenario_events: viewer.kind === "white_cell" ? scenarioEvents : [],
+      comms: [],
+      posts: [],
       refusals: sent,
     },
   };

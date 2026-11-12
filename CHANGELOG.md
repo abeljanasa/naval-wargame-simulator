@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 10: comms links and disruption)
+
+- **Comms links from command posts** (`docs/models/comms.md`, DL-0029):
+  - A player's order needs a link from a post that commands the unit: range, radio horizon for VHF/UHF posts, jamming, relays, no reception below 20 m, and comms critical hits.
+  - Jamming uses each unit's jammer while its EMCON is active: J/S at both ends of a hop, several jammers adding in power.
+  - A jammed post, or one whose carrier's comms are knocked out, goes down: its alternate takes over after the handover delay. The post comes back when the disruption ends (`CommandPostDisrupted`, `CommandPostRestored`, both in the AAR timeline).
+  - Posts default to beyond line of sight (HF or satellite), so existing scenarios behave as before. An airborne line-of-sight post gains range from its altitude.
+- **Picture:** each unit's link (status, post, relay) and each command post's state.
+- **Desktop:**
+  - A Comms line in the unit panel, and Command posts in the console.
+  - Scenario editor: link type, antenna, anti-jam margin, subordinates and relays for command posts.
+- **Scenario check:** subordinates and relays must be units of the post's side.
+- **Phase 3 plan:** slices 10–18 close the in-phase P1 gaps. Imagery, GEBCO/SRTM-dependent items and air operations move to Phase 4.
+
+### Changed (slice 10)
+
+- **Save format 18.**
+- **Refusal text:** *"is out of range of every command post"* became *"cannot be reached from {post}: out of range"*.
+- **Golden:** the planning demonstrator's golden hash, because facilities now hash with their link fields. Its behaviour is unchanged.
+
 ### Added (Phase 3, slice 1: white-cell adjudication)
 
 - **Phase 3 plan** (`docs/plan/phase-3.md`): white cell and injects first, at the client's choice.

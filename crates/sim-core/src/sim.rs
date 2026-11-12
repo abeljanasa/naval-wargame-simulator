@@ -427,6 +427,25 @@ impl Simulation {
                     homing: w.homing,
                 })
                 .collect(),
+            comms: match viewer {
+                Viewer::WhiteCell => {
+                    let mut sides: Vec<SideId> = side_of.values().copied().collect();
+                    sides.sort_unstable();
+                    sides.dedup();
+                    sides
+                        .into_iter()
+                        .flat_map(|s| crate::planning::comms_views(&self.world, s))
+                        .collect()
+                }
+                Viewer::Side { side } => crate::planning::comms_views(&self.world, side),
+            },
+            posts: crate::planning::post_views(
+                &self.world,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+            ),
             bearings: self.world.resource::<BearingTable>().views(
                 match viewer {
                     Viewer::WhiteCell => None,

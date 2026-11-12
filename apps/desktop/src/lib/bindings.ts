@@ -323,6 +323,29 @@ export type ClockStatus_Serialize = {
 /**  Comparison for counts. */
 export type Cmp = "lt" | "le" | "eq" | "ge" | "gt";
 
+/**  A unit's comms as its side sees them. */
+export type CommsView = CommsView_Serialize | CommsView_Deserialize;
+
+/**  A unit's comms as its side sees them. */
+export type CommsView_Deserialize = {
+	unit: UnitId,
+	status: LinkStatus,
+	/**  The post whose link reaches the unit (or that was tried last). */
+	post?: number | null,
+	/**  The relay the link goes through, if not direct. */
+	via?: UnitId | null,
+};
+
+/**  A unit's comms as its side sees them. */
+export type CommsView_Serialize = {
+	unit: UnitId,
+	status: LinkStatus,
+	/**  The post whose link reaches the unit (or that was tried last). */
+	post: number | null,
+	/**  The relay the link goes through, if not direct. */
+	via: UnitId | null,
+};
+
 /**  Something that must be true for a triggered event to fire. */
 export type Condition = Condition_Serialize | Condition_Deserialize;
 
@@ -716,6 +739,17 @@ export type Facility_Deserialize = {
 	handover_s?: number | null,
 	/**  Command posts: orders issued in the gap are lost or queued. */
 	orders_in_gap?: GapPolicy,
+	/**
+	 *  Command posts: the link is VHF/UHF only, so limited by the radio horizon. Default: beyond
+	 *  line of sight (HF or satellite).
+	 */
+	line_of_sight?: boolean,
+	/**  Command posts ashore: antenna height, m (default 30). */
+	antenna_m?: number | null,
+	/**  Command posts: the link's anti-jam margin, dB (default 10). */
+	anti_jam_db?: number | null,
+	/**  Command posts: units of its side that relay its traffic when the direct link fails. */
+	relays?: UnitId[],
 };
 
 /**  A planning-layer facility. */
@@ -749,6 +783,17 @@ export type Facility_Serialize = {
 	handover_s: number | null,
 	/**  Command posts: orders issued in the gap are lost or queued. */
 	orders_in_gap: GapPolicy,
+	/**
+	 *  Command posts: the link is VHF/UHF only, so limited by the radio horizon. Default: beyond
+	 *  line of sight (HF or satellite).
+	 */
+	line_of_sight: boolean,
+	/**  Command posts ashore: antenna height, m (default 30). */
+	antenna_m: number | null,
+	/**  Command posts: the link's anti-jam margin, dB (default 10). */
+	anti_jam_db: number | null,
+	/**  Command posts: units of its side that relay its traffic when the direct link fails. */
+	relays: UnitId[],
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */
@@ -867,6 +912,15 @@ export type JammerSpec = {
 	jn_db_at_1km: number | null,
 };
 
+/**  The state of a unit's link to its command post, or of a hop. */
+export type LinkStatus = "up" | "out_of_range" | "beyond_horizon" | "jammed" | 
+/**  Too deep to receive. */
+"submerged" | 
+/**  Comms knocked out by a critical hit (at either end). */
+"knocked_out" | 
+/**  No command post commands the unit, or every one is down. */
+"no_post";
+
 /**  One unit lost. */
 export type LossRow = LossRow_Serialize | LossRow_Deserialize;
 
@@ -953,6 +1007,29 @@ export type Mission =
 { kind: "escort"; escorted: number; bearing_deg: number | null; range_m: number | null } | 
 /**  Close and attack one of the side's contacts. */
 { kind: "strike"; contact: number };
+
+/**  A command post's state. */
+export type PostView = PostView_Serialize | PostView_Deserialize;
+
+/**  A command post's state. */
+export type PostView_Deserialize = {
+	facility: number,
+	up: boolean,
+	/**  Why it is down: jammed, comms knocked out, or (lost with its unit) `no_post`. */
+	status: LinkStatus,
+	/**  Game time it went down. */
+	since_s?: number | null,
+};
+
+/**  A command post's state. */
+export type PostView_Serialize = {
+	facility: number,
+	up: boolean,
+	/**  Why it is down: jammed, comms knocked out, or (lost with its unit) `no_post`. */
+	status: LinkStatus,
+	/**  Game time it went down. */
+	since_s: number | null,
+};
 
 /**  How one side regards another. */
 export type Posture = "friendly" | 
@@ -1383,6 +1460,10 @@ export type SnapshotUpdate_Deserialize = {
 	injects: InjectStatus_Deserialize[],
 	/**  White cell only: every scenario event's state. */
 	scenario_events: EventStatus[],
+	/**  The comms link of each of the viewer's units (when its side has command posts). */
+	comms: CommsView_Deserialize[],
+	/**  The viewer's command posts and whether each is up. */
+	posts: PostView_Deserialize[],
 };
 
 /**
@@ -1415,6 +1496,10 @@ export type SnapshotUpdate_Serialize = {
 	injects: InjectStatus_Serialize[],
 	/**  White cell only: every scenario event's state. */
 	scenario_events: EventStatus[],
+	/**  The comms link of each of the viewer's units (when its side has command posts). */
+	comms: CommsView_Serialize[],
+	/**  The viewer's command posts and whether each is up. */
+	posts: PostView_Serialize[],
 };
 
 /**  What a unit can still do. */

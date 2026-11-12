@@ -34,3 +34,28 @@ Each slice: behaviour spec, design-log entry, tests, docs, CHANGELOG, green CI (
 The P1 features of §7 and §7.1 that are still partial are listed in the pack and the backlog, for the panel to accept or schedule.
 
 Out of phase (backlog): Monte Carlo batch statistics, SVP acoustics, weather zones, air operations (Phase 4); networked multiplayer (Phase 5).
+
+## Slices 10–17: closing the P1 gaps
+
+The client asked (2026-11-12) to close the P1 gaps in the Gate 3 pack, in phase. These need outside data or a Phase 4 subsystem, so they move to Phase 4:
+
+- satellite imagery (needs a licensed imagery source);
+- terrain elevation and bathymetry packs (GEBCO/SRTM), and what depends on them:
+  - radar terrain masking;
+  - choke points that inherit depth and shipping lanes;
+  - shallow-water routing;
+- airbases, air operations, tanking and aircraft loadout choice.
+
+Draft limits do not wait for bathymetry: a port's or anchorage's depth is entered by the planner and checked against the platform's draft.
+
+| # | Slice | Delivers |
+|---|---|---|
+| 10 | **Comms links and disruption** | Orders reach a unit over a link from its command post: radio horizon (line of sight) unless the post has a beyond-line-of-sight link, range, jamming by another side's radiating jammer (J/S at the receiver), relay units, no reception deep submerged, comms critical hits. A jammed post is down (alternate takes over) and comes back when the jamming stops. Airborne posts gain range from altitude. Link status in the snapshot and the desktop |
+| 11 | **Fuel and refuelling** | Fuel for ships and submarines from database endurance (opt-in per scenario, so older scenarios are unchanged); burn by speed (cube law); out of fuel = no propulsion. Units below a threshold on a mission go to the nearest refuelling point of their side with fuel; oilers carry moving refuelling points with a finite capacity; berths make queues. Transfer rate per point. Resume the mission when full |
+| 12 | **More missions** | Support (hold station), mining (lay a field in an area), mine clearing (sweep fields of other sides, at reduced risk), cargo (load, carry, unload; delivered tonnage in the AAR), barrier patrol (back and forth across a line), denial (patrol a choke point and engage inside it) |
+| 13 | **Anchorages and weather** | Anchorage and port areas as polygons; depth and holding limits (draft, sea state); units on a staging anchorage hold there between missions; weather-threatened units (sea state above their limit) shelter in port and resume when it eases |
+| 14 | **Sense-zone layers and coverage** | Zones carry a layer (outer, middle, inner) and sensor types; coverage and gaps of the side's sensors over each sense zone, on demand, drawn on the map |
+| 15 | **Surface action groups in the core** | Action groups as an engine object: one shared mission run by the leader, succession when the leader is lost, detach and join in play, a shared air-defence picture and fire deconfliction (one area-defence shot per threat at a time across the group) |
+| 16 | **Weapons in flight as sensor targets** | Each side holds tracks on other sides' missiles and torpedoes from radar, EO/IR, visual and sonar (deterministic geometry, no new draws); the desktop shows them; point defence fires on a track held by the defender or by its action group |
+| 17 | **Desktop: editing and facilitation** | Forms for event triggers, conditions and actions; polygon drawing for zones and areas; white-cell editing of the planning layer during play; day/night shading on the map |
+| 18 | **Gate 3 pack update** | Manuals, the Gate 3 pack and the backlog brought up to date |
