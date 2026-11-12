@@ -113,13 +113,14 @@ describe("symbols", () => {
     expect(figureKind("XYZ", "submarine")).toBe("sub");
     expect(figureKind(null, null, "air")).toBe("aircraft");
     expect(figureKind(null, null, null)).toBeNull();
-    expect(figureShape("frigate")).toBe("profile");
+    // Ships, submarines and aircraft are plan views turned to the heading; land sites upright.
+    expect(figureShape("frigate")).toBe("topdown");
+    expect(figureShape("sub_diesel")).toBe("topdown");
     expect(figureShape("fighter")).toBe("topdown");
     expect(figureShape("radar_site")).toBe("icon");
-    const right = decodeURIComponent(figureUrl("frigate", "friend", false));
-    const left = decodeURIComponent(figureUrl("frigate", "friend", false, true));
-    expect(right).toContain('viewBox="0 6 96 36"');
-    expect(left).toContain("matrix(-1 0 0 1 96 0)");
+    expect(decodeURIComponent(figureUrl("frigate", "friend", false))).toContain(
+      'viewBox="0 0 64 64"',
+    );
     expect(munitionKind("WPN-ASM-SUB")).toBe("anti_ship_missile");
     expect(munitionKind("WPN-TORP-HW")).toBe("torpedo");
     expect(munitionKind("WPN-GUN-76")).toBe("shell");

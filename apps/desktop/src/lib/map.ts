@@ -36,6 +36,9 @@ import {
   figureKind,
   figureShape,
   figureUrl,
+  figureSizeM,
+  FIGURE_MIN_PX,
+  FIGURE_MAX_PX,
   munitionKind,
   munitionUrl,
   type FigureKind,
@@ -256,21 +259,18 @@ export function outcomeLayers(outcomes: Outcome[], gameTimeS: number): Layer[] {
   ];
 }
 
-/** On-screen height of a figure, px: side profiles are wide, so a little lower. */
+/** A figure's size on the ground, metres (selected: a quarter larger); the layer clamps it on
+ * screen to FIGURE_MIN_PX–FIGURE_MAX_PX, so it shrinks as the map zooms out. */
 function figureSize(kind: FigureKind, selected: boolean): number {
-  // A side profile fills a band of its 96 × 48 canvas, so it needs the height to read.
-  const base = figureShape(kind) === "profile" ? 30 : 32;
-  return selected ? base + 6 : base;
+  return figureSizeM(kind) * (selected ? 1.25 : 1);
 }
 
-/** Figure icon for a unit or contact: profiles face the way they head (left when westbound);
- * top-down figures are rotated by `getAngle`. */
-function figureIcon(kind: FigureKind, aff: Affiliation, selected: boolean, heading: number) {
-  const westbound = figureShape(kind) === "profile" && heading > 180 && heading < 360;
+/** Figure icon for a unit or contact, drawn nose up; `getAngle` turns it to the heading. */
+function figureIcon(kind: FigureKind, aff: Affiliation, selected: boolean) {
   const [width, height] = figureCanvas(kind);
   return {
-    id: `fig-${kind}-${aff}-${selected}-${westbound}`,
-    url: figureUrl(kind, aff, selected, westbound),
+    id: `fig-${kind}-${aff}-${selected}`,
+    url: figureUrl(kind, aff, selected),
     width,
     height,
   };
@@ -594,7 +594,7 @@ export function buildLayers(s: SceneInput): Layer[] {
         const aff = affiliation(u, s.viewer);
         const sel = u.id === s.selected;
         const kind = figures ? figureKind(u.platform, null, u.domain) : null;
-        if (kind) return figureIcon(kind, aff, sel, n(u.heading_deg));
+        if (kind) return figureIcon(kind, aff, sel);
         const code = functionCode(u.platform);
         return {
           id: `${aff}-${u.domain}-${sel}-${code}`,
@@ -610,7 +610,9 @@ export function buildLayers(s: SceneInput): Layer[] {
       },
       getAngle: (u) =>
         iconAngle(figures ? figureKind(u.platform, null, u.domain) : null, n(u.heading_deg)),
-      sizeUnits: "pixels",
+      sizeUnits: figures ? "meters" : "pixels",
+      sizeMinPixels: figures ? FIGURE_MIN_PX : 0,
+      sizeMaxPixels: figures ? FIGURE_MAX_PX : Number.MAX_SAFE_INTEGER,
       updateTriggers: {
         getIcon: [s.selected, s.viewer, figures],
         getSize: [s.selected, figures],
@@ -682,9 +684,11 @@ export function buildLayers(s: SceneInput): Layer[] {
           height: 64,
         };
       },
-      getSize: (w) => (munitionKind(w.weapon) === "shell" ? 14 : 22),
+      getSize: (w) => (munitionKind(w.weapon) === "shell" ? 1200 : 2800),
       getAngle: (w) => -n(w.heading_deg),
-      sizeUnits: "pixels",
+      sizeUnits: "meters",
+      sizeMinPixels: 9,
+      sizeMaxPixels: 30,
       updateTriggers: { getIcon: [s.viewer] },
     }),
     new IconLayer<WeaponTrackView>({
@@ -739,7 +743,7 @@ export function buildLayers(s: SceneInput): Layer[] {
         // The figure (or code) shows only as far as the side has classified the contact; an
         // unclassified contact keeps the APP-6 frame.
         const kind = figures ? figureKind(c.platform, c.category, c.domain) : null;
-        if (kind) return figureIcon(kind, aff, false, 0);
+        if (kind) return figureIcon(kind, aff, false);
         const code = functionCode(c.platform, c.category);
         return {
           id: `contact-${aff}-${domain}-${code}`,
@@ -750,10 +754,13 @@ export function buildLayers(s: SceneInput): Layer[] {
       },
       getSize: (c) => {
         const kind = figures ? figureKind(c.platform, c.category, c.domain) : null;
-        return kind ? figureSize(kind, false) - 2 : 30;
+        // North-up: a side does not know a contact's course.
+        return kind ? figureSize(kind, false) * 0.9 : 30;
       },
+      sizeUnits: figures ? "meters" : "pixels",
+      sizeMinPixels: figures ? FIGURE_MIN_PX - 2 : 0,
+      sizeMaxPixels: figures ? FIGURE_MAX_PX - 8 : Number.MAX_SAFE_INTEGER,
       updateTriggers: { getIcon: [figures], getSize: [figures] },
-      sizeUnits: "pixels",
     }),
     new TextLayer<ContactView>({
       id: "contact-labels",

@@ -1,6 +1,6 @@
 // Recognisable figures for units and munitions on the map (docs/behaviour-specs/symbology.md):
-// ships and submarines as side profiles (bow toward the heading), aircraft and munitions as
-// top-down outlines (rotated to the heading), land sites as simple icons. Each figure is filled
+// ships, submarines, aircraft and munitions as top-down plan views drawn nose up and rotated to
+// the heading on the map; land sites as simple upright icons. Each figure is filled
 // in its affiliation colour and carries a small affiliation badge (the APP-6 frame shape), so
 // affiliation still reads without colour. Original drawings from simple shapes; nothing is
 // copied from any product.
@@ -8,7 +8,7 @@
 import type { Domain } from "./bindings";
 import { AFFILIATION_COLOUR, frameSvg, type Affiliation } from "./symbols";
 
-/** Side-profile figures (96 × 48 canvas, bow to the right). */
+/** Ship and submarine plan views (64 × 64 canvas, bow up). */
 type ShipKind =
   | "carrier"
   | "amphib"
@@ -131,7 +131,18 @@ export function figureKind(
   );
 }
 
-const PROFILE_KINDS = new Set<string>([
+const AIR_KINDS = new Set<string>([
+  "fighter",
+  "bomber",
+  "mpa",
+  "aew",
+  "air_tanker",
+  "helicopter",
+  "uav",
+  "aircraft",
+]);
+
+const SEA_KINDS = new Set<string>([
   "carrier",
   "amphib",
   "cruiser",
@@ -158,218 +169,276 @@ const PROFILE_KINDS = new Set<string>([
   "sub_midget",
   "sub",
 ]);
-const AIR_KINDS = new Set<string>([
-  "fighter",
-  "bomber",
-  "mpa",
-  "aew",
-  "air_tanker",
-  "helicopter",
-  "uav",
-  "aircraft",
-]);
 
-/** How a figure is drawn on the map. */
-export function figureShape(kind: FigureKind): "profile" | "topdown" | "icon" {
-  if (PROFILE_KINDS.has(kind)) return "profile";
-  if (AIR_KINDS.has(kind)) return "topdown";
-  return "icon";
+/** How a figure is drawn on the map: top-down (rotated to the heading) or an upright icon. */
+export function figureShape(kind: FigureKind): "topdown" | "icon" {
+  return SEA_KINDS.has(kind) || AIR_KINDS.has(kind) ? "topdown" : "icon";
 }
+
+/**
+ * Nominal size of a figure's 64 px canvas on the ground, metres. Exaggerated far beyond real
+ * lengths so a figure reads at planning scale; the figure then shrinks as the map zooms out and
+ * grows as it zooms in, within FIGURE_MIN_PX–FIGURE_MAX_PX. Ships keep their relative sizes,
+ * because each hull is drawn at its own length on the shared canvas.
+ */
+export function figureSizeM(kind: FigureKind): number {
+  return SEA_KINDS.has(kind) ? 9000 : 7000;
+}
+export const FIGURE_MIN_PX = 18;
+export const FIGURE_MAX_PX = 72;
 
 // ---------------------------------------------------------------------------------------------
-// Side profiles: a parametric ship on a 96 × 48 canvas, waterline at y = 34, bow to the right.
+// Plan views: a parametric hull on a 64 × 64 canvas, bow up, centred.
 
-interface Profile {
-  /** Hull length, px (at most 88). */
+/** Deck features, positions as fractions of the hull from bow (0) to stern (1). */
+type Feat =
+  | ["box", number, number, number] // from, to, width as a fraction of the beam
+  | ["dot", number, number] // at, radius px (a gun mount or crane)
+  | ["pad", number, number] // helicopter deck, from, to
+  | ["hatches", number, number, number] // from, to, count
+  | ["line", number, number]; // from, to (a centreline pipe)
+
+interface Plan {
+  /** Hull length on the canvas, px (at most 62). */
   len: number;
-  /** Hull height above the waterline, px. */
-  fb: number;
-  /** Bow rake, px. */
-  rake?: number;
-  /** Superstructure blocks: [x from the stern, width, height]. */
-  blocks?: [number, number, number][];
-  /** Masts: [x from the stern, height above the deck]. */
-  masts?: [number, number][];
-  /** Gun turrets: x from the stern. */
-  guns?: number[];
-  /** Small boxes on the deck (containers, hatches): [x, width, height]. */
-  cargo?: [number, number, number][];
-  /** A flight deck overhanging the hull (carriers, amphibious ships). */
-  flat?: boolean;
+  /** Beam, px. */
+  beam: number;
+  feats: Feat[];
 }
 
-const WL = 34;
+const DECK = `fill="#0b1b2b" fill-opacity="0.32" stroke="none"`;
+const MARK = `fill="none" stroke="#0b1b2b" stroke-opacity="0.5" stroke-width="0.8"`;
 
-function profileSvg(p: Profile): string {
-  const x0 = (96 - p.len) / 2;
-  const x1 = x0 + p.len;
-  const top = WL - p.fb;
-  const rake = p.rake ?? Math.min(10, p.len * 0.12);
-  const hull = `<path d="M${x0} ${top} L${x1} ${top} L${x1 - rake} ${WL + 3} L${x0 + 2} ${WL + 3} L${x0} ${WL} Z"/>`;
-  const deck = p.flat ? `<rect x="${x0 - 2}" y="${top - 3}" width="${p.len + 4}" height="3"/>` : "";
-  const boxes = (list: [number, number, number][] | undefined) =>
-    (list ?? [])
-      .map(([x, w, h]) => `<rect x="${x0 + x}" y="${top - h}" width="${w}" height="${h}"/>`)
-      .join("");
-  const masts = (p.masts ?? [])
-    .map(([x, h]) => {
-      const mx = x0 + x;
-      return `<path d="M${mx} ${top} V${top - h} M${mx - 3} ${top - h + 3} H${mx + 3}" fill="none"/>`;
+/** Beams are drawn wider than true (as in recognition sketches), so a hull reads at map size. */
+const BEAM_X = 1.6;
+
+function planSvg(plan: Plan): string {
+  const p = { ...plan, beam: plan.beam * BEAM_X };
+  const y0 = 32 - p.len / 2;
+  const y1 = 32 + p.len / 2;
+  const b = p.beam / 2;
+  const at = (f: number) => y0 + p.len * f;
+  const hull = `<path d="M32 ${y0} Q${32 + b} ${at(0.12)} ${32 + b} ${at(0.3)} L${32 + b * 0.92} ${y1} L${32 - b * 0.92} ${y1} L${32 - b} ${at(0.3)} Q${32 - b} ${at(0.12)} 32 ${y0} Z"/>`;
+  const feats = p.feats
+    .map((f) => {
+      switch (f[0]) {
+        case "box": {
+          const w = p.beam * f[3];
+          return `<rect x="${32 - w / 2}" y="${at(f[1])}" width="${w}" height="${at(f[2]) - at(f[1])}" ${DECK}/>`;
+        }
+        case "dot":
+          return `<circle cx="32" cy="${at(f[1])}" r="${f[2]}" ${DECK}/>`;
+        case "pad": {
+          const w = p.beam * 0.8;
+          const y = at(f[1]);
+          const h = at(f[2]) - y;
+          return `<rect x="${32 - w / 2}" y="${y}" width="${w}" height="${h}" ${MARK}/><path d="M${32 - w / 5} ${y + h / 2} H${32 + w / 5}" ${MARK}/>`;
+        }
+        case "hatches": {
+          const count = f[3];
+          const step = (at(f[2]) - at(f[1])) / count;
+          const w = p.beam * 0.6;
+          return Array.from({ length: count }, (_, k) => {
+            const y = at(f[1]) + k * step + step * 0.15;
+            return `<rect x="${32 - w / 2}" y="${y}" width="${w}" height="${step * 0.7}" ${DECK}/>`;
+          }).join("");
+        }
+        case "line":
+          return `<path d="M32 ${at(f[1])} V${at(f[2])}" ${MARK}/>`;
+      }
     })
     .join("");
-  const guns = (p.guns ?? [])
-    .map((x) => {
-      const gx = x0 + x;
-      return `<rect x="${gx - 2.5}" y="${top - 3}" width="5" height="3"/><path d="M${gx + 2} ${top - 2} H${gx + 7}" fill="none"/>`;
-    })
-    .join("");
-  return deck + hull + boxes(p.blocks) + boxes(p.cargo) + masts + guns;
+  return hull + feats;
 }
 
-/** A submarine: a long rounded hull at the waterline, a sail and a rudder. */
-function subSvg(len: number, h: number, sailAt: number): string {
-  const x0 = (96 - len) / 2;
-  const x1 = x0 + len;
-  const y = WL - h / 2;
-  const hull = `<path d="M${x0 + 4} ${y} H${x1 - h / 2} A${h / 2} ${h / 2} 0 0 1 ${x1 - h / 2} ${y + h} H${x0 + 4} L${x0} ${y + h / 2} Z"/>`;
-  const sail = `<path d="M${x0 + sailAt} ${y} L${x0 + sailAt + 2} ${y - 7} H${x0 + sailAt + 11} L${x0 + sailAt + 12} ${y} Z"/>`;
-  const rudder = `<path d="M${x0 + 1} ${y + h / 2} L${x0 - 3} ${y - 3} L${x0 + 4} ${y} Z"/>`;
-  return hull + sail + rudder;
+/** A carrier or amphibious ship: a full-length flight deck with the island to starboard. */
+function flatTopSvg(len: number, deck: number, angled: boolean): string {
+  const y0 = 32 - len / 2;
+  const y1 = 32 + len / 2;
+  const hw = deck / 2;
+  const flight = `<path d="M${32 - hw + 2} ${y0} H${32 + hw - 2} L${32 + hw} ${y0 + 4} V${y1} H${32 - hw} V${y0 + 4} Z"/>`;
+  const island = `<rect x="${32 + hw - 4}" y="${y0 + len * 0.4}" width="3" height="${len * 0.16}" ${DECK}/>`;
+  const marks = angled
+    ? `<path d="M${32 - hw + 2} ${y0 + len * 0.15} L${32 + 1} ${y1 - 2}" ${MARK}/>`
+    : `<path d="M32 ${y0 + 4} V${y1 - 3}" ${MARK} stroke-dasharray="3 2"/>`;
+  return flight + island + marks;
 }
 
-const PROFILES: Record<ShipKind, Profile> = {
-  carrier: { len: 88, fb: 8, rake: 6, flat: true, blocks: [[58, 8, 11]], masts: [[62, 16]] },
-  amphib: { len: 82, fb: 10, rake: 4, flat: true, blocks: [[50, 10, 10]], masts: [[55, 15]] },
+/** A submarine: a long rounded hull, the sail forward of midships, tail fins across the stern. */
+function subPlanSvg(len: number, trueBeam: number): string {
+  const y0 = 32 - len / 2;
+  const y1 = 32 + len / 2;
+  const b = (trueBeam * BEAM_X) / 2;
+  const hull = `<path d="M32 ${y0} C${32 + b} ${y0} ${32 + b} ${y0 + len * 0.15} ${32 + b} ${y0 + len * 0.25} L${32 + b} ${y0 + len * 0.7} Q${32 + b * 0.6} ${y1} 32 ${y1} Q${32 - b * 0.6} ${y1} ${32 - b} ${y0 + len * 0.7} L${32 - b} ${y0 + len * 0.25} C${32 - b} ${y0 + len * 0.15} ${32 - b} ${y0} 32 ${y0} Z"/>`;
+  const sail = `<rect x="${32 - b * 0.45}" y="${y0 + len * 0.22}" width="${b * 0.9}" height="${len * 0.14}" rx="1" ${DECK}/>`;
+  const fins = `<path d="M${32 - b - 2.5} ${y1 - len * 0.06} H${32 + b + 2.5}" stroke-width="1.6"/>`;
+  return hull + sail + fins;
+}
+
+const PLANS: Record<Exclude<ShipKind, "carrier" | "amphib">, Plan> = {
   cruiser: {
-    len: 82,
-    fb: 6,
-    blocks: [
-      [28, 22, 9],
-      [52, 8, 6],
+    len: 58,
+    beam: 9,
+    feats: [
+      ["dot", 0.15, 2.4],
+      ["box", 0.21, 0.29, 0.6],
+      ["box", 0.34, 0.6, 0.7],
+      ["box", 0.62, 0.7, 0.55],
+      ["pad", 0.82, 0.98],
     ],
-    masts: [
-      [36, 17],
-      [56, 12],
-    ],
-    guns: [68, 12],
   },
   destroyer: {
-    len: 76,
-    fb: 6,
-    blocks: [
-      [26, 20, 9],
-      [48, 7, 5],
+    len: 54,
+    beam: 8.5,
+    feats: [
+      ["dot", 0.17, 2.2],
+      ["box", 0.23, 0.3, 0.55],
+      ["box", 0.34, 0.58, 0.7],
+      ["pad", 0.8, 0.98],
     ],
-    masts: [[34, 16]],
-    guns: [62],
   },
   frigate: {
-    len: 68,
-    fb: 6,
-    blocks: [
-      [10, 12, 6],
-      [24, 16, 9],
+    len: 48,
+    beam: 8,
+    feats: [
+      ["dot", 0.18, 2.1],
+      ["box", 0.3, 0.55, 0.7],
+      ["box", 0.55, 0.68, 0.75],
+      ["pad", 0.7, 0.98],
     ],
-    masts: [[30, 14]],
-    guns: [56],
   },
-  corvette: { len: 56, fb: 5, blocks: [[16, 18, 8]], masts: [[24, 12]], guns: [45] },
-  fast_attack: { len: 40, fb: 4, rake: 8, blocks: [[12, 12, 6]], masts: [[17, 9]], guns: [32] },
-  patrol: { len: 58, fb: 6, blocks: [[22, 18, 8]], masts: [[30, 12]], guns: [48] },
-  mcm: { len: 46, fb: 5, blocks: [[18, 14, 8]], masts: [[24, 12]], cargo: [[4, 8, 4]] },
+  corvette: {
+    len: 40,
+    beam: 7,
+    feats: [
+      ["dot", 0.2, 1.9],
+      ["box", 0.35, 0.62, 0.7],
+      ["box", 0.7, 0.8, 0.5],
+    ],
+  },
+  fast_attack: {
+    len: 30,
+    beam: 6,
+    feats: [
+      ["dot", 0.2, 1.5],
+      ["box", 0.38, 0.6, 0.7],
+      ["box", 0.66, 0.86, 0.55],
+    ],
+  },
+  patrol: {
+    len: 42,
+    beam: 8,
+    feats: [
+      ["dot", 0.18, 1.7],
+      ["box", 0.3, 0.55, 0.75],
+      ["pad", 0.74, 0.97],
+    ],
+  },
+  mcm: {
+    len: 34,
+    beam: 7.5,
+    feats: [
+      ["box", 0.3, 0.6, 0.75],
+      ["box", 0.75, 0.95, 0.6],
+    ],
+  },
   landing: {
-    len: 78,
-    fb: 8,
-    rake: 3,
-    blocks: [[4, 16, 12]],
-    masts: [[10, 14]],
-    cargo: [[24, 30, 3]],
+    len: 54,
+    beam: 11,
+    feats: [
+      ["hatches", 0.08, 0.66, 3],
+      ["box", 0.7, 0.92, 0.85],
+    ],
   },
   oiler: {
-    len: 86,
-    fb: 7,
-    blocks: [
-      [4, 14, 11],
-      [40, 4, 12],
-      [52, 4, 12],
+    len: 60,
+    beam: 11,
+    feats: [
+      ["box", 0.08, 0.18, 0.8],
+      ["box", 0.34, 0.37, 1],
+      ["box", 0.5, 0.53, 1],
+      ["line", 0.2, 0.75],
+      ["box", 0.78, 0.95, 0.85],
     ],
-    masts: [[10, 16]],
   },
   stores: {
-    len: 80,
-    fb: 8,
-    blocks: [[4, 14, 11]],
-    masts: [
-      [10, 15],
-      [40, 14],
-      [60, 14],
+    len: 58,
+    beam: 11,
+    feats: [
+      ["dot", 0.28, 1.8],
+      ["dot", 0.5, 1.8],
+      ["hatches", 0.12, 0.7, 3],
+      ["box", 0.78, 0.95, 0.85],
     ],
   },
-  tug: { len: 34, fb: 5, rake: 6, blocks: [[10, 12, 9]], masts: [[16, 10]] },
+  tug: { len: 24, beam: 8, feats: [["box", 0.2, 0.55, 0.75]] },
   survey: {
-    len: 56,
-    fb: 6,
-    blocks: [[14, 22, 8]],
-    masts: [
-      [20, 16],
-      [30, 14],
-      [38, 12],
+    len: 40,
+    beam: 8,
+    feats: [
+      ["box", 0.2, 0.5, 0.75],
+      ["box", 0.75, 0.95, 0.6],
     ],
   },
   container: {
-    len: 88,
-    fb: 7,
-    blocks: [[4, 10, 12]],
-    cargo: [
-      [16, 14, 7],
-      [31, 14, 7],
-      [46, 14, 7],
-      [61, 14, 6],
+    len: 62,
+    beam: 12,
+    feats: [
+      ["hatches", 0.12, 0.78, 6],
+      ["box", 0.8, 0.93, 0.9],
     ],
   },
   bulk: {
-    len: 86,
-    fb: 7,
-    blocks: [[4, 10, 11]],
-    cargo: [
-      [20, 9, 3],
-      [34, 9, 3],
-      [48, 9, 3],
-      [62, 9, 3],
+    len: 60,
+    beam: 11,
+    feats: [
+      ["hatches", 0.14, 0.74, 5],
+      ["box", 0.8, 0.95, 0.85],
     ],
   },
-  tanker: { len: 88, fb: 5, blocks: [[4, 10, 11]], cargo: [[20, 60, 2]] },
+  tanker: {
+    len: 62,
+    beam: 12,
+    feats: [
+      ["line", 0.08, 0.78],
+      ["box", 0.82, 0.96, 0.85],
+    ],
+  },
   roro: {
-    len: 82,
-    fb: 6,
-    rake: 4,
-    blocks: [
-      [4, 74, 12],
-      [60, 10, 15],
+    len: 56,
+    beam: 11,
+    feats: [
+      ["box", 0.06, 0.94, 0.88],
+      ["box", 0.12, 0.3, 0.6],
     ],
   },
   trawler: {
-    len: 40,
-    fb: 6,
-    rake: 6,
-    blocks: [[22, 10, 8]],
-    masts: [
-      [8, 12],
-      [28, 12],
+    len: 26,
+    beam: 7,
+    feats: [
+      ["box", 0.2, 0.45, 0.7],
+      ["box", 0.75, 0.95, 0.6],
     ],
   },
-  supply: { len: 64, fb: 6, blocks: [[46, 12, 10]], masts: [[50, 14]], cargo: [[6, 30, 2]] },
-  ship: { len: 66, fb: 6, blocks: [[22, 18, 8]], masts: [[30, 12]] },
+  supply: { len: 40, beam: 9, feats: [["box", 0.06, 0.3, 0.85]] },
+  ship: { len: 46, beam: 8, feats: [["box", 0.35, 0.6, 0.7]] },
 };
 
-function subProfile(kind: SubKind): string {
+function seaSvg(kind: ShipKind | SubKind): string {
   switch (kind) {
+    case "carrier":
+      return flatTopSvg(60, 20, true);
+    case "amphib":
+      return flatTopSvg(58, 15, false);
     case "sub_nuclear":
-      return subSvg(84, 9, 26);
+      return subPlanSvg(60, 7);
     case "sub_midget":
-      return subSvg(38, 6, 12);
+      return subPlanSvg(26, 4);
+    case "sub_diesel":
+    case "sub":
+      return subPlanSvg(46, 6.5);
     default:
-      return subSvg(66, 8, 22);
+      return planSvg(PLANS[kind]);
   }
 }
 
@@ -473,48 +542,28 @@ function badge(aff: Affiliation, x: number, y: number, scale: number): string {
 
 const cache = new Map<string, string>();
 
-/** Canvas size of a figure's icon, px: profiles are cropped to the strip they occupy. */
+/** Canvas size of a figure's icon, px (every figure is drawn on 64 × 64). */
 export function figureCanvas(kind: FigureKind): [number, number] {
-  return figureShape(kind) === "profile" ? [96, 36] : [64, 64];
+  void kind;
+  return [64, 64];
 }
 
-/** Profiles are drawn with their heights stretched 1.6 × about the waterline (recognition-chart
- * style), so a long, low hull still reads at map size; then cropped to y 6–42. */
-const PROFILE_STRETCH = `matrix(1 0 0 1.6 0 ${-0.6 * WL})`;
-const PROFILE_VIEWBOX = "0 6 96 36";
-
 /**
- * An SVG data URL for a figure in its affiliation colour. Profiles face right, or left when the
- * unit heads west (`facingLeft`). Cached by kind, affiliation, selection and facing.
+ * An SVG data URL for a figure in its affiliation colour, nose up (the map turns it to the
+ * heading). Cached by kind, affiliation and selection.
  */
-export function figureUrl(
-  kind: FigureKind,
-  aff: Affiliation,
-  selected: boolean,
-  facingLeft = false,
-): string {
-  const key = `${kind}-${aff}-${selected}-${facingLeft}`;
+export function figureUrl(kind: FigureKind, aff: Affiliation, selected: boolean): string {
+  const key = `${kind}-${aff}-${selected}`;
   const hit = cache.get(key);
   if (hit !== undefined) return hit;
-  const shape = figureShape(kind);
-  const [w, h] = figureCanvas(kind);
-  let body: string;
-  if (shape === "profile") {
-    body = kind.startsWith("sub")
-      ? subProfile(kind as SubKind)
-      : profileSvg(PROFILES[kind as ShipKind]);
-  } else if (shape === "topdown") {
-    body = TOPDOWN[kind as AirKind];
-  } else {
-    body = LAND[kind as LandKind];
-  }
-  const flip = facingLeft && shape === "profile" ? ` transform="matrix(-1 0 0 1 ${w} 0)"` : "";
-  if (shape === "profile") body = `<g transform="${PROFILE_STRETCH}">${body}</g>`;
-  const viewBox = shape === "profile" ? PROFILE_VIEWBOX : `0 0 ${w} ${h}`;
+  const body = SEA_KINDS.has(kind)
+    ? seaSvg(kind as ShipKind | SubKind)
+    : AIR_KINDS.has(kind)
+      ? TOPDOWN[kind as AirKind]
+      : LAND[kind as LandKind];
   const stroke = selected ? "#ffffff" : "#0b1b2b";
-  const sw = selected ? 2.5 : 1.5;
-  const mark = shape === "profile" ? badge(aff, 1, 7, 0.2) : badge(aff, 0, 0, 0.25);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${viewBox}"><g fill="${rgb(AFFILIATION_COLOUR[aff])}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"${flip}>${body}</g>${mark}</svg>`;
+  const sw = selected ? 2 : 1.2;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><g fill="${rgb(AFFILIATION_COLOUR[aff])}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round">${body}</g>${badge(aff, 0, 0, 0.22)}</svg>`;
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   cache.set(key, url);
   return url;

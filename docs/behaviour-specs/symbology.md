@@ -45,16 +45,20 @@ The code comes from what the viewing side knows:
 
 **View › Unit figures** (on by default; off shows the APP-6 frames and codes above) draws each unit as a figure of what it is (`apps/desktop/src/lib/silhouettes.ts`):
 
-- **Ships and submarines:** side profiles.
-  - Each has its own: carrier, amphibious ship, cruiser, destroyer, frigate, corvette, fast attack craft, patrol vessel, MCM vessel, landing ship, oiler, stores ship, tug, survey ship, and container, bulk, tanker, ro-ro, trawler and supply vessels.
-  - Submarines are nuclear, diesel or midget.
-  - The bow faces the direction of travel, and heights are drawn 1.6× so a low hull reads at map size.
+- **Ships and submarines:** plan views (top-down) rotated to the heading, with the bow pointing the way the unit moves.
+  - Each class has its own hull length and deck features: gun mounts, superstructure, helicopter decks, flight decks with an island, container rows, hatches, tanker pipework, a submarine's sail and tail fins.
+  - Beams are drawn 1.6× true, so a hull reads at map size.
 - **Aircraft:** top-down outlines rotated to the heading. Fighter, bomber, maritime patrol, AEW (with rotodome), tanker, helicopter (rotor disc) and UAV.
 - **Land sites:** upright icons for missile and SAM batteries, radar sites, airbases and ports.
 - **Munitions in flight:** top-down, rotated to the heading. Anti-ship, surface-to-air, cruise and air-to-air missiles; torpedoes, ASW rockets, bombs, gunfire, depth charges, decoys and mines. A homing weapon is outlined in white.
 - **Colour and badge:** each figure is filled in its affiliation colour and carries a small APP-6 frame badge, so affiliation still reads by shape.
 - **Contacts:** a contact shows a figure only as far as it is classified (class, then category, then domain). An unclassified contact keeps the APP-6 frame.
 - **Coverage:** every generic platform class and every weapon has a figure, and `ui.test.ts` checks this.
+- **Size follows the map scale.** Each figure has a nominal size on the ground: ships 9 km, aircraft and land sites 7 km, and munitions 2.8 km (gunfire 1.2 km). The size is exaggerated so it reads at planning scale.
+  - Figures shrink as the map zooms out and grow as it zooms in.
+  - On screen they stay between 18 and 72 px (munitions 9–30 px).
+  - Ships keep their relative sizes, because each hull is drawn at its own length.
+- **Contacts** are drawn north-up, because a side does not know a contact's course.
 
 ## Weapon outcomes
 

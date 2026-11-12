@@ -5,9 +5,10 @@
 ### Added (map)
 
 - **Units drawn as figures of what they are** (default; **View › Unit figures**, off for APP-6 frames):
-  - side profiles for ships and submarines, facing their heading;
+  - plan views of ships and submarines with their deck features, rotated to their heading;
   - top-down outlines for aircraft, rotated to their heading;
   - icons for land sites.
+  - Figures are sized on the ground, so they scale with the map zoom, kept between 18 and 72 px on screen.
 
   Each figure has an affiliation colour and badge. A contact shows a figure only as far as it is classified.
 - **Munitions in flight drawn as figures:** missiles, torpedoes, rockets, bombs, gunfire, decoys. A side's tracks on incoming weapons show as missile or torpedo figures.
