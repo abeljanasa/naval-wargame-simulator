@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 2: terrain and bathymetry packs)
+
+- **Terrain packs** (`.nwsterrain`):
+  - Integer-grid heights from GEBCO 2020, whose land heights are SRTM15+. The packs and the raw downloads stay outside the repository; their SHA-256 sums are in the data dictionary.
+  - Two packs are built: the Philippine area at 15″ (30.5 MB) and the world at 4′ (17.5 MB). The world layer measured 64.5 MB at 2′, so 4′ is the installer layer.
+- **`nws-batch terrain build | info | sample`:**
+  - builds a pack from a GEBCO netCDF-3 file (the reader is our own, so there is no C library);
+  - averages blocks for coarser layers;
+  - writes a `.sha256` file next to the pack.
+- **Engine:**
+  - Deterministic bilinear sampling, with a 20,000-sample golden on both CI operating systems.
+  - The finest covering pack wins.
+  - The terrain id is in the state hash when packs are set; runs without packs keep their hashes and every golden replay is unchanged.
+  - Exercise records store the terrain id, and a replay refuses packs that differ, naming the ones it needs.
+- **Desktop:**
+  - **File › Install terrain pack…** checks the pack against its `.sha256` file before copying it in.
+  - Packs are read at start-up, and one that no longer matches its `.sha256` is set aside with the reason.
+  - **View › Depth shading / Depth contours / Relief** draw layers below the coastline and every unit.
+  - **View › Terrain packs…** lists what is installed. The status bar shows the depth or height under the cursor, and the map credits GEBCO.
+- **New direct dependencies:** `flate2` (pure-Rust backend) and `sha2`. Both were already in the lockfile, so no new crates.
+
 ### Added (Phase 4, slice 1: Monte Carlo batch)
 
 - **`nws-batch mc <scenario> --runs N [--seed S] [--threads T] --out <dir>`** runs a scenario for N seeds in parallel. Each run is independent and deterministic, so the results don't depend on the thread count, and a test checks this.

@@ -19,14 +19,23 @@ Your workstation needs:
 
 | Area | What it shows |
 |---|---|
-| **Menu bar** | **File**: open a scenario; new, edit or edit-from-file in the scenario editor. **View**: night shading, dark theme, the left-panel tabs, the platform database. **Exercise**: run or pause, step, review and AAR; for the white cell, each console tab. **Help**: keyboard shortcuts. The scenario name is on the right |
+| **Menu bar** | **File**: open a scenario; new, edit or edit-from-file in the scenario editor; install a terrain pack. **View**: night shading, dark theme, unit figures, depth shading, depth contours, relief, terrain packs, the left-panel tabs, the platform database. **Exercise**: run or pause, step, review and AAR; for the white cell, each console tab. **Help**: keyboard shortcuts. The scenario name is on the right |
 | **Toolbar** | Run/pause, step and time compression; game time, achieved speed (e.g. `60×`) or `paused`, sea state and weather; **REPLAY** while a replay is being reviewed; your **Seat** |
 | **Left panel** | Tabs: **Picture** (your units and contacts), **Messages** (with a count of unread messages), **Coverage** (when your side has sense zones) |
 | **Right panel** | **Unit**: the selected unit (details, orders, engage). For the white cell, also **Injects**, **Events**, **Planning**, **Seats** and **Log**; for seats that run the clock, **Review**. A side seat sees this panel only while a unit is selected |
-| **Status bar** | Refused orders and other errors, map-click prompts, and key hints |
+| **Status bar** | Refused orders and other errors, map-click prompts, and key hints; on the right, the depth or height under the cursor when a terrain pack covers it |
 | **Map** | Your units, contacts with their 95 % error ellipses, ESM bearing lines, your weapons in flight, the enemy weapons your sensors track (rings: red missiles, blue torpedoes), minefields, reference points, your side's planning layer (zones and facilities, with their areas), sense coverage, and the night side of the earth |
 
 **Map symbols.** Units are drawn as figures of what they are, seen from above and turned to their heading: ship and submarine hulls, aircraft outlines, and icons for land sites. They scale with the map, smaller as you zoom out. Each is coloured by affiliation, with a small affiliation badge. Missiles, torpedoes and other weapons in flight are drawn the same way. A contact shows a figure once your side has classified it. **View › Unit figures** switches to APP-6 frames. **Hits, misses and weapons shot down** show as a marker where they happened, and as a notice in the status bar: your own shots, and attacks on your units. With *Unit figures* off, frames follow APP-6 conventions by domain: a full frame for surface, the upper half for air, the lower half for subsurface. Colour and shape show affiliation. The code inside the frame shows the unit's type, such as `DDG`, `FFG`, `SSK`, `MV`, `F` (fighter) or `H` (helicopter). For a contact it appears once your side has classified it that far. The full list is in [symbology.md](../behaviour-specs/symbology.md). A short line ahead of each unit shows where it will be in 6 minutes. A dashed stub shows the start of a unit's route; select the unit to see all of it. ESM bearing lines are drawn 40 km long. Where labels would overlap, the less important one is hidden until you zoom in. The order, from most important, is: the selected unit, units, contacts, facilities, minefields, zones, reference points. Sense zones are blue outlines, engage zones red. Facilities are labelled `CP` (command post), `PORT`, `ANCH` (anchorage) or `RAS` (refuelling point).
+
+**Terrain packs.** With a terrain pack installed, the map shades the sea by depth, pale inshore and dark offshore. It also draws depth contours, fewer as you zoom out, and hill shading over land. Each layer can be turned off in the **View** menu. The status bar shows the depth or height under the cursor. **View › Terrain packs…** lists the packs, what they cover, and whether this exercise runs with them. Depths are for planning, not for navigation.
+
+- **Packs:** a regional pack (the Philippine area at 15″, about 460 m) and a world layer at 4′, about 7.4 km. Where both cover, the regional pack is used.
+- **Installing one:** the white cell installs a pack with **File › Install terrain pack…**, choosing the `.nwsterrain` file **and** its `.sha256` file together.
+  - The app checks the pack against the `.sha256` file before copying it in, and refuses a damaged or altered copy.
+  - No network is used.
+- **When a pack takes effect:** an exercise that has not started takes the pack at once; otherwise the next scenario you open does. A running exercise keeps the terrain it started with, so its record still replays.
+- **Records and terrain:** a record made with terrain packs replays only on a machine with the same packs installed. The app names the packs it needs.
 
 ## 3. Your seat
 
@@ -133,4 +142,6 @@ The white cell runs the replay and the after-action review (AAR). At a side seat
 | "Cannot connect to the simulation engine" | Restart the app. |
 | Time does not move | The white cell has paused it, or your window does not control time. |
 | An order seems ignored | Look for a red refusal in the status bar at the bottom: the reason is given. |
-| A record will not open | The app opens only `.nwsrec` records from this build or older. |
+| A record will not open | The app opens only `.nwsrec` records from this build or older. A record made with terrain packs needs the same packs installed (the message names them). |
+| No depth shading on the map | No terrain pack covers the area, or the layers are off in **View**. **View › Terrain packs…** shows what is installed and any pack that was set aside, and why. |
+| A terrain pack is "set aside" | It no longer matches its `.sha256` file: the copy is damaged or altered. Install a good copy. |

@@ -2,12 +2,14 @@
 //!
 //! `run` reports final state hashes (the CI cross-OS determinism matrix); `aar` writes the AAR
 //! tables of one run; `mc` runs many seeds in parallel and summarises the measures of
-//! effectiveness (Phase 4 slice 1); `bench` measures throughput.
+//! effectiveness (Phase 4 slice 1); `terrain` builds and inspects terrain and bathymetry packs
+//! (slice 2); `bench` measures throughput.
 
 #![forbid(unsafe_code)]
 
 mod bench;
 mod mc;
+mod terrain;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
@@ -93,6 +95,11 @@ enum Cmd {
         #[arg(long)]
         db: Option<PathBuf>,
     },
+    /// Terrain and bathymetry packs: build one from a GEBCO download, describe one, or sample it.
+    Terrain {
+        #[command(subcommand)]
+        command: TerrainCmd,
+    },
     /// Measure throughput (game seconds per wall second) against a performance budget.
     /// Build with `--release`; debug builds are 10–50× slower.
     Bench {
@@ -108,6 +115,36 @@ enum Cmd {
         /// Fail (exit 1) if the achieved ratio is below this.
         #[arg(long)]
         min_ratio: Option<f64>,
+    },
+}
+
+#[derive(Subcommand)]
+enum TerrainCmd {
+    /// Build a `.nwsterrain` pack (and its `.sha256`) from a GEBCO netCDF-3 file, as served by
+    /// NOAA ERDDAP (`elevation[latitude][longitude]`).
+    Build {
+        /// The netCDF file.
+        input: PathBuf,
+        /// Pack name, such as `gebco2020-par-15s` (letters, digits, `-`, `.`).
+        #[arg(long)]
+        name: String,
+        /// Average `N × N` cells into one (a coarser, smaller pack).
+        #[arg(long, default_value_t = 1)]
+        average: u32,
+        /// Output file (`.nwsterrain`).
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Print a pack's id, SHA-256, grid and coverage as JSON.
+    Info { pack: PathBuf },
+    /// Print the height and depth at a point, from the finest pack that covers it.
+    Sample {
+        #[arg(required = true)]
+        packs: Vec<PathBuf>,
+        #[arg(long, allow_hyphen_values = true)]
+        lat: f64,
+        #[arg(long, allow_hyphen_values = true)]
+        lon: f64,
     },
 }
 
@@ -174,6 +211,34 @@ fn main() -> Result<()> {
             ticks,
             db,
         } => aar(&input, &out, seed, ticks, db.as_deref()),
+        Cmd::Terrain { command } => {
+            let out = match command {
+                TerrainCmd::Build {
+                    input,
+                    name,
+                    average,
+                    out,
+                } => {
+                    let (h, bytes) = terrain::build(&input, &name, average)?;
+                    let sha = terrain::write(&out, &bytes)?;
+                    serde_json::json!({
+                        "out": out,
+                        "sha256": sha,
+                        "bytes": bytes.len(),
+                        "uncompressed_bytes": u64::from(h.rows) * u64::from(h.cols) * 2,
+                        "rows": h.rows,
+                        "cols": h.cols,
+                        "cell_arcsec": h.cell_arcsec(),
+                        "min_m": h.min_m,
+                        "max_m": h.max_m,
+                    })
+                }
+                TerrainCmd::Info { pack } => terrain::info(&pack)?,
+                TerrainCmd::Sample { packs, lat, lon } => terrain::sample(&packs, lat, lon)?,
+            };
+            println!("{out}");
+            Ok(())
+        }
         Cmd::Mc {
             scenario,
             runs,

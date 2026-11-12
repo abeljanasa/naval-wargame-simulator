@@ -15,6 +15,7 @@ sim-aar.workspace = true
 sim-core.workspace = true
 sim-scenario.workspace = true
 sim-db.workspace = true
+sim-geo.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true

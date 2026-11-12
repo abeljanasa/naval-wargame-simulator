@@ -5,6 +5,7 @@ use crate::report::AarReport;
 use crate::AarError;
 use sim_core::{SaveGame, SideId, Simulation, Snapshot, Tick, Viewer};
 use sim_geo::land::LandMask;
+use sim_geo::terrain::Terrain;
 use std::sync::Arc;
 
 /// Keyframes are at least this many ticks apart.
@@ -16,6 +17,7 @@ pub const MAX_KEYFRAMES: u64 = 240;
 pub struct Replay {
     record: ExerciseRecord,
     mask: Option<Arc<LandMask>>,
+    terrain: Option<Arc<Terrain>>,
     interval: u64,
     /// `keyframes[i]` is the state at tick `i * interval`, without the event log.
     keyframes: Vec<SaveGame>,
@@ -34,11 +36,16 @@ impl std::fmt::Debug for Replay {
     }
 }
 
-fn fresh(record: &ExerciseRecord, mask: Option<&Arc<LandMask>>) -> Result<Simulation, AarError> {
+fn fresh(
+    record: &ExerciseRecord,
+    mask: Option<&Arc<LandMask>>,
+    terrain: Option<&Arc<Terrain>>,
+) -> Result<Simulation, AarError> {
     let mut sim = Simulation::new(record.seed);
     if let Some(m) = mask {
         sim.set_land_mask(m.clone());
     }
+    sim.set_terrain(terrain.cloned());
     let mut ordered: Vec<_> = record.commands.iter().collect();
     ordered.sort_by_key(|c| c.seq);
     for c in ordered {
@@ -51,6 +58,23 @@ impl Replay {
     /// Rebuilds the run to its end, checks the final hash, builds the AAR report from the full
     /// logs, and leaves the cursor at the end. `sides` names the sides for the report.
     pub fn open(record: ExerciseRecord, sides: &[(SideId, String)]) -> Result<Self, AarError> {
+        Self::open_with_terrain(record, sides, None)
+    }
+
+    /// As [`Replay::open`], with the terrain packs installed here. A record made with terrain
+    /// opens only when `terrain` has exactly its id; a record made without ignores it.
+    pub fn open_with_terrain(
+        record: ExerciseRecord,
+        sides: &[(SideId, String)],
+        terrain: Option<Arc<Terrain>>,
+    ) -> Result<Self, AarError> {
+        let terrain = match record.terrain.as_deref() {
+            None => None,
+            Some(id) => match terrain {
+                Some(t) if t.id() == id => Some(t),
+                _ => return Err(AarError::UnknownTerrain(id.to_owned())),
+            },
+        };
         let mask = match record.land_mask.as_deref() {
             None => None,
             Some(id) => {
@@ -63,7 +87,7 @@ impl Replay {
         };
         let end = record.end_tick.0;
         let interval = MIN_KEYFRAME_INTERVAL.max(end.div_ceil(MAX_KEYFRAMES));
-        let mut sim = fresh(&record, mask.as_ref())?;
+        let mut sim = fresh(&record, mask.as_ref(), terrain.as_ref())?;
         let mut keyframes = Vec::new();
         loop {
             let t = sim.tick().0;
@@ -80,6 +104,7 @@ impl Replay {
         Ok(Self {
             record,
             mask,
+            terrain,
             interval,
             keyframes,
             sim,
@@ -133,9 +158,10 @@ impl Replay {
                     if let Some(m) = &self.mask {
                         sim.set_land_mask(m.clone());
                     }
+                    sim.set_terrain(self.terrain.clone());
                     sim
                 }
-                None => fresh(&self.record, self.mask.as_ref())?,
+                None => fresh(&self.record, self.mask.as_ref(), self.terrain.as_ref())?,
             };
         }
         self.sim.run_until(Tick(target));

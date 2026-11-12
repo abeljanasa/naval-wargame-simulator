@@ -35,6 +35,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
 use sim_c2::track_affiliation;
 use sim_geo::land::LandMask;
+use sim_geo::terrain::Terrain;
 use sim_geo::GeoPoint;
 use sim_weapons::Status;
 use std::collections::BTreeMap;
@@ -73,6 +74,11 @@ impl CommandLog {
 /// (unit tests, or scenarios that opt out).
 #[derive(Debug, Default, Clone, Resource)]
 pub(crate) struct LandMaskRes(pub(crate) Option<Arc<LandMask>>);
+
+/// Heights and depths from terrain and bathymetry packs (Phase 4 slice 2). `None` = no packs:
+/// models that need a depth fall back to their scenario values.
+#[derive(Debug, Default, Clone, Resource)]
+pub(crate) struct TerrainRes(pub(crate) Option<Arc<Terrain>>);
 
 /// Plans `waypoints` from `from` around land for ships and submarines. Returns the route to store
 /// and, when legs were replanned, how many.
@@ -136,6 +142,7 @@ impl Simulation {
         world.insert_resource(PlanningLayer::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
+        world.insert_resource(TerrainRes::default());
         world.insert_resource(crate::weapon_tracks::WeaponTracks::default());
         Self {
             world,
@@ -163,6 +170,24 @@ impl Simulation {
             .0
             .as_ref()
             .map(|m| m.id().to_owned())
+    }
+
+    /// Use these terrain and bathymetry packs from now on. Like the coastline, part of the state
+    /// hash (by id) and not saved: set it again after loading a save.
+    pub fn set_terrain(&mut self, terrain: Option<Arc<Terrain>>) {
+        self.world.insert_resource(TerrainRes(terrain));
+    }
+
+    /// The id of the terrain in use, if any (record it to replay the run).
+    #[must_use]
+    pub fn terrain_id(&self) -> Option<String> {
+        self.terrain().map(|t| t.id().to_owned())
+    }
+
+    /// The terrain in use, if any.
+    #[must_use]
+    pub fn terrain(&self) -> Option<&Arc<Terrain>> {
+        self.world.resource::<TerrainRes>().0.as_ref()
     }
 
     #[must_use]
@@ -526,6 +551,11 @@ impl Simulation {
                 .as_ref()
                 .map(|m| m.id()),
         );
+        // Only when set, so runs without packs keep their hashes (and the golden files).
+        if let Some(t) = self.terrain() {
+            h.str("terrain");
+            h.str(t.id());
+        }
         for r in self.unit_records() {
             h.u64(r.unit.id.0);
             h.u16(r.unit.side.0);

@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 mod host;
+mod terrain;
 
 use host::{AarView, ClockStatus, Host, SnapshotUpdate, TimeCompression, MAIN_WINDOW};
 use serde::{Deserialize, Serialize};
@@ -29,7 +30,107 @@ const MAX_MODE_BUDGET: Duration = Duration::from_millis(25);
 
 type SharedHost = Arc<Mutex<Host>>;
 
-fn lock(h: &SharedHost) -> MutexGuard<'_, Host> {
+/// Terrain and bathymetry packs on this machine (`terrain.rs`). Read at start-up on a thread of
+/// its own. Lock order: this before the host.
+#[derive(Default)]
+pub struct TerrainState {
+    dirs: Option<terrain::TerrainDirs>,
+    loading: bool,
+    loaded: terrain::Loaded,
+    terrain: Option<Arc<sim_geo::terrain::Terrain>>,
+}
+type SharedTerrain = Arc<Mutex<TerrainState>>;
+
+fn terrain_status_of(t: &TerrainState, h: &Host) -> terrain::TerrainStatus {
+    terrain::TerrainStatus {
+        loading: t.loading,
+        packs: t.loaded.infos(),
+        in_use: h.terrain_in_use(),
+        problems: t.loaded.problems.clone(),
+        folder: t
+            .dirs
+            .as_ref()
+            .map(|d| d.installed.display().to_string())
+            .unwrap_or_default(),
+    }
+}
+
+/// The terrain packs on this machine and the ones the current exercise uses.
+#[tauri::command]
+#[specta::specta]
+fn terrain_status(
+    host: State<'_, SharedHost>,
+    terrain: State<'_, SharedTerrain>,
+) -> terrain::TerrainStatus {
+    let t = lock(&terrain);
+    terrain_status_of(&t, &lock(&host))
+}
+
+/// Installs a terrain pack the user picked. Raw IPC (outside the typed bindings, see
+/// `src/lib/terrain.ts`): the body is the pack's bytes, the `x-sha256` header the line from its
+/// `.sha256` file. The pack is checked against it before it is copied in.
+#[tauri::command]
+fn install_terrain_pack(
+    window: WebviewWindow,
+    request: tauri::ipc::Request<'_>,
+    host: State<'_, SharedHost>,
+    terrain: State<'_, SharedTerrain>,
+) -> Result<terrain::TerrainStatus, String> {
+    if !lock(&host).controls_time(window.label()) {
+        return Err("only the white cell installs terrain packs".into());
+    }
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("send the pack as raw bytes".into());
+    };
+    let sha = request
+        .headers()
+        .get("x-sha256")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    let mut t = lock(&terrain);
+    let dirs = t.dirs.clone().ok_or("terrain folders are not set up yet")?;
+    terrain::install(&dirs, bytes, sha)?;
+    t.loaded = terrain::load(&dirs);
+    t.terrain = t.loaded.terrain();
+    let mut h = lock(&host);
+    h.set_terrain(t.terrain.clone());
+    Ok(terrain_status_of(&t, &h))
+}
+
+/// Largest terrain grid the map asks for, each way.
+const MAX_TERRAIN_GRID: usize = 2048;
+
+/// Heights for the map's depth shading, contours and relief: `cols` columns from `west` to
+/// `east` at each latitude in `lats` (north first). Raw IPC: the response is `i16`
+/// little-endian, `i16::MIN` where no pack covers; empty when no packs are installed.
+#[tauri::command]
+fn terrain_grid(
+    terrain: State<'_, SharedTerrain>,
+    west: f64,
+    east: f64,
+    lats: Vec<f64>,
+    cols: u32,
+) -> Result<tauri::ipc::Response, String> {
+    if lats.len() > MAX_TERRAIN_GRID || cols as usize > MAX_TERRAIN_GRID {
+        return Err(format!(
+            "at most {MAX_TERRAIN_GRID} × {MAX_TERRAIN_GRID} cells"
+        ));
+    }
+    if !(west.is_finite() && east.is_finite() && lats.iter().all(|l| l.is_finite())) {
+        return Err("the grid's edges must be numbers".into());
+    }
+    let Some(t) = lock(&terrain).terrain.clone() else {
+        return Ok(tauri::ipc::Response::new(Vec::new()));
+    };
+    let heights = t.sample_grid(&lats, west, east, cols);
+    let mut bytes = Vec::with_capacity(heights.len() * 2);
+    for h in heights {
+        bytes.extend_from_slice(&h.to_le_bytes());
+    }
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+fn lock<T>(h: &Mutex<T>) -> MutexGuard<'_, T> {
     // A panic while holding the lock would leave the sim mid-tick. The simulation step itself never
     // panics on valid input, so we recover the guard rather than crash the UI.
     h.lock().unwrap_or_else(PoisonError::into_inner)
@@ -1004,6 +1105,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             open_record,
             get_aar,
             aar_csv,
+            terrain_status,
         ])
         .events(collect_events![FrameEvent])
 }
@@ -1064,6 +1166,39 @@ fn spawn_runner(app: tauri::AppHandle, host: SharedHost) {
         .unwrap_or_else(|e| eprintln!("failed to start simulation thread: {e}"));
 }
 
+/// Finds the terrain folders and reads the packs on a thread of their own (a regional pack takes
+/// a second or two), then gives them to the host.
+fn start_terrain(app: &tauri::App, shared: &SharedTerrain, host: &SharedHost) {
+    let Ok(data) = app.path().app_data_dir() else {
+        eprintln!("warning: no app data folder; terrain packs cannot be installed");
+        return;
+    };
+    let dirs = terrain::TerrainDirs {
+        bundled: app.path().resource_dir().ok().map(|d| d.join("terrain")),
+        installed: data.join("terrain"),
+    };
+    {
+        let mut t = lock(shared);
+        t.dirs = Some(dirs.clone());
+        t.loading = true;
+    }
+    let (for_thread, host) = (shared.clone(), host.clone());
+    let spawned = std::thread::Builder::new()
+        .name("terrain-load".into())
+        .spawn(move || {
+            let loaded = terrain::load(&dirs);
+            let mut t = lock(&for_thread);
+            t.terrain = loaded.terrain();
+            t.loaded = loaded;
+            t.loading = false;
+            lock(&host).set_terrain(t.terrain.clone());
+        });
+    if let Err(e) = spawned {
+        eprintln!("warning: could not read terrain packs: {e}");
+        lock(shared).loading = false;
+    }
+}
+
 /// Desktop entry point.
 // `tauri::generate_context!` expands to code that uses `HashMap`. That is app wiring, not
 // simulation logic, so the determinism ban (ADR-0003) does not apply here.
@@ -1099,9 +1234,18 @@ pub fn run() {
         }
     };
 
+    let shared_terrain: SharedTerrain = Arc::new(Mutex::new(TerrainState::default()));
+    // The typed commands, plus the two raw-bytes terrain commands that have no typed binding.
+    let typed = builder.invoke_handler();
+    let raw: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
+        Box::new(tauri::generate_handler![install_terrain_pack, terrain_grid]);
     let result = tauri::Builder::default()
-        .invoke_handler(builder.invoke_handler())
+        .invoke_handler(move |invoke| match invoke.message.command() {
+            "install_terrain_pack" | "terrain_grid" => raw(invoke),
+            _ => typed(invoke),
+        })
         .manage(host.clone())
+        .manage(shared_terrain.clone())
         .manage(DbSources(Mutex::new(sim_db::embedded::source_set())))
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -1110,6 +1254,7 @@ pub fn run() {
         })
         .setup(move |app| {
             builder.mount_events(app);
+            start_terrain(app, &shared_terrain, &host);
             spawn_runner(
                 app.handle().clone(),
                 app.state::<SharedHost>().inner().clone(),

@@ -105,3 +105,14 @@ Run `cargo run -p sim-db -- validate`. Add `--strict` to treat warnings as error
 
 - **Not in the repository.** The raw downloads and the built packs live outside it (`%USERPROFILE%\nws-data\`), and the packs ship as separate files with SHA-256 sums.
 - **Not for navigation.** Depths are for planning at TTX scale, not for navigation, as the GEBCO licence says.
+
+**Downloads and built packs (2026-11-13).** Each pack is built with `nws-batch terrain build` ([model](../models/terrain-and-bathymetry.md)). Every file is checked by SHA-256.
+
+| File | From | SHA-256 |
+|---|---|---|
+| `gebco2020_par_15s.nc` (72.0 MB) | `https://coastwatch.pfeg.noaa.gov/erddap/griddap/GEBCO_2020.nc?elevation[(3.0):1:(27.0)][(111.0):1:(137.0)]` | `59ceadfa2e005a6b35815926cededc48d45d2e86cf5e1fa84a4554db8a8555b0` |
+| `gebco2020_global_2m.nc` (116.8 MB) | `…/GEBCO_2020.nc?elevation[(-89.99):8:(89.99)][(-179.99):8:(179.99)]` (every 8th cell: 2′) | `5b7c6f80a663d8219a68c061fcede83df69966c91997e01bb4843d7029191077` |
+| `gebco2020-par-15s.nwsterrain` (30.5 MB) | `terrain build gebco2020_par_15s.nc --name gebco2020-par-15s` | `0dfd348c955e5214368321fcc1ae3ebffe33112ad6a4c285fee6f4f6f16498ff` |
+| `gebco2020-global-4m.nwsterrain` (17.5 MB) | `terrain build gebco2020_global_2m.nc --name gebco2020-global-4m --average 2` | `c2db90ca0eecfa6a232ecb2798b9e083cc119971fbed4df0cdb25c27228653ad` |
+
+The build is reproducible: the same download and command give the same pack, byte for byte, and so the same id.

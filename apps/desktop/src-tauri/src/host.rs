@@ -20,8 +20,10 @@ use sim_core::{
     SimEventKind, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponTrackView,
     WeaponView, ZoneCoverage,
 };
+use sim_geo::terrain::Terrain;
 use sim_scenario::Scenario;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// The label of the control-station window.
@@ -179,6 +181,8 @@ pub struct Host {
     /// The planning layer in force: the scenario's, with the white cell's changes.
     pub zones: Vec<sim_core::Zone>,
     pub facilities: Vec<sim_core::Facility>,
+    /// Terrain and bathymetry packs for new exercises and replays (`None`: none installed).
+    terrain: Option<Arc<Terrain>>,
 }
 
 const IN_REVIEW: &str = "reviewing a replay: return to the live exercise first";
@@ -195,8 +199,10 @@ fn viewer_of(seat: &Seat) -> Viewer {
 fn start(
     scenario: &Scenario,
     platforms: &sim_db::PlatformDb,
+    terrain: Option<&Arc<Terrain>>,
 ) -> Result<(Simulation, BTreeMap<u32, Seat>, u32), sim_scenario::ScenarioError> {
     let mut sim = scenario.build(None, platforms)?;
+    sim.set_terrain(terrain.cloned());
     let seats = scenario.seats_or_default();
     if scenario.seats.is_empty() {
         sim.submit(Command {
@@ -226,7 +232,7 @@ impl Host {
         scenario: Scenario,
         platforms: sim_db::PlatformDb,
     ) -> Result<Self, sim_scenario::ScenarioError> {
-        let (sim, seats, first) = start(&scenario, &platforms)?;
+        let (sim, seats, first) = start(&scenario, &platforms, None)?;
         let zones = scenario.zones.clone();
         let facilities = scenario.facilities.clone();
         Ok(Self {
@@ -243,7 +249,38 @@ impl Host {
             replay: None,
             zones,
             facilities,
+            terrain: None,
         })
+    }
+
+    /// Uses these terrain packs for exercises started from now on. The current exercise takes
+    /// them too if it has not started (still at its starting picture, not under review), so its
+    /// record matches a straight run with them. Returns whether it did.
+    pub fn set_terrain(&mut self, terrain: Option<Arc<Terrain>>) -> bool {
+        self.terrain = terrain;
+        if self.replay.is_some() || self.sim.tick().0 > 1 {
+            return false;
+        }
+        match start(&self.scenario, &self.platforms, self.terrain.as_ref()) {
+            Ok((sim, seats, _)) => {
+                self.sim = sim;
+                self.seats = seats;
+                for st in self.stations.values_mut() {
+                    st.last_sent = None;
+                }
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// The terrain id the live exercise (or the replay under review) runs with.
+    #[must_use]
+    pub fn terrain_in_use(&self) -> Option<String> {
+        match &self.replay {
+            Some(r) => r.record().terrain.clone(),
+            None => self.sim.terrain_id(),
+        }
     }
 
     /// Replaces the running scenario. The new one is fully built first, so a scenario that fails
@@ -251,7 +288,7 @@ impl Host {
     /// the main window at the first side's seat. Returns the seat windows to close (their seats
     /// belonged to the old scenario).
     pub fn load(&mut self, scenario: Scenario) -> Result<Vec<String>, sim_scenario::ScenarioError> {
-        let (sim, seats, first) = start(&scenario, &self.platforms)?;
+        let (sim, seats, first) = start(&scenario, &self.platforms, self.terrain.as_ref())?;
         self.scenario = scenario;
         self.sim = sim;
         self.seats = seats;
@@ -404,7 +441,8 @@ impl Host {
             return Err("already reviewing a replay".into());
         }
         let record = self.capture();
-        let replay = Replay::open(record, &self.side_names()).map_err(|e| e.to_string())?;
+        let replay = Replay::open_with_terrain(record, &self.side_names(), self.terrain.clone())
+            .map_err(|e| e.to_string())?;
         self.enter_review(replay)
     }
 
@@ -436,7 +474,8 @@ impl Host {
             .iter()
             .map(|s| (s.id, s.name.clone()))
             .collect();
-        let replay = Replay::open(record, &sides).map_err(|e| e.to_string())?;
+        let replay = Replay::open_with_terrain(record, &sides, self.terrain.clone())
+            .map_err(|e| e.to_string())?;
         let closing = self.load(scenario).map_err(|e| e.to_string())?;
         self.enter_review(replay)?;
         Ok(closing)

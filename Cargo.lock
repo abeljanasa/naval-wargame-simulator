@@ -2844,6 +2844,7 @@ dependencies = [
  "sim-aar",
  "sim-core",
  "sim-db",
+ "sim-geo",
  "sim-scenario",
 ]
 
@@ -2856,6 +2857,7 @@ dependencies = [
  "sim-aar",
  "sim-core",
  "sim-db",
+ "sim-geo",
  "sim-scenario",
  "specta",
  "specta-typescript",
@@ -4131,10 +4133,12 @@ dependencies = [
 name = "sim-geo"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "libm",
  "proptest",
  "serde",
  "serde_json",
+ "sha2",
  "specta",
 ]
 

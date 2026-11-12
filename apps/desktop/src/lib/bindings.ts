@@ -108,6 +108,8 @@ export const commands = {
 	getAar: () => typedError<AarView_Serialize, string>(__TAURI_INVOKE("get_aar")),
 	/**  One AAR table as CSV text, for the UI to save. */
 	aarCsv: (table: AarTable) => typedError<string, string>(__TAURI_INVOKE("aar_csv", { table })),
+	/**  The terrain packs on this machine and the ones the current exercise uses. */
+	terrainStatus: () => __TAURI_INVOKE<TerrainStatus_Serialize>("terrain_status"),
 };
 
 /** Events */
@@ -1769,6 +1771,49 @@ export type StoreView = {
 
 /**  Systems a critical hit can knock out. */
 export type System = "sensors" | "propulsion" | "weapons" | "flight_deck" | "comms";
+
+/**  One pack found on this machine. */
+export type TerrainPackInfo = {
+	id: string,
+	name: string,
+	sha256: string,
+	source: string,
+	credit: string,
+	cell_arcsec: number | null,
+	/**  South, west, north, east, degrees. */
+	bounds_deg: [(number | null), (number | null), (number | null), (number | null)],
+	/**  Shipped with the app, rather than installed by the user. */
+	bundled: boolean,
+};
+
+/**  The terrain packs on this machine and the ones the current exercise uses. */
+export type TerrainStatus = TerrainStatus_Serialize | TerrainStatus_Deserialize;
+
+/**  The terrain packs on this machine and the ones the current exercise uses. */
+export type TerrainStatus_Deserialize = {
+	/**  Still reading the packs (at start-up). */
+	loading: boolean,
+	packs: TerrainPackInfo[],
+	/**  The terrain id the current exercise runs with (`None`: none). */
+	in_use?: string | null,
+	/**  Packs that were found but not used, and why. */
+	problems: string[],
+	/**  Where installed packs are kept. */
+	folder: string,
+};
+
+/**  The terrain packs on this machine and the ones the current exercise uses. */
+export type TerrainStatus_Serialize = {
+	/**  Still reading the packs (at start-up). */
+	loading: boolean,
+	packs: TerrainPackInfo[],
+	/**  The terrain id the current exercise runs with (`None`: none). */
+	in_use: string | null,
+	/**  Packs that were found but not used, and why. */
+	problems: string[],
+	/**  Where installed packs are kept. */
+	folder: string,
+};
 
 /**  A simulation tick number. Tick `n` covers game time `[n, n+1)` × [`TICK_SECONDS`]. */
 export type Tick = number;

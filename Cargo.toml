@@ -36,6 +36,8 @@ sim-weapons = { path = "crates/sim-weapons" }
 anyhow = "1"
 bevy_ecs = "0.20"
 clap = { version = "4", features = ["derive"] }
+# Terrain packs: zlib in pure Rust (no C toolchain), and SHA-256 for pack identity.
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
 libm = "0.2"
 # Lua 5.4 for scenario scripts, built from bundled source (no system Lua; works air-gapped).
 mlua = { version = "0.12", features = ["lua54", "vendored"] }
@@ -46,6 +48,7 @@ rmp-serde = "1"
 rusqlite = { version = "0.41", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 # tauri-specta 2.0.0-rc.26 requires exactly this specta release; bump them together.
 specta = { version = "=2.0.0-rc.26", features = ["derive"] }
 specta-typescript = "=0.0.13"

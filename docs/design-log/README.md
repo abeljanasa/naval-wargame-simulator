@@ -33,6 +33,7 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
 | [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
 | [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0038](DL-0038-terrain-packs.md) | Terrain and bathymetry packs: format, sampling, install, map layers | Project spec §6, §14 + GEBCO 2020 + netCDF classic spec + original design |
 | [DL-0037](DL-0037-db-editing-and-rehearsal.md) | Database record editing, symbol function codes, fixes from the pilot rehearsal | Project spec §9, §10 + ADR-0004 + original design |
 | [DL-0036](DL-0036-desktop-facilitation.md) | Event forms, polygon drawing, live planning edits, day/night shading | Project spec §10 + original design |
 | [DL-0035](DL-0035-action-groups.md) | Surface action groups in the core | Project spec §7.1 + original design |

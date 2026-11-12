@@ -38,6 +38,16 @@
   import { editor } from "./lib/editor.svelte";
   import DbBrowser from "./lib/DbBrowser.svelte";
   import Menubar, { type Menu } from "./lib/Menubar.svelte";
+  import {
+    TerrainLayers,
+    cellText,
+    coversText,
+    heightText,
+    installTerrainPack,
+    terrainStatus,
+    type TerrainStatus,
+    type TerrainView,
+  } from "./lib/terrain";
 
   let mapEl: HTMLElement;
   let map: MapLibreMap | null = null;
@@ -212,6 +222,76 @@
     }
   }
 
+  // Terrain and bathymetry (lib/terrain.ts): which layers show, remembered like the theme.
+  let terrainView = $state<TerrainView>(readTerrainView());
+  let terrain = $state<TerrainStatus | null>(null);
+  let terrainLayers = $state<TerrainLayers | null>(null);
+  let terrainReadout = $state("");
+  let showTerrain = $state(false);
+  let terrainError = $state("");
+  let terrainInput: HTMLInputElement;
+
+  function readTerrainView(): TerrainView {
+    const all = { depth: true, contours: true, relief: true };
+    try {
+      const v = JSON.parse(
+        localStorage.getItem("nws-terrain") ?? "null",
+      ) as Partial<TerrainView> | null;
+      return { ...all, ...(v ?? {}) };
+    } catch {
+      return all;
+    }
+  }
+
+  function toggleTerrain(k: keyof TerrainView) {
+    terrainView = { ...terrainView, [k]: !terrainView[k] };
+    try {
+      localStorage.setItem("nws-terrain", JSON.stringify(terrainView));
+    } catch {
+      // Storage unavailable: the choice lasts for this session only.
+    }
+  }
+
+  /** Asks the host which packs it has; again each second while it is still reading them. */
+  async function refreshTerrain() {
+    try {
+      terrain = await terrainStatus();
+    } catch {
+      return;
+    }
+    if (terrain?.loading) setTimeout(() => void refreshTerrain(), 1000);
+  }
+
+  async function installPack(files: FileList | null) {
+    const list = Array.from(files ?? []);
+    const pack = list.find((f) => f.name.endsWith(".nwsterrain"));
+    const sha = list.find((f) => f.name.endsWith(".sha256")) ?? null;
+    terrainError = "";
+    showTerrain = true;
+    if (!pack) {
+      terrainError = "Choose a .nwsterrain pack, together with its .sha256 file.";
+      return;
+    }
+    try {
+      terrain = await installTerrainPack(pack, sha);
+    } catch (e) {
+      terrainError = `${pack.name} was not installed: ${String(e)}`;
+    }
+  }
+
+  const terrainCredit = $derived(
+    [...new Set((terrain?.packs ?? []).map((p) => p.credit))].join("; "),
+  );
+
+  $effect(() => {
+    // Read everything first: an optional call skips its arguments while there is no map yet,
+    // and the effect would then never run again.
+    const view = { ...terrainView };
+    const available = (terrain?.packs.length ?? 0) > 0;
+    const t = theme;
+    terrainLayers?.set(view, t, available);
+  });
+
   $effect(() => {
     document.documentElement.dataset.theme = theme;
     if (map) setMapTheme(map, theme);
@@ -222,6 +302,12 @@
     map = created.map;
     overlay = created.overlay;
     setMapTheme(map, theme);
+    terrainLayers = new TerrainLayers(map, () => terrainCredit);
+    map.on("mousemove", (e) => {
+      const h = terrainLayers?.heightAt(e.lngLat.lng, e.lngLat.lat) ?? null;
+      terrainReadout = h === null ? "" : heightText(h);
+    });
+    map.on("mouseout", () => (terrainReadout = ""));
     map.on("click", (e) => {
       const p = { lat_deg: e.lngLat.lat, lon_deg: e.lngLat.lng };
       if (editor.open && editor.deliver(p)) return;
@@ -238,6 +324,7 @@
         relayout();
       });
     });
+    void refreshTerrain();
     sim.start().catch((e: unknown) => {
       startError = `Cannot connect to the simulation engine: ${String(e)}`;
     });
@@ -469,6 +556,12 @@
           disabled: !sim.controlsTime,
           onselect: () => editInput.click(),
         },
+        {
+          label: "Install terrain pack…",
+          disabled: !sim.controlsTime,
+          separatorBefore: true,
+          onselect: () => terrainInput.click(),
+        },
       ],
     },
     {
@@ -485,6 +578,23 @@
           checked: symbolStyle === "figures",
           onselect: toggleSymbols,
         },
+        {
+          label: "Depth shading",
+          separatorBefore: true,
+          checked: terrainView.depth,
+          onselect: () => toggleTerrain("depth"),
+        },
+        {
+          label: "Depth contours",
+          checked: terrainView.contours,
+          onselect: () => toggleTerrain("contours"),
+        },
+        {
+          label: "Relief",
+          checked: terrainView.relief,
+          onselect: () => toggleTerrain("relief"),
+        },
+        { label: "Terrain packs…", onselect: () => (showTerrain = true) },
         { label: "Picture", separatorBefore: true, onselect: () => (leftTab = "picture") },
         { label: "Messages", onselect: () => (leftTab = "messages") },
         {
@@ -644,6 +754,19 @@
     onchange={(e) => {
       const file = e.currentTarget.files?.[0];
       if (file) void editor.start(file);
+      e.currentTarget.value = "";
+    }}
+  />
+
+  <input
+    bind:this={terrainInput}
+    class="visually-hidden"
+    type="file"
+    multiple
+    accept=".nwsterrain,.sha256"
+    aria-label="Terrain pack and its .sha256 file"
+    onchange={(e) => {
+      void installPack(e.currentTarget.files);
       e.currentTarget.value = "";
     }}
   />
@@ -1363,6 +1486,9 @@
     {:else}
       <span class="dim">Space run/pause · 1–7 compression · . step · Esc deselect</span>
     {/if}
+    {#if terrainReadout}
+      <span class="terrain-readout">{terrainReadout}</span>
+    {/if}
   </footer>
 
   {#if showDb}
@@ -1382,6 +1508,69 @@
           >Close</button
         >
         <DbBrowser />
+      </div>
+    </div>
+  {/if}
+
+  {#if showTerrain}
+    <div class="dialog-backdrop" role="presentation" onclick={() => (showTerrain = false)}>
+      <div
+        class="dialog"
+        role="dialog"
+        aria-label="Terrain packs"
+        aria-modal="true"
+        tabindex="-1"
+        onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => {
+          if (e.key === "Escape") showTerrain = false;
+        }}
+      >
+        <h2>Terrain packs</h2>
+        {#if terrainError}
+          <p class="error" role="alert">{terrainError}</p>
+        {/if}
+        {#if terrain?.loading}
+          <p class="dim">Reading the packs…</p>
+        {:else if !terrain || terrain.packs.length === 0}
+          <p>
+            No terrain packs are installed, so the map has no depth shading and the exercise runs
+            without depths. Install a pack with File › Install terrain pack…, choosing the
+            <code>.nwsterrain</code> file and its <code>.sha256</code> file together.
+          </p>
+        {:else}
+          <table class="terrain-packs">
+            <thead>
+              <tr><th>Pack</th><th>Cell</th><th>Covers</th><th>From</th></tr>
+            </thead>
+            <tbody>
+              {#each terrain.packs as p (p.id)}
+                <tr>
+                  <td title={`SHA-256 ${p.sha256}`}>{p.name}</td>
+                  <td>{cellText(p.cell_arcsec)}</td>
+                  <td>{coversText(p.bounds_deg)}</td>
+                  <td>{p.bundled ? "with the app" : "installed"}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <p>
+            {#if terrain.in_use}
+              This exercise runs with these packs.
+            {:else}
+              This exercise started before the packs were read; the next scenario you open uses
+              them.
+            {/if}
+            Depths are for planning, not for navigation.
+          </p>
+          <p class="dim">{terrainCredit}</p>
+        {/if}
+        {#each terrain?.problems ?? [] as problem (problem)}
+          <p class="error">Not used: {problem}</p>
+        {/each}
+        {#if terrain?.folder}
+          <p class="dim">Installed packs are kept in {terrain.folder}</p>
+        {/if}
+        <button onclick={() => (showTerrain = false)}>Close</button>
       </div>
     </div>
   {/if}
@@ -1794,6 +1983,21 @@
   }
 
   /* Status bar: what needs your attention, or what the keys do. */
+  .statusbar .terrain-readout {
+    margin-left: auto;
+    padding-left: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+  .terrain-packs {
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 13px;
+  }
+  .terrain-packs th,
+  .terrain-packs td {
+    text-align: left;
+    padding: 3px 12px 3px 0;
+  }
   .statusbar {
     grid-area: status;
     display: flex;

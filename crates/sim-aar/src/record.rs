@@ -23,6 +23,10 @@ pub struct ExerciseRecord {
     pub seed: u64,
     /// The coastline the run navigated round (`None`: open ocean).
     pub land_mask: Option<String>,
+    /// The terrain and bathymetry packs the run used (`None`: none). Records made before
+    /// Phase 4 slice 2 have none.
+    #[serde(default)]
+    pub terrain: Option<String>,
     /// The tick the run had reached: the replay ends here.
     pub end_tick: Tick,
     /// [`Simulation::state_hash`] at `end_tick`; a replay that does not reach it is reported.
@@ -45,6 +49,7 @@ impl ExerciseRecord {
             scenario_json: scenario_json.into(),
             seed: sim.seed(),
             land_mask: sim.land_mask_id(),
+            terrain: sim.terrain_id(),
             end_tick: sim.tick(),
             final_hash: sim.state_hash(),
             commands: sim.command_log(),
