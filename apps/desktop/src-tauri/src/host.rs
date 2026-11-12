@@ -206,6 +206,11 @@ fn start(
             },
         })?;
     }
+    // Run the first second (tick 0). The scenario's units, settings and seats are tick-0
+    // commands, so until then the picture is empty. Running it here lets the white cell check
+    // the starting picture before STARTEX. It is the tick a straight run starts with, so records
+    // and replays are unchanged.
+    sim.step();
     let first = seats
         .iter()
         .find(|s| matches!(s.role, SeatRole::Side { .. }))
@@ -398,8 +403,9 @@ impl Host {
     }
 
     fn enter_review(&mut self, mut replay: Replay) -> Result<(), String> {
-        // The scrubber starts at the beginning, paused.
-        replay.seek(Tick(0)).map_err(|e| e.to_string())?;
+        // The scrubber starts at the starting picture (after tick 0, which places the units),
+        // paused.
+        replay.seek(Tick(1)).map_err(|e| e.to_string())?;
         self.replay = Some(replay);
         self.paused = true;
         self.carry = 0.0;
@@ -1098,7 +1104,13 @@ mod tests {
     fn starts_paused_and_does_not_advance() {
         let mut h = host();
         assert_eq!(h.advance(Duration::from_secs(1), Duration::ZERO), 0);
-        assert_eq!(h.clock().tick, Tick(0));
+        // Opened after the first second, which places the units.
+        assert_eq!(h.clock().tick, Tick(1));
+        let snap = h.sim.snapshot(Viewer::WhiteCell);
+        assert!(
+            !snap.units.is_empty(),
+            "the starting picture shows the units"
+        );
     }
 
     #[test]
@@ -1155,7 +1167,7 @@ mod tests {
         let closing = h.load(Scenario::from_json(inline).unwrap()).unwrap();
         assert_eq!(closing, vec!["seat-1-1".to_owned()]);
         assert_eq!(h.scenario.name, "Loaded");
-        assert_eq!(h.clock().tick, Tick(0));
+        assert_eq!(h.clock().tick, Tick(1));
         assert!(h.clock().paused);
         assert_eq!(
             h.viewer(M),
@@ -1294,7 +1306,11 @@ mod tests {
         let r = c.replay.clone().unwrap();
         assert!(r.verified);
         assert_eq!(r.end_s, live_tick.seconds());
-        assert_eq!(c.tick, Tick(0), "the scrubber starts at the beginning");
+        assert_eq!(
+            c.tick,
+            Tick(1),
+            "the scrubber starts at the starting picture"
+        );
         assert!(c.paused);
         // Every window gets a full picture of the replay.
         assert!(h.update(M).unwrap().full);
@@ -1357,7 +1373,8 @@ mod tests {
         assert!(other.reviewing());
         let r = other.clock().replay.unwrap();
         assert!(r.verified);
-        assert_eq!(r.end_s, 120.0);
+        // The first second runs on load, then 120 more.
+        assert_eq!(r.end_s, 121.0);
         // A saved review saves the same record again.
         assert_eq!(other.record_bytes(M).unwrap(), bytes);
     }

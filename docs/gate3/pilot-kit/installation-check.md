@@ -25,7 +25,7 @@ Machine: ____________  OS and version: ____________  Checked by: ____________  D
 | ☐ | Run at **Max** (key **7**) to 00:30 game time, then pause (**Space**) | Contacts and messages appear; the clock stops |
 | ☐ | **Review › Save record**, then **Replay** | The banner reads *"Replay: matches the recorded run"* |
 | ☐ | Copy the record to the spare machine and open it there under **Review** | The same banner on the spare |
-| ☐ | Reload the scenario (**File › Open scenario…**) for the exercise | Back at 00:00:00, paused |
+| ☐ | Reload the scenario (**File › Open scenario…**) for the exercise | Back at `D+0 00:00:01`, paused |
 
 ### Verifying the sums
 

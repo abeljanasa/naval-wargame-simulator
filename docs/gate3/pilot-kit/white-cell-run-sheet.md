@@ -4,7 +4,7 @@ Scenario `data/scenarios/phase3-pilot.json`: 4 hours of game time, about 75 minu
 
 ## Before STARTEX (10:15)
 
-- [ ] **File › Open scenario…** → `phase3-pilot.json`. The toolbar shows *Phase 3 — Kent passage pilot*, 00:00:00, paused.
+- [ ] **File › Open scenario…** → `phase3-pilot.json`. The toolbar shows *Phase 3 — Kent passage pilot*, `D+0 00:00:01`, paused, with every unit on the map. The STARTEX message is already in **Messages**.
 - [ ] **Seat** → *White cell*. Check the right panel shows Injects, Events, Planning, Seats, Log and Review.
 - [ ] **Seats** tab: **Open window** for *Blue command* and *Red command*, and move each to its screen. Each shows only its own side.
 - [ ] **Events** tab: eight events, all enabled.

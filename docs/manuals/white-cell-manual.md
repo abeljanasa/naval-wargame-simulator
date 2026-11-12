@@ -24,7 +24,7 @@ The default seats are **White cell**, plus one seat per side, named after it. Ad
 
 ### Rehearse
 
-Run the scenario at **Max** once, alone, to see where the decision points fall. Then load it again. A scenario restarts from the beginning every time it is loaded.
+Run the scenario at **Max** once, alone, to see where the decision points fall. Then load it again. A scenario restarts from the beginning every time it is loaded. It opens paused at `D+0 00:00:01`: the first second has run, so every unit is on the map and the time-zero events (such as STARTEX) have fired.
 
 ## 2. Running the clock
 
