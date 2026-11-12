@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed (Phase 3, slice 18: Gate 3 pack update)
+
+- **Gate 3 pack** (`docs/gate3/README.md`): the P1 gaps are closed in phase, and the client's Phase 4 deferrals are recorded with their reasons.
+- **Backlog:** closed items are ticked, and a Phase 4 section lists what was deferred.
+- **Manuals:**
+  - User manual: comms, fuel, groups, sense coverage, weapon tracks, day/night.
+  - White-cell manual: the live planning layer, command-post state, jamming, fuel, weather and group injects.
+
 ### Added (Phase 3, slice 17: desktop editing and facilitation)
 
 - **Event forms** in the scenario editor (DL-0036):

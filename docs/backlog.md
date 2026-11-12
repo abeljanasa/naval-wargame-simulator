@@ -6,24 +6,39 @@ Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md); Phase 3 in [plan/
 
 ## Phase 3, deferred from slices
 
-P1 gaps found at the Gate 3 review ([docs/gate3/README.md](gate3/README.md)), for the panel to accept or schedule:
+P1 gaps found at the Gate 3 review ([docs/gate3/README.md](gate3/README.md)), closed in slices 10–17 (2026-11-12):
 
-- [ ] Comms links and their disruption (jamming, relays), including jamming a command post.
-- [ ] Support, mining, mine-clearing and cargo missions; barrier-patrol and denial missions on a choke point.
-- [ ] Anchorages with polygon areas, depth and holding limits; units holding there between missions.
-- [ ] Sense-zone layers by sensor type, and coverage and gaps drawn on the map.
-- [ ] Coordinated air defence and one shared mission object for a surface action group.
-- [ ] Satellite imagery layers and day/night shading on the map.
+- [x] Comms links and their disruption (jamming, relays), including jamming a command post (slice 10, DL-0029).
+- [x] Support, mining, mine-clearing and cargo missions; barrier-patrol and denial missions on a choke point (slice 12, DL-0031).
+- [x] Anchorages with polygon areas, depth and holding limits; units holding there between missions (slice 13, DL-0032).
+- [x] Sense-zone layers by sensor type, and coverage and gaps drawn on the map (slice 14, DL-0033).
+- [x] Coordinated air defence and one shared mission object for a surface action group (slice 16, DL-0035).
+- [x] Day/night shading on the map (slice 17, DL-0036).
+- [x] Repair restores sensors and speed lost to earlier criticals: full repair at a facility restores the loadout (DL-0028).
+- [x] Fuel and endurance for ships and submarines, so refuelling points refuel (slice 11, DL-0030).
+- [x] Desktop white-cell control of the planning layer during an exercise (slice 17).
+- [x] Polygon zones and facility areas drawn in the scenario editor (slices 13, 17).
+- [x] Forms for event triggers, conditions and actions in the scenario editor (slice 17).
+- [x] Weapons in flight as detectable, engageable targets for every sensor (slice 15, DL-0034).
+
+Gate 3 conditions still open:
+
 - [ ] Code-signing certificates from the client (Windows PFX; Apple Developer ID and notarisation).
 - [ ] Air-gapped run of the signed release build on all three OSes.
 - [ ] The navy TTX pilot ([plan](gate3/ttx-pilot-plan.md)).
 
+## Phase 4, deferred by the client (2026-11-12)
 
-- [x] Repair restores sensors and speed lost to earlier criticals: full repair at a facility restores the loadout (DL-0028).
-- [ ] Fuel and endurance for ships, so refuelling points refuel (with air operations, Phase 4).
-- [ ] Desktop white-cell control of the planning layer during an exercise (the `SetPlanning` command already allows it).
-- [ ] Polygon zones drawn in the scenario editor (circles only today).
-- [ ] Forms for event triggers, conditions and actions in the scenario editor (JSON with templates today).
+The client chose to close the in-phase P1 gaps and move these to Phase 4, because they need outside data or a Phase 4 subsystem:
+
+- [ ] Satellite imagery layers (needs a licensed imagery source).
+- [ ] Terrain elevation and bathymetry packs (GEBCO/SRTM), then:
+  - radar terrain masking;
+  - depths for ports and anchorages from bathymetry;
+  - choke points that inherit depth and shipping lanes;
+  - shallow-water routing.
+- [ ] Airbases and air operations: aircraft fuel and tanking, aircraft loadout choice, runways at facilities.
+- [ ] Automatic sense-zone sensor placement and tasking (§7.1, analysis phase).
 
 ## Phase 2, deferred from slices
 
@@ -33,7 +48,8 @@ P1 gaps found at the Gate 3 review ([docs/gate3/README.md](gate3/README.md)), fo
 - [ ] Track velocity estimation and association errors (tracks model limitations).
 - [ ] Acoustic figures (radiated noise, sonar frequency, DI, DT, source level) as platform-database fields; generic defaults in code until then.
 - [ ] Sonobuoy laying and towed-array streaming states (missions, slice 10); active-sonar reverberation.
-- [ ] Weapons in flight as detectable, engageable targets (point defence, slice 9); salvo deconfliction and seeker re-attack.
+- [x] Weapons in flight as detectable, engageable targets (Phase 3 slice 15); salvo deconfliction within an action group (slice 16).
+- [ ] Seeker re-attack, and salvo deconfliction across ships that are not in a group.
 - [ ] Aircraft loadout choice (air operations, Phase 4); damage location and compartments.
 
 ## Phase 1, still to do (Gate 1: "units move and detect")
@@ -42,7 +58,7 @@ P1 gaps found at the Gate 3 review ([docs/gate3/README.md](gate3/README.md)), fo
 - [x] Scenarios reference database platforms (`"platform": "GEN-FFG"`) (DL-0007).
 - [x] In-app database browser: search, record detail with source citation, confidence and marking, and validation feedback (DL-0009).
 - [ ] In-app database *editing* (record diff, citation entry, live validation while typing). It writes the JSON source (ADR-0004). Phase 2; until then records are edited in `data/db/open/` and checked with `sim-db validate`.
-- [ ] Planning-layer facility attributes still to do: runways (air operations) and draft limits (bathymetry). Berths, repair and rearm are done (DL-0028).
+- [ ] Planning-layer facility attributes still to do: runways (air operations, Phase 4). Berths, repair, rearm, fuel and draft limits (planner-entered depth, DL-0032) are done.
 - [x] Release scan (`sim-db scan`), run in the release workflow.
 - [x] Installers, signed when secrets are configured, plus SBOMs and a `cargo deny` licence audit (docs/build/releasing.md).
 - [x] Air-gapped vendored build, with the engine verified offline (docs/build/air-gapped.md).

@@ -19,9 +19,9 @@ Your workstation needs:
 
 | Area | What it shows |
 |---|---|
-| **Header** | Scenario name; game time; achieved speed (e.g. `60×`) or `paused`; sea state and weather; time controls; **REPLAY** while a replay is being reviewed; the light/dark theme switch |
-| **Side panel** | Scenario, Seat, Units, Contacts, the selected unit, Messages, the platform database; for the white cell, the white-cell console and exercise review |
-| **Map** | Your units, contacts with their 95 % error ellipses, ESM bearing lines, weapons in flight, minefields, reference points, and your side's planning layer (zones and facilities) |
+| **Header** | Scenario name; game time; achieved speed (e.g. `60×`) or `paused`; sea state and weather; time controls; **REPLAY** while a replay is being reviewed; the **Day/night** switch; the light/dark theme switch |
+| **Side panel** | Scenario, Seat, Units, **Sense coverage**, Contacts, the selected unit, Messages, the platform database; for the white cell, the white-cell console and exercise review |
+| **Map** | Your units, contacts with their 95 % error ellipses, ESM bearing lines, your weapons in flight, the enemy weapons your sensors track (rings: red missiles, blue torpedoes), minefields, reference points, your side's planning layer (zones and facilities, with their areas), sense coverage, and the night side of the earth |
 
 **Map symbols.** Frames follow APP-6 conventions by domain: a full frame for surface, the upper half for air, the lower half for subsurface. Colour and shape show affiliation. A short line ahead of each unit shows where it will be in 6 minutes. Sense zones are blue outlines, engage zones red. Facilities are labelled `CP` (command post), `PORT`, `ANCH` (anchorage) or `RAS` (refuelling point).
 
@@ -44,7 +44,10 @@ Only the white cell (and the main window) controls time. In a seat window the bu
 ## 5. Your units
 
 - **Units** lists your side's units. Click one, in the list or on the map, to select it.
-- The unit panel shows its class, position, heading, speed, route, mission, doctrine, stores and damage.
+- The unit panel shows its class, position, heading, speed, route, mission, doctrine, stores and damage. It also shows, where they apply:
+  - **Group:** its surface action group, with **Detach**, or **join a group…**;
+  - **Comms:** its link to its command post, or why orders will not get through;
+  - **Fuel:** in scenarios with the fuel model.
 - **Esc** clears the selection.
 
 ### Orders
@@ -56,12 +59,13 @@ Only the white cell (and the main window) controls time. In a seat window the bu
 | **Emissions** | **Emissions**: active, or silent (radar and jammer off). Silence hides you from ESM but blinds your radar. |
 | **Weapons control** | **Weapons**: safe, tight (engage only hostile contacts), free (engage anything not friendly or neutral). Inherit uses the group's or side's setting. |
 | **Engage** | Choose a **Target** contact, a **Weapon** and **Rounds**, then **Fire**. |
-| **Mission** | **Patrol here** (a 30 km patrol round the unit); **Clear** ends the mission. |
+| **Mission** | **Patrol here** (a 30 km patrol round the unit); **Clear** ends the mission. On a group's leader, this sets the whole group's mission. Other missions are set in the scenario or by events: support, mining, mine clearing, cargo, barrier patrol, denial (`docs/models/missions.md`). |
+| **Groups** | **Detach** takes a ship out of its group. **join a group…** puts it 3 km astern of the group's leader. |
 
 **Refused orders.** The engine checks every order when it carries it out. A refusal appears in red with the reason, for example:
 - *"weapons control status Tight forbids engaging C3"*;
 - *"C3 at 182.0 km is outside WPN-ASM's 5.0–150.0 km"*;
-- *"U2 is out of range of every command post"*.
+- *"U2 cannot be reached from Blue maritime HQ: link jammed"* (or *out of range*, *beyond the radio horizon*, *submerged too deep to receive*).
 
 ## 6. Contacts
 
@@ -77,8 +81,17 @@ Only the white cell (and the main window) controls time. In a seat window the bu
 - **Zones and facilities** (`docs/models/planning-layer.md`):
   - **Sense zone:** your units inside it follow its emissions and weapons rules, and you are alerted (in Messages) when your side gains a contact inside it.
   - **Engage zone:** targets inside it are engaged under its rules, for example weapons free against unfriendly contacts in a choke point.
-  - **Command posts:** your orders reach only units within range of a command post that is up. If the post is lost with its ship, an alternate takes over after a delay. Orders in the gap are refused, or queued until then.
-  - **Ports and anchorages:** a unit stopped there (at ≤ 1 kn) is repaired and, after 30 minutes, rearmed, if the facility offers it.
+  - **Command posts:** your orders reach a unit only over a comms link from a command post that is up (`docs/models/comms.md`). A link fails if:
+    - the unit is out of range;
+    - the post is VHF/UHF only and the unit is beyond the radio horizon;
+    - an enemy jammer is too close;
+    - the unit is a submarine deeper than 20 m.
+
+    Relay units extend a post's reach. If the post is lost or jammed, an alternate takes over after a delay, and orders in the gap are refused or queued until then.
+  - **Ports and anchorages:** a unit stopped there (at ≤ 1 kn) is repaired and, after 30 minutes, rearmed, if the facility offers it. Units must fit the facility's depth. Ships that have finished their mission wait at a staging anchorage. In heavy weather, small ships run for a sheltering port.
+  - **Fuel** (if the scenario uses it): ships burn more the faster they go. A unit on a mission below 30 % goes to refuel at the nearest refuelling point or oiler. Out of fuel, a ship stops (`docs/models/fuel.md`).
+  - **Sense coverage:** tick a sense zone under **Sense coverage** to see which parts of it your sensors can watch now (green) and where the gaps are (red).
+  - **Surface action groups:** members keep station on the leader and share its mission. Their air defence shares one picture and does not double up on the same missile.
 
 ## 8. Messages
 

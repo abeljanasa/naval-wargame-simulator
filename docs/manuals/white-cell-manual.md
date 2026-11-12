@@ -58,11 +58,26 @@ The override log at the bottom of the console lists the most recent overrides wi
 - Every scenario event is listed with its state: on/off, and times fired.
 - Untick to stop an event firing; **Fire** runs its actions now, whatever its trigger and conditions.
 
+### Planning layer (live)
+
+- **Facilities:** turn a facility's repair, rearm and refuel services on or off, or **Remove** it.
+  - For example, a port is closed by strikes.
+  - An alternate command post cannot be removed while another post depends on it; the console says why.
+- **Add on the map:** choose sense or engage zone and a radius, then click the map for its centre.
+- Every change is one logged order from your seat, so it replays exactly and appears in the AAR. The surface action groups in play are not touched.
+
 ### Zone rules (per-zone ROE override)
 
-- Lists every zone of every side. Change a zone's **weapons control** (safe, tight, free) during play.
+- Lists every zone of every side. During play you can:
+  - change a zone's **weapons control** (safe, tight, free);
+  - change its **emissions** (active or silent);
+  - **Remove** it.
 - Use it to open or close an engage zone at a decision point: *"Blue may now engage in the passage."*
 - The change is a logged order from your seat, so it appears in the AAR.
+
+### Command posts
+
+- Lists every side's command posts, **up** or **down** with the reason: jammed, comms knocked out, or lost with its unit.
 
 ### Seats
 
@@ -78,6 +93,11 @@ Scenarios with a planning layer add decision points you can exploit:
 - **Sense-zone alerts** reach the side's message log as contacts are gained in a zone. Watch the timeline for when each side first knew.
 - **Engage zones with assigned shooters** fire on their own once contacts are inside under weapons free. Close the zone (weapons safe) to hold them.
 - **Damaged AI units** divert to the nearest repair port and resume their mission when repaired.
+- **Jamming** a command post (move or switch on an enemy jammer near it) takes it down. Its alternate takes over after the handover delay, and the post comes back when the jamming stops.
+- **Fuel** (scenarios with the fuel model): AI units low on fuel head for the nearest refuelling point or oiler. Queues at a busy point show in the timeline (*waiting for a berth*). Closing a depot's refuel service is a strong logistics inject.
+- **Weather:** raising the sea state (an event, or the scenario) sends small ships to shelter. Ships at an anchorage whose holding limit is exceeded leave it.
+- **Action groups:** sinking a leader hands the group to its next ship, with the group's mission.
+- **Coverage:** **Sense coverage** shows any side's sense-zone coverage and gaps, for planning a decision point.
 
 ## 5. Exercise review and AAR
 
