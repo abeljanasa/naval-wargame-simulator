@@ -28,7 +28,7 @@ import type {
   WeaponView,
 } from "./bindings";
 import { n, project } from "./format";
-import { AFFILIATION_COLOUR, symbolUrl, type Affiliation } from "./symbols";
+import { AFFILIATION_COLOUR, functionCode, symbolUrl, type Affiliation } from "./symbols";
 
 type LonLat = [number, number];
 
@@ -298,14 +298,15 @@ export function buildLayers(s: SceneInput): Layer[] {
       getIcon: (u) => {
         const aff = affiliation(u, s.viewer);
         const sel = u.id === s.selected;
+        const code = functionCode(u.platform);
         return {
-          id: `${aff}-${u.domain}-${sel}`,
-          url: symbolUrl(aff, sel, u.domain),
+          id: `${aff}-${u.domain}-${sel}-${code}`,
+          url: symbolUrl(aff, sel, u.domain, code),
           width: 64,
           height: 64,
         };
       },
-      getSize: 28,
+      getSize: 36, // large enough to read the function code
       sizeUnits: "pixels",
       updateTriggers: { getIcon: [s.selected, s.viewer] },
       onClick: (info: PickingInfo<UnitView>) => {
@@ -410,14 +411,16 @@ export function buildLayers(s: SceneInput): Layer[] {
       getIcon: (c) => {
         const domain = c.domain ?? "surface";
         const aff = contactAffiliation(c);
+        // The code shows only as far as the side has classified the contact.
+        const code = functionCode(c.platform, c.category);
         return {
-          id: `contact-${aff}-${domain}`,
-          url: symbolUrl(aff, false, domain),
+          id: `contact-${aff}-${domain}-${code}`,
+          url: symbolUrl(aff, false, domain, code),
           width: 64,
           height: 64,
         };
       },
-      getSize: 24,
+      getSize: 30,
       sizeUnits: "pixels",
     }),
     new TextLayer<ContactView>({

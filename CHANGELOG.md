@@ -23,6 +23,7 @@
 
 ### Changed (map)
 
+- **Function codes inside unit and contact symbols:** `DDG`, `FFG`, `SSK`, `MV`, `F`, `H` and so on, from the platform class, or the category for a contact classified only that far. An unclassified contact shows the frame alone. The spec is in `docs/behaviour-specs/symbology.md`. Every generic class has a code, and a test checks it.
 - **The map frames the units a seat sees** when a scenario's first picture arrives, and again when the seat changes. It used to open at a fixed zoom, where the pilot's units were an unreadable cluster of labels.
 
 ### Added (packaged-app test)

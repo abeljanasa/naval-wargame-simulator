@@ -81,7 +81,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [x] Front-end unit tests (Vitest, 8 tests) and an end-to-end smoke test of the real UI against a mocked backend (Playwright, 11 checks); both in CI.
 - [ ] Full end-to-end test through the packaged Tauri app (WebDriver + tauri-driver).
 - [x] APP-6-style frames by domain (sea surface full, air upper half, subsurface lower half, land) and affiliation.
-- [ ] Function icons inside the frames (frigate, submarine, fighter…); needs a symbology behaviour spec.
+- [x] Function codes inside the frames (DDG, FFG, SSK, F, H…), by class or category as far as the side has classified it ([symbology spec](behaviour-specs/symbology.md)). Echelon and status amplifiers, and graphic air and land icons, are still to do if asked for.
 - [x] Light-theme toggle (header button; map base layers recoloured; remembered per viewer).
 
 ## Phase 2 (replacing Gate 1 interim detection)

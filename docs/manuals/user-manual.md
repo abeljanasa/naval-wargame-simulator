@@ -26,7 +26,7 @@ Your workstation needs:
 | **Status bar** | Refused orders and other errors, map-click prompts, and key hints |
 | **Map** | Your units, contacts with their 95 % error ellipses, ESM bearing lines, your weapons in flight, the enemy weapons your sensors track (rings: red missiles, blue torpedoes), minefields, reference points, your side's planning layer (zones and facilities, with their areas), sense coverage, and the night side of the earth |
 
-**Map symbols.** Frames follow APP-6 conventions by domain: a full frame for surface, the upper half for air, the lower half for subsurface. Colour and shape show affiliation. A short line ahead of each unit shows where it will be in 6 minutes. Sense zones are blue outlines, engage zones red. Facilities are labelled `CP` (command post), `PORT`, `ANCH` (anchorage) or `RAS` (refuelling point).
+**Map symbols.** Frames follow APP-6 conventions by domain: a full frame for surface, the upper half for air, the lower half for subsurface. Colour and shape show affiliation. The code inside the frame shows the unit's type, such as `DDG`, `FFG`, `SSK`, `MV`, `F` (fighter) or `H` (helicopter). For a contact it appears once your side has classified it that far. The full list is in [symbology.md](../behaviour-specs/symbology.md). A short line ahead of each unit shows where it will be in 6 minutes. Sense zones are blue outlines, engage zones red. Facilities are labelled `CP` (command post), `PORT`, `ANCH` (anchorage) or `RAS` (refuelling point).
 
 ## 3. Your seat
 

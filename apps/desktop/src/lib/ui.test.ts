@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { bearing, distance, gameTime, knots, latLon, MPS_PER_KNOT, project } from "./format";
-import { frameSvg, symbolUrl } from "./symbols";
+import { frameSvg, functionCode, symbolUrl } from "./symbols";
 import {
   buildLayers,
   circleRing,
@@ -81,6 +81,39 @@ describe("symbols", () => {
     expect(a).toBe(symbolUrl("friend", false, "air"));
     expect(a.startsWith("data:image/svg+xml")).toBe(true);
     expect(a).not.toBe(symbolUrl("friend", true, "air"));
+  });
+
+  it("puts a function code in the frame: by class, else category, else none", () => {
+    expect(functionCode("GEN-DDG")).toBe("DDG");
+    expect(functionCode("GEN-SSK-AIP")).toBe("SSK");
+    expect(functionCode("GEN-FTR-MR")).toBe("F");
+    // An unknown class falls back to its category; a contact classified to category shows it.
+    expect(functionCode("XYZ-1", "submarine")).toBe("SS");
+    expect(functionCode(null, "helicopter")).toBe("H");
+    // A surface combatant of unknown type, and an unclassified contact, show the frame alone.
+    expect(functionCode(null, "surface_combatant")).toBe("");
+    expect(functionCode(null, null)).toBe("");
+    const url = decodeURIComponent(symbolUrl("hostile", false, "subsurface", "SSK"));
+    expect(url).toContain(">SSK</text>");
+    expect(symbolUrl("hostile", false, "subsurface", "SSK")).not.toBe(
+      symbolUrl("hostile", false, "subsurface"),
+    );
+  });
+
+  it("has a function code for every generic platform class", async () => {
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    // Tests run from apps/desktop.
+    const dir = join(process.cwd(), "../../data/db/open/platforms");
+    const ids = readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .flatMap((f) =>
+        (
+          JSON.parse(readFileSync(join(dir, f), "utf8")) as { platforms: { id: string }[] }
+        ).platforms.map((p) => p.id),
+      );
+    expect(ids.length).toBeGreaterThan(40);
+    expect(ids.filter((id) => functionCode(id) === "")).toEqual([]);
   });
 });
 
