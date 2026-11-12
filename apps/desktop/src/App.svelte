@@ -65,6 +65,18 @@
         return `escort ${unitName(m.escorted)}`;
       case "strike":
         return `strike C${m.contact}`;
+      case "support":
+        return `support station at ${latLon(m.station.lat_deg, m.station.lon_deg)}`;
+      case "mining":
+        return `lay ${m.mines} mines at ${latLon(m.centre.lat_deg, m.centre.lon_deg)}`;
+      case "mine_clearing":
+        return `clear mines ${(n(m.radius_m) / 1000).toFixed(0)} km around ${latLon(m.centre.lat_deg, m.centre.lon_deg)}`;
+      case "cargo":
+        return `carry ${n(m.tonnes).toFixed(0)} t to ${latLon(m.destination.lat_deg, m.destination.lon_deg)}`;
+      case "barrier_patrol":
+        return `barrier patrol ${latLon(m.start.lat_deg, m.start.lon_deg)} – ${latLon(m.end.lat_deg, m.end.lon_deg)}`;
+      case "denial":
+        return `deny choke point ${m.choke_point}`;
     }
   }
 

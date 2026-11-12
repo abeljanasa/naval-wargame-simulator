@@ -125,10 +125,31 @@
               }
             : kind === "strike"
               ? { kind: "strike", contact: 1 }
-              : undefined;
+              : kind === "support"
+                ? { kind: "support", station: here, radius_m: 5_000 }
+                : kind === "mining"
+                  ? { kind: "mining", centre: here, radius_m: 2_000, mines: 20 }
+                  : kind === "mine_clearing"
+                    ? { kind: "mine_clearing", centre: here, radius_m: 3_000 }
+                    : kind === "cargo"
+                      ? { kind: "cargo", origin: null, destination: here, tonnes: 1_000 }
+                      : kind === "barrier_patrol"
+                        ? { kind: "barrier_patrol", start: here, end: here }
+                        : kind === "denial"
+                          ? { kind: "denial", choke_point: chokePoints()[0] ?? "" }
+                          : undefined;
     if (m) u.mission = m;
     else delete u.mission;
     changed();
+  }
+
+  /** Choke-point names used by the draft's zones. */
+  function chokePoints(): string[] {
+    return [
+      ...new Set(
+        (d.zones ?? []).map((z) => z.choke_point ?? "").filter((name) => name.trim() !== ""),
+      ),
+    ].sort();
   }
 
   function addUnitHere() {
@@ -487,6 +508,12 @@
               <option value="ferry">ferry</option>
               <option value="escort">escort</option>
               <option value="strike">strike</option>
+              <option value="support">support (hold a station)</option>
+              <option value="mining">mining</option>
+              <option value="mine_clearing">mine clearing</option>
+              <option value="cargo">cargo</option>
+              <option value="barrier_patrol">barrier patrol</option>
+              <option value="denial">denial of a choke point</option>
             </select>
           </label>
           {#if u.mission?.kind === "patrol"}
@@ -552,6 +579,115 @@
               Contact number
               <input type="number" min="1" bind:value={m.contact} onchange={changed} />
             </label>
+          {:else if u.mission?.kind === "support"}
+            {@const m = u.mission}
+            <div class="row">
+              <label class="inline">
+                Radius (km)
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={n(m.radius_m) / 1000}
+                  onchange={(e) => {
+                    m.radius_m = num(e.currentTarget.value, 5) * 1000;
+                    changed();
+                  }}
+                />
+              </label>
+              <button onclick={() => editor.pick("Click the station", (p) => (m.station = p))}>
+                Station on the map
+              </button>
+            </div>
+          {:else if u.mission?.kind === "mining" || u.mission?.kind === "mine_clearing"}
+            {@const m = u.mission}
+            <div class="row">
+              <label class="inline">
+                Radius (km)
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={n(m.radius_m) / 1000}
+                  onchange={(e) => {
+                    m.radius_m = num(e.currentTarget.value, 2) * 1000;
+                    changed();
+                  }}
+                />
+              </label>
+              {#if m.kind === "mining"}
+                <label class="inline">
+                  Mines
+                  <input
+                    type="number"
+                    min="1"
+                    value={m.mines}
+                    onchange={(e) => {
+                      m.mines = Math.max(1, Math.round(num(e.currentTarget.value, 1)));
+                      changed();
+                    }}
+                  />
+                </label>
+              {/if}
+              <button onclick={() => editor.pick("Click the centre", (p) => (m.centre = p))}>
+                Centre on the map
+              </button>
+            </div>
+          {:else if u.mission?.kind === "cargo"}
+            {@const m = u.mission}
+            <div class="row">
+              <label class="inline">
+                Tonnes
+                <input
+                  type="number"
+                  min="1"
+                  value={m.tonnes}
+                  onchange={(e) => {
+                    m.tonnes = Math.max(1, num(e.currentTarget.value, 1000));
+                    changed();
+                  }}
+                />
+              </label>
+              <button onclick={() => editor.pick("Click the loading point", (p) => (m.origin = p))}>
+                Load at (map)
+              </button>
+              {#if m.origin}
+                <button
+                  onclick={() => {
+                    m.origin = null;
+                    changed();
+                  }}>Already loaded</button
+                >
+              {/if}
+              <button
+                onclick={() => editor.pick("Click the destination", (p) => (m.destination = p))}
+              >
+                Deliver to (map)
+              </button>
+            </div>
+          {:else if u.mission?.kind === "barrier_patrol"}
+            {@const m = u.mission}
+            <div class="row">
+              <button
+                onclick={() => editor.pick("Click one end of the barrier", (p) => (m.start = p))}
+              >
+                One end on the map
+              </button>
+              <button onclick={() => editor.pick("Click the other end", (p) => (m.end = p))}>
+                Other end on the map
+              </button>
+            </div>
+          {:else if u.mission?.kind === "denial"}
+            {@const m = u.mission}
+            <label class="inline">
+              Choke point
+              <select bind:value={m.choke_point} onchange={changed}>
+                {#each chokePoints() as c (c)}<option value={c}>{c}</option>{/each}
+              </select>
+            </label>
+            {#if chokePoints().length === 0}
+              <p class="dim">Name a choke point on a zone (Planning tab) first.</p>
+            {/if}
           {/if}
           <label class="inline">
             <input

@@ -789,6 +789,56 @@ impl<'a> Builder<'a> {
                 None,
                 format!("command post {facility} is down: {}", status.describe()),
             ),
+            SimEventKind::MissionMinesLaid { unit, field, mines } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Mine,
+                    self.unit_side(*unit),
+                    format!("{name} laid {mines} mines (field {field})"),
+                );
+            }
+            SimEventKind::MissionFailed { unit, reason } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name}'s mission failed: {reason}"),
+                );
+            }
+            SimEventKind::MineSwept {
+                unit,
+                field,
+                swept: true,
+                ..
+            } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Mine,
+                    self.unit_side(*unit),
+                    format!("{name} swept a mine of field {field}"),
+                );
+            }
+            SimEventKind::CargoLoaded { unit, tonnes } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} loaded {tonnes:.0} t of cargo"),
+                );
+            }
+            SimEventKind::CargoDelivered { unit, tonnes } => {
+                let name = self.unit_name(*unit);
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!("{name} delivered {tonnes:.0} t of cargo"),
+                );
+            }
             SimEventKind::FuelExhausted { unit } => {
                 let name = self.unit_name(*unit);
                 self.note(
@@ -963,6 +1013,12 @@ fn mission_name(m: &sim_core::Mission) -> &'static str {
         sim_core::Mission::Ferry { .. } => "ferry",
         sim_core::Mission::Escort { .. } => "escort",
         sim_core::Mission::Strike { .. } => "strike",
+        sim_core::Mission::Support { .. } => "support",
+        sim_core::Mission::Mining { .. } => "mining",
+        sim_core::Mission::MineClearing { .. } => "mine clearing",
+        sim_core::Mission::Cargo { .. } => "cargo",
+        sim_core::Mission::BarrierPatrol { .. } => "barrier patrol",
+        sim_core::Mission::Denial { .. } => "denial",
     }
 }
 

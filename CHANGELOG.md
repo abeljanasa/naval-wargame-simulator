@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 12: more missions)
+
+- **Six missions** (`docs/models/missions.md`, DL-0031):
+  - **Support:** hold a station, engaging nothing.
+  - **Mining:** lay a field at a point (`MissionMinesLaid`).
+  - **Mine clearing:** sweep an area at 8 kn. It removes mines from other sides' fields (`MineSwept`), at a tenth of the normal risk.
+  - **Cargo:** load, carry and unload, 30 minutes at each end (`CargoLoaded`, `CargoDelivered` with the tonnes).
+  - **Barrier patrol:** back and forth between two points.
+  - **Denial:** patrol a choke point's zones and engage only contacts inside them.
+- **Engagement:** support, mining, mine-clearing and cargo units no longer engage on their own (point defence still protects them).
+- **AAR timeline:** mines laid and swept, cargo loaded and delivered, failed missions.
+- **Desktop:**
+  - The unit panel describes every mission.
+  - The scenario editor sets every mission: stations, centres and points on the map, the mine count, the tonnage, and the choke point.
+
+### Changed (slice 12)
+
+- **Save format 20:** mission progress (phase and start tick). Older saves load.
+
 ### Added (Phase 3, slice 11: fuel and refuelling)
 
 - **Fuel for ships and submarines** (`docs/models/fuel.md`, DL-0030):

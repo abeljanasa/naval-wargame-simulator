@@ -2066,3 +2066,254 @@ fn fuel_survives_save_and_resume() {
         unit_view(&mut b, 1).fuel_fraction
     );
 }
+
+// ---- More missions (Phase 3 slice 12; docs/models/missions.md) ----
+
+#[test]
+fn a_support_unit_holds_its_station_and_engages_nothing() {
+    let mut sim = scene(34, 30_000.0, None);
+    sim.submit(weapons_free(1)).unwrap();
+    let station = direct(ORIGIN, 0.0, 8_000.0).point;
+    sim.submit(assign(
+        1,
+        Issuer::Player { seat: 1 },
+        Some(1),
+        1,
+        Some(Mission::Support {
+            station,
+            radius_m: 2_000.0,
+        }),
+    ))
+    .unwrap();
+    sim.run_ticks(1_500);
+    let u = unit_view(&mut sim, 1);
+    assert!(sim_geo::inverse(u.position, station).distance_m <= 2_000.0);
+    assert_eq!(u.speed_mps, 0.0, "holding");
+    assert!(
+        mission_events(&sim).2.is_empty(),
+        "support units do not engage"
+    );
+}
+
+#[test]
+fn a_mining_mission_lays_its_field_at_the_centre_and_completes() {
+    let mut sim = Simulation::new(3);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![mine()],
+        },
+    ))
+    .unwrap();
+    let centre = direct(ORIGIN, 90.0, 4_000.0).point;
+    sim.submit(with_mission(
+        unit(1, 1, ORIGIN, vec![], &[("T-MINE", 12)], None),
+        Mission::Mining {
+            centre,
+            radius_m: 1_500.0,
+            mines: 20,
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(1_200);
+    let laid: Vec<(u32, u32)> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::MissionMinesLaid { field, mines, .. } => Some((field, mines)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(laid, vec![(1, 12)], "all it carried, fewer than ordered");
+    let fields = sim.snapshot(Viewer::Side { side: SideId(1) }).minefields;
+    assert_eq!(fields.len(), 1);
+    assert_eq!((fields[0].mines, fields[0].radius_m), (12, 1_500.0));
+    assert!(sim_geo::inverse(fields[0].centre, centre).distance_m <= 1_000.0);
+    let u = unit_view(&mut sim, 1);
+    assert!(u.mission_complete && u.stores.is_empty());
+}
+
+#[test]
+fn mine_clearing_sweeps_mines_at_a_tenth_of_the_risk() {
+    let mut sim = Simulation::new(11);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![mine()],
+        },
+    ))
+    .unwrap();
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::CreateMinefield {
+            side: SideId(2),
+            centre: ORIGIN,
+            radius_m: 2_000.0,
+            mines: 40,
+            weapon: "T-MINE".into(),
+        },
+    ))
+    .unwrap();
+    let mut mcm = with_mission(
+        unit(1, 1, ORIGIN, vec![], &[], None),
+        Mission::MineClearing {
+            centre: ORIGIN,
+            radius_m: 2_000.0,
+        },
+    );
+    if let CommandPayload::SpawnUnit(s) = &mut mcm.payload {
+        s.damage_profile = Some(DamageProfile {
+            damage_points: 100_000.0,
+            mission_kill_fraction: 0.99,
+            fire_susceptibility: 0.0,
+            flooding_susceptibility: 0.0,
+        });
+    }
+    sim.submit(mcm).unwrap();
+    sim.run_ticks(7_200);
+    let mut sweeps = Vec::new();
+    let mut risks = Vec::new();
+    for e in sim.events() {
+        match e.kind {
+            SimEventKind::MineSwept { p, swept, .. } => sweeps.push((e.tick, p, swept)),
+            SimEventKind::MineEncounter { p, .. } => risks.push((e.tick, p)),
+            _ => {}
+        }
+    }
+    let swept = sweeps.iter().filter(|s| s.2).count();
+    assert!(swept >= 5, "{swept} swept in two hours");
+    let left = sim.snapshot(Viewer::WhiteCell).minefields[0].mines;
+    assert_eq!(left as usize, 40 - swept);
+    // Each check: the sweep chance (W = 200 m) is far above the risk to the sweeper.
+    for (t, p) in &risks {
+        let sweep = sweeps.iter().find(|s| s.0 == *t).unwrap();
+        assert!(*p < sweep.1, "risk {p} vs sweep {}", sweep.1);
+    }
+    let u = unit_view(&mut sim, 1);
+    assert!(!u.mission_complete, "never completes on its own");
+    assert!(u.speed_mps <= 4.0 + 1e-9, "sweeps at 8 kn");
+}
+
+#[test]
+fn cargo_is_loaded_carried_and_delivered() {
+    let origin = direct(ORIGIN, 0.0, 3_000.0).point;
+    let destination = direct(ORIGIN, 0.0, 12_000.0).point;
+    let mut sim = Simulation::new(5);
+    sim.submit(with_mission(
+        unit(1, 1, ORIGIN, vec![], &[], None),
+        Mission::Cargo {
+            origin: Some(origin),
+            destination,
+            tonnes: 800.0,
+        },
+    ))
+    .unwrap();
+    sim.run_ticks(6_000);
+    let loaded = fired(&sim, |k| matches!(k, SimEventKind::CargoLoaded { .. }));
+    let delivered: Vec<(u64, f64)> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::CargoDelivered { tonnes, .. } => Some((e.tick.0, tonnes)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(delivered.len(), 1);
+    assert_eq!(delivered[0].1, 800.0);
+    // At least 30 minutes alongside at each end.
+    assert!(loaded[0] >= 1_800);
+    assert!(delivered[0].0 >= loaded[0] + 1_800);
+    let u = unit_view(&mut sim, 1);
+    assert!(u.mission_complete);
+    assert!(sim_geo::inverse(u.position, destination).distance_m <= 1_000.0);
+}
+
+#[test]
+fn a_barrier_patrol_runs_back_and_forth_between_its_ends() {
+    let start = direct(ORIGIN, 0.0, 4_000.0).point;
+    let end = direct(ORIGIN, 180.0, 4_000.0).point;
+    let mut sim = Simulation::new(9);
+    sim.submit(with_mission(
+        unit(1, 1, ORIGIN, vec![], &[], None),
+        Mission::BarrierPatrol { start, end },
+    ))
+    .unwrap();
+    let mut legs = Vec::new();
+    for _ in 0..360 {
+        sim.run_ticks(10);
+        let at = unit_view(&mut sim, 1).position;
+        let near = if sim_geo::inverse(at, start).distance_m <= 1_000.0 {
+            Some('S')
+        } else if sim_geo::inverse(at, end).distance_m <= 1_000.0 {
+            Some('E')
+        } else {
+            None
+        };
+        if let Some(c) = near {
+            if legs.last() != Some(&c) {
+                legs.push(c);
+            }
+        }
+    }
+    assert!(legs.len() >= 4, "{legs:?}");
+    assert!(legs.windows(2).all(|w| w[0] != w[1]));
+}
+
+#[test]
+fn denial_patrols_inside_the_choke_point_and_engages_only_inside_it() {
+    let around = |c: GeoPoint| Area::Polygon {
+        points: vec![
+            direct(c, 315.0, 5_000.0).point,
+            direct(c, 45.0, 5_000.0).point,
+            direct(c, 135.0, 5_000.0).point,
+            direct(c, 225.0, 5_000.0).point,
+        ],
+    };
+    let run = |zone_at: GeoPoint| {
+        let mut sim = scene(34, 30_000.0, None);
+        sim.submit(weapons_free(1)).unwrap();
+        let mut z = zone(1, ZoneKind::Sense, around(zone_at), Doctrine::default());
+        z.choke_point = Some("Narrows".into());
+        sim.submit(cmd(
+            1,
+            Issuer::Scenario,
+            None,
+            CommandPayload::SetPlanning {
+                facilities: vec![],
+                zones: vec![z],
+            },
+        ))
+        .unwrap();
+        sim.submit(assign(
+            1,
+            Issuer::Player { seat: 1 },
+            Some(1),
+            1,
+            Some(Mission::Denial {
+                choke_point: "Narrows".into(),
+            }),
+        ))
+        .unwrap();
+        sim.run_ticks(120);
+        sim
+    };
+    // The zone holds the red ship (30 km east): engaged.
+    let red = direct(ORIGIN, 90.0, 30_000.0).point;
+    let sim = run(red);
+    let (points, _, engaged) = mission_events(&sim);
+    assert_eq!(engaged, vec![(1, "T-ASM".to_owned())]);
+    assert!(!points.is_empty());
+    for p in &points {
+        assert!(around(red).contains(*p), "waypoint {p:?} inside the zone");
+    }
+    // The zone is elsewhere: the red ship is not engaged.
+    let sim = run(direct(ORIGIN, 0.0, 30_000.0).point);
+    assert!(mission_events(&sim).2.is_empty());
+}

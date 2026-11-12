@@ -8,6 +8,7 @@
 //! weapon arriving (damage, criticals, fire, flooding). The owning side knows its safe lanes
 //! and is not at risk.
 
+use crate::ai::MissionState;
 use crate::combat::{apply_hit_roll, Magazine, WeaponCatalog};
 use crate::components::{Domain, Position, Unit};
 use crate::events::{EventLog, SimEventKind};
@@ -17,6 +18,7 @@ use crate::sim::UnitIndex;
 use crate::time::SimClock;
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
+use sim_ai::{Mission, MCM_RISK_FACTOR, SWEEP_WIDTH_M};
 use sim_geo::{inverse, GeoPoint};
 use sim_weapons::{mine_encounter_probability, mine_swept_width_m, WeaponKind};
 use std::collections::BTreeMap;
@@ -127,15 +129,23 @@ pub(crate) fn mine_system(world: &mut World) {
     if world.resource::<Minefields>().fields.is_empty() {
         return;
     }
-    let mut ships: Vec<(UnitId, SideId, GeoPoint)> = world
-        .query::<(&Unit, &Position)>()
+    // (id, side, position, clearing mines here: on a mine-clearing mission, inside its area).
+    let mut ships: Vec<(UnitId, SideId, GeoPoint, bool)> = world
+        .query::<(&Unit, &Position, Option<&MissionState>)>()
         .iter(world)
-        .filter(|(u, _)| matches!(u.domain, Domain::Surface | Domain::Subsurface))
-        .map(|(u, p)| (u.id, u.side, p.point))
+        .filter(|(u, _, _)| matches!(u.domain, Domain::Surface | Domain::Subsurface))
+        .map(|(u, p, m)| {
+            let clearing = matches!(
+                m.and_then(|m| m.mission.as_ref()),
+                Some(Mission::MineClearing { centre, radius_m })
+                    if inverse(*centre, p.point).distance_m <= *radius_m
+            );
+            (u.id, u.side, p.point, clearing)
+        })
         .collect();
-    ships.sort_by_key(|(id, _, _)| *id);
+    ships.sort_by_key(|s| s.0);
     let catalog = world.resource::<WeaponCatalog>().0.clone();
-    for (id, side, at) in ships {
+    for (id, side, at, clearing) in ships {
         let previous = world
             .resource_mut::<Minefields>()
             .last_position
@@ -155,8 +165,43 @@ pub(crate) fn mine_system(world: &mut World) {
             let Some(spec) = catalog.get(&f.weapon) else {
                 continue;
             };
-            let p =
-                mine_encounter_probability(f.mines, f.radius_m, mine_swept_width_m(spec), moved);
+            // A unit clearing mines first tries to sweep one (one `Weapons` draw), then meets
+            // the rest at a tenth of a normal ship's rate.
+            let mut left = f.mines;
+            if clearing {
+                let p = mine_encounter_probability(left, f.radius_m, SWEEP_WIDTH_M, moved);
+                let draw = world
+                    .resource_mut::<RngStreams>()
+                    .uniform(StreamId::Weapons);
+                let swept = draw < p;
+                world.resource_mut::<EventLog>().push(
+                    tick,
+                    SimEventKind::MineSwept {
+                        unit: id,
+                        field: f.id,
+                        distance_m: moved,
+                        p,
+                        draw,
+                        swept,
+                    },
+                );
+                if swept {
+                    if let Some(field) = world
+                        .resource_mut::<Minefields>()
+                        .fields
+                        .iter_mut()
+                        .find(|x| x.id == f.id)
+                    {
+                        field.mines -= 1;
+                    }
+                    left -= 1;
+                    if left == 0 {
+                        continue;
+                    }
+                }
+            }
+            let width = mine_swept_width_m(spec) * if clearing { MCM_RISK_FACTOR } else { 1.0 };
+            let p = mine_encounter_probability(left, f.radius_m, width, moved);
             let draw = world
                 .resource_mut::<RngStreams>()
                 .uniform(StreamId::Weapons);

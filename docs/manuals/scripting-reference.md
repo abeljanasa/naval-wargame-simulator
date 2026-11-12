@@ -54,8 +54,14 @@ Positions are `{ "lat_deg": -39.6, "lon_deg": 146.4 }`. Distances are metres, sp
 | `ferry` | `destination` | Go there; then complete |
 | `escort` | `escorted` (unit id), `bearing_deg` (relative), `range_m` | Keep station |
 | `strike` | `contact` (side's contact number) | Close and attack |
+| `support` | `station`, `radius_m` | Hold a station; no engagements of its own |
+| `mining` | `centre`, `radius_m`, `mines` | Go there and lay a field; then complete |
+| `mine_clearing` | `centre`, `radius_m` | Sweep the area at 8 kn (never completes) |
+| `cargo` | `origin` (optional), `destination`, `tonnes` | Load, carry, unload; then complete |
+| `barrier_patrol` | `start`, `end` | Back and forth between the two points |
+| `denial` | `choke_point` (a zone's choke-point name) | Patrol the choke point's zones; engage only inside them |
 
-Units on a mission also engage automatically under their doctrine.
+Units on patrol, ferry, escort, strike, barrier-patrol and denial missions also engage automatically under their doctrine.
 
 **Reserve units** (`"reserve": true`) stay off the board until an event's `spawn_reserve` brings them in.
 

@@ -356,6 +356,34 @@ pub enum SimEventKind {
         unit: UnitId,
         facility: u32,
     },
+    /// A unit on a mining mission laid its field.
+    MissionMinesLaid {
+        unit: UnitId,
+        field: u32,
+        mines: u32,
+    },
+    /// A mission could not be carried out (it is marked complete).
+    MissionFailed {
+        unit: UnitId,
+        reason: String,
+    },
+    /// A unit clearing mines tried to sweep one mine of a field: P = 1 − exp(−ρ·W·d).
+    MineSwept {
+        unit: UnitId,
+        field: u32,
+        distance_m: f64,
+        p: f64,
+        draw: f64,
+        swept: bool,
+    },
+    CargoLoaded {
+        unit: UnitId,
+        tonnes: f64,
+    },
+    CargoDelivered {
+        unit: UnitId,
+        tonnes: f64,
+    },
     /// An order held while its command post was down was carried out.
     QueuedOrderApplied {
         seq: u64,

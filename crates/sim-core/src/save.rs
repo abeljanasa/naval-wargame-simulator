@@ -60,7 +60,9 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   and the planning layer records disrupted posts. Older saves load with the defaults.
 /// * 19: unit fuel, and the planning layer's issued fuel, waiting units and diversion reasons.
 ///   Older saves load with none.
-pub const SAVE_FORMAT_VERSION: u32 = 19;
+/// * 20: missions gain support, mining, mine clearing, cargo, barrier patrol and denial, and a
+///   mission's progress (phase and start tick). Older saves load at phase 0.
+pub const SAVE_FORMAT_VERSION: u32 = 20;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]

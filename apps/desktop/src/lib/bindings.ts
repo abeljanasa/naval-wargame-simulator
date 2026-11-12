@@ -45,7 +45,7 @@ export const commands = {
 	/**  Fires `rounds` of `weapon` from `shooter` at the seat's contact `contact`. */
 	orderEngage: (shooter: UnitId, contact: number, weapon: string, rounds: number) => typedError<null, string>(__TAURI_INVOKE("order_engage", { shooter, contact, weapon, rounds })),
 	/**  Gives a unit a mission (patrol, ferry, escort, strike), or clears it with `null`. */
-	orderMission: (unit: UnitId, mission: Mission | null) => typedError<null, string>(__TAURI_INVOKE("order_mission", { unit, mission })),
+	orderMission: (unit: UnitId, mission: Mission_Deserialize | null) => typedError<null, string>(__TAURI_INVOKE("order_mission", { unit, mission })),
 	/**  A white-cell adjudication override with its reason (white-cell seat only). */
 	orderAdjudicate: (reason: string, action: Adjudication_Deserialize) => typedError<null, string>(__TAURI_INVOKE("order_adjudicate", { reason, action })),
 	/**
@@ -648,7 +648,7 @@ export type EventAction_Deserialize =
 	type: "message",
 } & {
 	text: string,
-} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Deserialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Deserialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission?: Mission | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Deserialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Deserialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission?: Mission_Deserialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
 /**  Brings a reserve unit (declared in the scenario, held off the board) into play. */
 ({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
 /**  Turns an event on or off. */
@@ -665,7 +665,7 @@ export type EventAction_Serialize =
 	type: "message",
 } & {
 	text: string,
-} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Serialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Serialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission: Mission | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Serialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Serialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission: Mission_Serialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
 /**  Brings a reserve unit (declared in the scenario, held off the board) into play. */
 ({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
 /**  Turns an event on or off. */
@@ -1006,7 +1006,10 @@ export type Minefield = {
 };
 
 /**  What a unit has been told to do. */
-export type Mission = 
+export type Mission = Mission_Serialize | Mission_Deserialize;
+
+/**  What a unit has been told to do. */
+export type Mission_Deserialize = 
 /**  Steam between random points in a circular area. */
 { kind: "patrol"; centre: GeoPoint; radius_m: number | null } | 
 /**  Go to a point, then the mission is complete. */
@@ -1014,7 +1017,68 @@ export type Mission =
 /**  Keep station on another unit: `bearing_deg` relative to its heading, at `range_m`. */
 { kind: "escort"; escorted: number; bearing_deg: number | null; range_m: number | null } | 
 /**  Close and attack one of the side's contacts. */
-{ kind: "strike"; contact: number };
+{ kind: "strike"; contact: number } | 
+/**
+ *  Hold a station (within `radius_m` of it), engaging nothing on its own: an oiler, a
+ *  picket, an ESM or relay station.
+ */
+{ kind: "support"; station: GeoPoint; radius_m: number | null } | 
+/**  Go to `centre` and lay `mines` (or all it carries, if fewer) in a circle of `radius_m`. */
+{ kind: "mining"; centre: GeoPoint; radius_m: number | null; mines: number } | 
+/**
+ *  Sweep the area at 8 kn: it removes mines of other sides' fields it passes through, at a
+ *  tenth of a normal ship's risk. It never completes on its own: the side cannot know the
+ *  area is clear.
+ */
+{ kind: "mine_clearing"; centre: GeoPoint; radius_m: number | null } | 
+/**
+ *  Carry `tonnes` to `destination` (loading first at `origin`, if given): 30 minutes to load
+ *  and to unload, then complete.
+ */
+{ kind: "cargo"; origin?: GeoPoint | null; destination: GeoPoint; tonnes: number | null } | 
+/**  Steam back and forth between two points across a passage. */
+{ kind: "barrier_patrol"; start: GeoPoint; end: GeoPoint } | 
+/**
+ *  Patrol inside the side's zones of a choke point and engage only contacts believed inside
+ *  them.
+ */
+{ kind: "denial"; choke_point: string };
+
+/**  What a unit has been told to do. */
+export type Mission_Serialize = 
+/**  Steam between random points in a circular area. */
+{ kind: "patrol"; centre: GeoPoint; radius_m: number | null } | 
+/**  Go to a point, then the mission is complete. */
+{ kind: "ferry"; destination: GeoPoint } | 
+/**  Keep station on another unit: `bearing_deg` relative to its heading, at `range_m`. */
+{ kind: "escort"; escorted: number; bearing_deg: number | null; range_m: number | null } | 
+/**  Close and attack one of the side's contacts. */
+{ kind: "strike"; contact: number } | 
+/**
+ *  Hold a station (within `radius_m` of it), engaging nothing on its own: an oiler, a
+ *  picket, an ESM or relay station.
+ */
+{ kind: "support"; station: GeoPoint; radius_m: number | null } | 
+/**  Go to `centre` and lay `mines` (or all it carries, if fewer) in a circle of `radius_m`. */
+{ kind: "mining"; centre: GeoPoint; radius_m: number | null; mines: number } | 
+/**
+ *  Sweep the area at 8 kn: it removes mines of other sides' fields it passes through, at a
+ *  tenth of a normal ship's risk. It never completes on its own: the side cannot know the
+ *  area is clear.
+ */
+{ kind: "mine_clearing"; centre: GeoPoint; radius_m: number | null } | 
+/**
+ *  Carry `tonnes` to `destination` (loading first at `origin`, if given): 30 minutes to load
+ *  and to unload, then complete.
+ */
+{ kind: "cargo"; origin: GeoPoint | null; destination: GeoPoint; tonnes: number | null } | 
+/**  Steam back and forth between two points across a passage. */
+{ kind: "barrier_patrol"; start: GeoPoint; end: GeoPoint } | 
+/**
+ *  Patrol inside the side's zones of a choke point and engage only contacts believed inside
+ *  them.
+ */
+{ kind: "denial"; choke_point: string };
 
 /**  A command post's state. */
 export type PostView = PostView_Serialize | PostView_Deserialize;
@@ -1182,7 +1246,7 @@ export type ScenarioUnit_Deserialize = {
 	 */
 	jammer?: JammerSpec | null,
 	/**  Mission at start. */
-	mission?: Mission | null,
+	mission?: Mission_Deserialize | null,
 	/**  Held off the board until an event's `spawn_reserve` action brings it in. */
 	reserve?: boolean,
 	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
@@ -1215,7 +1279,7 @@ export type ScenarioUnit_Serialize = {
 	 */
 	jammer?: JammerSpec,
 	/**  Mission at start. */
-	mission?: Mission,
+	mission?: Mission_Serialize,
 	/**  Held off the board until an event's `spawn_reserve` action brings it in. */
 	reserve?: boolean,
 	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
@@ -1640,7 +1704,7 @@ export type UnitView_Deserialize = {
 	flooding: boolean,
 	/**  Rounds carried, by weapon id (sorted). */
 	stores: StoreView[],
-	mission?: Mission | null,
+	mission?: Mission_Deserialize | null,
 	mission_complete: boolean,
 	/**  Fraction of fuel left, for units with a fuel model. */
 	fuel_fraction?: number | null,
@@ -1674,7 +1738,7 @@ export type UnitView_Serialize = {
 	flooding: boolean,
 	/**  Rounds carried, by weapon id (sorted). */
 	stores: StoreView[],
-	mission: Mission | null,
+	mission: Mission_Serialize | null,
 	mission_complete: boolean,
 	/**  Fraction of fuel left, for units with a fuel model. */
 	fuel_fraction: number | null,

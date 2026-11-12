@@ -890,8 +890,50 @@ fn hash_mission(h: &mut StateHash, m: &MissionState) {
                     h.f64(*range_m);
                 }
                 sim_ai::Mission::Strike { contact } => h.u64(u64::from(*contact)),
+                sim_ai::Mission::Support { station, radius_m }
+                | sim_ai::Mission::MineClearing {
+                    centre: station,
+                    radius_m,
+                } => {
+                    h.f64(station.lat_deg);
+                    h.f64(station.lon_deg);
+                    h.f64(*radius_m);
+                }
+                sim_ai::Mission::Mining {
+                    centre,
+                    radius_m,
+                    mines,
+                } => {
+                    h.f64(centre.lat_deg);
+                    h.f64(centre.lon_deg);
+                    h.f64(*radius_m);
+                    h.u64(u64::from(*mines));
+                }
+                sim_ai::Mission::Cargo {
+                    origin,
+                    destination,
+                    tonnes,
+                } => {
+                    h.opt_f64(origin.map(|o| o.lat_deg));
+                    h.opt_f64(origin.map(|o| o.lon_deg));
+                    h.f64(destination.lat_deg);
+                    h.f64(destination.lon_deg);
+                    h.f64(*tonnes);
+                }
+                sim_ai::Mission::BarrierPatrol { start, end } => {
+                    for p in [start, end] {
+                        h.f64(p.lat_deg);
+                        h.f64(p.lon_deg);
+                    }
+                }
+                sim_ai::Mission::Denial { choke_point } => h.str(choke_point),
             }
         }
+    }
+    // Hashed only when used, so earlier runs keep their hashes.
+    if m.phase != 0 || m.since.is_some() {
+        h.u8(m.phase);
+        h.u64(m.since.map_or(u64::MAX, |t| t.0));
     }
 }
 
@@ -1130,6 +1172,8 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
                 .ok_or_else(|| format!("{unit} cannot take missions"))?;
             m.mission = mission.clone();
             m.complete = false;
+            m.phase = 0;
+            m.since = None;
             Ok(())
         }
         CommandPayload::SetEnvironment { environment } => {
@@ -1255,6 +1299,8 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             MissionState {
                 mission: s.mission.clone(),
                 complete: false,
+                phase: 0,
+                since: None,
             },
             Health::new(
                 s.damage_profile
