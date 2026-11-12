@@ -227,7 +227,42 @@ fn num(x: f64) -> String {
     }
 }
 
-/// Writes `runs.csv`, `summary.csv` and `summary.json` to `out`.
+/// Writes the runs as `runs.parquet` (Apache Parquet): `seed` (UInt64), `final_hash` (Utf8),
+/// then one nullable Float64 column per measure (null where it did not occur).
+fn write_parquet(path: &Path, runs: &[RunMoes]) -> Result<()> {
+    use arrow_array::{ArrayRef, Float64Array, RecordBatch, StringArray, UInt64Array};
+    use arrow_schema::{DataType, Field, Schema};
+    use std::sync::Arc;
+    let names: Vec<String> = runs
+        .first()
+        .map(|r| r.moes.keys().cloned().collect())
+        .unwrap_or_default();
+    let mut fields = vec![
+        Field::new("seed", DataType::UInt64, false),
+        Field::new("final_hash", DataType::Utf8, false),
+    ];
+    let mut columns: Vec<ArrayRef> = vec![
+        Arc::new(UInt64Array::from_iter_values(runs.iter().map(|r| r.seed))),
+        Arc::new(StringArray::from_iter_values(
+            runs.iter().map(|r| r.final_hash.as_str()),
+        )),
+    ];
+    for n in &names {
+        fields.push(Field::new(n, DataType::Float64, true));
+        columns.push(Arc::new(Float64Array::from_iter(
+            runs.iter().map(|r| r.moes.get(n).copied().flatten()),
+        )));
+    }
+    let batch = RecordBatch::try_new(Arc::new(Schema::new(fields)), columns)?;
+    let file =
+        std::fs::File::create(path).with_context(|| format!("creating {}", path.display()))?;
+    let mut writer = parquet::arrow::ArrowWriter::try_new(file, batch.schema(), None)?;
+    writer.write(&batch)?;
+    writer.close()?;
+    Ok(())
+}
+
+/// Writes `runs.csv`, `runs.parquet`, `summary.csv` and `summary.json` to `out`.
 pub fn write(out: &Path, scenario: &str, runs: &[RunMoes], stats: &[Stat]) -> Result<()> {
     std::fs::create_dir_all(out).with_context(|| format!("creating {}", out.display()))?;
     let names: Vec<&String> = runs
@@ -251,6 +286,7 @@ pub fn write(out: &Path, scenario: &str, runs: &[RunMoes], stats: &[Stat]) -> Re
         csv.push('\n');
     }
     std::fs::write(out.join("runs.csv"), csv)?;
+    write_parquet(&out.join("runs.parquet"), runs)?;
     let mut sum = String::from("moe,n,mean,sd,ci95_low,ci95_high,min,median,max\n");
     for s in stats {
         sum.push_str(&format!(
@@ -329,5 +365,44 @@ mod tests {
         assert!(one[0].moes.contains_key("cargo_delivered_t"));
         let stats = summarise(&one);
         assert_eq!(stats.len(), one[0].moes.len());
+    }
+
+    #[test]
+    fn writes_a_readable_parquet_file() {
+        use parquet::file::reader::{FileReader, SerializedFileReader};
+        let mut moes = BTreeMap::new();
+        moes.insert("Blue.losses".to_owned(), Some(1.0));
+        moes.insert("Blue.weapons_per_kill".to_owned(), None);
+        let runs = vec![
+            RunMoes {
+                seed: 7,
+                final_hash: "ab".into(),
+                moes: moes.clone(),
+            },
+            RunMoes {
+                seed: 8,
+                final_hash: "cd".into(),
+                moes,
+            },
+        ];
+        let dir = std::env::temp_dir().join(format!("nws-mc-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("runs.parquet");
+        write_parquet(&path, &runs).unwrap();
+        let reader = SerializedFileReader::new(std::fs::File::open(&path).unwrap()).unwrap();
+        let meta = reader.metadata();
+        assert_eq!(meta.file_metadata().num_rows(), 2);
+        let cols: Vec<String> = meta
+            .file_metadata()
+            .schema_descr()
+            .columns()
+            .iter()
+            .map(|c| c.name().to_owned())
+            .collect();
+        assert_eq!(
+            cols,
+            ["seed", "final_hash", "Blue.losses", "Blue.weapons_per_kill"]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

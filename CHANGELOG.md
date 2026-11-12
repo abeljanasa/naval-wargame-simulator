@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-### Added (Phase 4, slice 1: Monte Carlo batch, in progress)
+### Added (Phase 4, slice 1: Monte Carlo batch)
 
 - **`nws-batch mc <scenario> --runs N [--seed S] [--threads T] --out <dir>`** runs a scenario for N seeds in parallel. Each run is independent and deterministic, so the results don't depend on the thread count, and a test checks this.
 - **Default measures of effectiveness**, until the client names its own:
@@ -13,7 +13,9 @@
   - `summary.csv`: n, mean, SD, 95 % CI, min, median, max;
   - `summary.json`: the same, plus a ten-bin histogram per measure.
 - **Speed:** 20 four-hour runs of the Mindoro pilot take 89 s on 12 cores.
-- **Next:** Parquet export.
+- **`runs.parquet`** (Apache Parquet): `seed`, `final_hash`, and one nullable Float64 column per measure.
+- **New dependencies:** `parquet`, `arrow-array` and `arrow-schema` 60.1 (Apache-2.0, compression features off). `cargo deny` passes.
+- **Scaling:** 12 one-hour runs take 2.8 s on 1 thread and 0.9 s on 12, with identical results.
 
 ### Added (map)
 
