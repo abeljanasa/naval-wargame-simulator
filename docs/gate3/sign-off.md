@@ -11,7 +11,7 @@ The panel's go/no-go record (master prompt §13). Each line is checked against i
 | ☐ | A white cell can run a multi-seat exercise with injects, overrides and AAR | White-cell manual; packaged-app rehearsal of the run sheet; the pilot | Panel, after the pilot |
 | ☐ | Signed installers for Windows and macOS (ADR-0006) | A release workflow run with no `UNSIGNED` warning | Client provides the certificates as Actions secrets; developer runs the release |
 | ☐ | The installers run air-gapped | Completed [installation checks](pilot-kit/installation-check.md) for Windows and macOS, on disconnected machines, with the signed build | Client's IT or the developer, on the client's machines |
-| ☐ | All CI checks are green | PR #3 checks green on the release commit | GitHub billing restored; developer pushes and confirms |
+| ☐ | All CI checks are green | PR #3 checks green on the release commit (green on `0e9f5f4`, 2026-11-12) | Developer confirms on the final commit |
 | ☐ | Manuals are complete | User manual, white-cell manual, scripting reference; reviewed by the pilot staff | Panel |
 | ☐ | A navy staff has run a TTX pilot on the release build | The [pilot report](pilot-report-template.md), with criteria 1–6 met | Client's staff; developer writes the report |
 

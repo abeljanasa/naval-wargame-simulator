@@ -17,8 +17,7 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
     - satellite imagery;
     - terrain and bathymetry data, and what depends on them;
     - air operations.
-- **Four conditions remain.** None can be met from the codebase:
-  - **CI on the latest commits.** GitHub stopped starting Actions jobs on 2026-11-12 (a billing or spending-limit block on the account). The last fully green run is `6835749`. Everything since passes locally (see the CI row).
+- **Three conditions remain.** None can be met from the codebase:
   - the client's signing certificates;
   - the air-gapped run of the signed release build on disconnected Windows and macOS machines;
   - the TTX pilot itself.
@@ -33,7 +32,7 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
 | A white cell can run a multi-seat exercise with injects, overrides and AAR | [white-cell manual](../manuals/white-cell-manual.md); models: [multi-seat](../models/multi-seat.md), [injects](../models/injects.md), [adjudication](../models/adjudication.md), [replay-aar](../models/replay-aar.md); host tests and e2e | **Done**, now with live planning-layer edits (slice 17) |
 | Signed installers for Windows and macOS (Linux dropped by the client, 2026-11-12, [ADR-0006](../adr/0006-target-platforms.md)) | Release workflow (`.github/workflows/release.yml`); macOS re-enabled; [releasing.md](../build/releasing.md) | **Waiting for the client's certificates.** Installers build unsigned until the Actions secrets are set. Every installer and scenario ships with a SHA-256 sum. Unsigned dry run on 2026-11-12 ([run 43180956359](https://github.com/abeljanasa/naval-wargame-simulator/actions/runs/43180956359)): installers built on all three OSes then targeted, passed the release scan, and produced SBOMs. Only the signing steps were skipped |
 | Installers run air-gapped | [air-gapped.md](../build/air-gapped.md): Phase 1 Windows bundle built and run with networking blocked; the app makes no network calls | **To repeat** on the release build, on a disconnected machine, for Windows and macOS |
-| All CI checks are green | PR #3 checks (Windows and macOS) | **Green up to `6835749`** (all 13 checks, 2026-11-12). **Later commits are not yet checked:** GitHub stopped starting jobs (account billing block). Locally on Windows, every later commit passes: the full workspace tests and clippy, the front-end type check, lint, unit tests and smoke test, and the packaged-app end-to-end test (20 checks). To confirm on GitHub once billing is restored |
+| All CI checks are green | PR #3 checks (Windows and macOS) | **Green:** all 14 checks on `0e9f5f4` (2026-11-12, [run 43216904162](https://github.com/abeljanasa/naval-wargame-simulator/actions/runs/43216904162)). That includes the packaged-app end-to-end test, the determinism matrix on Windows and macOS, and the tooling jobs on Windows runners. A billing block earlier that day stopped jobs from starting. It was cleared by making the repository public |
 | Manuals are complete | [User manual](../manuals/user-manual.md), [white-cell manual](../manuals/white-cell-manual.md), [scripting reference](../manuals/scripting-reference.md) (examples checked by `sim-scenario/tests/docs.rs`) | **Done**, updated for slices 10–20, record editing and the pause behaviour (review at the pilot) |
 | A navy staff has run a TTX pilot on the release build | [TTX pilot plan](ttx-pilot-plan.md) | **Planned**: needs the client's staff and the signed build |
 
