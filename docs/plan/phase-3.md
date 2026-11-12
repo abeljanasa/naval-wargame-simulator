@@ -33,7 +33,7 @@ Each slice: behaviour spec, design-log entry, tests, docs, CHANGELOG, green CI (
 
 The P1 features of §7 and §7.1 that are still partial are listed in the pack and the backlog, for the panel to accept or schedule.
 
-Out of phase (backlog): Monte Carlo batch statistics, SVP acoustics, weather zones, air operations (Phase 4); networked multiplayer (Phase 5).
+Out of phase (backlog): Monte Carlo batch statistics, SVP acoustics, weather zones, air operations (Phase 4, drafted in [phase-4.md](phase-4.md)); networked multiplayer (Phase 5).
 
 ## Slices 10–17: closing the P1 gaps
 

@@ -2,7 +2,7 @@
 
 Items deferred out of the current change, or requested out of phase (master prompt §14). Each item names the phase it belongs to.
 
-Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md); Phase 3 in [plan/phase-3.md](plan/phase-3.md).
+Phase 2 work is planned in [plan/phase-2.md](plan/phase-2.md); Phase 3 in [plan/phase-3.md](plan/phase-3.md); Phase 4 (draft) in [plan/phase-4.md](plan/phase-4.md).
 
 ## Phase 3, deferred from slices
 
@@ -29,7 +29,7 @@ Gate 3 conditions still open:
 
 ## Phase 4, deferred by the client (2026-11-12)
 
-The client chose to close the in-phase P1 gaps and move these to Phase 4, because they need outside data or a Phase 4 subsystem:
+The client chose to close the in-phase P1 gaps and move these to Phase 4, because they need outside data or a Phase 4 subsystem. The [Phase 4 plan](plan/phase-4.md) (draft) schedules them:
 
 - [ ] Satellite imagery layers (needs a licensed imagery source).
 - [ ] Terrain elevation and bathymetry packs (GEBCO/SRTM), then:

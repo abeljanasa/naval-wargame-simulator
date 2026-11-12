@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added (planning)
+
+- **Draft Phase 4 plan** (`docs/plan/phase-4.md`) for the Gate 3 panel. It covers 14 slices, the client decisions they need (region, imagery licence, historical engagements, data pack size, MOEs) and the risks. It is linked from the Gate 3 pack and the backlog.
+
 ### Added (Phase 3, slice 19: pilot scenario)
 
 - **`data/scenarios/phase3-pilot.json`**, *Kent passage pilot*: the Gate 3 pilot exercise, with three seats, four injects and eight events. It uses:
