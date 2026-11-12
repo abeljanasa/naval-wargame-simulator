@@ -6,6 +6,7 @@
     createMap,
     buildLayers,
     coverageLayers,
+    nightLayers,
     editorLayers,
     planningLayers,
     referenceLayers,
@@ -17,7 +18,16 @@
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
-  import type { Audience, CommsView, Emcon, Mission, Seat, Wcs } from "./lib/bindings";
+  import type {
+    Audience,
+    CommsView,
+    Emcon,
+    Facility,
+    Mission,
+    Seat,
+    Wcs,
+    Zone,
+  } from "./lib/bindings";
   import AarPanel from "./lib/AarPanel.svelte";
   import ScenarioEditor from "./lib/ScenarioEditor.svelte";
   import { editor } from "./lib/editor.svelte";
@@ -55,6 +65,39 @@
   });
 
   const clock = $derived(sim.clock);
+  /** Shade the night side of the map. */
+  let showNight = $state(true);
+
+  /** White cell: the kind and radius of a zone to add on the map. */
+  let newZoneKind = $state<"sense" | "engage">("sense");
+  let newZoneKm = $state(20);
+
+  function editPlanning(change: (f: Facility[], z: Zone[]) => void) {
+    const facilities = structuredClone($state.snapshot(sim.session?.facilities ?? []));
+    const zones = structuredClone($state.snapshot(sim.session?.zones ?? []));
+    change(facilities, zones);
+    void sim.setPlanning(facilities, zones);
+  }
+
+  function addZoneOnMap() {
+    sim.pick("Click the centre of the new zone", (p) => {
+      editPlanning((_, zones) => {
+        const id = Math.max(0, ...zones.map((z) => z.id)) + 1;
+        zones.push({
+          id,
+          name: `${newZoneKind === "sense" ? "Sense" : "Engage"} ${id}`,
+          side: sim.session?.sides[0]?.id ?? 1,
+          kind: newZoneKind,
+          area: { shape: "circle", centre: p, radius_m: newZoneKm * 1000 },
+          doctrine: { wcs: null, emcon: null, engage_unfriendly: null },
+          choke_point: null,
+          shooters: [],
+          layer: null,
+          sensors: [],
+        });
+      });
+    });
+  }
 
   /** Sense zones the seat may see coverage for: its side's, or every one for the white cell. */
   const senseZones = $derived(
@@ -156,6 +199,7 @@
     map.on("click", (e) => {
       const p = { lat_deg: e.lngLat.lat, lon_deg: e.lngLat.lng };
       if (editor.open && editor.deliver(p)) return;
+      if (sim.deliverPick(p)) return;
       if (sim.draft) sim.addWaypoint(p);
     });
     sim.start().catch((e: unknown) => {
@@ -187,6 +231,9 @@
     }
     overlay.setProps({
       layers: [
+        ...(showNight
+          ? nightLayers(n(sim.environment?.start_unix_s ?? 0) + n(clock?.game_time_s ?? 0))
+          : []),
         ...coverageLayers(sim.coverage),
         ...planningLayers(sim.session?.facilities ?? [], sim.session?.zones ?? []),
         ...buildLayers({
@@ -296,6 +343,14 @@
         </button>
       {/each}
     </div>
+    <button
+      class="theme"
+      aria-pressed={showNight}
+      onclick={() => (showNight = !showNight)}
+      title="Shade the night side of the earth at the game time"
+    >
+      Day/night
+    </button>
     <button
       class="theme"
       onclick={toggleTheme}
@@ -795,6 +850,52 @@
             {/each}
           </ul>
         {/if}
+        <h3>Planning layer (live)</h3>
+        <ul class="zones" aria-label="Facilities in play">
+          {#each sim.session?.facilities ?? [] as f, i (f.id)}
+            <li>
+              <span>{f.name} <span class="dim">({f.kind.replaceAll("_", " ")})</span></span>
+              {#if f.kind !== "command_post"}
+                {#each ["repair", "rearm", "refuel"] as const as sv (sv)}
+                  <label class="inline">
+                    <input
+                      type="checkbox"
+                      checked={f.services?.[sv] ?? false}
+                      onchange={(e) => {
+                        const on = e.currentTarget.checked;
+                        editPlanning((fs) => {
+                          const x = fs[i];
+                          if (x) x.services = { ...x.services, [sv]: on };
+                        });
+                      }}
+                    />{sv}
+                  </label>
+                {/each}
+              {/if}
+              <button
+                type="button"
+                onclick={() => editPlanning((fs) => void fs.splice(i, 1))}
+                aria-label={`Remove ${f.name}`}>Remove</button
+              >
+            </li>
+          {/each}
+        </ul>
+        <div class="row">
+          <select bind:value={newZoneKind} aria-label="Kind of zone to add">
+            <option value="sense">sense zone</option>
+            <option value="engage">engage zone</option>
+          </select>
+          <input
+            type="number"
+            min="1"
+            bind:value={newZoneKm}
+            aria-label="Radius of the zone to add, km"
+            style="width: 4.5em"
+          />
+          km
+          <button type="button" onclick={addZoneOnMap}>Add on the map</button>
+        </div>
+        {#if sim.picking}<p class="dim">{sim.picking.prompt}</p>{/if}
         {#if (sim.session?.zones ?? []).length > 0}
           <h3>Zone rules</h3>
           <ul class="zones" aria-label="Zone rules">
@@ -817,6 +918,30 @@
                   <option value="tight">tight</option>
                   <option value="free">free</option>
                 </select>
+                <select
+                  aria-label={`Emissions in ${z.name}`}
+                  value={z.doctrine?.emcon ?? ""}
+                  onchange={(e) => {
+                    const v = e.currentTarget.value;
+                    void sim.setZoneDoctrine(z.id, {
+                      ...z.doctrine,
+                      emcon: v === "" ? null : (v as Emcon),
+                    });
+                  }}
+                >
+                  <option value="">EMCON not set</option>
+                  <option value="active">active</option>
+                  <option value="silent">silent</option>
+                </select>
+                <button
+                  type="button"
+                  aria-label={`Remove ${z.name}`}
+                  onclick={() =>
+                    editPlanning((_, zs) => {
+                      const k = zs.findIndex((x) => x.id === z.id);
+                      if (k >= 0) zs.splice(k, 1);
+                    })}>Remove</button
+                >
               </li>
             {/each}
           </ul>
@@ -890,7 +1015,7 @@
   <main
     class="map"
     bind:this={mapEl}
-    class:planning={sim.draft !== null || editor.picking !== null}
+    class:planning={sim.draft !== null || editor.picking !== null || sim.picking !== null}
   ></main>
   {#if editor.open}
     <ScenarioEditor />

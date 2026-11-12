@@ -4,6 +4,8 @@
 import {
   type ActionGroup,
   type AarTable,
+  type Facility,
+  type Zone,
   type AarView,
   type Adjudication,
   type AdjudicationRecord,
@@ -329,6 +331,32 @@ class SimSession {
       this.session = res.data;
       this.error = null;
     }
+  }
+
+  /** White cell: replaces the planning layer's facilities and zones in play. */
+  async setPlanning(facilities: Facility[], zones: Zone[]) {
+    const res = await commands.orderPlanning(facilities, zones);
+    if (res.status === "error") this.error = res.error;
+    else {
+      this.session = res.data;
+      this.error = null;
+    }
+  }
+
+  /** A point being picked on the map for the white cell (a new zone's centre). */
+  picking = $state<{ prompt: string; done: (p: GeoPoint) => void } | null>(null);
+
+  pick(prompt: string, done: (p: GeoPoint) => void) {
+    this.picking = { prompt, done };
+  }
+
+  /** A map click while picking. True if it was used. */
+  deliverPick(p: GeoPoint): boolean {
+    const pk = this.picking;
+    if (!pk) return false;
+    this.picking = null;
+    pk.done(p);
+    return true;
   }
 
   async facilitate(action: Facilitation) {

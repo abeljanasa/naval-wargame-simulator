@@ -161,3 +161,24 @@ describe("npm licence policy", () => {
     expect(satisfiable("LGPL-2.1-only")).toBe(false);
   });
 });
+
+describe("day/night shading", () => {
+  it("puts the sun where the engine's solar model does (hand values)", async () => {
+    const { subsolarPoint, nightPolygon } = await import("./map");
+    // 1970-01-01 00:00 UTC: midnight at Greenwich, so the sun is over 180°; day 0, so the
+    // declination is −23.44 × cos(360/365 × 10°) = −23.09°.
+    const s = subsolarPoint(0);
+    expect(s.lon).toBeCloseTo(180, 9);
+    expect(s.lat).toBeCloseTo(-23.09, 2);
+    // Six hours later the sun is over 90° E.
+    expect(subsolarPoint(6 * 3600).lon).toBeCloseTo(90, 9);
+    const ring = nightPolygon(0);
+    const at = (lon: number) => ring.find(([x]) => x === lon)?.[1];
+    // A quarter of the way round from the sun the terminator crosses the equator.
+    expect(at(90)).toBeCloseTo(0, 6);
+    // Under the sun it is at atan(−1 / tan(−23.09°)) = 66.9° N: the polar night beyond.
+    expect(at(180)).toBeCloseTo(66.9, 1);
+    // Southern summer: the night side holds the north pole.
+    expect(ring.at(-1)?.[1]).toBe(85);
+  });
+});

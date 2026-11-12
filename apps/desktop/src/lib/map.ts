@@ -650,6 +650,56 @@ export function coverageLayers(coverage: MapCoverage[]): Layer[] {
   ];
 }
 
+/**
+ * The sun's subsolar point at `unixS`, by the engine's own simplified solar position
+ * (`sim_sensors::sun_elevation_deg`): declination −23.44° · cos(360°/365 · (N + 10)) with N the
+ * day count, and the subsolar longitude from mean solar time.
+ */
+export function subsolarPoint(unixS: number): { lat: number; lon: number } {
+  const n = (((unixS / 86_400) % 365.2422) + 365.2422) % 365.2422;
+  const dec = -23.44 * Math.cos(((360 / 365) * (n + 10) * Math.PI) / 180);
+  const utcHours = (((unixS % 86_400) + 86_400) % 86_400) / 3600;
+  let lon = 15 * (12 - utcHours);
+  if (lon > 180) lon -= 360;
+  if (lon <= -180) lon += 360;
+  return { lat: dec, lon };
+}
+
+/** The night side of the earth at `unixS` (sun below the horizon), as a polygon in [lon, lat]. */
+export function nightPolygon(unixS: number): LonLat[] {
+  const { lat: dec, lon: lon0 } = subsolarPoint(unixS);
+  const rad = Math.PI / 180;
+  // Avoid the equinox singularity: the terminator is then a meridian pair.
+  const d = Math.abs(dec) < 0.01 ? (dec < 0 ? -0.01 : 0.01) : dec;
+  const line: LonLat[] = [];
+  for (let lon = -180; lon <= 180; lon += 2) {
+    const h = (lon - lon0) * rad;
+    const lat = Math.atan(-Math.cos(h) / Math.tan(d * rad)) / rad;
+    line.push([lon, Math.max(-85, Math.min(85, lat))]);
+  }
+  // The pole away from the sun is in the night.
+  const pole = d > 0 ? -85 : 85;
+  return [...line, [180, pole], [-180, pole]];
+}
+
+const NIGHT_FILL: RGBA = [0, 0, 30, 70];
+
+/** Night shading for the map at game time `unixS`. */
+export function nightLayers(unixS: number): Layer[] {
+  return [
+    new PolygonLayer<{ ring: LonLat[] }>({
+      id: "night",
+      data: [{ ring: nightPolygon(unixS) }],
+      getPolygon: (x) => x.ring,
+      getFillColor: NIGHT_FILL,
+      stroked: false,
+      filled: true,
+      // Recompute when the minute changes.
+      updateTriggers: { getPolygon: Math.floor(unixS / 60) },
+    }),
+  ];
+}
+
 /** Outline of a zone, closed. */
 export function zoneRing(z: MapZone): LonLat[] {
   if (z.area.shape === "circle") return circleRing(z.area.centre, n(z.area.radius_m));

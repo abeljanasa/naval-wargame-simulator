@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 17: desktop editing and facilitation)
+
+- **Event forms** in the scenario editor (DL-0036):
+  - The trigger, with area triggers drawn on the map as a circle or polygon.
+  - Conditions and actions, routes drawn on the map, and Lua as script text.
+  - JSON stays available for injects, seats and groups.
+- **Polygon drawing** for zones and facility areas (from slice 13); event areas here.
+- **White-cell planning layer in play:**
+  - Toggle a facility's services, or remove it.
+  - Add a sense or engage zone on the map, set a zone's emissions, or remove it.
+  - Each change is one logged `SetPlanning` (`order_planning`). The groups in play are kept.
+- **Day/night shading** on the map at the game time, from the engine's solar model, with a **Day/night** switch.
+- **e2e smoke:** the event form, and scenario format 6.
+
 ### Added (Phase 3, slice 16: surface action groups in the core)
 
 - **Action groups are engine objects** (`docs/models/planning-layer.md` §Surface action groups, DL-0035):

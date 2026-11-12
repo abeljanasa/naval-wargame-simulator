@@ -174,8 +174,9 @@ pub struct Host {
     windows_opened: u32,
     /// Set while reviewing: windows show the replay, and orders are refused.
     replay: Option<Replay>,
-    /// The planning layer in force: the scenario's, with the white cell's zone changes.
+    /// The planning layer in force: the scenario's, with the white cell's changes.
     pub zones: Vec<sim_core::Zone>,
+    pub facilities: Vec<sim_core::Facility>,
 }
 
 const IN_REVIEW: &str = "reviewing a replay: return to the live exercise first";
@@ -220,6 +221,7 @@ impl Host {
     ) -> Result<Self, sim_scenario::ScenarioError> {
         let (sim, seats, first) = start(&scenario, &platforms)?;
         let zones = scenario.zones.clone();
+        let facilities = scenario.facilities.clone();
         Ok(Self {
             scenario,
             platforms,
@@ -233,6 +235,7 @@ impl Host {
             windows_opened: 0,
             replay: None,
             zones,
+            facilities,
         })
     }
 
@@ -247,6 +250,7 @@ impl Host {
         self.seats = seats;
         self.replay = None;
         self.zones = self.scenario.zones.clone();
+        self.facilities = self.scenario.facilities.clone();
         let closing: Vec<String> = self
             .stations
             .keys()
@@ -830,11 +834,36 @@ impl Host {
         let seq = self.order(
             label,
             CommandPayload::SetPlanning {
-                facilities: self.scenario.facilities.clone(),
+                facilities: self.facilities.clone(),
                 zones: zones.clone(),
                 action_groups: None,
             },
         )?;
+        self.zones = zones;
+        Ok(seq)
+    }
+
+    /// White cell: replaces the planning layer's facilities and zones in play (one logged
+    /// `SetPlanning`; the action groups in play are kept).
+    pub fn order_planning(
+        &mut self,
+        label: &str,
+        facilities: Vec<sim_core::Facility>,
+        zones: Vec<sim_core::Zone>,
+    ) -> Result<u64, String> {
+        if self.seat_of(label)?.role != SeatRole::WhiteCell {
+            return Err("only the white cell changes the planning layer".into());
+        }
+        sim_core::validate_planning(&facilities, &zones)?;
+        let seq = self.order(
+            label,
+            CommandPayload::SetPlanning {
+                facilities: facilities.clone(),
+                zones: zones.clone(),
+                action_groups: None,
+            },
+        )?;
+        self.facilities = facilities;
         self.zones = zones;
         Ok(seq)
     }
@@ -1331,6 +1360,42 @@ mod tests {
         assert_eq!(r.end_s, 120.0);
         // A saved review saves the same record again.
         assert_eq!(other.record_bytes(M).unwrap(), bytes);
+    }
+
+    #[test]
+    fn the_white_cell_edits_the_planning_layer_in_play() {
+        let mut s = Scenario::from_json(include_str!(
+            "../../../../data/scenarios/phase3-planning-demo.json"
+        ))
+        .unwrap();
+        s.seats.clear();
+        let mut h = Host::new(s, sim_db::embedded::open_platform_db().unwrap()).unwrap();
+        // Remove a facility nothing depends on (an alternate post cannot simply go).
+        let mut facilities = h.facilities.clone();
+        let free = facilities
+            .iter()
+            .position(|f| !h.facilities.iter().any(|g| g.alternate == Some(f.id)))
+            .unwrap();
+        let removed = facilities.remove(free).id;
+        let zones = h.zones.clone();
+        assert!(
+            h.order_planning(M, facilities.clone(), zones.clone())
+                .is_err(),
+            "a side's seat may not"
+        );
+        h.set_seat(M, seat_named(&h, "White cell")).unwrap();
+        h.order_planning(M, facilities.clone(), zones.clone())
+            .unwrap();
+        h.step(M, 1).unwrap();
+        assert!(h.update(M).unwrap().refusals.is_empty());
+        let save = h.sim.save();
+        assert!(save.planning.facilities.iter().all(|f| f.id != removed));
+        assert_eq!(h.facilities, facilities);
+        // The groups in play survive the edit.
+        assert_eq!(
+            save.planning.action_groups.len(),
+            h.scenario.action_groups.len()
+        );
     }
 
     #[test]

@@ -33,6 +33,7 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
 | [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
 | [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0036](DL-0036-desktop-facilitation.md) | Event forms, polygon drawing, live planning edits, day/night shading | Project spec §10 + original design |
 | [DL-0035](DL-0035-action-groups.md) | Surface action groups in the core | Project spec §7.1 + original design |
 | [DL-0034](DL-0034-weapon-tracks.md) | Weapons in flight as sensor targets | Project spec §7, §8 + the detection models + original design |
 | [DL-0033](DL-0033-coverage.md) | Sense-zone layers, coverage and gaps | Project spec §7.1 + the detection models + original design |

@@ -278,7 +278,6 @@ fn session_info(h: &Host, label: &str) -> Result<SessionInfo, String> {
             .cloned()
             .collect(),
         facilities: h
-            .scenario
             .facilities
             .iter()
             .filter(|f| sees(h.viewer(label), f.side))
@@ -675,6 +674,20 @@ fn order_mission(
         .map_err(|e| e.to_string())
 }
 
+/// White cell: replaces the planning layer's facilities and zones in play.
+#[tauri::command]
+#[specta::specta]
+fn order_planning(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    facilities: Vec<sim_core::Facility>,
+    zones: Vec<sim_core::Zone>,
+) -> Result<SessionInfo, String> {
+    let mut h = lock(&host);
+    h.order_planning(window.label(), facilities, zones)?;
+    session_info(&h, window.label())
+}
+
 /// Gives an action group its mission (run by its leader); `None` clears it.
 #[tauri::command]
 #[specta::specta]
@@ -784,6 +797,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_zone_doctrine,
             zone_coverage,
             order_group_mission,
+            order_planning,
             order_detach,
             order_join,
             db_weapons,

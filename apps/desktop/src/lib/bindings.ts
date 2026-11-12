@@ -62,6 +62,8 @@ export const commands = {
 	zoneCoverage: (zone: number) => typedError<ZoneCoverage | null, string>(__TAURI_INVOKE("zone_coverage", { zone })),
 	/**  Gives an action group its mission (run by its leader); `None` clears it. */
 	orderGroupMission: (group: string, mission: Mission_Deserialize | null) => typedError<null, string>(__TAURI_INVOKE("order_group_mission", { group, mission })),
+	/**  White cell: replaces the planning layer's facilities and zones in play. */
+	orderPlanning: (facilities: Facility_Deserialize[], zones: Zone_Deserialize[]) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_planning", { facilities, zones })),
 	/**  Takes a unit out of its action group. */
 	orderDetach: (unit: UnitId) => typedError<null, string>(__TAURI_INVOKE("order_detach", { unit })),
 	/**  Puts a unit into an action group at a station on its leader. */

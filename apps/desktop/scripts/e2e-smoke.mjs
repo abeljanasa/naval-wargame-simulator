@@ -280,6 +280,11 @@ try {
   await ed.getByText("Choke point 1 engage zone · Choke point 1").waitFor({ timeout: 5_000 });
   await ed.getByRole("tab", { name: "Events" }).click();
   await ed.getByLabel("Add an event from a template").selectOption({ index: 1 });
+  check(
+    (await ed.getByLabel("Add an action").count()) === 1 &&
+      (await ed.getByLabel("Add a condition").count()) === 1,
+    "the template event is shown as a form with its trigger, conditions and actions",
+  );
   await ed.getByRole("button", { name: "Play" }).click();
   await page.waitForTimeout(400);
   {
@@ -292,7 +297,7 @@ try {
         last.events.length === 1 &&
         last.zones.length === 2 &&
         last.zones[1].kind === "engage" &&
-        last.format_version === 5,
+        last.format_version === 6,
       "Play sends the checked draft (its unit, event and choke-point zones) to load_scenario",
     );
   }

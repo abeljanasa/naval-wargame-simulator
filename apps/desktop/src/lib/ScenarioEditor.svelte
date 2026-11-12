@@ -4,6 +4,7 @@
   // (facilities, zones, action groups); JSON for events, injects, seats and groups. The engine checks the draft; errors block Save and Play.
   import type { Emcon, FacilityKind, Mission, Posture, Wcs } from "./bindings";
   import { editor } from "./editor.svelte";
+  import EventsEditor from "./EventsEditor.svelte";
   import { MPS_PER_KNOT, n } from "./format";
   import {
     addChokePoint,
@@ -1493,9 +1494,18 @@
         }}>Add action group</button
       >
     {:else}
+      <EventsEditor
+        onchange={() => {
+          const ev = editor.draft.events;
+          jsonText.events = Array.isArray(ev) && ev.length ? JSON.stringify(ev, null, 2) : "";
+          jsonError.events = null;
+          changed();
+        }}
+      />
+      <h3>Injects, seats and groups</h3>
       <p class="dim">
-        Events, injects, seats and groups are edited as JSON (docs/models/events.md). Changes apply
-        when you leave a box.
+        These are edited as JSON (docs/models/events.md), as are events for anything the forms do
+        not cover. Changes apply when you leave a box.
       </p>
       <label class="inline">
         Add an event

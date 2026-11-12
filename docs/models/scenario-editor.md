@@ -35,12 +35,13 @@ Clicking a unit selects it. The running exercise is not affected until **Play**.
 
 | Tab | Edits |
 |---|---|
-| **Overview** | Name, description, seed, duration, start time (UTC), sea state, weather loss, visibility |
+| **Overview** | Name, description, seed, duration, start time (UTC), sea state, weather loss, visibility, the fuel model ([fuel.md](fuel.md)) |
 | **Sides** | Names; how each side regards every other (friendly, neutral, unfriendly, hostile; neutral is not written); add a side; remove a side, with its units, minefields, points and the postures toward it |
-| **Units** | List; **Add unit on the map**; per unit: name, side, platform (from the database), position (typed or **Move on the map**), heading, speed in knots (blank: the platform's cruise speed), **Draw route** (click waypoints, then Done), mission (patrol: centre and radius; ferry: destination; escort: unit, relative bearing, range; strike: contact number), reserve; Duplicate, Delete |
+| **Units** | List; **Add unit on the map**; per unit: name, side, platform (from the database), position (typed or **Move on the map**), heading, speed in knots (blank: the platform's cruise speed), starting fuel (with the fuel model), **Draw route** (click waypoints, then Done), mission (patrol, ferry, escort, strike, support, mining, mine clearing, cargo, barrier patrol, denial: [missions.md](missions.md)), reserve; Duplicate, Delete |
 | **Mines** | Side, mine type (database weapons of kind `mine`), number of mines, radius, centre on the map |
 | **Points** | Reference points: name, position on the map, shown to every side or to one side |
-| **Events** | Events, injects, seats and groups as JSON (format in [events.md](events.md), [injects.md](injects.md), [multi-seat.md](multi-seat.md)); **Add an event** from a template |
+| **Planning** | Facilities (command-post links, relays and subordinates; refuelling carrier, stock and rate; depth, holding limit, staging; **Draw area**), zones (layer, sensor types, **Draw polygon** or circle), surface action groups ([planning-layer.md](planning-layer.md)) |
+| **Events** | **Forms** for each event (slice 17): id, name, on at the start, repeatable; the trigger (time, every, area entered with a circle or a drawn polygon, unit destroyed, contact gained); conditions (event fired or not, unit alive or gone, units alive, time window, probability, Lua); actions (message, inject, posture, doctrine, weather, speed, route drawn on the map, patrol or clear a mission, reserve, turn an event on or off, Lua). **Add an event** blank or from a template. Injects, seats and groups as JSON (format in [events.md](events.md), [injects.md](injects.md), [multi-seat.md](multi-seat.md)) |
 
 - Positions picked on the map are rounded to 10⁻⁵ degree (about a metre).
 - Fields the forms do not cover (unit doctrine, jammers, inline performance overrides, side doctrine) are kept unchanged from the file.
@@ -67,7 +68,7 @@ Clicking a unit selects it. The running exercise is not affected until **Play**.
 - Two units with the same name.
 - A ship or submarine that starts on land (against the bundled coastline).
 
-**Save file** writes the draft as formatted JSON at format 4, named after the scenario. **Play** loads it into the session, replacing the running exercise (as loading a file does), and closes the editor.
+**Save file** writes the draft as formatted JSON at the current format (6), named after the scenario. **Play** loads it into the session, replacing the running exercise (as loading a file does), and closes the editor.
 
 ## Scenario format 4
 
@@ -80,7 +81,6 @@ Reference points have no effect on the simulation. Seat windows show the points 
 
 ## Limitations
 
-- Events, injects, seats and groups are edited as JSON, with templates and the engine's checks. There are no forms for triggers, conditions and actions yet.
+- Injects, seats and groups are edited as JSON, with the engine's checks. Event fields the forms do not cover (an event action's full mission set, group doctrine targets) are kept as written.
 - No undo; reopen the file or **Edit this scenario** to start again.
-- Areas for `area_entered` triggers are typed as JSON; they are not drawn on the map.
 - Unit doctrine, jammers and inline performance overrides are kept, but have no form.
