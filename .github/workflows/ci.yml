@@ -258,7 +258,8 @@ jobs:
         env:
           WEBKIT_DISABLE_DMABUF_RENDERER: "1"
           WEBKIT_DISABLE_COMPOSITING_MODE: "1"
-        run: xvfb-run -a npm run e2e:app
+        # A screen as large as the app window (xvfb-run's default is 640x480).
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" npm run e2e:app
       - name: Packaged-app test (Windows)
         if: runner.os == 'Windows'
         run: npm run e2e:app

@@ -129,11 +129,18 @@ class SimSession {
   selectedUnit = $derived(this.units.find((u) => u.id === this.selected) ?? null);
 
   async start() {
+    // Each window listens to its own frames: a seat window sees only its seat's picture.
+    // Listen first: asking for the session then makes the next frame a full picture, which
+    // would be lost if it came before the listener (a slow cold start).
+    await events.frameEvent(getCurrentWebviewWindow()).listen((e) => this.apply(e.payload));
+    await this.resync();
+  }
+
+  /** Fetches the session; the backend answers by sending this window a full picture next. */
+  private async resync() {
     const res = await commands.getSession();
     if (res.status === "error") throw new Error(res.error);
     this.session = res.data;
-    // Each window listens to its own frames: a seat window sees only its seat's picture.
-    await events.frameEvent(getCurrentWebviewWindow()).listen((e) => this.apply(e.payload));
   }
 
   /** Applies one frame: a full picture replaces the units; a diff upserts by id and removes. */
@@ -183,6 +190,8 @@ class SimSession {
     this.selected = null;
     this.draft = null;
     this.error = null;
+    // The new scenario's full picture may have come before this reply and been cleared above.
+    await this.resync();
     return true;
   }
 
@@ -417,6 +426,7 @@ class SimSession {
     this.selected = null;
     this.draft = null;
     this.error = null;
+    await this.resync();
   }
 
   /** The after-action review tables (of the replay, or of the live run so far). */

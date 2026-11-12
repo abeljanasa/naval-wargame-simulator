@@ -75,7 +75,10 @@ pub struct SessionInfo {
 #[tauri::command]
 #[specta::specta]
 fn get_session(window: WebviewWindow, host: State<'_, SharedHost>) -> Result<SessionInfo, String> {
-    session_info(&lock(&host), window.label())
+    // The window is listening by now, so send it a full picture next (see `Host::resync`).
+    let mut h = lock(&host);
+    h.resync(window.label());
+    session_info(&h, window.label())
 }
 
 /// Closes seat windows whose seats are gone.

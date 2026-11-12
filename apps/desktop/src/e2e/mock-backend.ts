@@ -123,8 +123,10 @@ const zones = [
     shooters: [],
   },
 ];
+// The loaded scenario, as the real backend keeps it (get_session reports it after a load).
+let scenarioName = "E2E — mock scenario";
 const session = (): SessionInfo => ({
-  scenario_name: "E2E — mock scenario",
+  scenario_name: scenarioName,
   description: "",
   sides: [
     { id: 1, name: "Blue" },
@@ -170,7 +172,8 @@ mockIPC(
         return null;
       case "load_scenario": {
         const parsed = JSON.parse((args as { json: string }).json) as { name: string };
-        return { ...session(), scenario_name: parsed.name };
+        scenarioName = parsed.name;
+        return session();
       }
       case "db_search": {
         const q = (args as { query: string }).query.toLowerCase();

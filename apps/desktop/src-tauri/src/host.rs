@@ -276,6 +276,15 @@ impl Host {
         &self.platforms
     }
 
+    /// The window's next update is a full picture. A window calls this (through
+    /// `get_session`) once it is listening: a full picture sent before then would be lost,
+    /// and while paused nothing else would bring its units.
+    pub fn resync(&mut self, label: &str) {
+        if let Some(st) = self.stations.get_mut(label) {
+            st.last_sent = None;
+        }
+    }
+
     fn station(&self, label: &str) -> Result<&Station, String> {
         self.stations
             .get(label)
@@ -1098,6 +1107,20 @@ mod tests {
             .unwrap()
             .iter()
             .all(|i| i.severity == sim_db::Severity::Warning));
+    }
+
+    #[test]
+    fn a_window_that_asks_again_gets_a_full_picture() {
+        let mut h = host();
+        assert!(h.update(M).unwrap().full);
+        let u = h.update(M).unwrap();
+        assert!(!u.full && u.units.is_empty(), "paused: nothing changed");
+        h.resync(M);
+        let u = h.update(M).unwrap();
+        assert!(
+            u.full && !u.units.is_empty(),
+            "a full picture with the units"
+        );
     }
 
     #[test]

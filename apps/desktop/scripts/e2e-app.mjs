@@ -108,6 +108,10 @@ try {
     throw e;
   });
   check(true, "app starts and shows the built-in scenario");
+  // The starting picture arrives even when the window starts slowly (it asks for it once it
+  // is listening).
+  await until("units in the starting picture", async () => /Units [1-9]/.test(await bodyText()));
+  check(true, "starting picture lists the seat's units");
   // The host runs the first second on load, which places the units.
   check(seconds(await clock()) === 1, "opens after the first second (D+0 00:00:01)");
 

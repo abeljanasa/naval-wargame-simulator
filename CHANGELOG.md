@@ -9,6 +9,7 @@
   - The review scrubber starts there too.
   - Determinism, records and replays are unchanged: it is the tick a straight run starts with.
   - Found by the new packaged-app test.
+- **A window that started slowly could miss its starting picture** and show no units until something moved. The window now starts listening for frames before it asks for its session, and asking makes the backend send a full picture next. Loading a scenario or a record asks again, so a full picture that arrives before the load reply is not lost. Found by the packaged-app test on Linux CI.
 
 ### Added (packaged-app test)
 
