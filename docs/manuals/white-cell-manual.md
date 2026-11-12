@@ -33,7 +33,16 @@ Run the scenario at **Max** once, alone, to see where the decision points fall. 
 
 ## 3. The white-cell console
 
-Choose the **White cell** seat to see ground truth: every side's units, with no fog of war.
+Choose the **White cell** seat (toolbar, **Seat**) to see ground truth: every side's units, with no fog of war. The console is the right panel's tabs (also on the **Exercise** menu):
+- **Unit**: the selected unit, with **Override** (Repair, Destroy, Remove) and weapons in flight (Hit, Miss);
+- **Injects**: the inject library and free messages;
+- **Events**;
+- **Planning**: command posts, facilities and zones in play;
+- **Seats**;
+- **Log**: the override log;
+- **Review**: replay and AAR.
+
+**Reason (logged)** stays at the top of every console tab.
 
 ### Overrides (adjudication)
 
@@ -46,7 +55,7 @@ Every override is logged with your seat name and the **Reason (logged)**. An ove
 | Remove a unit | Select it, **Remove** (out of the exercise, not counted as destroyed) |
 | Force a weapon's outcome | Under weapons in flight, **Hit** (full damage, no roll) or **Miss** |
 
-The override log at the bottom of the console lists the most recent overrides with time, umpire and reason.
+The **Log** tab lists the most recent overrides with time, umpire and reason.
 
 ### Injects and messages
 
@@ -97,11 +106,11 @@ Scenarios with a planning layer add decision points you can exploit:
 - **Fuel** (scenarios with the fuel model): AI units low on fuel head for the nearest refuelling point or oiler. Queues at a busy point show in the timeline (*waiting for a berth*). Closing a depot's refuel service is a strong logistics inject.
 - **Weather:** raising the sea state (an event, or the scenario) sends small ships to shelter. Ships at an anchorage whose holding limit is exceeded leave it.
 - **Action groups:** sinking a leader hands the group to its next ship, with the group's mission.
-- **Coverage:** **Sense coverage** shows any side's sense-zone coverage and gaps, for planning a decision point.
+- **Coverage:** the left panel's **Coverage** tab shows any side's sense-zone coverage and gaps, for planning a decision point.
 
 ## 5. Exercise review and AAR
 
-Under **Exercise review**, for the control station and white-cell seats:
+On the **Review** tab (or **Exercise › Review and AAR**), for the control station and white-cell seats:
 
 | Action | What it does |
 |---|---|
@@ -128,7 +137,7 @@ The Gate 3 pilot plan is [docs/gate3/ttx-pilot-plan.md](../gate3/ttx-pilot-plan.
 
 ## 7. Editing scenarios
 
-**Edit this scenario**, **New scenario** or **Edit a scenario file** under **Scenario** opens the editor beside the map. The map then shows the draft, not the live exercise. The tabs:
+**Edit this scenario**, **New scenario** or **Edit a scenario file** on the **File** menu opens the editor beside the map. The map then shows the draft, not the live exercise. The tabs:
 
 - **Overview:** name, description, seed, duration, start time, sea state, weather, visibility.
 - **Sides:** names and postures toward each other.

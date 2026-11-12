@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed (desktop layout)
+
+- **Menu bar** (File, View, Exercise, Help) for occasional actions. The platform database opens in a dialog.
+- **Toolbar:** time controls, the clock and the seat picker.
+- **Tabbed side panels:**
+  - Left: Picture, Messages (with an unread count), Coverage.
+  - Right: Unit, plus Injects, Events, Planning, Seats, Log and Review where the seat has them.
+- **Status bar:** errors and map-pick prompts, instead of the bottom of a scrolling sidebar.
+- **Manuals** updated for the new layout.
+
 ### Changed (Phase 3, slice 18: Gate 3 pack update)
 
 - **Gate 3 pack** (`docs/gate3/README.md`): the P1 gaps are closed in phase, and the client's Phase 4 deferrals are recorded with their reasons.

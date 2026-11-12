@@ -19,8 +19,11 @@ Your workstation needs:
 
 | Area | What it shows |
 |---|---|
-| **Header** | Scenario name; game time; achieved speed (e.g. `60×`) or `paused`; sea state and weather; time controls; **REPLAY** while a replay is being reviewed; the **Day/night** switch; the light/dark theme switch |
-| **Side panel** | Scenario, Seat, Units, **Sense coverage**, Contacts, the selected unit, Messages, the platform database; for the white cell, the white-cell console and exercise review |
+| **Menu bar** | **File**: open a scenario; new, edit or edit-from-file in the scenario editor. **View**: night shading, dark theme, the left-panel tabs, the platform database. **Exercise**: run or pause, step, review and AAR; for the white cell, each console tab. **Help**: keyboard shortcuts. The scenario name is on the right |
+| **Toolbar** | Run/pause, step and time compression; game time, achieved speed (e.g. `60×`) or `paused`, sea state and weather; **REPLAY** while a replay is being reviewed; your **Seat** |
+| **Left panel** | Tabs: **Picture** (your units and contacts), **Messages** (with a count of unread messages), **Coverage** (when your side has sense zones) |
+| **Right panel** | **Unit**: the selected unit (details, orders, engage). For the white cell, also **Injects**, **Events**, **Planning**, **Seats** and **Log**; for seats that run the clock, **Review**. A side seat sees this panel only while a unit is selected |
+| **Status bar** | Refused orders and other errors, map-click prompts, and key hints |
 | **Map** | Your units, contacts with their 95 % error ellipses, ESM bearing lines, your weapons in flight, the enemy weapons your sensors track (rings: red missiles, blue torpedoes), minefields, reference points, your side's planning layer (zones and facilities, with their areas), sense coverage, and the night side of the earth |
 
 **Map symbols.** Frames follow APP-6 conventions by domain: a full frame for surface, the upper half for air, the lower half for subsurface. Colour and shape show affiliation. A short line ahead of each unit shows where it will be in 6 minutes. Sense zones are blue outlines, engage zones red. Facilities are labelled `CP` (command post), `PORT`, `ANCH` (anchorage) or `RAS` (refuelling point).
@@ -90,7 +93,7 @@ Only the white cell (and the main window) controls time. In a seat window the bu
     Relay units extend a post's reach. If the post is lost or jammed, an alternate takes over after a delay, and orders in the gap are refused or queued until then.
   - **Ports and anchorages:** a unit stopped there (at ≤ 1 kn) is repaired and, after 30 minutes, rearmed, if the facility offers it. Units must fit the facility's depth. Ships that have finished their mission wait at a staging anchorage. In heavy weather, small ships run for a sheltering port.
   - **Fuel** (if the scenario uses it): ships burn more the faster they go. A unit on a mission below 30 % goes to refuel at the nearest refuelling point or oiler. Out of fuel, a ship stops (`docs/models/fuel.md`).
-  - **Sense coverage:** tick a sense zone under **Sense coverage** to see which parts of it your sensors can watch now (green) and where the gaps are (red).
+  - **Sense coverage:** tick a sense zone on the **Coverage** tab to see which parts of it your sensors can watch now (green) and where the gaps are (red).
   - **Surface action groups:** members keep station on the leader and share its mission. Their air defence shares one picture and does not double up on the same missile.
 
 ## 8. Messages
@@ -100,7 +103,7 @@ Only the white cell (and the main window) controls time. In a seat window the bu
 
 ## 9. The platform database
 
-- **Platform database** opens a read-only browser. Search by id, name or category.
+- **View › Platform database…** opens a read-only browser. Search by id, name or category.
 - Each record shows its figures, its source citation, its confidence and its classification marking.
 - The shipped database is generic: its figures are illustrative, not real.
 
@@ -115,5 +118,5 @@ The white cell runs the replay and the after-action review (AAR). At a side seat
 | The map is blank | Check the GPU supports WebGL 2; update its driver. |
 | "Cannot connect to the simulation engine" | Restart the app. |
 | Time does not move | The white cell has paused it, or your window does not control time. |
-| An order seems ignored | Look for a red refusal under the panel: the reason is given. |
+| An order seems ignored | Look for a red refusal in the status bar at the bottom: the reason is given. |
 | A record will not open | The app opens only `.nwsrec` records from this build or older. |

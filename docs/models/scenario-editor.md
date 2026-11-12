@@ -17,11 +17,11 @@
 
 ## Opening
 
-The editor is offered to windows that control time (the control station and white-cell seats), under **Scenario**:
+The editor is offered to windows that control time (the control station and white-cell seats), on the **File** menu:
 
 - **Edit this scenario:** the scenario now loaded, as the engine holds it.
 - **New scenario:** two sides (Blue and Red, hostile to each other), no units, four hours.
-- **Edit a scenario file:** any `.json` file. The webview reads it; nothing is written to disk by the app.
+- **Edit a scenario file…:** any `.json` file. The webview reads it; nothing is written to disk by the app.
 
 While the editor is open, the map shows the draft instead of the live picture:
 - units as dots in their side's colour (reserves faint), with names;
