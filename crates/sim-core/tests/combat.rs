@@ -2560,3 +2560,168 @@ fn sense_zone_coverage_follows_the_radar_horizon_and_emcon() {
         .submit(planning(vec![], vec![bad]))
         .is_err());
 }
+
+// ---- Weapons in flight as sensor targets (Phase 3 slice 15) ----
+
+fn sensor(kind: SensorKind, max_range_m: f64) -> SensorSpec {
+    SensorSpec {
+        sensor_id: format!("TEST-{kind:?}"),
+        kind,
+        mount_height_m: 20.0,
+        min_range_m: 0.0,
+        max_range_m,
+        ref_range_m: None,
+        ref_rcs_m2: None,
+        max_target_altitude_m: 25_000.0,
+        clutter_db_per_sea_state: None,
+        beamwidth_deg: None,
+        active: false,
+    }
+}
+
+fn torpedo() -> WeaponSpec {
+    WeaponSpec {
+        id: "T-TORP".into(),
+        name: "test torpedo".into(),
+        kind: WeaponKind::Torpedo,
+        guidance: Guidance::Acoustic,
+        min_range_m: 500.0,
+        max_range_m: 20_000.0,
+        speed_mps: 25.0,
+        warhead_kg: 250.0,
+        base_ph: 0.7,
+        target_domains: vec!["surface".into()],
+    }
+}
+
+/// Blue (unit 1) at the origin with `sensors` and `stores`, radiating or silent; red (unit 2,
+/// radar) `range_m` east fires one `weapon` at it at tick 1.
+fn incoming(
+    sensors: Vec<SensorSpec>,
+    stores: &[(&str, u32)],
+    silent: bool,
+    weapon: &str,
+    range_m: f64,
+) -> Simulation {
+    let mut sim = Simulation::new(4);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![asm(), sam(), torpedo()],
+        },
+    ))
+    .unwrap();
+    let mut blue = unit(1, 1, ORIGIN, sensors, stores, None);
+    if let CommandPayload::SpawnUnit(u) = &mut blue.payload {
+        if silent {
+            u.doctrine.emcon = Some(Emcon::Silent);
+        }
+    }
+    sim.submit(blue).unwrap();
+    let at = direct(ORIGIN, 90.0, range_m).point;
+    sim.submit(unit(2, 2, at, vec![radar()], &[(weapon, 2)], None))
+        .unwrap();
+    sim.run_ticks(1);
+    sim.submit(cmd(
+        1,
+        umpire(),
+        None,
+        CommandPayload::Engage {
+            shooter: UnitId(2),
+            contact: 1,
+            weapon: weapon.into(),
+            rounds: 1,
+        },
+    ))
+    .unwrap();
+    sim
+}
+
+fn detections(sim: &Simulation) -> Vec<(u64, SideId, SensorKind)> {
+    sim.events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::WeaponDetected { side, sensor, .. } => Some((e.tick.0, side, sensor)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_radar_tracks_an_incoming_missile_and_the_side_sees_it() {
+    let mut sim = incoming(vec![radar()], &[], false, "T-ASM", 30_000.0);
+    sim.run_ticks(5);
+    let d = detections(&sim);
+    assert_eq!(d.len(), 1, "{d:?}");
+    assert_eq!((d[0].1, d[0].2), (SideId(1), SensorKind::Radar));
+    // In blue's picture, not in red's (red sees its own weapon as its own).
+    let blue = sim.snapshot(Viewer::Side { side: SideId(1) }).weapon_tracks;
+    assert_eq!(blue.len(), 1);
+    assert_eq!(blue[0].domain, Domain::Air);
+    assert!(sim
+        .snapshot(Viewer::Side { side: SideId(2) })
+        .weapon_tracks
+        .is_empty());
+    // Gone with the weapon.
+    sim.run_ticks(200);
+    assert!(sim.weapons_in_flight().is_empty());
+    assert!(sim.snapshot(Viewer::WhiteCell).weapon_tracks.is_empty());
+}
+
+#[test]
+fn a_silent_ship_sees_a_missile_with_ir_and_defends_itself() {
+    // IR, 20 km: R50 against the missile's plume = 0.7 × 20 km = 14 km (night, full size).
+    let mut sim = incoming(
+        vec![sensor(SensorKind::Ir, 20_000.0)],
+        &[("T-SAM", 4)],
+        true,
+        "T-ASM",
+        30_000.0,
+    );
+    sim.run_ticks(120);
+    let d = detections(&sim);
+    assert_eq!(d.len(), 1, "{d:?}");
+    assert_eq!(d[0].2, SensorKind::Ir);
+    let shots: Vec<f64> = sim
+        .events()
+        .iter()
+        .filter_map(|e| match e.kind {
+            SimEventKind::PointDefenceShot { range_m, .. } => Some(range_m),
+            _ => None,
+        })
+        .collect();
+    assert!(!shots.is_empty(), "radar silent, but IR lets it shoot");
+    // Seen at 14 km; the SAM's 8 s reaction time lets it close 270 m/s × 8 s = 2.16 km.
+    assert!((11_500.0..=12_000.0).contains(&shots[0]), "{shots:?}");
+    // The same ship without IR, radar silent: blind to the missile.
+    let mut blind = incoming(vec![radar()], &[("T-SAM", 4)], true, "T-ASM", 30_000.0);
+    blind.run_ticks(120);
+    assert!(detections(&blind).is_empty());
+    assert!(!blind
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::PointDefenceShot { .. })));
+}
+
+#[test]
+fn a_hull_sonar_hears_an_incoming_torpedo() {
+    let mut sim = incoming(
+        vec![sensor(SensorKind::SonarHull, 30_000.0)],
+        &[],
+        false,
+        "T-TORP",
+        8_000.0,
+    );
+    sim.run_ticks(3);
+    let d = detections(&sim);
+    assert_eq!(d.len(), 1, "{d:?}");
+    assert_eq!((d[0].1, d[0].2), (SideId(1), SensorKind::SonarHull));
+    let v = sim.snapshot(Viewer::Side { side: SideId(1) }).weapon_tracks;
+    assert_eq!(v[0].domain, Domain::Subsurface);
+    // A radar does not see a torpedo.
+    let mut r = incoming(vec![radar()], &[], false, "T-TORP", 8_000.0);
+    r.run_ticks(3);
+    assert!(detections(&r).is_empty());
+}

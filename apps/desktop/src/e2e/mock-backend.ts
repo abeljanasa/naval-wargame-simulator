@@ -457,6 +457,7 @@ const frame = (): FrameEvent => {
       scenario_events: viewer.kind === "white_cell" ? scenarioEvents : [],
       comms: [],
       posts: [],
+      weapon_tracks: [],
       refusals: sent,
     },
   };

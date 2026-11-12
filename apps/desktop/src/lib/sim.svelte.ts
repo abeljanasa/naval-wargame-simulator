@@ -23,6 +23,7 @@ import {
   type Minefield,
   type Mission,
   type PostView,
+  type WeaponTrackView,
   type ZoneCoverage,
   type SessionInfo,
   type TimeCompression,
@@ -68,6 +69,8 @@ class SimSession {
   comms = $state<CommsView[]>([]);
   /** The seat's command posts and whether each is up. */
   posts = $state<PostView[]>([]);
+  /** The seat's tracks on other sides' missiles and torpedoes. */
+  weaponTracks = $state<WeaponTrackView[]>([]);
   /** Sense zones whose coverage is drawn, and their latest coverage. */
   coverageShown = $state<number[]>([]);
   coverage = $state<ZoneCoverage[]>([]);
@@ -135,6 +138,7 @@ class SimSession {
     this.scenarioEvents = u.scenario_events;
     this.comms = u.comms;
     this.posts = u.posts;
+    this.weaponTracks = u.weapon_tracks;
     if (u.refusals.length > 0) this.error = u.refusals[u.refusals.length - 1] ?? null;
   }
 

@@ -33,6 +33,7 @@ mod sim;
 mod snapshot;
 mod sonar;
 mod time;
+mod weapon_tracks;
 
 pub use adjudication::{
     Adjudication, AdjudicationLog, AdjudicationRecord, ADJUDICATION_VIEW_LIMIT,
@@ -101,5 +102,9 @@ pub use sonar::{
     DEFAULT_SURFACE_NOISE_DB, TARGET_STRENGTH_SUBMARINE_DB, TARGET_STRENGTH_SURFACE_DB,
 };
 pub use time::{SimClock, Tick, TICK_SECONDS};
+pub use weapon_tracks::{
+    WeaponTrack, WeaponTrackView, WeaponTracks, MISSILE_LENGTH_M, TORPEDO_NOISE_DB,
+    WEAPON_TRACK_TIMEOUT_TICKS,
+};
 
 pub use sim_geo::GeoPoint;

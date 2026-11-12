@@ -134,6 +134,7 @@ impl Simulation {
         world.insert_resource(PlanningLayer::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
+        world.insert_resource(crate::weapon_tracks::WeaponTracks::default());
         Self {
             world,
             schedule: build_schedule(),
@@ -460,6 +461,13 @@ impl Simulation {
                 }
                 Viewer::Side { side } => crate::planning::comms_views(&self.world, side),
             },
+            weapon_tracks: crate::weapon_tracks::views(
+                &self.world,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+            ),
             posts: crate::planning::post_views(
                 &self.world,
                 match viewer {
@@ -631,6 +639,9 @@ impl Simulation {
             }
         }
         self.world.resource::<PlanningLayer>().hash(&mut h);
+        self.world
+            .resource::<crate::weapon_tracks::WeaponTracks>()
+            .hash(&mut h);
         let msgs = self.world.resource::<MessageLog>();
         h.u64(msgs.0.len() as u64);
         for m in &msgs.0 {
@@ -793,6 +804,10 @@ impl Simulation {
             messages: self.world.resource::<MessageLog>().clone(),
             seats: self.world.resource::<Seats>().clone(),
             planning: self.world.resource::<PlanningLayer>().clone(),
+            weapon_tracks: self
+                .world
+                .resource::<crate::weapon_tracks::WeaponTracks>()
+                .clone(),
         }
     }
 
@@ -831,6 +846,7 @@ impl Simulation {
         sim.world.insert_resource(save.messages);
         sim.world.insert_resource(save.seats);
         sim.world.insert_resource(save.planning);
+        sim.world.insert_resource(save.weapon_tracks);
         sim.world.insert_resource(ContactTable::restore(
             save.contacts,
             save.next_contact_numbers,
@@ -969,6 +985,7 @@ fn build_schedule() -> Schedule {
         (
             apply_commands_system,
             movement_system,
+            crate::weapon_tracks::weapon_tracks_system,
             point_defence_system,
             weapons_system,
             mine_system,

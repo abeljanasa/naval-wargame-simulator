@@ -393,6 +393,13 @@ pub enum SimEventKind {
     WeatherEased {
         unit: UnitId,
     },
+    /// A side gained a track on another side's weapon in flight.
+    WeaponDetected {
+        side: SideId,
+        weapon_id: u64,
+        by: UnitId,
+        sensor: crate::detection::SensorKind,
+    },
     /// A unit whose mission is complete was sent to hold at a staging anchorage.
     HoldingAtAnchorage {
         unit: UnitId,

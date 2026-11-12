@@ -24,6 +24,7 @@ import type {
   Minefield,
   UnitView,
   Viewer,
+  WeaponTrackView,
   WeaponView,
 } from "./bindings";
 import { n, project } from "./format";
@@ -140,6 +141,8 @@ export interface SceneInput {
   bearings?: BearingView[];
   /** Missiles and torpedoes in flight that the viewer may see. */
   weapons?: WeaponView[];
+  /** The side's tracks on other sides' weapons in flight (side viewers). */
+  weaponTracks?: WeaponTrackView[];
   /** Minefields the viewer may see. */
   minefields?: Minefield[];
   gameTimeS: number;
@@ -362,6 +365,17 @@ export function buildLayers(s: SceneInput): Layer[] {
         project(n(w.position.lat_deg), n(w.position.lon_deg), n(w.heading_deg), 1500),
       getColor: (w) => (w.homing ? [255, 90, 60, 255] : [255, 200, 120, 220]),
       getWidth: 3,
+    }),
+    new ScatterplotLayer<WeaponTrackView>({
+      id: "weapon-tracks",
+      data: s.weaponTracks ?? [],
+      getPosition: (t) => pt(t.position),
+      getRadius: 5,
+      radiusUnits: "pixels",
+      stroked: true,
+      filled: false,
+      getLineColor: (t) => (t.domain === "subsurface" ? [120, 200, 255, 255] : [255, 70, 50, 255]),
+      lineWidthMinPixels: 2,
     }),
     new PathLayer<BearingView>({
       id: "bearings",

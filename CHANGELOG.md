@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added (Phase 3, slice 15: weapons in flight as sensor targets)
+
+- **Weapon tracks** (`docs/models/weapons-damage.md` §Weapons as sensor targets, DL-0034):
+  - Each side tracks other sides' weapons in flight, every tick, with no draws:
+    - missiles by radar (0.1 m²), IR (plume), EO and visual (5 m body), and ESM (active seekers homing);
+    - torpedoes by hull, towed and dipping sonar (150 dB).
+  - Tracks are logged (`WeaponDetected`, in the AAR timeline), saved and hashed.
+- **Point defence** also fires on a missile that the defender's own non-radar sensors track, so a radar-silent ship with IR can defend itself.
+- **Picture:** `weapon_tracks`. The desktop draws them as rings: red for missiles, blue for torpedoes.
+
+### Changed (slice 15)
+
+- **Save format 23.** Golden hashes are unchanged: no weapon is in flight at the end of a shipped scenario, and their outcomes did not move.
+
 ### Added (Phase 3, slice 14: sense-zone layers and coverage)
 
 - **Zone layers** (`outer`, `middle`, `inner`), and sensor types for sense zones (`docs/models/planning-layer.md` §Coverage, DL-0033).

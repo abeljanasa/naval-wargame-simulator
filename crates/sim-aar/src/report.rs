@@ -866,6 +866,24 @@ impl<'a> Builder<'a> {
                     format!("{name} holding at anchorage {facility}"),
                 );
             }
+            SimEventKind::WeaponDetected {
+                side,
+                weapon_id,
+                sensor,
+                ..
+            } => {
+                let name = self.side_name(*side);
+                let what = self
+                    .launches
+                    .get(weapon_id)
+                    .map_or_else(|| "a weapon".to_owned(), |c| c.weapon.clone());
+                self.note(
+                    t,
+                    TimelineKind::Contact,
+                    Some(*side),
+                    format!("{name} detected {what} W{weapon_id} in flight ({sensor:?})"),
+                );
+            }
             SimEventKind::FuelExhausted { unit } => {
                 let name = self.unit_name(*unit);
                 self.note(

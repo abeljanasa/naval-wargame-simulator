@@ -1580,6 +1580,8 @@ export type SnapshotUpdate_Deserialize = {
 	comms: CommsView_Deserialize[],
 	/**  The viewer's command posts and whether each is up. */
 	posts: PostView_Deserialize[],
+	/**  The viewer's tracks on other sides' missiles and torpedoes. */
+	weapon_tracks: WeaponTrackView[],
 };
 
 /**
@@ -1616,6 +1618,8 @@ export type SnapshotUpdate_Serialize = {
 	comms: CommsView_Serialize[],
 	/**  The viewer's command posts and whether each is up. */
 	posts: PostView_Serialize[],
+	/**  The viewer's tracks on other sides' missiles and torpedoes. */
+	weapon_tracks: WeaponTrackView[],
 };
 
 /**  What a unit can still do. */
@@ -1835,6 +1839,17 @@ export type WeaponRow = {
 	intercepted: number,
 	/**  Units destroyed with this as the last weapon to hit them. */
 	kills: number,
+};
+
+/**  A side's view of one weapon it tracks. */
+export type WeaponTrackView = {
+	side: SideId,
+	weapon_id: number,
+	position: GeoPoint,
+	/**  `air` (a missile) or `subsurface` (a torpedo). */
+	domain: Domain,
+	sensor: SensorKind,
+	first_seen_s: number | null,
 };
 
 /**  A missile or torpedo in flight, as shown to its own side (and the white cell). */

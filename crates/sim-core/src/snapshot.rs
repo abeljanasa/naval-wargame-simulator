@@ -170,4 +170,6 @@ pub struct Snapshot {
     pub comms: Vec<crate::comms::CommsView>,
     /// Side viewer: its command posts and whether each is up. White cell: every side's.
     pub posts: Vec<crate::comms::PostView>,
+    /// Side viewer: its tracks on other sides' missiles and torpedoes. White cell: every side's.
+    pub weapon_tracks: Vec<crate::weapon_tracks::WeaponTrackView>,
 }

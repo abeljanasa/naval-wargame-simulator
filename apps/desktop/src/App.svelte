@@ -194,6 +194,7 @@
           contacts: sim.contacts,
           bearings: sim.bearings,
           weapons: sim.weapons,
+          weaponTracks: sim.session?.viewer.kind === "side" ? sim.weaponTracks : [],
           minefields: sim.minefields,
           gameTimeS: n(clock?.game_time_s ?? 0),
           viewer: sim.session?.viewer ?? { kind: "white_cell" },

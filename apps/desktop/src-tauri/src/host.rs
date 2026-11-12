@@ -17,7 +17,8 @@ use sim_core::{
     Adjudication, AdjudicationRecord, BearingView, Command, CommandPayload, CommsView, ContactView,
     Doctrine, DoctrineScope, Environment, EventStatus, Facilitation, GeoPoint, InjectStatus,
     Issuer, Message, Minefield, Mission, PostView, Seat, SeatRole, SideId, SimEventKind,
-    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponView, ZoneCoverage,
+    Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponTrackView, WeaponView,
+    ZoneCoverage,
 };
 use sim_scenario::Scenario;
 use std::collections::{BTreeMap, BTreeSet};
@@ -89,6 +90,8 @@ pub struct SnapshotUpdate {
     pub comms: Vec<CommsView>,
     /// The viewer's command posts and whether each is up.
     pub posts: Vec<PostView>,
+    /// The viewer's tracks on other sides' missiles and torpedoes.
+    pub weapon_tracks: Vec<WeaponTrackView>,
 }
 
 /// Clock status sent with every frame.
@@ -951,6 +954,7 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
         scenario_events: snap.scenario_events.clone(),
         comms: snap.comms.clone(),
         posts: snap.posts.clone(),
+        weapon_tracks: snap.weapon_tracks.clone(),
     }
 }
 

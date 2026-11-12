@@ -65,7 +65,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 /// * 21: facility areas, depth, holding limits and staging; unit draft; weather and staging
 ///   diversions. Older saves load without them.
 /// * 22: zones gain a layer and sensor types. Older saves load without them.
-pub const SAVE_FORMAT_VERSION: u32 = 22;
+/// * 23: each side's tracks on weapons in flight. Older saves load with none.
+pub const SAVE_FORMAT_VERSION: u32 = 23;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,6 +140,9 @@ pub struct SaveGame {
     pub seats: Seats,
     #[serde(default)]
     pub planning: crate::planning::PlanningLayer,
+    /// Each side's tracks on weapons in flight. Empty in saves before format 23.
+    #[serde(default)]
+    pub weapon_tracks: crate::weapon_tracks::WeaponTracks,
 }
 
 impl SaveGame {
