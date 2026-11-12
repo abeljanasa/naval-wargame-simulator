@@ -68,7 +68,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [x] Map at 60 fps with 10,000 symbols: `npm run bench:map`. 59.2 fps with 30 Hz updates on Intel UHD, with labels decluttered above 1,500 units.
 - [ ] Rerun the map and engine benchmarks on the actual reference laptop at the Gate 1 review.
 - [x] Full Windows desktop bundle built from vendored sources with every network path blocked (docs/build/air-gapped.md).
-- [ ] Repeat the offline bundle on a physically disconnected machine, and for macOS and Linux.
+- [ ] Repeat the offline bundle on a physically disconnected machine, and for macOS. Linux is no longer a target (ADR-0006).
 - [x] npm licence audit of production dependencies (`npm run licenses`, in CI). 52 packages, 0 rejected.
 - [x] A basic detection model for Gate 1: the interim radar model (DL-0006).
 - [x] Desktop app shows contacts: covered by the end-to-end smoke test (Contacts panel) and engine tests.

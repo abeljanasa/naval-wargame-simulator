@@ -6,12 +6,12 @@ For players: the commanders and staff at a side's seat. The white cell's own tas
 
 ## 1. Installing and starting
 
-- **Windows:** run the `.msi` (or the setup `.exe`). **Linux:** run the `.AppImage`, or install the `.deb` or `.rpm`. **macOS:** open the `.dmg` and drag the app to Applications.
+- **Windows:** run the `.msi` (or the setup `.exe`). **macOS:** open the `.dmg` and drag the app to Applications.
 - **No network needed.** The map, coastline, platform database and scenarios are built in. The app makes no network connection, so it runs on an air-gapped machine.
 - **First start:** the built-in demonstrator scenario loads, paused, with this window at the first side's seat.
 
 Your workstation needs:
-- Windows 10/11, macOS 12 or later, or a recent Linux (glibc 2.35 or later);
+- Windows 10/11, or macOS 12 or later;
 - 8 GB RAM;
 - a GPU with WebGL 2 (any integrated GPU since about 2016).
 

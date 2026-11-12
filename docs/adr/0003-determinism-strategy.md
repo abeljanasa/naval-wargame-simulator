@@ -5,7 +5,7 @@
 
 ## Context
 
-Same scenario + same seed + same command log must give an identical result, bit for bit, on Windows, macOS and Linux. Analysts compare Monte Carlo runs, golden replays guard against regressions, and multiplayer reconnect relies on replaying the command log.
+Same scenario + same seed + same command log must give an identical result, bit for bit, on Windows and macOS (ADR-0006). Analysts compare Monte Carlo runs, golden replays guard against regressions, and multiplayer reconnect relies on replaying the command log.
 
 ## Decision
 

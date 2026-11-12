@@ -81,7 +81,7 @@ Lua is not deterministic out of the box. The sandbox removes or replaces every s
 | Garbage-collector timing | Finalizers (`__gc`) and weak tables (`__mode`) are refused. |
 
 - **Known gap:** the `^` operator uses the platform's C `pow`. Use `math.pow(x, y)` in any result that matters.
-- **Known gap:** float formatting uses the C library. `%d`, `%.Nf` and `%g` agree on Windows and Linux in the CI matrix, which replays the demonstrator's script on both.
+- **Known gap:** float formatting uses the C library. `%d`, `%.Nf` and `%g` agree on Windows and macOS in the CI matrix, which replays the demonstrator's script on both.
 
 ## Limitations
 

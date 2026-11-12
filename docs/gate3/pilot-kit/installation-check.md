@@ -1,12 +1,12 @@
 # Installation check (air-gapped)
 
-One copy per exercise machine and for the spare. This covers success criterion 1 of the [pilot plan](../ttx-pilot-plan.md) §7. The same sheet serves the Gate 3 air-gapped run of the signed build ([Gate 3 pack](../README.md)) on Windows, macOS and Linux.
+One copy per exercise machine and for the spare. This covers success criterion 1 of the [pilot plan](../ttx-pilot-plan.md) §7. The same sheet serves the Gate 3 air-gapped run of the signed build ([Gate 3 pack](../README.md)) on Windows and macOS.
 
 Machine: ____________  OS and version: ____________  Checked by: ____________  Date: ________
 
 ## On a connected machine, the day before
 
-1. Download the release workflow's artefact for this OS: `installers-windows-2022`, `installers-macos-15` or `installers-ubuntu-22.04`. Each holds:
+1. Download the release workflow's artefact for this OS: `installers-windows-2022` or `installers-macos-15`. Each holds:
    - the installers, under `target/release/bundle/`;
    - `release-extra/scenarios/`, the shipped scenarios (only the Phase 1 demo is built into the app);
    - `release-extra/SHA256SUMS-<os>.txt`, a SHA-256 sum for every file.
@@ -18,7 +18,7 @@ Machine: ____________  OS and version: ____________  Checked by: ____________  D
 |---|---|---|
 | ☐ | Disconnect the network: unplug the cable, turn off Wi-Fi and Bluetooth, and disable the adapters in the OS settings | The OS reports no network |
 | ☐ | Copy the folder from the media and verify the sums (commands below) | Every line says `OK` |
-| ☐ | Install. **Windows:** the MSI or the setup `.exe`. **macOS:** open the `.dmg` and drag the app to Applications. **Linux:** `.deb`, `.rpm` or the AppImage (`chmod +x` first) | It installs with no download prompt. An **unsigned** build shows the OS warning (Windows SmartScreen *More info › Run anyway*; macOS right-click › *Open*). Note it below |
+| ☐ | Install. **Windows:** the MSI or the setup `.exe`. **macOS:** open the `.dmg` and drag the app to Applications. | It installs with no download prompt. An **unsigned** build shows the OS warning (Windows SmartScreen *More info › Run anyway*; macOS right-click › *Open*). Note it below |
 | ☐ | Start *Naval Wargame Simulator* | The map shows the coastline; no error about the network |
 | ☐ | **File › Open scenario…** → `release-extra/scenarios/phase3-pilot.json` | The title reads *Phase 3 — Kent passage pilot*; the units are on the map |
 | ☐ | **Seats** tab → **Open window** for Blue and for Red | Each window shows only its own side |
@@ -30,12 +30,6 @@ Machine: ____________  OS and version: ____________  Checked by: ____________  D
 ### Verifying the sums
 
 Run these from the unzipped artefact folder (the one holding `target` and `release-extra`).
-
-**Linux:**
-
-```sh
-sha256sum -c release-extra/SHA256SUMS-ubuntu-22.04.txt
-```
 
 **macOS:**
 

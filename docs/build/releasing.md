@@ -2,12 +2,11 @@
 
 ## What the release workflow does
 
-`.github/workflows/release.yml` runs on a `v*` tag or manually. On Windows, macOS and Ubuntu 22.04 it:
+`.github/workflows/release.yml` runs on a `v*` tag or manually. On Windows and macOS (the application's platforms, ADR-0006) it:
 
 1. Builds the desktop app with `npx tauri build`, which produces:
    - **Windows:** MSI (WiX) and NSIS `.exe` installers.
    - **macOS:** `.app` and `.dmg`.
-   - **Linux:** AppImage, `.deb` and `.rpm`.
 2. Signs the installers, **only if the signing secrets are configured**; otherwise the run warns `UNSIGNED`. The secret names are below.
 3. Runs the **release scan** (`sim-db scan target/release/bundle data`). The release fails if any database file is not on `data/db/release-allowlist.txt`, or if any record or JSON `classification` is not `UNCLASSIFIED` (master prompt §3).
 4. Copies the shipped scenarios to `release-extra/scenarios/`, since only the Phase 1 demo is built into the app. Writes `release-extra/SHA256SUMS-<os>.txt` with a SHA-256 sum for every installer and scenario, after signing, so the sums match what ships. The [installation check](../gate3/pilot-kit/installation-check.md) verifies them on the target machine.
@@ -31,7 +30,7 @@ Set these in the repository's (or organisation's) Actions secrets.
 
 macOS builds are back in the CI and release matrices (Gate 3, 2026-11-11). Without the Apple secrets the `.dmg` is unsigned and not notarised; Gatekeeper will then block it until the user allows it in System Settings.
 
-Linux packages are not signed by default. Distribute their SHA-256 sums alongside, or sign them with the organisation's GPG key in the accredited pipeline.
+The SHA-256 sums (`release-extra/SHA256SUMS-<os>.txt`) travel with the installers, signed or not.
 
 ## Local build
 
@@ -53,15 +52,14 @@ On Windows the first `tauri build` downloads the WiX and NSIS toolsets. For air-
 - the white-cell seat sees both sides;
 - the engine runs at Max and the scenario events send messages.
 
-CI runs it on Windows and Linux (job *Packaged app end to end*). macOS has no WebDriver for its webview.
+CI runs it on Windows (job *Packaged app end to end*). macOS has no WebDriver for its webview.
 
 ```sh
 cargo install tauri-driver --locked
 cd apps/desktop
 npx tauri build --no-bundle          # the binary in target/release/
-npm run e2e:app                      # Linux: xvfb-run -a npm run e2e:app
+npm run e2e:app
 ```
 
-- **Windows:** needs `msedgedriver` of the same version as the WebView2 runtime, on the `PATH` or in `NATIVE_DRIVER`. The version is under `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}` (value `pv`). Download it from `https://msedgedriver.microsoft.com/<version>/edgedriver_win64.zip`.
-- **Linux:** needs `WebKitWebDriver` (package `webkit2gtk-driver`).
+- Needs `msedgedriver` of the same version as the WebView2 runtime, on the `PATH` or in `NATIVE_DRIVER`. The version is under `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}` (value `pv`). Download it from `https://msedgedriver.microsoft.com/<version>/edgedriver_win64.zip`.
 - **Another build:** set `NWS_APP` to its binary.

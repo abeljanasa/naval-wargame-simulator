@@ -5,9 +5,8 @@
 // Needs (docs/build/releasing.md, "Packaged-app test"):
 //   - a release build of the app: `npx tauri build --no-bundle` (or a full build);
 //   - tauri-driver on the PATH (`cargo install tauri-driver --locked`), or TAURI_DRIVER=<path>;
-//   - the platform's native driver: msedgedriver matching the WebView2 version (Windows), or
-//     WebKitWebDriver (Linux, package webkit2gtk-driver). Pass its path in NATIVE_DRIVER if it is
-//     not on the PATH. macOS has no WKWebView driver, so this test runs on Windows and Linux.
+//   - msedgedriver matching the WebView2 version, on the PATH or in NATIVE_DRIVER.
+//     macOS has no WebDriver for its webview, so this test runs on Windows.
 // Run: npm run e2e:app   (NWS_APP=<path to the binary> to test another build)
 //
 // The W3C WebDriver protocol is spoken directly over fetch, so the test adds no dependencies.
@@ -92,7 +91,7 @@ try {
   };
 
   // 1. The app starts on its built-in scenario, with the real engine behind it.
-  // A cold start (first WebKitGTK launch under a virtual display) can take a while.
+  // A cold start can take a while.
   await until(
     "the built-in scenario",
     async () => (await bodyText()).includes("Phase 1 — Strait transit"),

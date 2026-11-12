@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Changed (platforms)
+
+- **The application targets Windows and macOS only** (client decision, 2026-11-12, ADR-0006).
+  - No Linux installers. The release builds MSI/NSIS and `.app`/`.dmg`.
+  - CI tests and checks determinism on Windows and macOS. The packaged-app test runs on Windows.
+  - Linux steps are removed from the workflows, the test script and the docs. Platform-neutral tooling still runs on Linux runners.
+
 ### Fixed
 
 - **A loaded scenario showed an empty map until the clock ran.** The scenario's units and settings are tick-0 commands, so before Run or Step the white cell saw no units and the default sea state.
@@ -13,7 +20,7 @@
 
 ### Added (packaged-app test)
 
-- **`npm run e2e:app`** drives the built app over WebDriver (tauri-driver), with no new dependencies. It covers the real engine, database, map, scenario loading, the white-cell seat and running at Max. CI runs it on Windows and Linux (*Packaged app end to end*); see `docs/build/releasing.md`.
+- **`npm run e2e:app`** drives the built app over WebDriver (tauri-driver), with no new dependencies. It covers the real engine, database, map, scenario loading, the white-cell seat and running at Max. CI runs it on Windows (*Packaged app end to end*); see `docs/build/releasing.md`.
 
 ### Added (Phase 3, slice 20: pilot kit)
 

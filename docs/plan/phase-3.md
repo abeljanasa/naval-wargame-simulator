@@ -6,7 +6,7 @@
 - **Gate 3 definition of done (§16):**
   - All P1 features in §7 and the planning layer in §7.1 work.
   - A white cell can run a multi-seat exercise with injects, overrides and AAR.
-  - Signed installers exist for Windows, macOS and Linux, and run air-gapped.
+  - Signed installers exist for Windows and macOS, and run air-gapped. (The master prompt also names Linux; the client dropped it on 2026-11-12, ADR-0006.)
   - CI is green and the manuals are complete.
   - A navy staff has run a TTX pilot on the release build.
 

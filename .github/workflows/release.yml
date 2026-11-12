@@ -18,9 +18,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Ubuntu 22.04 keeps the AppImage's glibc floor low enough for older target systems.
         # macOS re-enabled for Gate 3 (2026-11-11).
-        os: [windows-2022, ubuntu-22.04, macos-15]
+        # The application targets Windows and macOS only (ADR-0006).
+        os: [windows-2022, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -31,12 +31,6 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
-      - name: Linux system deps for Tauri
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
       - name: macOS signing and notarisation credentials (only if configured)
         if: runner.os == 'macOS'
         shell: bash
@@ -98,8 +92,7 @@ jobs:
           cp data/scenarios/*.json release-extra/scenarios/
           if command -v sha256sum >/dev/null; then sum="sha256sum"; else sum="shasum -a 256"; fi
           {
-            find target/release/bundle -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' \
-              -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) -print0
+            find target/release/bundle -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' \) -print0
             find release-extra/scenarios -type f -name '*.json' -print0
           } | sort -z | xargs -0 $sum > "release-extra/SHA256SUMS-${{ matrix.os }}.txt"
           cat "release-extra/SHA256SUMS-${{ matrix.os }}.txt"
@@ -121,9 +114,6 @@ jobs:
             target/release/bundle/msi/*.msi
             target/release/bundle/nsis/*.exe
             target/release/bundle/dmg/*.dmg
-            target/release/bundle/appimage/*.AppImage
-            target/release/bundle/deb/*.deb
-            target/release/bundle/rpm/*.rpm
             release-extra/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4

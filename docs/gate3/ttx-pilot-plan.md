@@ -26,7 +26,7 @@ The last Gate 3 criterion: **a navy staff runs a TTX on the release build** (mas
 
 ## 3. Equipment
 
-- **Machine:** one Windows, macOS or Linux machine meeting the [user manual](../manuals/user-manual.md) requirements, with three screens (or two and a projector). A second machine as a cold spare, with the same installer.
+- **Machine:** one Windows or macOS machine meeting the [user manual](../manuals/user-manual.md) requirements, with three screens (or two and a projector). A second machine as a cold spare, with the same installer.
 - **No network connection.** Install from removable media with the release's SHA-256 sums, following the [installation check](pilot-kit/installation-check.md). The scenarios travel with the installers, in `release-extra/scenarios/`.
 - **Handouts:** the [pilot kit](pilot-kit/README.md): seat cards, the white-cell run sheet, the observer's log and the questionnaire.
 - **Shipped content only:** the open generic platform database and the shipped scenarios, or a client scenario built with the editor on the day before.

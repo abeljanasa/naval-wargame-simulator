@@ -1,7 +1,7 @@
 //! Deterministic WGS-84 geodesy for the simulation core.
 //!
 //! All transcendental maths goes through the pure-Rust [`libm`] crate, so results are
-//! bit-identical on Windows, macOS and Linux (ADR-0003). Model documentation:
+//! bit-identical on Windows and macOS (ADR-0003, ADR-0006). Model documentation:
 //! `docs/models/geodesy-and-movement.md` and `docs/models/radar-horizon.md`.
 
 #![forbid(unsafe_code)]

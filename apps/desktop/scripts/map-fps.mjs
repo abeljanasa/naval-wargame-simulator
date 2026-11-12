@@ -30,7 +30,6 @@ const candidates =
       "C:/Program Files/Google/Chrome/Application/chrome.exe",
     ],
     darwin: ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
-    linux: ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"],
   }[process.platform] ?? [];
 const executablePath = candidates.find((p) => existsSync(p));
 const browser = await chromium.launch({

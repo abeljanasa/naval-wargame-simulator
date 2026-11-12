@@ -13,7 +13,6 @@ Prerequisites:
 - Rust (rustup; the version is pinned in `rust-toolchain.toml`)
 - Node 20+
 - **Windows:** VS 2022 C++ Build Tools
-- **Linux:** `libwebkit2gtk-4.1-dev librsvg2-dev`
 
 ```sh
 cargo test --workspace                                                       # engine tests

@@ -27,19 +27,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS re-enabled for Gate 3 (2026-11-11).
-        os: [ubuntu-24.04, windows-2022, macos-15]
+        # The application targets Windows and macOS only (ADR-0006).
+        os: [windows-2022, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1
         with: { components: clippy }
       - uses: Swatinem/rust-cache@v2
-      - name: Linux system deps for Tauri
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Front-end dist placeholder (tauri::generate_context! needs it to exist)
         shell: bash
         run: mkdir -p apps/desktop/dist
@@ -74,8 +69,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS re-enabled for Gate 3 (2026-11-11).
-        os: [ubuntu-24.04, windows-2022, macos-15]
+        # The application's platforms (ADR-0006).
+        os: [windows-2022, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -213,13 +208,9 @@ jobs:
 
   packaged-app:
     # The real binary, engine, database and map, driven over WebDriver (tauri-driver).
-    # macOS has no WKWebView WebDriver, so Windows and Linux only.
-    name: Packaged app end to end (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2022]
-    runs-on: ${{ matrix.os }}
+    # Windows only: macOS has no WebDriver for its webview (WKWebView).
+    name: Packaged app end to end (windows-2022)
+    runs-on: windows-2022
     defaults:
       run:
         working-directory: apps/desktop
@@ -232,13 +223,7 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
-      - name: Linux system deps for Tauri, WebKitWebDriver and a virtual display
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf webkit2gtk-driver xvfb
       - name: msedgedriver matching the runner's WebView2
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $v = (Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}").pv
@@ -252,15 +237,5 @@ jobs:
       - run: npm ci
       - name: Build the app (release, no installer)
         run: npx tauri build --no-bundle
-      - name: Packaged-app test (Linux, virtual display)
-        if: runner.os == 'Linux'
-        # No GPU under xvfb: WebKitGTK's DMA-BUF renderer and compositing mode need one.
-        env:
-          WEBKIT_DISABLE_DMABUF_RENDERER: "1"
-          WEBKIT_DISABLE_COMPOSITING_MODE: "1"
-        # A screen as large as the app window (xvfb-run's default is 640x480).
-        run: xvfb-run -a -s "-screen 0 1600x1000x24" npm run e2e:app
-      - name: Packaged-app test (Windows)
-        if: runner.os == 'Windows'
+      - name: Packaged-app test
         run: npm run e2e:app
-      - run: npm run build
