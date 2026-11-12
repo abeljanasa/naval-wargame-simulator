@@ -1,6 +1,9 @@
 # Phase 4 plan: Analysis (Gate 4: historical replays)
 
-> **Draft (2026-11-12), for the Gate 3 panel.** Phase 4 starts only after Gate 3 passes (master prompt §13). Until then nothing here is built. The client's decisions in §2 shape the order and the data.
+> **Started 2026-11-12, ahead of Gate 3, by the client's decision.** Master prompt §13 has Phase 4 wait for the gate. The client chose to start while the TTX pilot is arranged, because the first slices do not touch what the pilot tests.
+> - Phase 4 work is on `phase-4/analysis`, branched from `phase-3/ttx-release`. PR #3 stays open for the Gate 3 panel.
+> - Fixes from the pilot land on Phase 3 and are merged forward.
+> - Until the client names its measures of effectiveness (decision 5), slice 1 reports a default set (§4).
 
 - **Months:** 12–24 (master prompt §13).
 - **Scope (§13):**
