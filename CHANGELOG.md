@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 1: Monte Carlo batch, in progress)
+
+- **`nws-batch mc <scenario> --runs N [--seed S] [--threads T] --out <dir>`** runs a scenario for N seeds in parallel. Each run is independent and deterministic, so the results don't depend on the thread count, and a test checks this.
+- **Default measures of effectiveness**, until the client names its own:
+  - per side: losses, time to first detection, weapons fired per kill, choke-point transits;
+  - for the whole run: cargo delivered.
+- **Outputs:**
+  - `runs.csv`: one row per seed, with its final hash;
+  - `summary.csv`: n, mean, SD, 95 % CI, min, median, max;
+  - `summary.json`: the same, plus a ten-bin histogram per measure.
+- **Speed:** 20 four-hour runs of the Mindoro pilot take 89 s on 12 cores.
+- **Next:** Parquet export.
+
 ### Added (map)
 
 - **Units drawn as figures of what they are** (default; **View › Unit figures**, off for APP-6 frames):

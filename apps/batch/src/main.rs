@@ -1,11 +1,13 @@
 //! `nws-batch`: headless scenario runner.
 //!
-//! Phase 1 scope: run a scenario for one or more seeds and report the final state hash, used by
-//! the CI cross-OS determinism matrix. Monte Carlo statistics and Arrow/Parquet export arrive in Phase 4.
+//! `run` reports final state hashes (the CI cross-OS determinism matrix); `aar` writes the AAR
+//! tables of one run; `mc` runs many seeds in parallel and summarises the measures of
+//! effectiveness (Phase 4 slice 1); `bench` measures throughput.
 
 #![forbid(unsafe_code)]
 
 mod bench;
+mod mc;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
@@ -62,6 +64,31 @@ enum Cmd {
         /// Scenario runs only: the run length in ticks (default: the scenario's duration).
         #[arg(long)]
         ticks: Option<u64>,
+        /// Open platform database file. Defaults to the embedded database.
+        #[arg(long)]
+        db: Option<PathBuf>,
+    },
+    /// Monte Carlo: run a scenario for many seeds in parallel and summarise its measures of
+    /// effectiveness (mean, SD, 95 % CI, median, range, histogram). Writes `runs.csv`,
+    /// `summary.csv` and `summary.json`.
+    Mc {
+        /// Scenario file (.json).
+        scenario: PathBuf,
+        /// Number of runs (seeds `seed`, `seed + 1`, …).
+        #[arg(long, default_value_t = 30)]
+        runs: u64,
+        /// First seed (default: the scenario's own).
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Worker threads (default: the machine's cores).
+        #[arg(long)]
+        threads: Option<usize>,
+        /// Override the run length in ticks (seconds).
+        #[arg(long)]
+        ticks: Option<u64>,
+        /// Output directory.
+        #[arg(long)]
+        out: PathBuf,
         /// Open platform database file. Defaults to the embedded database.
         #[arg(long)]
         db: Option<PathBuf>,
@@ -147,6 +174,33 @@ fn main() -> Result<()> {
             ticks,
             db,
         } => aar(&input, &out, seed, ticks, db.as_deref()),
+        Cmd::Mc {
+            scenario,
+            runs,
+            seed,
+            threads,
+            ticks,
+            out,
+            db,
+        } => {
+            let s = Scenario::load(&scenario)
+                .with_context(|| format!("loading {}", scenario.display()))?;
+            let first = seed.unwrap_or(s.seed);
+            let seeds: Vec<u64> = (0..runs).map(|i| first.wrapping_add(i)).collect();
+            let end = ticks.map_or_else(|| s.duration_ticks(), Tick);
+            let threads = threads.unwrap_or_else(|| {
+                std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+            });
+            let open = || platforms(db.as_deref());
+            let results = mc::run(&s, &seeds, end, threads, &open)?;
+            let stats = mc::summarise(&results);
+            mc::write(&out, &s.name, &results, &stats)?;
+            println!(
+                "{}",
+                serde_json::json!({ "scenario": s.name, "runs": results.len(), "threads": threads, "out": out })
+            );
+            Ok(())
+        }
         Cmd::Bench {
             units,
             ticks,
