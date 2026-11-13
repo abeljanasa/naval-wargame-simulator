@@ -141,6 +141,7 @@ const session = (): SessionInfo => ({
   facilities: [],
   zones: viewer.kind === "white_cell" ? zones : [],
   action_groups: [],
+  lanes: [],
 });
 
 const platforms = [
@@ -325,6 +326,15 @@ mockIPC(
         return { report: aarReport(), replaying: replay !== null };
       case "aar_csv":
         return "time,tick,kind,side,text\n";
+      case "choke_depths":
+        return [];
+      case "imagery_status":
+      case "rescan_imagery":
+        return { packs: [], problems: [], folder: "" };
+      case "terrain_status":
+        return { loading: false, packs: [], in_use: null, problems: [], folder: "" };
+      case "terrain_grid":
+        return new ArrayBuffer(0);
       default:
         return null;
     }
@@ -451,6 +461,11 @@ const frame = (): FrameEvent => {
         start_unix_s: 1794268800,
         visibility_km: 40,
       },
+      weather_zones: [],
+      sound_profiles: [],
+      sonobuoys: [],
+      air_bases: [],
+      sensor_tasking: [],
       bearings,
       weapons: [],
       minefields: [],

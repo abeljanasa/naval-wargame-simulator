@@ -77,19 +77,30 @@ fn open_database_has_fifty_generic_types_across_required_categories() {
     }
 }
 
+/// The open database is unclassified throughout. Generic classes are generic; specific records
+/// (the regional database, Phase 4 slice 13, and the Gate 4 historical records) each cite the
+/// open source they come from.
 #[test]
-fn open_database_is_entirely_unclassified_and_generic() {
+fn open_database_is_unclassified_and_specific_records_cite_their_sources() {
     let c = built();
     for table in sim_db::PROVENANCE_TABLES {
         let bad: i64 = c
             .query_row(
-                &format!("SELECT count(*) FROM {table} WHERE classification != 'UNCLASSIFIED' OR is_generic != 1"),
+                &format!("SELECT count(*) FROM {table} WHERE classification != 'UNCLASSIFIED' OR (is_generic = 0 AND source_citation NOT LIKE '%http%')"),
                 [],
                 |r| r.get(0),
             )
             .unwrap();
         assert_eq!(bad, 0, "{table}");
     }
+    let generic_ffg: i64 = c
+        .query_row(
+            "SELECT is_generic FROM platforms WHERE id = 'GEN-FFG'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(generic_ffg, 1);
 }
 
 #[test]
@@ -124,8 +135,11 @@ const FAULTS: &[(&str, &str, &str)] = &[
     ("sensor range order", "UPDATE sensors SET min_range_m = max_range_m WHERE id = 'SEN-VISUAL'", "sensor.range_order"),
     ("half a radar reference", "UPDATE sensors SET ref_target_rcs_m2 = NULL WHERE id = 'SEN-RDR-NAV'", "sensor.reference_range"),
     ("radar field on a non-radar", "UPDATE sensors SET beamwidth_deg = 2 WHERE id = 'SEN-VISUAL'", "sensor.radar_fields"),
+    ("sonar field on a non-sonar", "UPDATE sensors SET sonar_di_db = 10 WHERE id = 'SEN-VISUAL'", "sensor.sonar_fields"),
+    ("ECM out of range", "UPDATE ecm_systems SET jn_db_at_1km = 500 WHERE id = 'ECM-GEN-SHIP'", "ecm.values"),
     ("radar without clutter figure", "UPDATE sensors SET clutter_db_per_sea_state = NULL WHERE id = 'SEN-RDR-NAV'", "sensor.radar_defaults"),
     ("radar without reference","UPDATE sensors SET ref_target_rcs_m2 = NULL, ref_detect_range_m = NULL WHERE id = 'SEN-RDR-NAV'", "sensor.radar_reference"),
+    ("weapon range against a domain beyond its maximum", "UPDATE weapon_target_ranges SET max_range_m = 999999 WHERE weapon_id = 'WPN-GUN-127'", "weapon.target_ranges"),
     ("weapon range order", "UPDATE weapons SET min_range_m = max_range_m WHERE id = 'WPN-SAM-MR'", "weapon.range_order"),
     ("Ph above one", "UPDATE weapons SET base_ph = 1.5 WHERE id = 'WPN-SAM-MR'", "weapon.base_ph"),
     ("bad target domain", "UPDATE weapons SET target_domains = 'air,space' WHERE id = 'WPN-SAM-MR'", "weapon.target_domains"),
@@ -280,7 +294,7 @@ fn open_source_loads_and_answers_queries() {
     assert_eq!(ffg.domain, "surface");
     assert!(db.platform("NOPE").unwrap().is_none());
     let all = db.platforms().unwrap();
-    assert_eq!(all.len(), 50);
+    assert_eq!(all.len(), 113, "50 generic, 55 regional, 8 historical");
     assert!(all.windows(2).all(|w| w[0].id < w[1].id), "sorted by id");
 }
 

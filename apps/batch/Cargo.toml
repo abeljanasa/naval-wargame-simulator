@@ -15,10 +15,14 @@ sim-aar.workspace = true
 sim-core.workspace = true
 sim-scenario.workspace = true
 sim-db.workspace = true
+sim-geo.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+parquet = { version = "60.1.0", default-features = false, features = ["arrow"] }
+arrow-array = "60.1.0"
+arrow-schema = "60.1.0"
 
 [lints]
 workspace = true

@@ -2,6 +2,12 @@
 // (selection, draft route). Every change to the simulation goes through `commands`.
 
 import {
+  type WeatherZone_Serialize as WeatherZone,
+  type SoundProfile_Serialize as SoundProfile,
+  type SonobuoyView,
+  type AirBaseView,
+  type TaskingView,
+  type Lane_Deserialize as Lane,
   type Outcome,
   type ActionGroup,
   type AarTable,
@@ -55,6 +61,16 @@ class SimSession {
   session = $state<SessionInfo | null>(null);
   /** Sea state and weather, from the latest frame. */
   environment = $state<Environment | null>(null);
+  /** Weather zones over the scenario-wide weather (every seat sees them). */
+  weatherZones = $state<WeatherZone[]>([]);
+  /** Sound-velocity profiles in force (every seat sees them). */
+  soundProfiles = $state<SoundProfile[]>([]);
+  /** The seat's laid sonobuoys. */
+  sonobuoys = $state<SonobuoyView[]>([]);
+  /** The seat's airbases and the aircraft parked there (air operations). */
+  airBases = $state<AirBaseView[]>([]);
+  /** The seat's sense zones with coverage goals, and the units the engine tasked to them. */
+  sensorTasking = $state<TaskingView[]>([]);
   /** The seat's recent ESM bearing lines. */
   bearings = $state<BearingView[]>([]);
   /** The seat's missiles and torpedoes in flight. */
@@ -160,6 +176,11 @@ class SimSession {
     }
     this.allContacts = u.contacts;
     this.environment = u.environment;
+    this.weatherZones = (u.weather_zones ?? []) as WeatherZone[];
+    this.soundProfiles = (u.sound_profiles ?? []) as SoundProfile[];
+    this.sonobuoys = u.sonobuoys ?? [];
+    this.airBases = u.air_bases ?? [];
+    this.sensorTasking = u.sensor_tasking ?? [];
     this.bearings = u.bearings;
     this.weapons = u.weapons;
     this.minefields = u.minefields;
@@ -354,8 +375,9 @@ class SimSession {
   }
 
   /** White cell: replaces the planning layer's facilities and zones in play. */
-  async setPlanning(facilities: Facility[], zones: Zone[]) {
-    const res = await commands.orderPlanning(facilities, zones);
+  /** Sets the planning layer; `lanes` null keeps the lanes in play. */
+  async setPlanning(facilities: Facility[], zones: Zone[], lanes: Lane[] | null = null) {
+    const res = await commands.orderPlanning(facilities, zones, lanes);
     if (res.status === "error") this.error = res.error;
     else {
       this.session = res.data;

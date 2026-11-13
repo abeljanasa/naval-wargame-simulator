@@ -12,14 +12,48 @@
       "id": "GEN",
       "name": "Generic",
       "provenance": { "source_citation": "Original design: placeholder nation for generic classes", "confidence": "A" }
-    }
+    },
+    {"id": "PHL", "name": "Philippines", "provenance": {"source_citation": "Wikipedia, \"Philippines\", https://en.wikipedia.org/wiki/Philippines (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "CHN", "name": "China", "provenance": {"source_citation": "Wikipedia, \"China\", https://en.wikipedia.org/wiki/China (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "USA", "name": "United States", "provenance": {"source_citation": "Wikipedia, \"United States\", https://en.wikipedia.org/wiki/United_States (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IRN", "name": "Iran", "provenance": {"source_citation": "Wikipedia, \"Iran\", https://en.wikipedia.org/wiki/Iran (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "PAK", "name": "Pakistan", "provenance": {"source_citation": "Wikipedia, \"Pakistan\", https://en.wikipedia.org/wiki/Pakistan (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IND", "name": "India", "provenance": {"source_citation": "Wikipedia, \"India\", https://en.wikipedia.org/wiki/India (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "VNM", "name": "Vietnam", "provenance": {"source_citation": "Wikipedia, \"Vietnam\", https://en.wikipedia.org/wiki/Vietnam (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "JPN", "name": "Japan", "provenance": {"source_citation": "Wikipedia, \"Japan\", https://en.wikipedia.org/wiki/Japan (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "MYS", "name": "Malaysia", "provenance": {"source_citation": "Wikipedia, \"Malaysia\", https://en.wikipedia.org/wiki/Malaysia (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IDN", "name": "Indonesia", "provenance": {"source_citation": "Wikipedia, \"Indonesia\", https://en.wikipedia.org/wiki/Indonesia (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "AUS", "name": "Australia", "provenance": {"source_citation": "Wikipedia, \"Australia\", https://en.wikipedia.org/wiki/Australia (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "KOR", "name": "South Korea", "provenance": {"source_citation": "Wikipedia, \"South Korea\", https://en.wikipedia.org/wiki/South_Korea (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "TWN", "name": "Taiwan", "provenance": {"source_citation": "Wikipedia, \"Taiwan\", https://en.wikipedia.org/wiki/Taiwan (accessed 2026-11-13)", "confidence": "A", "is_generic": false}}
   ],
   "services": [
     { "id": "GEN-NAVY", "nation": "GEN", "name": "Generic navy", "branch": "navy" },
     { "id": "GEN-AIR", "nation": "GEN", "name": "Generic air force", "branch": "air_force" },
     { "id": "GEN-ARMY", "nation": "GEN", "name": "Generic army (coastal defence)", "branch": "army" },
     { "id": "GEN-CG", "nation": "GEN", "name": "Generic coast guard", "branch": "coast_guard" },
-    { "id": "GEN-CIVIL", "nation": "GEN", "name": "Generic civil / merchant", "branch": "civil" }
+    { "id": "GEN-CIVIL", "nation": "GEN", "name": "Generic civil / merchant", "branch": "civil" },
+    {"id": "PHL-PN", "nation": "PHL", "name": "Philippine Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Philippine Navy\", https://en.wikipedia.org/wiki/Philippine_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "PHL-PCG", "nation": "PHL", "name": "Philippine Coast Guard", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"Philippine Coast Guard\", https://en.wikipedia.org/wiki/Philippine_Coast_Guard (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "CHN-PLAN", "nation": "CHN", "name": "People's Liberation Army Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"People's Liberation Army Navy\", https://en.wikipedia.org/wiki/People%27s_Liberation_Army_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "CHN-CCG", "nation": "CHN", "name": "China Coast Guard", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"China Coast Guard\", https://en.wikipedia.org/wiki/China_Coast_Guard (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "USA-USN", "nation": "USA", "name": "United States Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"United States Navy\", https://en.wikipedia.org/wiki/United_States_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IRN-IRIN", "nation": "IRN", "name": "Islamic Republic of Iran Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Islamic Republic of Iran Navy\", https://en.wikipedia.org/wiki/Islamic_Republic_of_Iran_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "PAK-PN", "nation": "PAK", "name": "Pakistan Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Pakistan Navy\", https://en.wikipedia.org/wiki/Pakistan_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IND-IN", "nation": "IND", "name": "Indian Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Indian Navy\", https://en.wikipedia.org/wiki/Indian_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "VNM-VPN", "nation": "VNM", "name": "Vietnam People's Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Vietnam People's Navy\", https://en.wikipedia.org/wiki/Vietnam_People%27s_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "VNM-VCG", "nation": "VNM", "name": "Vietnam Coast Guard", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"Vietnam Coast Guard\", https://en.wikipedia.org/wiki/Vietnam_Coast_Guard (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "USA-USCG", "nation": "USA", "name": "United States Coast Guard", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"United States Coast Guard\", https://en.wikipedia.org/wiki/United_States_Coast_Guard (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "JPN-JMSDF", "nation": "JPN", "name": "Japan Maritime Self-Defense Force", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Japan Maritime Self-Defense Force\", https://en.wikipedia.org/wiki/Japan_Maritime_Self-Defense_Force (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "JPN-JCG", "nation": "JPN", "name": "Japan Coast Guard", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"Japan Coast Guard\", https://en.wikipedia.org/wiki/Japan_Coast_Guard (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "MYS-RMN", "nation": "MYS", "name": "Royal Malaysian Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Royal Malaysian Navy\", https://en.wikipedia.org/wiki/Royal_Malaysian_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "MYS-MMEA", "nation": "MYS", "name": "Malaysian Maritime Enforcement Agency", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"Malaysian Maritime Enforcement Agency\", https://en.wikipedia.org/wiki/Malaysian_Maritime_Enforcement_Agency (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IDN-TNIAL", "nation": "IDN", "name": "Indonesian Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Indonesian Navy\", https://en.wikipedia.org/wiki/Indonesian_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IDN-BAKAMLA", "nation": "IDN", "name": "Indonesian Maritime Security Agency", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"Indonesian Maritime Security Agency\", https://en.wikipedia.org/wiki/Indonesian_Maritime_Security_Agency (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "AUS-RAN", "nation": "AUS", "name": "Royal Australian Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Royal Australian Navy\", https://en.wikipedia.org/wiki/Royal_Australian_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "KOR-ROKN", "nation": "KOR", "name": "Republic of Korea Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Republic of Korea Navy\", https://en.wikipedia.org/wiki/Republic_of_Korea_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "TWN-ROCN", "nation": "TWN", "name": "Republic of China Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Republic of China Navy\", https://en.wikipedia.org/wiki/Republic_of_China_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "TWN-CGA", "nation": "TWN", "name": "Coast Guard Administration (Taiwan)", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"Coast Guard Administration (Taiwan)\", https://en.wikipedia.org/wiki/Coast_Guard_Administration_(Taiwan) (accessed 2026-11-13)", "confidence": "A", "is_generic": false}}
   ],
   "propulsion": [
     { "id": "PROP-NUC-SURFACE", "name": "Nuclear steam turbine (surface)", "kind": "nuclear", "fuel_type": "nuclear" },
@@ -63,5 +97,16 @@
     { "id": "COM-LINK", "name": "Generic tactical data link", "kind": "datalink", "range_km": 450, "is_datalink": true },
     { "id": "COM-UWT", "name": "Generic underwater telephone", "kind": "underwater_telephone", "range_km": 10, "is_datalink": false },
     { "id": "COM-VLF", "name": "Generic VLF broadcast receiver", "kind": "vlf", "range_km": 10000, "is_datalink": false }
+  ],
+  "ecm": [
+    {"id": "ECM-GEN-SHIP", "name": "Generic shipborne noise jammer", "kind": "noise_jammer", "jn_db_at_1km": 50},
+    {"id": "ECM-GEN-AIR", "name": "Generic airborne jamming pod", "kind": "noise_jammer", "jn_db_at_1km": 60},
+    {"id": "ECM-CHN-HZ100", "name": "HZ-100 ECM and ELINT system (Type 054A)", "kind": "noise_jammer", "jn_db_at_1km": 50, "provenance": {"source_citation": "Wikipedia, \"Type 054A frigate\", https://en.wikipedia.org/wiki/Type_054A_frigate (accessed 2026-11-13): system named; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}},
+    {"id": "ECM-CHN-NRJ6A", "name": "NRJ-6A electronic warfare system (Type 052D)", "kind": "noise_jammer", "jn_db_at_1km": 55, "provenance": {"source_citation": "Wikipedia, \"Type 052D destroyer\", https://en.wikipedia.org/wiki/Type_052D_destroyer (accessed 2026-11-13): system named; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}},
+    {"id": "ECM-VNM-BELLSQUAT", "name": "Bell Squat jammers (Gepard 3.9)", "kind": "noise_jammer", "jn_db_at_1km": 50, "provenance": {"source_citation": "Wikipedia, \"Gepard-class frigate\", https://en.wikipedia.org/wiki/Gepard-class_frigate (accessed 2026-11-13): two Bell Squat jammers named; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}},
+    {"id": "ECM-JPN-NOLQ3E", "name": "NOLQ-3E electronic warfare system with electronic attack (Mogami)", "kind": "noise_jammer", "jn_db_at_1km": 50, "provenance": {"source_citation": "Wikipedia, \"Mogami-class frigate\", https://en.wikipedia.org/wiki/Mogami-class_frigate (accessed 2026-11-13): electronic attack integrated in the main radar antenna; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}},
+    {"id": "ECM-MYS-SCIMITAR", "name": "Thales Scimitar ECM (Lekiu)", "kind": "noise_jammer", "jn_db_at_1km": 50, "provenance": {"source_citation": "Wikipedia, \"Lekiu-class frigate\", https://en.wikipedia.org/wiki/Lekiu-class_frigate (accessed 2026-11-13): Scimitar ECM named; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}},
+    {"id": "ECM-IDN-SCORPION2L", "name": "Thales Scorpion 2L radar ECM (Martadinata)", "kind": "noise_jammer", "jn_db_at_1km": 50, "provenance": {"source_citation": "Wikipedia, \"Martadinata-class frigate\", https://en.wikipedia.org/wiki/Martadinata-class_frigate (accessed 2026-11-13): Scorpion 2L RECM named; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}},
+    {"id": "ECM-KOR-SONATA", "name": "LIG Nex1 SLQ-200(V)K Sonata EW suite", "kind": "noise_jammer", "jn_db_at_1km": 50, "provenance": {"source_citation": "Wikipedia, \"Yoon Youngha-class patrol vessel\", https://en.wikipedia.org/wiki/Yoon_Youngha-class_patrol_vessel (accessed 2026-11-13): Sonata SLQ-200(V)K ECM/ECCM suite named; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}}
   ]
 }

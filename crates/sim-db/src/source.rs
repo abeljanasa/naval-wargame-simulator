@@ -93,6 +93,19 @@ struct ReferenceFile {
     propulsion: Vec<Propulsion>,
     damage_profiles: Vec<DamageProfile>,
     comms: Vec<Comms>,
+    /// ECM equipment (migration 0004).
+    #[serde(default)]
+    ecm: Vec<Ecm>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Ecm {
+    id: String,
+    name: String,
+    kind: String,
+    jn_db_at_1km: f64,
+    provenance: Option<ProvenanceSpec>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -177,6 +190,17 @@ struct Sensor {
     /// Radar: two-way half-power beamwidth, degrees (migration 0002).
     #[serde(default)]
     beamwidth_deg: Option<f64>,
+    /// Sonar acoustic figures (migration 0003); the generic figures by kind when absent.
+    #[serde(default)]
+    sonar_frequency_khz: Option<f64>,
+    #[serde(default)]
+    sonar_di_db: Option<f64>,
+    #[serde(default)]
+    sonar_dt_db: Option<f64>,
+    #[serde(default)]
+    sonar_source_level_db: Option<f64>,
+    #[serde(default)]
+    sonar_self_noise_db: Option<f64>,
     provenance: Option<ProvenanceSpec>,
 }
 
@@ -201,6 +225,18 @@ struct Weapon {
     warhead_kg: f64,
     base_ph: f64,
     targets: Vec<String>,
+    /// Ranges against particular target domains (migration 0005), where they differ.
+    #[serde(default)]
+    target_ranges: Vec<TargetRange>,
+    provenance: Option<ProvenanceSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TargetRange {
+    target: String,
+    max_range_km: f64,
+    /// Overrides the weapon's provenance (a range estimate is often less certain).
     provenance: Option<ProvenanceSpec>,
 }
 
@@ -245,6 +281,9 @@ struct Platform {
     loadouts: Vec<Loadout>,
     #[serde(default)]
     comms: Vec<String>,
+    /// ECM equipment fitted (migration 0004).
+    #[serde(default)]
+    ecm: Vec<String>,
     provenance: Option<ProvenanceSpec>,
 }
 
@@ -258,6 +297,8 @@ struct Signature {
     speed_band: String,
     value: f64,
     unit: String,
+    /// Overrides the platform's provenance (a real ship's signature is usually an estimate).
+    provenance: Option<ProvenanceSpec>,
 }
 
 fn all() -> String {
@@ -494,6 +535,14 @@ fn insert_reference(tx: &Transaction<'_>, f: &ReferenceFile) -> Result<(), DbErr
             params![m.id, m.name, m.kind, m.range_km * M_PER_KM, m.is_datalink, c, conf, cl, g, by, at],
         )?;
     }
+    for x in &f.ecm {
+        let p = Provenance::resolve(&f.defaults, x.provenance.as_ref(), &format!("ecm {}", x.id))?;
+        let (c, conf, cl, g, by, at) = prov_params!(p);
+        tx.execute(
+            &format!("INSERT INTO ecm_systems (id, name, kind, jn_db_at_1km, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)"),
+            params![x.id, x.name, x.kind, x.jn_db_at_1km, c, conf, cl, g, by, at],
+        )?;
+    }
     Ok(())
 }
 
@@ -506,13 +555,15 @@ fn insert_sensors(tx: &Transaction<'_>, f: &SensorsFile) -> Result<usize, DbErro
         )?;
         let (c, conf, cl, g, by, at) = prov_params!(p);
         tx.execute(
-            &format!("INSERT INTO sensors (id, name, kind, role, band, is_active, min_range_m, max_range_m, ref_detect_range_m, ref_target_rcs_m2, max_target_altitude_m, scan_period_s, clutter_db_per_sea_state, beamwidth_deg, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)"),
+            &format!("INSERT INTO sensors (id, name, kind, role, band, is_active, min_range_m, max_range_m, ref_detect_range_m, ref_target_rcs_m2, max_target_altitude_m, scan_period_s, clutter_db_per_sea_state, beamwidth_deg, sonar_frequency_khz, sonar_di_db, sonar_dt_db, sonar_source_level_db, sonar_self_noise_db, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)"),
             params![
                 s.id, s.name, s.kind, s.role, s.band, s.active,
                 s.min_range_km * M_PER_KM, s.max_range_km * M_PER_KM,
                 s.ref_detect_range_km.map(|r| r * M_PER_KM), s.ref_target_rcs_m2,
                 s.max_target_altitude_m, s.scan_period_s,
                 s.clutter_db_per_sea_state, s.beamwidth_deg,
+                s.sonar_frequency_khz, s.sonar_di_db, s.sonar_dt_db, s.sonar_source_level_db,
+                s.sonar_self_noise_db,
                 c, conf, cl, g, by, at
             ],
         )?;
@@ -537,6 +588,21 @@ fn insert_weapons(tx: &Transaction<'_>, f: &WeaponsFile) -> Result<usize, DbErro
                 c, conf, cl, g, by, at
             ],
         )?;
+        for r in &w.target_ranges {
+            let rp = match &r.provenance {
+                Some(o) => Provenance::resolve(
+                    &f.defaults,
+                    Some(o),
+                    &format!("weapon {} range against {}", w.id, r.target),
+                )?,
+                None => p.clone(),
+            };
+            let (c, conf, cl, g, by, at) = prov_params!(rp);
+            tx.execute(
+                &format!("INSERT INTO weapon_target_ranges (weapon_id, target, max_range_m, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)"),
+                params![w.id, r.target, r.max_range_km * M_PER_KM, c, conf, cl, g, by, at],
+            )?;
+        }
     }
     Ok(f.weapons.len())
 }
@@ -563,9 +629,24 @@ fn insert_platform(
         ],
     )?;
     for s in &pl.signatures {
+        let sp = match &s.provenance {
+            Some(o) => Provenance::resolve(
+                defaults,
+                Some(o),
+                &format!("platform {} signature {}", pl.id, s.kind),
+            )?,
+            None => p.clone(),
+        };
+        let (c, conf, cl, g, by, at) = prov_params!(sp);
         tx.execute(
             &format!("INSERT INTO platform_signatures (platform_id, kind, aspect, speed_band, value, unit, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)"),
             params![pl.id, s.kind, s.aspect, s.speed_band, s.value, s.unit, c, conf, cl, g, by, at],
+        )?;
+    }
+    for e in &pl.ecm {
+        tx.execute(
+            "INSERT INTO platform_ecm (platform_id, ecm_id) VALUES (?1,?2)",
+            params![pl.id, e],
         )?;
     }
     for m in &pl.sensors {

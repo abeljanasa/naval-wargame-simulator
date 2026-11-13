@@ -97,6 +97,7 @@ fn key_column(table: &str) -> &'static str {
     match table {
         "platform_signatures" => "platform_id || ':' || kind || ':' || aspect || ':' || speed_band",
         "mounts" | "magazines" => "platform_id || '#' || name",
+        "weapon_target_ranges" => "weapon_id || ':' || target",
         _ => "id",
     }
 }
@@ -113,8 +114,8 @@ fn provenance(conn: &Connection, policy: Policy, out: &mut Collector) -> Result<
         if policy == Policy::Open {
             rows(conn, out, Severity::Error, "classification.open_build",
                 &format!("SELECT '{table}/' || {key}, 'classification ' || quote(classification) || ' is not allowed in the open build' FROM {table} WHERE classification != '{OPEN_CLASSIFICATION}' ORDER BY 1"))?;
-            rows(conn, out, Severity::Warning, "provenance.not_generic",
-                &format!("SELECT '{table}/' || {key}, 'record is not marked generic; open-build data should be generic classes' FROM {table} WHERE is_generic = 0 ORDER BY 1"))?;
+            rows(conn, out, Severity::Error, "provenance.not_generic",
+                &format!("SELECT '{table}/' || {key}, 'a specific (non-generic) record must cite its open source: a URL or a published document' FROM {table} WHERE is_generic = 0 AND source_citation NOT LIKE '%http%' AND source_citation NOT LIKE '%doi:%' AND source_citation NOT LIKE '%ISBN%' ORDER BY 1"))?;
         }
     }
     Ok(())
@@ -170,6 +171,10 @@ fn sensors(conn: &Connection, out: &mut Collector) -> Result<(), DbError> {
         "SELECT 'sensors/' || id, 'ref_detect_range_m and ref_target_rcs_m2 must be given together, positive, with ref range <= max range' FROM sensors WHERE (ref_detect_range_m IS NULL) != (ref_target_rcs_m2 IS NULL) OR ref_detect_range_m <= 0 OR ref_target_rcs_m2 <= 0 OR ref_detect_range_m > max_range_m ORDER BY 1")?;
     rows(conn, out, Severity::Error, "sensor.radar_fields",
         "SELECT 'sensors/' || id, 'clutter_db_per_sea_state (>= 0) and beamwidth_deg (0 < b <= 360) apply to radars only' FROM sensors WHERE ((clutter_db_per_sea_state IS NOT NULL OR beamwidth_deg IS NOT NULL) AND kind != 'radar') OR clutter_db_per_sea_state < 0 OR beamwidth_deg <= 0 OR beamwidth_deg > 360 ORDER BY 1")?;
+    rows(conn, out, Severity::Error, "ecm.values",
+        "SELECT 'ecm_systems/' || id, 'jammer strength must be 0–100 dB J/N at 1 km' FROM ecm_systems WHERE jn_db_at_1km NOT BETWEEN 0 AND 100 ORDER BY 1")?;
+    rows(conn, out, Severity::Error, "sensor.sonar_fields",
+        "SELECT 'sensors/' || id, 'sonar figures apply to sonars only, within frequency 0.01–100 kHz, DI 0–40 dB, DT -10–30 dB, source level 150–250 dB, self-noise 20–120 dB' FROM sensors WHERE ((sonar_frequency_khz IS NOT NULL OR sonar_di_db IS NOT NULL OR sonar_dt_db IS NOT NULL OR sonar_source_level_db IS NOT NULL OR sonar_self_noise_db IS NOT NULL) AND kind NOT IN ('sonar_hull','sonar_towed','sonar_dipping','sonobuoy')) OR sonar_frequency_khz NOT BETWEEN 0.01 AND 100 OR sonar_di_db NOT BETWEEN 0 AND 40 OR sonar_dt_db NOT BETWEEN -10 AND 30 OR sonar_source_level_db NOT BETWEEN 150 AND 250 OR sonar_self_noise_db NOT BETWEEN 20 AND 120 ORDER BY 1")?;
     rows(conn, out, Severity::Warning, "sensor.radar_defaults",
         "SELECT 'sensors/' || id, 'radar has no clutter_db_per_sea_state or beamwidth_deg; the model defaults apply' FROM sensors WHERE kind = 'radar' AND (clutter_db_per_sea_state IS NULL OR beamwidth_deg IS NULL) ORDER BY 1")?;
     rows(conn, out, Severity::Error, "sensor.radar_reference",
@@ -228,6 +233,8 @@ fn sensors(conn: &Connection, out: &mut Collector) -> Result<(), DbError> {
 fn weapons(conn: &Connection, out: &mut Collector) -> Result<(), DbError> {
     rows(conn, out, Severity::Error, "weapon.range_order",
         "SELECT 'weapons/' || id, 'min_range_m ' || min_range_m || ' must be >= 0 and < max_range_m ' || max_range_m FROM weapons WHERE min_range_m < 0 OR min_range_m >= max_range_m ORDER BY 1")?;
+    rows(conn, out, Severity::Error, "weapon.target_ranges",
+        "SELECT 'weapon_target_ranges/' || r.weapon_id || ':' || r.target, 'a range against ' || r.target || ' must be for a domain the weapon targets, above its minimum range and no more than its maximum range' FROM weapon_target_ranges r JOIN weapons w ON w.id = r.weapon_id WHERE (',' || w.target_domains || ',') NOT LIKE ('%,' || r.target || ',%') OR r.max_range_m <= w.min_range_m OR r.max_range_m > w.max_range_m ORDER BY 1")?;
     rows(conn, out, Severity::Error, "weapon.base_ph",
         "SELECT 'weapons/' || id, 'base_ph ' || base_ph || ' must be in [0, 1]' FROM weapons WHERE base_ph < 0 OR base_ph > 1 ORDER BY 1")?;
     rows(conn, out, Severity::Error, "weapon.values",

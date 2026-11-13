@@ -35,6 +35,7 @@ Each facility belongs to one side:
 |---|---|
 | `command_post` | Orders route through the post (below). Ashore when fixed, or carried by a `unit` (a flagship afloat, an aircraft airborne, a land unit). |
 | `sheltering_port`, `anchorage`, `refuelling_point` | Serve the side's units that are **alongside**: inside the facility's water and at ≤ 0.5 m/s, with the `services` the facility offers. |
+| `airbase` | An airfield, or a ship's flight deck (`unit`): runways or deck spots, parking and aviation fuel in its `air` block. Its aircraft park there, launch and recover ([air-operations.md](air-operations.md)). Ships never divert to one. |
 
 **Water, depth and holding limits** (slice 13, [DL-0032](../design-log/DL-0032-anchorages-weather.md)):
 - **`area`:** a polygon or circle that a fixed facility's water uses instead of `radius_m` round `position`. `position` stays the point units steer for, and the scenario check warns if it is outside the area. A facility carried by a unit (an oiler) always uses its radius.
@@ -92,7 +93,7 @@ A **choke point** is a sense zone round an engage zone, sharing a `choke_point` 
 
 ### Coverage
 
-For any sense zone, the side (or the white cell) can ask for its **coverage** now. This is a query: it changes nothing, draws nothing, and is not hashed. In this TTX release players task the sensors themselves; automatic sensor tasking is Phase 4.
+For any sense zone, the side (or the white cell) can ask for its **coverage** now. This is a query: it changes nothing, draws nothing, and is not hashed. Players task sensors themselves, unless the zone has a **coverage goal**: then the engine tasks the side's free sensors to keep it ([sensor-tasking.md](sensor-tasking.md), Phase 4 slice 12).
 - **Grid:** the zone's bounding box is cut into 24 × 24 cells, and the cells whose centre is inside the zone are kept.
 - **Covered:** a cell is covered when some unit of the zone's side has a working sensor of one of the zone's types (every type when it lists none) whose **nominal range** reaches the cell's centre. Otherwise the cell is a **gap**.
 

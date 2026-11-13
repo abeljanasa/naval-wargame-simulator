@@ -1,0 +1,598 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, Australia (Phase 4 slice 13, tranche 3): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "AUS-DDG-HOBART",
+   "name": "Hobart-class destroyer",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "AUS-RAN",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-DESTROYER",
+   "length_m": 147.2,
+   "displacement_t": 7000,
+   "draft_m": 5.17,
+   "max_speed_kn": 28,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.06,
+   "endurance_nm": 5000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 10000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MFR",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 25
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-IRST",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 28
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -6
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -100
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 41 VLS (48 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-ESSM",
+      "WPN-LACM",
+      "WPN-SM2MR",
+      "WPN-SM6"
+     ]
+    },
+    {
+     "name": "NSM canisters (2x4)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-NSM"
+     ]
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 15,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Mk 38 25 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Mk 32 Mod 9 twin torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-MU90"
+     ]
+    },
+    {
+     "name": "Nulka and Mk 36 SRBOC launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 41 VLS (48 cells)",
+     "capacity": 72,
+     "contents": {
+      "WPN-SM2MR": 24,
+      "WPN-ESSM": 32,
+      "WPN-SM6": 8,
+      "WPN-LACM": 8
+     }
+    },
+    {
+     "name": "NSM canisters (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-NSM": 8
+     }
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 60,
+     "contents": {
+      "WPN-CIWS": 60
+     }
+    },
+    {
+     "name": "Mk 38 25 mm guns (2)",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "Mk 32 Mod 9 twin torpedo tubes (2)",
+     "capacity": 4,
+     "contents": {
+      "WPN-MU90": 4
+     }
+    },
+    {
+     "name": "Nulka and Mk 36 SRBOC launchers",
+     "capacity": 40,
+     "contents": {
+      "WPN-DECOY-CHAFF": 40
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Hobart-class destroyer\", https://en.wikipedia.org/wiki/Hobart-class_destroyer (accessed 2026-11-13): 7,000 t full load, 147.2 m, 5.17 m draught, over 28 kn, over 5,000 nmi at 18 kn, complement 186; Aegis with AN/SPY-1D(V), AN/SPQ-9B, 2 AN/SPG-62, 2 X-band navigation radars, hull and towed sonar, Series 2500 EO director, VAMPIR IRST, ES-3701 ESM, 4 quad Nulka and 4 Mk 36 SRBOC; 48-cell Mk 41 (SM-2, ESSM, SM-6, Tomahawk; split not given: 24 SM-2MR, 32 ESSM in 8 cells, 8 SM-6, 8 Tomahawk assumed), 2x4 NSM, 2 x 2-tube Mk 32 Mod 9 (MU90), 5 in/62 Mk 45 Mod 4, 2 Mk 38 25 mm, one Phalanx. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "AUS-FFH-ANZAC",
+   "name": "Anzac-class frigate (RAN, anti-ship missile defence upgrade)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "AUS-RAN",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 118,
+   "displacement_t": 3600,
+   "draft_m": 4.35,
+   "max_speed_kn": 27,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.05,
+   "endurance_nm": 6000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-MFR",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -5
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 41 VLS (8 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-ESSM"
+     ]
+    },
+    {
+     "name": "NSM canisters (2x4)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-NSM"
+     ]
+    },
+    {
+     "name": "5 in/54 Mk 45 Mod 2 gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-MU90"
+     ]
+    },
+    {
+     "name": "Mk 36 SRBOC and Nulka launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 41 VLS (8 cells)",
+     "capacity": 32,
+     "contents": {
+      "WPN-ESSM": 32
+     }
+    },
+    {
+     "name": "NSM canisters (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-NSM": 8
+     }
+    },
+    {
+     "name": "5 in/54 Mk 45 Mod 2 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-MU90": 6
+     }
+    },
+    {
+     "name": "Mk 36 SRBOC and Nulka launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Anzac-class frigate\", https://en.wikipedia.org/wiki/Anzac-class_frigate (accessed 2026-11-13): 3,600 t full load, 118 m overall, 4.35 m draught, 27 kn, 6,000 nmi at 18 kn; ASMD fit: SPS-49(V)8 ANZ, CEAFAR S-band phased array, Sharp Eye navigation, CEAMOUNT illuminators, Ceros 200 director, JEDS 3701 ESM, Spherion B bow sonar, Mk 36 SRBOC, SLQ-25A and Nulka; RAN: 8-cell Mk 41 with 32 quad-packed ESSM, 2x4 Harpoon or NSM (NSM used), 2 Mk 32 triple tubes (MU90), 5 in/54 Mk 45 Mod 2. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "AUS-SSK-COLLINS",
+   "name": "Collins-class submarine",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "AUS-RAN",
+   "propulsion": "PROP-DE-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 77.42,
+   "displacement_t": 3407,
+   "draft_m": 7,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 10,
+   "accel_mps2": 0.05,
+   "endurance_nm": 9000,
+   "max_depth_m": 180,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 200,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 105,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 118,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-SON-SUB-TAS",
+     "height_m": -150
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "21 in torpedo tubes (6)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-HARPOON-1",
+      "WPN-MK48"
+     ]
+    },
+    {
+     "name": "SSE decoys",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "21 in torpedo tubes (6)",
+     "capacity": 22,
+     "contents": {
+      "WPN-MK48": 18,
+      "WPN-HARPOON-1": 4
+     }
+    },
+    {
+     "name": "SSE decoys",
+     "capacity": 2,
+     "contents": {
+      "WPN-DECOY-TORP": 2
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Collins-class submarine\", https://en.wikipedia.org/wiki/Collins-class_submarine (accessed 2026-11-13): 3,407 t submerged, 77.42 m, 7 m draught, 20 kn submerged, 9,000 nmi at 10 kn at periscope depth, 70 days, test depth over 180 m (180 used; actual classified), complement 58; Scylla bow and distributed arrays, SHORT-TAS towed array, intercept array, Type 1007 radar, CK043 and CH093 periscopes, Condor CS-5600 ESM; 6 x 21 in tubes, 22 weapons (Mk 48 Mod 7 and UGM-84C Sub-Harpoon; 18 and 4 assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "AUS-PS-ARAFURA",
+   "name": "Arafura-class offshore patrol vessel",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "AUS-RAN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 80,
+   "displacement_t": 1640,
+   "draft_m": 4,
+   "max_speed_kn": 22,
+   "cruise_speed_kn": 12,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 1500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 11
+    }
+   ],
+   "launchers": [],
+   "magazines": [],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Arafura-class patrol vessel\", https://en.wikipedia.org/wiki/Arafura-class_patrol_vessel (accessed 2026-11-13): 1,640 t, 80 m, 4 m draught, 22 kn, 4,000 nmi, 21 days, complement 40; Terma SCANTER 6002, Furuno navigation radars, Saab EOS500 and Vigy Engage EO; 2 .50 calibre machine guns (not modelled). Cruise speed not given (12 kn assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  }
+ ]
+}

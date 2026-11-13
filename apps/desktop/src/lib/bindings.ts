@@ -77,7 +77,7 @@ export const commands = {
 	/**  Gives an action group its mission (run by its leader); `None` clears it. */
 	orderGroupMission: (group: string, mission: Mission_Deserialize | null) => typedError<null, string>(__TAURI_INVOKE("order_group_mission", { group, mission })),
 	/**  White cell: replaces the planning layer's facilities and zones in play. */
-	orderPlanning: (facilities: Facility_Deserialize[], zones: Zone_Deserialize[]) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_planning", { facilities, zones })),
+	orderPlanning: (facilities: Facility_Deserialize[], zones: Zone_Deserialize[], lanes: Lane_Deserialize[] | null) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_planning", { facilities, zones, lanes })),
 	/**  Takes a unit out of its action group. */
 	orderDetach: (unit: UnitId) => typedError<null, string>(__TAURI_INVOKE("order_detach", { unit })),
 	/**  Puts a unit into an action group at a station on its leader. */
@@ -108,6 +108,32 @@ export const commands = {
 	getAar: () => typedError<AarView_Serialize, string>(__TAURI_INVOKE("get_aar")),
 	/**  One AAR table as CSV text, for the UI to save. */
 	aarCsv: (table: AarTable) => typedError<string, string>(__TAURI_INVOKE("aar_csv", { table })),
+	/**  The terrain packs on this machine and the ones the current exercise uses. */
+	terrainStatus: () => __TAURI_INVOKE<TerrainStatus_Serialize>("terrain_status"),
+	/**  The water under a unit and along the rest of its route (`None` without terrain packs). */
+	routeDepths: (unit: UnitId) => typedError<RouteDepths_Serialize | null, string>(__TAURI_INVOKE("route_depths", { unit })),
+	/**  Each facility's charted depth, for the white cell's planning tab. */
+	facilityDepths: () => typedError<FacilityDepth_Serialize[], string>(__TAURI_INVOKE("facility_depths")),
+	/**  The water of every choke point, for the white cell's planning tab. */
+	chokeDepths: () => typedError<ChokeDepths_Serialize[], string>(__TAURI_INVOKE("choke_depths")),
+	/**  The imagery packs on this machine (`imagery.rs`). */
+	imageryStatus: () => __TAURI_INVOKE<ImageryStatus_Serialize>("imagery_status"),
+	/**  Replaces the weather zones (white cell only). */
+	orderWeather: (zones: WeatherZone_Deserialize[]) => typedError<null, string>(__TAURI_INVOKE("order_weather", { zones })),
+	/**  Replaces the sound-velocity profiles (white cell only). */
+	orderSoundProfiles: (profiles: SoundProfile_Deserialize[]) => typedError<null, string>(__TAURI_INVOKE("order_sound_profiles", { profiles })),
+	/**  Streams (`true`) or recovers a unit's towed array; either takes ten minutes. */
+	orderTowed: (unit: UnitId, streamed: boolean) => typedError<null, string>(__TAURI_INVOKE("order_towed", { unit, streamed })),
+	/**  Sends a unit through `points`, laying a sonobuoy at each (`deep`: hydrophones at 300 m). */
+	orderSonobuoys: (unit: UnitId, points: GeoPoint[], deep: boolean) => typedError<null, string>(__TAURI_INVOKE("order_sonobuoys", { unit, points, deep })),
+	/**  Launches a parked aircraft on a sortie; the loadout defaults to the mission's. */
+	orderSortie: (unit: UnitId, mission: Mission_Deserialize, loadout: string | null) => typedError<null, string>(__TAURI_INVOKE("order_sortie", { unit, mission, loadout })),
+	/**  Recalls an aircraft: cancels a launch, or brings it back to `base` (default its own). */
+	orderRecall: (unit: UnitId, base: number | null) => typedError<null, string>(__TAURI_INVOKE("order_recall", { unit, base })),
+	/**  Sets a parked aircraft's readiness (with a maintenance period, if given). */
+	orderReadiness: (unit: UnitId, readiness: Readiness, maintenanceS: number | null) => typedError<null, string>(__TAURI_INVOKE("order_readiness", { unit, readiness, maintenanceS })),
+	/**  Reads the imagery folder again (after packs were copied into it by hand). */
+	rescanImagery: () => __TAURI_INVOKE<ImageryStatus_Serialize>("rescan_imagery"),
 };
 
 /** Events */
@@ -127,6 +153,10 @@ export type AarReport_Deserialize = {
 	losses: LossRow_Deserialize[],
 	weapons: WeaponRow[],
 	detections: DetectionRow_Deserialize[],
+	/**  Choke-point transits with lanes or terrain packs (older reports: none). */
+	transits?: TransitRow_Deserialize[],
+	/**  Sorties flown (older reports: none). */
+	sorties?: SortieRow_Deserialize[],
 	timeline: TimelineEntry_Deserialize[],
 };
 
@@ -138,11 +168,15 @@ export type AarReport_Serialize = {
 	losses: LossRow_Serialize[],
 	weapons: WeaponRow[],
 	detections: DetectionRow_Serialize[],
+	/**  Choke-point transits with lanes or terrain packs (older reports: none). */
+	transits: TransitRow_Serialize[],
+	/**  Sorties flown (older reports: none). */
+	sorties: SortieRow_Serialize[],
 	timeline: TimelineEntry_Serialize[],
 };
 
 /**  The tables of an [`AarReport`]. */
-export type AarTable = "sides" | "losses" | "weapons" | "detections" | "timeline";
+export type AarTable = "sides" | "losses" | "weapons" | "detections" | "transits" | "sorties" | "timeline";
 
 /**
  *  The after-action review for one window: the whole report, with the timeline cut to what the
@@ -273,6 +307,103 @@ export type Adjudication_Serialize =
 /**  Set the rounds of one weapon a unit carries (0 removes it). */
 { kind: "set_stores"; unit: UnitId; weapon: string; count: number };
 
+/**  An airbase and its aircraft on the ground, as a seat sees it. */
+export type AirBaseView = AirBaseView_Serialize | AirBaseView_Deserialize;
+
+/**  An airbase and its aircraft on the ground, as a seat sees it. */
+export type AirBaseView_Deserialize = {
+	facility: number,
+	name: string,
+	side: SideId,
+	position?: GeoPoint | null,
+	runways: number,
+	parking: number,
+	deck: boolean,
+	/**  Aviation fuel left, t (`None`: unlimited). */
+	aviation_fuel_t?: number | null,
+	aircraft: ParkedView_Deserialize[],
+};
+
+/**  An airbase and its aircraft on the ground, as a seat sees it. */
+export type AirBaseView_Serialize = {
+	facility: number,
+	name: string,
+	side: SideId,
+	position: GeoPoint | null,
+	runways: number,
+	parking: number,
+	deck: boolean,
+	/**  Aviation fuel left, t (`None`: unlimited). */
+	aviation_fuel_t: number | null,
+	aircraft: ParkedView_Serialize[],
+};
+
+/**  The runways (or deck) of an airbase facility. */
+export type AirField = AirField_Serialize | AirField_Deserialize;
+
+/**  The runways (or deck) of an airbase facility. */
+export type AirField_Deserialize = {
+	/**
+	 *  Runways (ashore) or launch and recovery spots (deck), each launching or recovering one
+	 *  aircraft per interval.
+	 */
+	runways?: number,
+	/**  Seconds between launches or recoveries on one runway (default 120 ashore, 60 on a deck). */
+	interval_s?: number | null,
+	/**  Aircraft it can park; 0 = no limit. */
+	parking?: number,
+	/**  A ship's flight deck. */
+	deck?: boolean,
+	/**  Fixed-wing aircraft can use it (default: yes ashore, no on a deck; a carrier sets it). */
+	fixed_wing?: boolean | null,
+	/**  Aviation fuel held at the start, t; `None` = unlimited. */
+	aviation_fuel_t?: number | null,
+};
+
+/**  The runways (or deck) of an airbase facility. */
+export type AirField_Serialize = {
+	/**
+	 *  Runways (ashore) or launch and recovery spots (deck), each launching or recovering one
+	 *  aircraft per interval.
+	 */
+	runways: number,
+	/**  Seconds between launches or recoveries on one runway (default 120 ashore, 60 on a deck). */
+	interval_s: number | null,
+	/**  Aircraft it can park; 0 = no limit. */
+	parking: number,
+	/**  A ship's flight deck. */
+	deck: boolean,
+	/**  Fixed-wing aircraft can use it (default: yes ashore, no on a deck; a carrier sets it). */
+	fixed_wing: boolean | null,
+	/**  Aviation fuel held at the start, t; `None` = unlimited. */
+	aviation_fuel_t: number | null,
+};
+
+/**  An aircraft in the air, as a seat sees it. */
+export type AirUnitView = AirUnitView_Serialize | AirUnitView_Deserialize;
+
+/**  An aircraft in the air, as a seat sees it. */
+export type AirUnitView_Deserialize = {
+	base?: number | null,
+	/**  `airborne`, `returning`, `to_tanker` or `tanking`. */
+	state: string,
+	loadout?: string | null,
+	/**  Fuel share at which it turns for home from here (`None`: no fuel model). */
+	bingo_fraction?: number | null,
+	tanker: boolean,
+};
+
+/**  An aircraft in the air, as a seat sees it. */
+export type AirUnitView_Serialize = {
+	base: number | null,
+	/**  `airborne`, `returning`, `to_tanker` or `tanking`. */
+	state: string,
+	loadout: string | null,
+	/**  Fuel share at which it turns for home from here (`None`: no fuel model). */
+	bingo_fraction: number | null,
+	tanker: boolean,
+};
+
 /**  A region of the sea. */
 export type Area = 
 /**  Within `radius_m` (geodesic) of `centre`. */
@@ -310,6 +441,54 @@ export type BearingView = {
 	age_s: number | null,
 	/**  Intercepted emitter type. */
 	emitter: string,
+};
+
+/**
+ *  A choke point's water: depth statistics over its zones, a depth section across it, and its
+ *  lanes' traffic.
+ */
+export type ChokeDepths = ChokeDepths_Serialize | ChokeDepths_Deserialize;
+
+/**
+ *  A choke point's water: depth statistics over its zones, a depth section across it, and its
+ *  lanes' traffic.
+ */
+export type ChokeDepths_Deserialize = {
+	choke_point: string,
+	/**  Over a 24 × 24 grid of the zones' area (`None` without terrain packs there). */
+	least_m?: number | null,
+	median_m?: number | null,
+	deepest_m?: number | null,
+	/**
+	 *  Across the choke point: square to its lane where it has one, else across its narrower
+	 *  way. Samples outside its zones have no depth.
+	 */
+	section_from: GeoPoint,
+	section_to: GeoPoint,
+	section: DepthSample_Deserialize[],
+	lanes: number[],
+	traffic_per_day: number | null,
+};
+
+/**
+ *  A choke point's water: depth statistics over its zones, a depth section across it, and its
+ *  lanes' traffic.
+ */
+export type ChokeDepths_Serialize = {
+	choke_point: string,
+	/**  Over a 24 × 24 grid of the zones' area (`None` without terrain packs there). */
+	least_m: number | null,
+	median_m: number | null,
+	deepest_m: number | null,
+	/**
+	 *  Across the choke point: square to its lane where it has one, else across its narrower
+	 *  way. Samples outside its zones have no depth.
+	 */
+	section_from: GeoPoint,
+	section_to: GeoPoint,
+	section: DepthSample_Serialize[],
+	lanes: number[],
+	traffic_per_day: number | null,
 };
 
 /**  How much a side knows about a track. Ordered: a track only ever climbs the ladder. */
@@ -456,6 +635,13 @@ export type ContactView_Deserialize = {
 	/**  Own unit whose sensor last detected it. */
 	detected_by: UnitId,
 	sensor_id: string,
+	/**
+	 *  Estimated course, degrees, from the track's own movement; absent until it has moved
+	 *  clearly beyond its position error (`docs/models/tracks.md`).
+	 */
+	course_deg?: number | null,
+	/**  Estimated speed, m/s, with the course. */
+	speed_mps?: number | null,
 };
 
 /**
@@ -485,6 +671,13 @@ export type ContactView_Serialize = {
 	/**  Own unit whose sensor last detected it. */
 	detected_by: UnitId,
 	sensor_id: string,
+	/**
+	 *  Estimated course, degrees, from the track's own movement; absent until it has moved
+	 *  clearly beyond its position error (`docs/models/tracks.md`).
+	 */
+	course_deg: number | null,
+	/**  Estimated speed, m/s, with the course. */
+	speed_mps: number | null,
 };
 
 /**  One sampled cell. */
@@ -592,6 +785,25 @@ export type DbWeaponRow = {
 	id: string,
 	name: string,
 	kind: string,
+};
+
+/**  Water depth at one point along a route. */
+export type DepthSample = DepthSample_Serialize | DepthSample_Deserialize;
+
+/**  Water depth at one point along a route. */
+export type DepthSample_Deserialize = {
+	/**  Along the route from the unit, metres. */
+	distance_m: number | null,
+	/**  Water depth, metres (0 on land); `None` where no terrain pack covers. */
+	depth_m?: number | null,
+};
+
+/**  Water depth at one point along a route. */
+export type DepthSample_Serialize = {
+	/**  Along the route from the unit, metres. */
+	distance_m: number | null,
+	/**  Water depth, metres (0 on land); `None` where no terrain pack covers. */
+	depth_m: number | null,
 };
 
 /**  One contact held by one side. */
@@ -726,15 +938,20 @@ export type EventAction_Deserialize =
 	type: "message",
 } & {
 	text: string,
-} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Deserialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Deserialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission?: Mission_Deserialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never; zones?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Deserialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | ({ type: "set_environment"; environment: Environment_Deserialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
+/**
+ *  Replaces the weather zones (`docs/models/weather.md`); an empty list leaves only the
+ *  scenario-wide weather.
+ */
+({ type: "set_weather"; zones: WeatherZone_Deserialize[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never; zones?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; zones?: never } | ({ type: "assign_mission"; unit: number; mission?: Mission_Deserialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never; zones?: never } | 
 /**  Brings a reserve unit (declared in the scenario, held off the board) into play. */
-({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never; zones?: never } | 
 /**  Turns an event on or off. */
-({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
 /**  Delivers an inject from the scenario's library. */
-({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
 /**  A Lua script whose `sim.*` requests become actions (`docs/models/lua-scripting.md`). */
-({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never };
+({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never };
 
 /**  What a fired event does. */
 export type EventAction_Serialize = 
@@ -743,15 +960,20 @@ export type EventAction_Serialize =
 	type: "message",
 } & {
 	text: string,
-} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Serialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Serialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission: Mission_Serialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never; zones?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Serialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | ({ type: "set_environment"; environment: Environment_Serialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
+/**
+ *  Replaces the weather zones (`docs/models/weather.md`); an empty list leaves only the
+ *  scenario-wide weather.
+ */
+({ type: "set_weather"; zones: WeatherZone_Serialize[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never; zones?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; zones?: never } | ({ type: "assign_mission"; unit: number; mission: Mission_Serialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never; zones?: never } | 
 /**  Brings a reserve unit (declared in the scenario, held off the board) into play. */
-({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never; zones?: never } | 
 /**  Turns an event on or off. */
-({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
 /**  Delivers an inject from the scenario's library. */
-({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
 /**  A Lua script whose `sim.*` requests become actions (`docs/models/lua-scripting.md`). */
-({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never };
+({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never };
 
 /**  An event as the white cell sees it. */
 export type EventStatus = {
@@ -783,8 +1005,34 @@ export type Facilitation =
 /**  A planning-layer facility. */
 export type Facility = Facility_Serialize | Facility_Deserialize;
 
+/**
+ *  A facility's depth from the terrain packs (`chart_m`, `None` where no pack covers or for a
+ *  facility on a unit). The planner's `depth_m`, when set, is used instead.
+ */
+export type FacilityDepth = FacilityDepth_Serialize | FacilityDepth_Deserialize;
+
+/**
+ *  A facility's depth from the terrain packs (`chart_m`, `None` where no pack covers or for a
+ *  facility on a unit). The planner's `depth_m`, when set, is used instead.
+ */
+export type FacilityDepth_Deserialize = {
+	facility: number,
+	chart_m?: number | null,
+};
+
+/**
+ *  A facility's depth from the terrain packs (`chart_m`, `None` where no pack covers or for a
+ *  facility on a unit). The planner's `depth_m`, when set, is used instead.
+ */
+export type FacilityDepth_Serialize = {
+	facility: number,
+	chart_m: number | null,
+};
+
 /**  What a facility is. */
-export type FacilityKind = "command_post" | "refuelling_point" | "sheltering_port" | "anchorage";
+export type FacilityKind = "command_post" | "refuelling_point" | "sheltering_port" | "anchorage" | 
+/**  An airfield, or a ship's flight deck (Phase 4 slice 9, `docs/models/air-operations.md`). */
+"airbase";
 
 /**  A planning-layer facility. */
 export type Facility_Deserialize = {
@@ -843,6 +1091,8 @@ export type Facility_Deserialize = {
 	max_sea_state?: number | null,
 	/**  Anchorages: AI-run units whose mission is complete hold here until tasked again. */
 	staging?: boolean,
+	/**  Airbases: runways or deck, parking and aviation fuel (Phase 4 slice 9). */
+	air?: AirField_Deserialize | null,
 };
 
 /**  A planning-layer facility. */
@@ -902,6 +1152,8 @@ export type Facility_Serialize = {
 	max_sea_state: number | null,
 	/**  Anchorages: AI-run units whose mission is complete hold here until tasked again. */
 	staging: boolean,
+	/**  Airbases: runways or deck, parking and aviation fuel (Phase 4 slice 9). */
+	air?: AirField_Serialize,
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */
@@ -964,6 +1216,62 @@ export type GroupStation = {
 	range_m: number | null,
 };
 
+/**  One installed pack, as the UI sees it. */
+export type ImageryInfo = ImageryInfo_Serialize | ImageryInfo_Deserialize;
+
+/**  One installed pack, as the UI sees it. */
+export type ImageryInfo_Deserialize = {
+	/**  File name in the imagery folder; also the pack's key in tile URLs. */
+	file: string,
+	name: string,
+	/**  `png`, `jpg` or `webp`. */
+	format: string,
+	min_zoom: number,
+	max_zoom: number,
+	/**  West, south, east, north, degrees (whole world if the pack does not say). */
+	bounds: [(number | null), (number | null), (number | null), (number | null)],
+	/**  The credit the imagery's licence asks for (`None`: the pack does not give one). */
+	attribution?: string | null,
+	/**  Tile size in pixels (256 unless the pack says otherwise). */
+	tile_size: number,
+};
+
+/**  One installed pack, as the UI sees it. */
+export type ImageryInfo_Serialize = {
+	/**  File name in the imagery folder; also the pack's key in tile URLs. */
+	file: string,
+	name: string,
+	/**  `png`, `jpg` or `webp`. */
+	format: string,
+	min_zoom: number,
+	max_zoom: number,
+	/**  West, south, east, north, degrees (whole world if the pack does not say). */
+	bounds: [(number | null), (number | null), (number | null), (number | null)],
+	/**  The credit the imagery's licence asks for (`None`: the pack does not give one). */
+	attribution: string | null,
+	/**  Tile size in pixels (256 unless the pack says otherwise). */
+	tile_size: number,
+};
+
+/**  The imagery packs on this machine. */
+export type ImageryStatus = ImageryStatus_Serialize | ImageryStatus_Deserialize;
+
+/**  The imagery packs on this machine. */
+export type ImageryStatus_Deserialize = {
+	packs: ImageryInfo_Deserialize[],
+	/**  Files in the folder that could not be read, and why. */
+	problems: string[],
+	folder: string,
+};
+
+/**  The imagery packs on this machine. */
+export type ImageryStatus_Serialize = {
+	packs: ImageryInfo_Serialize[],
+	/**  Files in the folder that could not be read, and why. */
+	problems: string[],
+	folder: string,
+};
+
 /**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */
 export type Inject = Inject_Serialize | Inject_Deserialize;
 
@@ -1020,6 +1328,45 @@ export type JammerSpec = {
 	jn_db_at_1km: number | null,
 };
 
+/**  A shipping lane. */
+export type Lane = Lane_Serialize | Lane_Deserialize;
+
+/**  A shipping lane. */
+export type Lane_Deserialize = {
+	id: number,
+	name: string,
+	/**  The lane's centreline, at least two points. */
+	points: GeoPoint[],
+	width_m?: number | null,
+	/**  Traffic using the lane, ships per day. Only with a `source`. */
+	ships_per_day?: number | null,
+	/**
+	 *  Where the lane and its traffic figure come from: a licensed traffic data set, a chart,
+	 *  or "planner's estimate".
+	 */
+	source?: string | null,
+	/**  The choke point the lane runs through (as zones name it). */
+	choke_point?: string | null,
+};
+
+/**  A shipping lane. */
+export type Lane_Serialize = {
+	id: number,
+	name: string,
+	/**  The lane's centreline, at least two points. */
+	points: GeoPoint[],
+	width_m: number | null,
+	/**  Traffic using the lane, ships per day. Only with a `source`. */
+	ships_per_day: number | null,
+	/**
+	 *  Where the lane and its traffic figure come from: a licensed traffic data set, a chart,
+	 *  or "planner's estimate".
+	 */
+	source: string | null,
+	/**  The choke point the lane runs through (as zones name it). */
+	choke_point: string | null,
+};
+
 /**  The state of a unit's link to its command post, or of a hop. */
 export type LinkStatus = "up" | "out_of_range" | "beyond_horizon" | "jammed" | 
 /**  Too deep to receive. */
@@ -1028,6 +1375,15 @@ export type LinkStatus = "up" | "out_of_range" | "beyond_horizon" | "jammed" |
 "knocked_out" | 
 /**  No command post commands the unit, or every one is down. */
 "no_post";
+
+/**  One loadout an aircraft can carry (from the platform database). */
+export type LoadoutOption = {
+	id: string,
+	name: string,
+	/**  `air_superiority`, `asuw`, `asw` or `strike`. */
+	role: string,
+	stores: { [key in string]: number },
+};
 
 /**  One unit lost. */
 export type LossRow = LossRow_Serialize | LossRow_Deserialize;
@@ -1234,6 +1590,43 @@ export type Outcome_Serialize = {
 	reason: string | null,
 };
 
+/**  A parked aircraft, as a seat sees it. */
+export type ParkedView = ParkedView_Serialize | ParkedView_Deserialize;
+
+/**  A parked aircraft, as a seat sees it. */
+export type ParkedView_Deserialize = {
+	unit: UnitId,
+	name: string,
+	platform?: string | null,
+	readiness: Readiness,
+	/**  Tasked and waiting to launch. */
+	launching: boolean,
+	/**  Seconds until it can launch (turnaround, maintenance, alert delay once tasked). */
+	ready_in_s: number | null,
+	loadout?: string | null,
+	loadouts: LoadoutOption[],
+	fuel_fraction?: number | null,
+	/**  Damaged: it cannot fly. */
+	damaged: boolean,
+};
+
+/**  A parked aircraft, as a seat sees it. */
+export type ParkedView_Serialize = {
+	unit: UnitId,
+	name: string,
+	platform: string | null,
+	readiness: Readiness,
+	/**  Tasked and waiting to launch. */
+	launching: boolean,
+	/**  Seconds until it can launch (turnaround, maintenance, alert delay once tasked). */
+	ready_in_s: number | null,
+	loadout: string | null,
+	loadouts: LoadoutOption[],
+	fuel_fraction: number | null,
+	/**  Damaged: it cannot fly. */
+	damaged: boolean,
+};
+
 /**  A command post's state. */
 export type PostView = PostView_Serialize | PostView_Deserialize;
 
@@ -1261,6 +1654,17 @@ export type PostView_Serialize = {
 export type Posture = "friendly" | 
 /**  The default between sides that have not set a posture. */
 "neutral" | "unfriendly" | "hostile";
+
+/**  How soon a parked aircraft can launch once tasked. */
+export type Readiness = 
+/**  Crewed and armed: launches when a runway is free. */
+"ready" | 
+/**  Launches 15 minutes after tasking. */
+"alert15" | 
+/**  Launches 60 minutes after tasking. */
+"alert60" | 
+/**  Not available until maintenance ends (or the readiness is changed). */
+"maintenance";
 
 /**
  *  A named point on the map (a rendezvous, a waypoint name, a briefing mark). It has no effect
@@ -1313,6 +1717,37 @@ export type ResolvedDoctrine_Serialize = {
 	wcs: Wcs_Serialize,
 	emcon: Emcon,
 	engage_unfriendly: boolean,
+};
+
+/**  The water under a unit and along the rest of its route. */
+export type RouteDepths = RouteDepths_Serialize | RouteDepths_Deserialize;
+
+/**  The water under a unit and along the rest of its route. */
+export type RouteDepths_Deserialize = {
+	draft_m?: number | null,
+	/**  Depth where the unit is now. */
+	here_m?: number | null,
+	/**  The rest of the route, from the unit (empty without a route). */
+	profile: DepthSample_Deserialize[],
+	/**  The shallowest sample on the rest of the route, and how far ahead it is. */
+	least_m?: number | null,
+	least_at_m?: number | null,
+	/**  The route was planned deep enough for the draft (the unit is on the navigable graph). */
+	charted: boolean,
+};
+
+/**  The water under a unit and along the rest of its route. */
+export type RouteDepths_Serialize = {
+	draft_m: number | null,
+	/**  Depth where the unit is now. */
+	here_m: number | null,
+	/**  The rest of the route, from the unit (empty without a route). */
+	profile: DepthSample_Serialize[],
+	/**  The shallowest sample on the rest of the route, and how far ahead it is. */
+	least_m: number | null,
+	least_at_m: number | null,
+	/**  The route was planned deep enough for the draft (the unit is on the navigable graph). */
+	charted: boolean,
 };
 
 export type RouteView = {
@@ -1395,8 +1830,8 @@ export type ScenarioUnit_Deserialize = {
 	/**  Doctrine set on this unit; unset fields inherit from its group and side. */
 	doctrine?: Doctrine_Deserialize,
 	/**
-	 *  A noise jammer (radiates while the unit's EMCON is active). Until the database carries
-	 *  ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+	 *  A noise jammer (radiates while the unit's EMCON is active). Without one, the unit jams
+	 *  with its platform's strongest ECM equipment from the database, if it has any.
 	 */
 	jammer?: JammerSpec | null,
 	/**  Mission at start. */
@@ -1405,6 +1840,19 @@ export type ScenarioUnit_Deserialize = {
 	reserve?: boolean,
 	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
 	fuel_level?: number | null,
+	/**
+	 *  Aircraft: its airbase facility (Phase 4 slice 9, `docs/models/air-operations.md`). With a
+	 *  base it starts parked there, unless `airborne`.
+	 */
+	base?: number | null,
+	/**  Aircraft with a base: starts in the air instead of parked. */
+	airborne?: boolean,
+	/**  Aircraft: readiness at the start (default ready). */
+	readiness?: Readiness | null,
+	/**  Aircraft in maintenance: for how long, s (none: until changed). */
+	maintenance_s?: number | null,
+	/**  Aircraft: the loadout carried at the start (default the platform's first). */
+	loadout?: string | null,
 };
 
 /**  A unit as written in a scenario file. */
@@ -1428,8 +1876,8 @@ export type ScenarioUnit_Serialize = {
 	/**  Doctrine set on this unit; unset fields inherit from its group and side. */
 	doctrine?: Doctrine_Serialize,
 	/**
-	 *  A noise jammer (radiates while the unit's EMCON is active). Until the database carries
-	 *  ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+	 *  A noise jammer (radiates while the unit's EMCON is active). Without one, the unit jams
+	 *  with its platform's strongest ECM equipment from the database, if it has any.
 	 */
 	jammer?: JammerSpec,
 	/**  Mission at start. */
@@ -1438,6 +1886,19 @@ export type ScenarioUnit_Serialize = {
 	reserve?: boolean,
 	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
 	fuel_level?: number | null,
+	/**
+	 *  Aircraft: its airbase facility (Phase 4 slice 9, `docs/models/air-operations.md`). With a
+	 *  base it starts parked there, unless `airborne`.
+	 */
+	base?: number,
+	/**  Aircraft with a base: starts in the air instead of parked. */
+	airborne?: boolean,
+	/**  Aircraft: readiness at the start (default ready). */
+	readiness?: Readiness,
+	/**  Aircraft in maintenance: for how long, s (none: until changed). */
+	maintenance_s?: number | null,
+	/**  Aircraft: the loadout carried at the start (default the platform's first). */
+	loadout?: string,
 };
 
 export type Scenario_Deserialize = {
@@ -1455,6 +1916,10 @@ export type Scenario_Deserialize = {
 	minefields?: ScenarioMinefield[],
 	/**  Sea state and weather loss for the whole scenario (default: calm, clear). */
 	environment?: Environment_Deserialize,
+	/**  Weather zones over the scenario-wide weather (Phase 4 slice 7, `docs/models/weather.md`). */
+	weather_zones?: WeatherZone_Deserialize[],
+	/**  Sound-velocity profiles by region and season (Phase 4 slice 8, `docs/models/acoustics.md`). */
+	sound_profiles?: SoundProfile_Deserialize[],
 	units: ScenarioUnit_Deserialize[],
 	/**  Scenario events, checked every tick (`docs/models/events.md`). */
 	events?: ScenarioEvent_Deserialize[],
@@ -1473,6 +1938,8 @@ export type Scenario_Deserialize = {
 	zones?: Zone_Deserialize[],
 	/**  Surface action groups: members keep station on the leader (format 5). */
 	action_groups?: ActionGroup_Deserialize[],
+	/**  Planning layer: shipping lanes, e.g. through choke points (Phase 4 slice 5). */
+	lanes?: Lane_Deserialize[],
 	/**  The fuel model for ships and submarines (format 6; `docs/models/fuel.md`). */
 	fuel?: boolean,
 };
@@ -1492,6 +1959,10 @@ export type Scenario_Serialize = {
 	minefields?: ScenarioMinefield[],
 	/**  Sea state and weather loss for the whole scenario (default: calm, clear). */
 	environment?: Environment_Serialize,
+	/**  Weather zones over the scenario-wide weather (Phase 4 slice 7, `docs/models/weather.md`). */
+	weather_zones?: WeatherZone_Serialize[],
+	/**  Sound-velocity profiles by region and season (Phase 4 slice 8, `docs/models/acoustics.md`). */
+	sound_profiles?: SoundProfile_Serialize[],
 	units: ScenarioUnit_Serialize[],
 	/**  Scenario events, checked every tick (`docs/models/events.md`). */
 	events?: ScenarioEvent_Serialize[],
@@ -1510,6 +1981,8 @@ export type Scenario_Serialize = {
 	zones?: Zone_Serialize[],
 	/**  Surface action groups: members keep station on the leader (format 5). */
 	action_groups?: ActionGroup_Serialize[],
+	/**  Planning layer: shipping lanes, e.g. through choke points (Phase 4 slice 5). */
+	lanes?: Lane_Serialize[],
 	/**  The fuel model for ships and submarines (format 6; `docs/models/fuel.md`). */
 	fuel?: boolean,
 };
@@ -1577,6 +2050,8 @@ export type SessionInfo_Deserialize = {
 	zones: Zone_Deserialize[],
 	/**  Surface action groups this window's seat may see. */
 	action_groups: ActionGroup_Deserialize[],
+	/**  Shipping lanes (public: every seat sees them). */
+	lanes: Lane_Deserialize[],
 };
 
 export type SessionInfo_Serialize = {
@@ -1600,6 +2075,8 @@ export type SessionInfo_Serialize = {
 	zones: Zone_Serialize[],
 	/**  Surface action groups this window's seat may see. */
 	action_groups: ActionGroup_Serialize[],
+	/**  Shipping lanes (public: every seat sees them). */
+	lanes: Lane_Serialize[],
 };
 
 /**  How serious a scenario problem is. */
@@ -1681,6 +2158,16 @@ export type SnapshotUpdate_Deserialize = {
 	contacts: ContactView_Deserialize[],
 	/**  Sea state and weather (small; sent every frame). */
 	environment: Environment_Deserialize,
+	/**  Weather zones (small; sent every frame). */
+	weather_zones: WeatherZone_Deserialize[],
+	/**  Sound-velocity profiles in force (small; sent every frame). */
+	sound_profiles: SoundProfile_Deserialize[],
+	/**  The viewer's laid sonobuoys (sent whole). */
+	sonobuoys: SonobuoyView[],
+	/**  The viewer's airbases and the aircraft parked there (sent whole). */
+	air_bases: AirBaseView_Deserialize[],
+	/**  The viewer's sense zones with coverage goals and the units tasked to them. */
+	sensor_tasking: TaskingView[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -1723,6 +2210,16 @@ export type SnapshotUpdate_Serialize = {
 	contacts: ContactView_Serialize[],
 	/**  Sea state and weather (small; sent every frame). */
 	environment: Environment_Serialize,
+	/**  Weather zones (small; sent every frame). */
+	weather_zones: WeatherZone_Serialize[],
+	/**  Sound-velocity profiles in force (small; sent every frame). */
+	sound_profiles: SoundProfile_Serialize[],
+	/**  The viewer's laid sonobuoys (sent whole). */
+	sonobuoys: SonobuoyView[],
+	/**  The viewer's airbases and the aircraft parked there (sent whole). */
+	air_bases: AirBaseView_Serialize[],
+	/**  The viewer's sense zones with coverage goals and the units tasked to them. */
+	sensor_tasking: TaskingView[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -1751,6 +2248,78 @@ export type SnapshotUpdate_Serialize = {
 	outcomes: Outcome_Serialize[],
 };
 
+/**  A laid sonobuoy, as a seat sees it. */
+export type SonobuoyView = {
+	id: number,
+	side: SideId,
+	position: GeoPoint,
+	depth_m: number | null,
+	/**  Seconds of life left. */
+	life_s: number | null,
+};
+
+/**  One sortie (`docs/models/air-operations.md`). */
+export type SortieRow = SortieRow_Serialize | SortieRow_Deserialize;
+
+/**  One sortie (`docs/models/air-operations.md`). */
+export type SortieRow_Deserialize = {
+	launched: Tick,
+	unit: UnitId,
+	unit_name: string,
+	side?: SideId | null,
+	base: string,
+	mission: string,
+	loadout?: string | null,
+	/**  When it landed or was lost (`None`: still flying at the end). */
+	ended?: Tick | null,
+	/**  Recovered, lost (and why), or airborne at the end. */
+	outcome: string,
+	/**  Fuel taken from tankers, t. */
+	tanker_fuel_t: number | null,
+};
+
+/**  One sortie (`docs/models/air-operations.md`). */
+export type SortieRow_Serialize = {
+	launched: Tick,
+	unit: UnitId,
+	unit_name: string,
+	side: SideId | null,
+	base: string,
+	mission: string,
+	loadout: string | null,
+	/**  When it landed or was lost (`None`: still flying at the end). */
+	ended: Tick | null,
+	/**  Recovered, lost (and why), or airborne at the end. */
+	outcome: string,
+	/**  Fuel taken from tankers, t. */
+	tanker_fuel_t: number | null,
+};
+
+/**  A sound-velocity profile for a region and season (`docs/models/acoustics.md`). */
+export type SoundProfile = SoundProfile_Serialize | SoundProfile_Deserialize;
+
+/**  A sound-velocity profile for a region and season (`docs/models/acoustics.md`). */
+export type SoundProfile_Deserialize = {
+	id: number,
+	name: string,
+	/**  Where it applies (`None`: everywhere). */
+	area?: Area | null,
+	/**  The months it applies in, 1–12 (empty: all year). */
+	months?: number[],
+	points: SvpPoint[],
+};
+
+/**  A sound-velocity profile for a region and season (`docs/models/acoustics.md`). */
+export type SoundProfile_Serialize = {
+	id: number,
+	name: string,
+	/**  Where it applies (`None`: everywhere). */
+	area: Area | null,
+	/**  The months it applies in, 1–12 (empty: all year). */
+	months: number[],
+	points: SvpPoint[],
+};
+
 /**  What a unit can still do. */
 export type Status = "operational" | 
 /**
@@ -1767,8 +2336,67 @@ export type StoreView = {
 	count: number,
 };
 
+/**  One point of a sound-velocity profile. */
+export type SvpPoint = {
+	depth_m: number | null,
+	speed_mps: number | null,
+};
+
 /**  Systems a critical hit can knock out. */
 export type System = "sensors" | "propulsion" | "weapons" | "flight_deck" | "comms";
+
+/**  A sense zone's tasking, as a seat sees it. */
+export type TaskingView = {
+	zone: number,
+	goal: number | null,
+	/**  Units tasked to it, in unit-id order. */
+	units: UnitId[],
+	/**  Short of its goal with nothing left to send. */
+	short: boolean,
+};
+
+/**  One pack found on this machine. */
+export type TerrainPackInfo = {
+	id: string,
+	name: string,
+	sha256: string,
+	source: string,
+	credit: string,
+	cell_arcsec: number | null,
+	/**  South, west, north, east, degrees. */
+	bounds_deg: [(number | null), (number | null), (number | null), (number | null)],
+	/**  Shipped with the app, rather than installed by the user. */
+	bundled: boolean,
+};
+
+/**  The terrain packs on this machine and the ones the current exercise uses. */
+export type TerrainStatus = TerrainStatus_Serialize | TerrainStatus_Deserialize;
+
+/**  The terrain packs on this machine and the ones the current exercise uses. */
+export type TerrainStatus_Deserialize = {
+	/**  Still reading the packs (at start-up). */
+	loading: boolean,
+	packs: TerrainPackInfo[],
+	/**  The terrain id the current exercise runs with (`None`: none). */
+	in_use?: string | null,
+	/**  Packs that were found but not used, and why. */
+	problems: string[],
+	/**  Where installed packs are kept. */
+	folder: string,
+};
+
+/**  The terrain packs on this machine and the ones the current exercise uses. */
+export type TerrainStatus_Serialize = {
+	/**  Still reading the packs (at start-up). */
+	loading: boolean,
+	packs: TerrainPackInfo[],
+	/**  The terrain id the current exercise runs with (`None`: none). */
+	in_use: string | null,
+	/**  Packs that were found but not used, and why. */
+	problems: string[],
+	/**  Where installed packs are kept. */
+	folder: string,
+};
 
 /**  A simulation tick number. Tick `n` covers game time `[n, n+1)` × [`TICK_SECONDS`]. */
 export type Tick = number;
@@ -1800,7 +2428,59 @@ export type TimelineEntry_Serialize = {
 };
 
 /**  What a timeline entry is about. */
-export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | "override" | "facilitation" | "event" | "script_error";
+export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | 
+/**  Air operations: sorties, recoveries, bingo, tanking. */
+"air" | 
+/**  Automatic sense-zone tasking: sensors sent, goals short or met. */
+"tasking" | "override" | "facilitation" | "event" | "script_error";
+
+/**  A towed array, as a seat sees it. */
+export type TowedView = {
+	/**  Streamed (or streaming); else recovered (or recovering). */
+	streamed: boolean,
+	/**  Seconds until the ordered state is reached (0: there). */
+	ready_in_s: number | null,
+};
+
+/**  A transit's risk. */
+export type TransitRisk = "low" | "moderate" | "high";
+
+/**  One choke-point transit, assessed (`docs/models/choke-points.md`). */
+export type TransitRow = TransitRow_Serialize | TransitRow_Deserialize;
+
+/**  One choke-point transit, assessed (`docs/models/choke-points.md`). */
+export type TransitRow_Deserialize = {
+	tick: Tick,
+	choke_point: string,
+	unit: UnitId,
+	unit_name: string,
+	side?: SideId | null,
+	/**  The lane the unit was in, if any. */
+	lane?: string | null,
+	/**  The choke point's lanes' traffic, ships per day. */
+	traffic_per_day: number | null,
+	/**  Water under the unit as it entered (terrain packs), and its draft. */
+	depth_m?: number | null,
+	draft_m?: number | null,
+	risk: TransitRisk,
+};
+
+/**  One choke-point transit, assessed (`docs/models/choke-points.md`). */
+export type TransitRow_Serialize = {
+	tick: Tick,
+	choke_point: string,
+	unit: UnitId,
+	unit_name: string,
+	side: SideId | null,
+	/**  The lane the unit was in, if any. */
+	lane: string | null,
+	/**  The choke point's lanes' traffic, ships per day. */
+	traffic_per_day: number | null,
+	/**  Water under the unit as it entered (terrain packs), and its draft. */
+	depth_m: number | null,
+	draft_m: number | null,
+	risk: TransitRisk,
+};
 
 /**  What makes an event check its conditions. */
 export type Trigger = Trigger_Serialize | Trigger_Deserialize;
@@ -1877,6 +2557,12 @@ export type UnitView_Deserialize = {
 	mission_complete: boolean,
 	/**  Fraction of fuel left, for units with a fuel model. */
 	fuel_fraction?: number | null,
+	/**  The towed array's state, for units with one. */
+	towed?: TowedView | null,
+	/**  Sonobuoys left, for units that carry them. */
+	sonobuoys_left?: number | null,
+	/**  An aircraft's air operations state: base, sortie, loadout, bingo. */
+	air?: AirUnitView_Deserialize | null,
 };
 
 export type UnitView_Serialize = {
@@ -1911,6 +2597,12 @@ export type UnitView_Serialize = {
 	mission_complete: boolean,
 	/**  Fraction of fuel left, for units with a fuel model. */
 	fuel_fraction: number | null,
+	/**  The towed array's state, for units with one. */
+	towed?: TowedView,
+	/**  Sonobuoys left, for units that carry them. */
+	sonobuoys_left?: number,
+	/**  An aircraft's air operations state: base, sortie, loadout, bingo. */
+	air?: AirUnitView_Serialize,
 };
 
 /**  Whose picture a snapshot shows. */
@@ -1993,6 +2685,45 @@ export type WeaponView = {
 	homing: boolean,
 };
 
+/**  An area with its own weather. */
+export type WeatherZone = WeatherZone_Serialize | WeatherZone_Deserialize;
+
+/**  An area with its own weather. */
+export type WeatherZone_Deserialize = {
+	id: number,
+	name: string,
+	area: Area,
+	/**  Douglas sea state, 0–9. */
+	sea_state: number,
+	/**  Mean wind, knots, and the direction it blows from, degrees true. */
+	wind_kn?: number | null,
+	wind_from_deg?: number | null,
+	/**  Meteorological visibility, km. */
+	visibility_km?: number | null,
+	/**  Rain rate, mm/h (0: dry). */
+	rain_mm_h?: number | null,
+	/**  Cloud base, metres above sea level (`None`: no low cloud). */
+	cloud_base_m?: number | null,
+};
+
+/**  An area with its own weather. */
+export type WeatherZone_Serialize = {
+	id: number,
+	name: string,
+	area: Area,
+	/**  Douglas sea state, 0–9. */
+	sea_state: number,
+	/**  Mean wind, knots, and the direction it blows from, degrees true. */
+	wind_kn: number | null,
+	wind_from_deg: number | null,
+	/**  Meteorological visibility, km. */
+	visibility_km: number | null,
+	/**  Rain rate, mm/h (0: dry). */
+	rain_mm_h: number | null,
+	/**  Cloud base, metres above sea level (`None`: no low cloud). */
+	cloud_base_m: number | null,
+};
+
 /**  A sense or engage zone of one side. */
 export type Zone = Zone_Serialize | Zone_Deserialize;
 
@@ -2040,6 +2771,13 @@ export type Zone_Deserialize = {
 	layer?: ZoneLayer | null,
 	/**  Sense zones: the sensor types this layer is for; coverage counts only these (empty: all). */
 	sensors?: SensorKind[],
+	/**
+	 *  Sense zones: the share of the zone to keep covered; the engine tasks free sensors to keep
+	 *  it (Phase 4 slice 12, `docs/models/sensor-tasking.md`). `None`: players task them.
+	 */
+	coverage_goal?: number | null,
+	/**  Sense zones with a goal: the units the engine may task for it (empty: any free unit). */
+	assets?: UnitId[],
 };
 
 /**  A sense or engage zone of one side. */
@@ -2062,6 +2800,13 @@ export type Zone_Serialize = {
 	layer: ZoneLayer | null,
 	/**  Sense zones: the sensor types this layer is for; coverage counts only these (empty: all). */
 	sensors: SensorKind[],
+	/**
+	 *  Sense zones: the share of the zone to keep covered; the engine tasks free sensors to keep
+	 *  it (Phase 4 slice 12, `docs/models/sensor-tasking.md`). `None`: players task them.
+	 */
+	coverage_goal?: number | null,
+	/**  Sense zones with a goal: the units the engine may task for it (empty: any free unit). */
+	assets?: UnitId[],
 };
 
 /* Tauri Specta runtime */

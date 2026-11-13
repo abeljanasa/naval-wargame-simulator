@@ -232,12 +232,14 @@ pub(crate) fn engage(
         ));
     }
     let range = inverse(from.point, estimate.position).distance_m;
-    if range < spec.min_range_m || range > spec.max_range_m {
+    // The range against this domain: a gun reaches aircraft at less than its surface range.
+    let max_range = spec.max_range_for(domain_name);
+    if range < spec.min_range_m || range > max_range {
         return Err(format!(
-            "C{contact} at {:.1} km is outside {weapon}'s {:.1}–{:.1} km",
+            "C{contact} at {:.1} km is outside {weapon}'s {:.1}–{:.1} km against {domain_name} targets",
             range / 1000.0,
             spec.min_range_m / 1000.0,
-            spec.max_range_m / 1000.0
+            max_range / 1000.0
         ));
     }
     // Weapons control status and ROE. The white cell may override (adjudication).
@@ -336,7 +338,16 @@ pub(crate) fn apply_hit_roll(
         .get::<Signature>(e)
         .and_then(|s| s.length_m)
         .unwrap_or_else(|| crate::optical::default_length_m(domain));
-    let sea_state = world.resource::<EnvState>().0.sea_state;
+    // The sea where the target is (weather zones), else the scenario-wide sea state.
+    let sea_state = {
+        let env = world.resource::<EnvState>().0;
+        let zones = &world.resource::<crate::detection::Weather>().0;
+        world
+            .get::<crate::components::Position>(e)
+            .map_or(env.sea_state, |p| {
+                crate::detection::local_env(env, zones, p.point).sea_state
+            })
+    };
     let air = domain == Domain::Air;
     let size = ph_size_modifier(air, length);
     let manoeuvre = ph_speed_modifier(air, speed);
@@ -417,6 +428,14 @@ pub(crate) fn apply_hit(
     torpedo: bool,
     tick: Tick,
 ) {
+    apply_damage(world, target, hit_damage_dp(warhead_kg), torpedo, tick);
+}
+
+/// Applies `dp` damage points to `target`, then four `Damage` draws in fixed order (critical?,
+/// which system, fire?, flooding?; `torpedo` floods as an underwater hit or a holed hull does).
+/// Destroys the unit if its damage reaches its damage points. Weapon hits and collisions both
+/// come here.
+pub(crate) fn apply_damage(world: &mut World, target: UnitId, dp: f64, torpedo: bool, tick: Tick) {
     let Some(e) = entity_of(world, target) else {
         return;
     };
@@ -429,7 +448,6 @@ pub(crate) fn apply_hit(
             rng.uniform(StreamId::Damage),
         ]
     };
-    let dp = hit_damage_dp(warhead_kg);
     let Some(mut h) = world.get_mut::<Health>(e) else {
         return;
     };

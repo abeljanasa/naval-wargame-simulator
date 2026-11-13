@@ -97,6 +97,15 @@ export interface DraftFacility {
   max_sea_state?: number | null;
   /** Anchorages: units hold here between missions. */
   staging?: boolean;
+  /** Airbases: runways or deck, parking, aviation fuel (docs/models/air-operations.md). */
+  air?: {
+    runways?: number;
+    interval_s?: number | null;
+    parking?: number;
+    deck?: boolean;
+    fixed_wing?: boolean | null;
+    aviation_fuel_t?: number | null;
+  } | null;
 }
 
 export interface DraftDoctrine {
@@ -123,6 +132,10 @@ export interface DraftZone {
   layer?: "outer" | "middle" | "inner" | null;
   /** Sense zones: the sensor types the layer is for (coverage counts these). */
   sensors?: string[];
+  /** Sense zones: the share to keep covered; the engine tasks free sensors (slice 12). */
+  coverage_goal?: number | null;
+  /** Sense zones with a goal: the units the engine may task (empty: any free unit). */
+  assets?: number[];
 }
 
 export interface DraftStation {
@@ -275,6 +288,7 @@ export function addFacility(
     refuelling_point: "Refuelling point",
     sheltering_port: "Port",
     anchorage: "Anchorage",
+    airbase: "Airbase",
   };
   s.facilities = [
     ...(s.facilities ?? []),
@@ -287,6 +301,7 @@ export function addFacility(
       radius_m: kind === "command_post" ? 1_000 : 3_000,
       ...(kind === "command_post" ? { range_m: 200_000, orders_in_gap: "lose" as const } : {}),
       services: defaultServices(kind),
+      ...(kind === "airbase" ? { air: { runways: 1 } } : {}),
     },
   ];
   return id;

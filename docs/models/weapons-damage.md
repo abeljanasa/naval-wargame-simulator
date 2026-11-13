@@ -34,7 +34,7 @@ The scenario loader sends the weapon catalogue (`SetWeaponCatalog`) and each uni
    | Command | 300 m | — (shooter steers) |
    | Navigation (GNSS, laser, terrain) and unguided | 100 m | — |
 
-5. The track estimate is within the weapon's minimum and maximum range.
+5. The track estimate is within the weapon's minimum and maximum range against the track's domain. A weapon may have a shorter range against one domain (`weapon_target_ranges`, [DL-0051](../design-log/DL-0051-weapon-target-ranges.md)): the generic 127 mm-class gun reaches aircraft at 12 km against 24 km for ships, the 76 mm-class at 8 km against 16 km. Point defence uses the range against air targets.
 6. The **release rule** ([c2-doctrine.md](c2-doctrine.md)): the shooter's WCS and ROE allow firing at what the side knows of the track. The white cell may override this (adjudication).
 
 **Flying weapons** (SAM, ASM, LACM, torpedo, AAM) then fly at their database speed. Every tick they head for the shooter side's current estimate of the track (midcourse update). They carry fuel for 1.1 × maximum range.

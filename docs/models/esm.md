@@ -79,6 +79,6 @@ A fix carries its identification into the track. A single bearing cannot place a
 ## Limitations
 
 - No frequency or band matching between ESM receivers and emitters, no scan coincidence, no pulse analysis: an emitter type is identified perfectly when intercepted.
-- Fixes need bearings from the same scan; there is no bearings-only tracking of a moving emitter from a single platform.
+- Fixes need bearings from the same scan. A single platform's passive *acoustic* bearings over time are ranged by TMA ([tma.md](tma.md)); its ESM bearings are not.
 - The emitter library holds only the radar types fitted in the scenario.
 - One generic bearing accuracy (2°) for every ESM set; per-sensor accuracy is a later database field.

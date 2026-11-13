@@ -42,4 +42,6 @@ pub const PROVENANCE_TABLES: &[&str] = &[
     "mounts",
     "magazines",
     "loadouts",
+    "ecm_systems",
+    "weapon_target_ranges",
 ];

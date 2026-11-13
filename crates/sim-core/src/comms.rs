@@ -42,6 +42,8 @@ pub(crate) struct Node {
     pub(crate) point: GeoPoint,
     pub(crate) antenna_m: f64,
     pub(crate) receives: Receives,
+    /// Ground under a post ashore or a land unit (terrain packs), for terrain masking.
+    pub(crate) ground_m: f64,
 }
 
 /// A radiating jammer: (side, position, antenna height, figure at 1 km), in unit-id order.
@@ -86,10 +88,16 @@ fn unit_node(world: &World, e: Entity) -> Option<Node> {
         }
         Domain::Subsurface => (0.0, Err(LinkStatus::Submerged)),
     };
+    let terrain = world.resource::<crate::sim::TerrainRes>().0.as_deref();
     Some(Node {
         side: u.side,
         point: p.point,
         antenna_m,
+        ground_m: if u.domain == Domain::Land {
+            crate::detection::ground_m(terrain, p.point)
+        } else {
+            0.0
+        },
         receives: if knocked_out {
             Err(LinkStatus::KnockedOut)
         } else {
@@ -112,6 +120,10 @@ pub(crate) fn post_node(world: &World, f: &Facility) -> Option<Node> {
             point: f.position,
             antenna_m: f.antenna_m.unwrap_or(DEFAULT_POST_ANTENNA_M),
             receives: Ok(()),
+            ground_m: crate::detection::ground_m(
+                world.resource::<crate::sim::TerrainRes>().0.as_deref(),
+                f.position,
+            ),
         }),
     }
 }
@@ -157,13 +169,32 @@ fn link_spec(f: &Facility) -> LinkSpec {
     }
 }
 
-fn hop_between(spec: LinkSpec, jammers: &Jammers, tx: &Node, rx: &Node) -> LinkStatus {
+fn hop_between(
+    terrain: Option<&sim_geo::terrain::Terrain>,
+    spec: LinkSpec,
+    jammers: &Jammers,
+    tx: &Node,
+    rx: &Node,
+) -> LinkStatus {
     let d = inverse(tx.point, rx.point).distance_m;
+    // Terrain between the two ends cuts a line-of-sight link as the horizon does.
+    let masked = crate::detection::terrain_masks(
+        terrain,
+        tx.point,
+        tx.antenna_m + tx.ground_m,
+        rx.point,
+        rx.antenna_m + rx.ground_m,
+        d,
+    );
     hop(
         spec,
         (rx.receives, tx.receives),
         d,
-        radar_horizon_m(tx.antenna_m, rx.antenna_m),
+        if masked {
+            0.0
+        } else {
+            radar_horizon_m(tx.antenna_m, rx.antenna_m)
+        },
         &jam_at(jammers, rx),
         &jam_at(jammers, tx),
     )
@@ -182,7 +213,8 @@ pub(crate) fn link(
         return (LinkStatus::NoPost, None);
     };
     let spec = link_spec(f);
-    let direct = hop_between(spec, jammers, &post, &target);
+    let terrain = world.resource::<crate::sim::TerrainRes>().0.as_deref();
+    let direct = hop_between(terrain, spec, jammers, &post, &target);
     if direct == LinkStatus::Up || f.relays.is_empty() {
         return (direct, None);
     }
@@ -197,11 +229,11 @@ pub(crate) fn link(
             let Some(rn) = node_of(world, r).filter(|n| n.side == f.side) else {
                 continue;
             };
-            let from_post = hop_between(spec, jammers, &post, &rn) == LinkStatus::Up;
+            let from_post = hop_between(terrain, spec, jammers, &post, &rn) == LinkStatus::Up;
             let from_relay = || {
                 reached
                     .iter()
-                    .any(|(_, n)| hop_between(spec, jammers, n, &rn) == LinkStatus::Up)
+                    .any(|(_, n)| hop_between(terrain, spec, jammers, n, &rn) == LinkStatus::Up)
             };
             if from_post || from_relay() {
                 reached.push((r, rn));
@@ -212,7 +244,7 @@ pub(crate) fn link(
         }
     }
     for (r, rn) in &reached {
-        if hop_between(spec, jammers, rn, &target) == LinkStatus::Up {
+        if hop_between(terrain, spec, jammers, rn, &target) == LinkStatus::Up {
             return (LinkStatus::Up, Some(*r));
         }
     }

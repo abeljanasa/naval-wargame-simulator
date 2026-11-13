@@ -71,6 +71,15 @@ pub struct UnitView {
     pub mission_complete: bool,
     /// Fraction of fuel left, for units with a fuel model.
     pub fuel_fraction: Option<f64>,
+    /// The towed array's state, for units with one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub towed: Option<crate::acoustics::TowedView>,
+    /// Sonobuoys left, for units that carry them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sonobuoys_left: Option<u32>,
+    /// An aircraft's air operations state: base, sortie, loadout, bingo.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub air: Option<crate::air::AirUnitView>,
 }
 
 /// Rounds of one weapon carried.
@@ -131,6 +140,11 @@ pub struct ContactView {
     /// Own unit whose sensor last detected it.
     pub detected_by: UnitId,
     pub sensor_id: String,
+    /// Estimated course, degrees, from the track's own movement; absent until it has moved
+    /// clearly beyond its position error (`docs/models/tracks.md`).
+    pub course_deg: Option<f64>,
+    /// Estimated speed, m/s, with the course.
+    pub speed_mps: Option<f64>,
 }
 
 /// A full state snapshot for one viewer. Units are sorted by `id`.
@@ -148,6 +162,21 @@ pub struct Snapshot {
     pub postures: Vec<PostureView>,
     /// Sea state and weather, known to every side.
     pub environment: Environment,
+    /// Weather zones, known to every side (empty: the scenario-wide weather only).
+    #[serde(default)]
+    pub weather_zones: Vec<sim_events::WeatherZone>,
+    /// The viewer's laid sonobuoys (every side's for the white cell).
+    #[serde(default)]
+    pub sonobuoys: Vec<crate::acoustics::SonobuoyView>,
+    /// Sound-velocity profiles in force (every seat sees them, like the weather).
+    #[serde(default)]
+    pub sound_profiles: Vec<sim_events::SoundProfile>,
+    /// The viewer's airbases (every side's for the white cell) and the aircraft parked there.
+    #[serde(default)]
+    pub air_bases: Vec<crate::air::AirBaseView>,
+    /// The viewer's sense zones with coverage goals, and the units tasked to them.
+    #[serde(default)]
+    pub sensor_tasking: Vec<crate::tasking::TaskingView>,
     /// Side viewer: that side's recent ESM bearing lines. White cell: every side's.
     pub bearings: Vec<BearingView>,
     /// Side viewer: its own weapons in flight. White cell: every weapon in flight.

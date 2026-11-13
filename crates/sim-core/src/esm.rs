@@ -106,6 +106,8 @@ pub(crate) struct Intercepts {
     target_index: usize,
     /// One line per observer (the first it took on this target this scan).
     lines: Vec<(UnitId, BearingLine)>,
+    /// The passive acoustic lines among them (TMA input).
+    acoustic: Vec<(UnitId, BearingLine)>,
     best: Option<Identification>,
 }
 
@@ -144,10 +146,15 @@ pub(crate) fn note_bearing(
     let entry = fresh.entry((side, target)).or_insert_with(|| Intercepts {
         target_index,
         lines: Vec::new(),
+        acoustic: Vec::new(),
         best: None,
     });
     if !entry.lines.iter().any(|(o, _)| *o == observer) {
         entry.lines.push((observer, line));
+    }
+    if label == crate::sonar::ACOUSTIC_LABEL && !entry.acoustic.iter().any(|(o, _)| *o == observer)
+    {
+        entry.acoustic.push((observer, line));
     }
     if entry
         .best
@@ -169,6 +176,7 @@ pub(crate) fn esm_pass(
     bearings: &mut BearingTable,
     library: &EmitterLibrary,
     fresh: &mut FreshBearings,
+    terrain: Option<&sim_geo::terrain::Terrain>,
 ) {
     // Radiating emitters: radars and jammers of units whose EMCON is active.
     let mut emitters: Vec<Emitter> = Vec::new();
@@ -258,6 +266,17 @@ pub(crate) fn esm_pass(
                     if range < esm.min_range_m || range > esm.max_range_m || range > horizon {
                         continue;
                     }
+                    // Terrain masking: land between the emitter and the receiver.
+                    if crate::detection::terrain_masks(
+                        terrain,
+                        obs.position.point,
+                        h + obs.ground_m,
+                        tgt.position.point,
+                        em.height_m + tgt.ground_m,
+                        range,
+                    ) {
+                        continue;
+                    }
                     let r_int = intercept_range_m(em.ref_range_m, esm.max_range_m);
                     let pd = pd_per_scan(range, r_int);
                     let draw = rng.uniform(StreamId::Sensors);
@@ -313,8 +332,12 @@ pub(crate) fn resolve_bearings(
     contacts: &mut ContactTable,
     log: &mut EventLog,
     bearings: &mut BearingTable,
+    tma: &mut crate::tma::Tma,
 ) {
     for ((side, target), i) in fresh {
+        for (observer, line) in &i.acoustic {
+            tma.note(side, target, *observer, *line, tick);
+        }
         let domain = all[i.target_index].domain;
         let ident = i.best.unwrap_or(Identification {
             classification: Classification::Unknown,
@@ -353,10 +376,61 @@ pub(crate) fn resolve_bearings(
                     },
                 );
             }
+        } else if let Some((observer, n, s)) = i
+            .acoustic
+            .iter()
+            .filter_map(|(o, _)| {
+                let b = tma.bearings(side, target, *o, tick);
+                sim_sensors::tma_solve(&b).map(|s| (*o, b.len(), s))
+            })
+            // The tightest solution; ties to the lowest observer id (iteration order).
+            .min_by(|a, b| {
+                a.2.cov
+                    .ellipse()
+                    .semi_major_m
+                    .total_cmp(&b.2.cov.ellipse().semi_major_m)
+            })
+        {
+            // One observer's bearings over time, while it manoeuvred, range the target.
+            if tma.mark_solved(side, target, observer) {
+                #[allow(clippy::cast_possible_truncation)]
+                log.push(
+                    tick,
+                    SimEventKind::TmaSolution {
+                        side,
+                        target,
+                        observer,
+                        bearings: n as u32,
+                        range_m: s.range_m,
+                        error_m: s.cov.ellipse().semi_major_m,
+                    },
+                );
+            }
+            let m = Measurement {
+                point: s.position,
+                cov: s.cov,
+                classification: ident.classification,
+                category: ident.category.clone(),
+                platform: ident.platform.clone(),
+                domain,
+                observer,
+                sensor_id: "tma",
+            };
+            if let Some(number) = contacts.record(side, target, tick, &m) {
+                log.push(
+                    tick,
+                    SimEventKind::ContactGained {
+                        side,
+                        number,
+                        target,
+                    },
+                );
+            }
         } else {
             // A bearing alone does not place the target, but it identifies an existing track.
             contacts.classify(side, target, &ident, domain);
         }
     }
     bearings.expire(tick);
+    tma.expire(tick);
 }

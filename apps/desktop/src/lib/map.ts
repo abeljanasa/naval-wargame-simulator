@@ -20,7 +20,9 @@ import type { Layer, PickingInfo } from "@deck.gl/core";
 import type {
   BearingView,
   ContactView,
+  Domain,
   GeoPoint,
+  Lane_Deserialize as Lane,
   Minefield,
   Outcome,
   UnitView,
@@ -35,6 +37,7 @@ import {
   figureCanvas,
   figureKind,
   figureShape,
+  badgeUrl,
   figureUrl,
   figureSizeM,
   FIGURE_MIN_PX,
@@ -263,6 +266,14 @@ export function outcomeLayers(outcomes: Outcome[], gameTimeS: number): Layer[] {
  * screen to FIGURE_MIN_PX–FIGURE_MAX_PX, so it shrinks as the map zooms out. */
 function figureSize(kind: FigureKind, selected: boolean): number {
   return figureSizeM(kind) * (selected ? 1.25 : 1);
+}
+
+/** Size of the affiliation badge drawn beside a figure's label, px. */
+export const BADGE_PX = 13;
+
+/** The affiliation badge: a small APP-6 frame, so the side reads by shape as well as colour. */
+function badgeIcon(aff: Affiliation, domain: Domain) {
+  return { id: `badge-${aff}-${domain}`, url: badgeUrl(aff, domain), width: 64, height: 64 };
 }
 
 /** Figure icon for a unit or contact, drawn nose up; `getAngle` turns it to the heading. */
@@ -499,6 +510,57 @@ function clip(a: GeoPoint, b: GeoPoint, max_m: number): LonLat {
 
 export function buildLayers(s: SceneInput): Layer[] {
   const figures = (s.symbolStyle ?? "figures") === "figures";
+  const unitKind = (u: UnitView) => (figures ? figureKind(u.platform, null, u.domain) : null);
+  /** A classified contact with a plan-view figure and an estimated course. */
+  const flatContact = (c: ContactView) => {
+    const kind = figureKind(c.platform, c.category, c.domain);
+    return kind !== null && figureShape(kind) === "topdown" && c.course_deg != null;
+  };
+  /** A plan-view figure, drawn flat on the map and turned to the heading. */
+  const flatFigure = (u: UnitView) => {
+    const kind = unitKind(u);
+    return kind !== null && figureShape(kind) === "topdown";
+  };
+  /** Own units: figures (or APP-6 frames). `billboard`: face the screen rather than lie flat. */
+  const unitLayer = (id: string, data: UnitView[], billboard: boolean) =>
+    new IconLayer<UnitView>({
+      id,
+      data,
+      pickable: true,
+      billboard,
+      getPosition: (u) => pt(u.position),
+      getIcon: (u) => {
+        const aff = affiliation(u, s.viewer);
+        const sel = u.id === s.selected;
+        const kind = unitKind(u);
+        if (kind) return figureIcon(kind, aff, sel);
+        const code = functionCode(u.platform);
+        return {
+          id: `${aff}-${u.domain}-${sel}-${code}`,
+          url: symbolUrl(aff, sel, u.domain, code),
+          width: 64,
+          height: 64,
+        };
+      },
+      getSize: (u) => {
+        const kind = unitKind(u);
+        // Frames: large enough to read the function code.
+        return kind ? figureSize(kind, u.id === s.selected) : 36;
+      },
+      getAngle: (u) => iconAngle(unitKind(u), n(u.heading_deg)),
+      sizeUnits: figures ? "meters" : "pixels",
+      sizeMinPixels: figures ? FIGURE_MIN_PX : 0,
+      sizeMaxPixels: figures ? FIGURE_MAX_PX : Number.MAX_SAFE_INTEGER,
+      updateTriggers: {
+        getIcon: [s.selected, s.viewer, figures],
+        getSize: [s.selected, figures],
+        getAngle: [figures],
+      },
+      onClick: (info: PickingInfo<UnitView>) => {
+        if (info.object) s.onPickUnit(info.object.id);
+        return true;
+      },
+    });
   // The selected unit's whole route; for the others only a short stub of the next leg, so long
   // transits (a ferry 100 km away) do not draw lines across the whole picture.
   const routes = s.units
@@ -585,43 +647,21 @@ export function buildLayers(s: SceneInput): Layer[] {
       getColor: (d) => rgba(d.colour, 220),
       getWidth: 1.5,
     }),
+    // Plan-view figures (ships, submarines, aircraft) lie flat on the map, turned to the heading,
+    // so they point along it however the view is rotated or tilted. Upright icons (land sites)
+    // and APP-6 frames face the screen.
+    unitLayer("units", figures ? s.units.filter(flatFigure) : s.units, !figures),
+    unitLayer("unit-icons", figures ? s.units.filter((u) => !flatFigure(u)) : [], true),
+    // Affiliation by shape as well as colour, beside the name: it never turns with the figure.
     new IconLayer<UnitView>({
-      id: "units",
-      data: s.units,
-      pickable: true,
+      id: "unit-badges",
+      data: figures ? s.units : [],
       getPosition: (u) => pt(u.position),
-      getIcon: (u) => {
-        const aff = affiliation(u, s.viewer);
-        const sel = u.id === s.selected;
-        const kind = figures ? figureKind(u.platform, null, u.domain) : null;
-        if (kind) return figureIcon(kind, aff, sel);
-        const code = functionCode(u.platform);
-        return {
-          id: `${aff}-${u.domain}-${sel}-${code}`,
-          url: symbolUrl(aff, sel, u.domain, code),
-          width: 64,
-          height: 64,
-        };
-      },
-      getSize: (u) => {
-        const kind = figures ? figureKind(u.platform, null, u.domain) : null;
-        // Frames: large enough to read the function code.
-        return kind ? figureSize(kind, u.id === s.selected) : 36;
-      },
-      getAngle: (u) =>
-        iconAngle(figures ? figureKind(u.platform, null, u.domain) : null, n(u.heading_deg)),
-      sizeUnits: figures ? "meters" : "pixels",
-      sizeMinPixels: figures ? FIGURE_MIN_PX : 0,
-      sizeMaxPixels: figures ? FIGURE_MAX_PX : Number.MAX_SAFE_INTEGER,
-      updateTriggers: {
-        getIcon: [s.selected, s.viewer, figures],
-        getSize: [s.selected, figures],
-        getAngle: [figures],
-      },
-      onClick: (info: PickingInfo<UnitView>) => {
-        if (info.object) s.onPickUnit(info.object.id);
-        return true;
-      },
+      getIcon: (u) => badgeIcon(affiliation(u, s.viewer), u.domain),
+      getSize: BADGE_PX,
+      sizeUnits: "pixels",
+      getPixelOffset: [0, 24],
+      updateTriggers: { getIcon: [s.viewer] },
     }),
     new TextLayer<UnitView>({
       id: "labels",
@@ -635,7 +675,9 @@ export function buildLayers(s: SceneInput): Layer[] {
       getText: unitLabel,
       getSize: 12,
       getColor: [220, 230, 238, 255],
-      getPixelOffset: [0, 24],
+      // With figures the name starts just after the affiliation badge under the unit.
+      getTextAnchor: figures ? "start" : "middle",
+      getPixelOffset: figures ? [BADGE_PX / 2 + 4, 24] : [0, 24],
       fontFamily: "system-ui, sans-serif",
       outlineWidth: 2,
       outlineColor: [11, 27, 43, 255],
@@ -686,6 +728,8 @@ export function buildLayers(s: SceneInput): Layer[] {
       },
       getSize: (w) => (munitionKind(w.weapon) === "shell" ? 1200 : 2800),
       getAngle: (w) => -n(w.heading_deg),
+      // Flat on the map, like unit figures, so it points along its heading in a rotated view.
+      billboard: false,
       sizeUnits: "meters",
       sizeMinPixels: 9,
       sizeMaxPixels: 30,
@@ -733,9 +777,31 @@ export function buildLayers(s: SceneInput): Layer[] {
       widthUnits: "pixels",
       updateTriggers: { getPath: [s.gameTimeS] },
     }),
+    // A classified contact whose course the side has estimated lies flat on the map, turned to
+    // that course, like own units; it keeps it however the view is rotated or tilted.
+    new IconLayer<ContactView>({
+      id: "contact-figures",
+      data: figures ? s.contacts.filter(flatContact) : [],
+      billboard: false,
+      getPosition: (c) => pt(c.position),
+      getIcon: (c) => {
+        const kind = figureKind(c.platform, c.category, c.domain);
+        return figureIcon(kind ?? "ship", contactAffiliation(c), false);
+      },
+      getSize: (c) => {
+        const kind = figureKind(c.platform, c.category, c.domain);
+        return kind ? figureSize(kind, false) * 0.9 : 30;
+      },
+      getAngle: (c) => -n(c.course_deg ?? 0),
+      sizeUnits: "meters",
+      sizeMinPixels: FIGURE_MIN_PX - 2,
+      sizeMaxPixels: FIGURE_MAX_PX - 8,
+    }),
+    // Contacts with no course yet (newly acquired, stopped), unclassified ones and APP-6 frames
+    // face the screen: the side does not know which way they point.
     new IconLayer<ContactView>({
       id: "contacts",
-      data: s.contacts,
+      data: figures ? s.contacts.filter((c) => !flatContact(c)) : s.contacts,
       getPosition: (c) => pt(c.position),
       getIcon: (c) => {
         const domain = c.domain ?? "surface";
@@ -762,6 +828,17 @@ export function buildLayers(s: SceneInput): Layer[] {
       sizeMaxPixels: figures ? FIGURE_MAX_PX - 8 : Number.MAX_SAFE_INTEGER,
       updateTriggers: { getIcon: [figures], getSize: [figures] },
     }),
+    // A classified contact's figure carries no frame, so its affiliation badge goes beside its
+    // label, as for own units. An unclassified contact keeps the APP-6 frame and needs none.
+    new IconLayer<ContactView>({
+      id: "contact-badges",
+      data: figures ? s.contacts.filter((c) => figureKind(c.platform, c.category, c.domain)) : [],
+      getPosition: (c) => pt(c.position),
+      getIcon: (c) => badgeIcon(contactAffiliation(c), c.domain ?? "surface"),
+      getSize: BADGE_PX,
+      sizeUnits: "pixels",
+      getPixelOffset: [0, 20],
+    }),
     new TextLayer<ContactView>({
       id: "contact-labels",
       data: s.contacts.filter((c) => !s.hiddenLabels?.has(`c:${c.number}`)),
@@ -769,7 +846,8 @@ export function buildLayers(s: SceneInput): Layer[] {
       getText: (c) => contactLabel(c, s.gameTimeS),
       getSize: 12,
       getColor: [255, 240, 150, 255],
-      getPixelOffset: [0, 20],
+      getTextAnchor: figures ? "start" : "middle",
+      getPixelOffset: figures ? [BADGE_PX / 2 + 4, 20] : [0, 20],
       fontFamily: "system-ui, sans-serif",
       outlineWidth: 2,
       outlineColor: [11, 27, 43, 255],
@@ -793,6 +871,44 @@ export interface MapPoint {
 }
 
 const POINT_COLOUR: RGBA = [120, 220, 160, 255];
+
+/** Shipping lanes (slice 5): a translucent band of the lane's width, and its name and traffic
+ * at the middle of its centreline. */
+export function laneLayers(lanes: Lane[], hidden?: Set<string>): Layer[] {
+  const mid = (l: Lane): LonLat => {
+    const k = Math.floor((l.points.length - 1) / 2);
+    const p = l.points[k] ?? { lat_deg: 0, lon_deg: 0 };
+    const q = l.points[k + 1] ?? p;
+    return [(n(p.lon_deg) + n(q.lon_deg)) / 2, (n(p.lat_deg) + n(q.lat_deg)) / 2];
+  };
+  return [
+    new PathLayer<Lane>({
+      id: "lanes",
+      data: lanes,
+      getPath: (l) => l.points.map(pt),
+      getWidth: (l) => n(l.width_m),
+      widthUnits: "meters",
+      widthMinPixels: 2,
+      getColor: [214, 178, 92, 70],
+      capRounded: true,
+      jointRounded: true,
+    }),
+    new TextLayer<Lane>({
+      id: "lane-labels",
+      data: lanes.filter((l) => !hidden?.has(`lane:${l.id}`)),
+      getPosition: mid,
+      getText: (l) =>
+        l.ships_per_day == null ? l.name : `${l.name} · ${Math.round(l.ships_per_day)}/day`,
+      getSize: 11,
+      getColor: [226, 196, 120, 230],
+      fontFamily: "system-ui, sans-serif",
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
+  ];
+}
 
 /** Reference points: a small ring and the name. */
 export function referenceLayers(
@@ -952,6 +1068,7 @@ const FACILITY_CODE: Record<string, string> = {
   refuelling_point: "RAS",
   sheltering_port: "PORT",
   anchorage: "ANCH",
+  airbase: "AIR",
 };
 
 /** One sense zone's coverage, as the engine samples it. */

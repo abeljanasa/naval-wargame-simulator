@@ -15,6 +15,7 @@ const ORIGIN: GeoPoint = GeoPoint {
 
 fn radar() -> SensorSpec {
     SensorSpec {
+        sonar: None,
         sensor_id: "TEST-RADAR".into(),
         kind: SensorKind::Radar,
         mount_height_m: 25.0,
@@ -41,6 +42,7 @@ fn asm() -> WeaponSpec {
         warhead_kg: 220.0,
         base_ph: 0.8,
         target_domains: vec!["surface".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -56,6 +58,7 @@ fn gun() -> WeaponSpec {
         warhead_kg: 6.0,
         base_ph: 0.3,
         target_domains: vec!["surface".into(), "air".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -71,6 +74,7 @@ fn sam() -> WeaponSpec {
         warhead_kg: 40.0,
         base_ph: 0.75,
         target_domains: vec!["air".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -126,6 +130,8 @@ fn unit(
             mission: None,
             fuel: None,
             draft_m: None,
+            displacement_t: None,
+            air: None,
         }),
     )
 }
@@ -460,6 +466,7 @@ fn chaff() -> WeaponSpec {
         warhead_kg: 0.0,
         base_ph: 0.3,
         target_domains: vec!["air".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -766,6 +773,7 @@ fn mine() -> WeaponSpec {
         warhead_kg: 600.0,
         base_ph: 0.5,
         target_domains: vec!["surface".into(), "subsurface".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -1102,6 +1110,8 @@ fn zone(id: u32, kind: ZoneKind, area: Area, doctrine: Doctrine) -> Zone {
         shooters: vec![],
         layer: None,
         sensors: vec![],
+        coverage_goal: None,
+        assets: vec![],
     }
 }
 
@@ -1137,6 +1147,7 @@ fn facility(
         depth_m: None,
         max_sea_state: None,
         staging: false,
+        air: None,
     }
 }
 
@@ -1146,6 +1157,7 @@ fn planning(facilities: Vec<Facility>, zones: Vec<Zone>) -> Command {
         Issuer::Scenario,
         None,
         CommandPayload::SetPlanning {
+            lanes: None,
             facilities,
             zones,
             action_groups: None,
@@ -1436,6 +1448,7 @@ fn only_privileged_issuers_set_the_planning_layer_and_bad_layers_are_refused() {
         Issuer::Player { seat: 1 },
         Some(1),
         CommandPayload::SetPlanning {
+            lanes: None,
             facilities: vec![],
             zones: vec![zone(
                 1,
@@ -1904,6 +1917,8 @@ fn fuelled(mut c: Command, capacity_t: f64, endurance_m: f64, level: f64) -> Com
             cruise_mps: 10.0,
             level,
             bingo: None,
+            kind: Default::default(),
+            idle_fraction: None,
         });
     }
     c
@@ -2298,6 +2313,7 @@ fn denial_patrols_inside_the_choke_point_and_engages_only_inside_it() {
             Issuer::Scenario,
             None,
             CommandPayload::SetPlanning {
+                lanes: None,
                 facilities: vec![],
                 zones: vec![z],
                 action_groups: None,
@@ -2571,6 +2587,7 @@ fn sense_zone_coverage_follows_the_radar_horizon_and_emcon() {
 
 fn sensor(kind: SensorKind, max_range_m: f64) -> SensorSpec {
     SensorSpec {
+        sonar: None,
         sensor_id: format!("TEST-{kind:?}"),
         kind,
         mount_height_m: 20.0,
@@ -2597,6 +2614,7 @@ fn torpedo() -> WeaponSpec {
         warhead_kg: 250.0,
         base_ph: 0.7,
         target_domains: vec!["surface".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -2758,6 +2776,7 @@ fn set_groups(tick: u64, groups: Vec<ActionGroup>) -> Command {
         Issuer::Scenario,
         None,
         CommandPayload::SetPlanning {
+            lanes: None,
             facilities: vec![],
             zones: vec![],
             action_groups: Some(groups),
@@ -2992,4 +3011,64 @@ fn a_group_shares_its_air_picture_and_fires_one_sam_per_threat_at_a_time() {
         UnitId(1),
         "the silent ship fires on its mate's track: {fired:?}"
     );
+}
+
+/// The test gun, with a 5 km range against aircraft (its surface range stays 15 km). Given a
+/// seeker's track tolerance so the order is judged on range alone: an aircraft track grows at
+/// the air speed bound between scans, past a gun's 300 m limit.
+fn gun_with_air_range() -> WeaponSpec {
+    let mut g = gun();
+    g.guidance = Guidance::ActiveRadar;
+    g.max_range_by_target.insert("air".into(), 5_000.0);
+    g
+}
+
+/// Blue with that gun at the origin; a red aircraft at 1,000 m, `range_m` east.
+fn air_scene(range_m: f64) -> Simulation {
+    let mut sim = Simulation::new(3);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![gun_with_air_range()],
+        },
+    ))
+    .unwrap();
+    sim.submit(unit(1, 1, ORIGIN, vec![radar()], &[("T-GUN", 100)], None))
+        .unwrap();
+    let mut red = unit(2, 2, direct(ORIGIN, 90.0, range_m).point, vec![], &[], None);
+    if let CommandPayload::SpawnUnit(s) = &mut red.payload {
+        s.domain = Domain::Air;
+        s.altitude_m = 1000.0;
+    }
+    sim.submit(red).unwrap();
+    sim.run_ticks(1);
+    sim
+}
+
+#[test]
+fn a_gun_reaches_aircraft_only_within_its_anti_air_range() {
+    // 10 km: inside the gun's 15 km surface range, beyond its 5 km range against aircraft.
+    let mut sim = air_scene(10_000.0);
+    sim.submit(engage_as(1, umpire(), None, "T-GUN", 1))
+        .unwrap();
+    sim.step();
+    let r = rejected(&sim);
+    assert!(
+        r.iter()
+            .any(|x| x.contains("0.0–5.0 km against air targets")),
+        "{r:?}"
+    );
+    assert!(!any_hit(&sim));
+    // 4 km: inside it, so the round is fired and rolled.
+    let mut sim = air_scene(4_000.0);
+    sim.submit(engage_as(1, umpire(), None, "T-GUN", 1))
+        .unwrap();
+    sim.step();
+    assert!(rejected(&sim).is_empty(), "{:?}", rejected(&sim));
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::HitRoll { .. })));
 }

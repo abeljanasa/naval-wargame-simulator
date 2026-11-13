@@ -1,0 +1,222 @@
+{
+  "format": "nws-scenario",
+  "format_version": 2,
+  "name": "Validation draft — Operation Praying Mantis, 18 April 1988",
+  "description": "DRAFT for SME review (Gate 4). The ship-against-ship actions of 18 April 1988 in the southern Persian Gulf, time-compressed into one scenario: Surface Action Group Charlie against the fast attack craft Joshan near Sirri, and A-6E Intruders from USS Enterprise against the frigates Sahand and Sabalan near the Strait of Hormuz. Built from public accounts; see data/validation/praying-mantis-1988/validation.json for sources and simplifications.",
+  "seed": 19880418,
+  "duration_s": 5400,
+  "environment": {
+    "sea_state": 2,
+    "start_unix_s": 577353600
+  },
+  "sides": [
+    {
+      "id": 1,
+      "name": "United States",
+      "postures": [
+        {
+          "toward": 2,
+          "posture": "hostile"
+        }
+      ],
+      "doctrine": {
+        "wcs": "free",
+        "emcon": "active"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Iran",
+      "postures": [
+        {
+          "toward": 1,
+          "posture": "hostile"
+        }
+      ],
+      "doctrine": {
+        "wcs": "free",
+        "emcon": "active"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": 1,
+      "name": "USS Wainwright (CG-28)",
+      "side": 1,
+      "platform": "USA-CG-BELKNAP",
+      "position": {
+        "lat_deg": 25.8,
+        "lon_deg": 54.25
+      },
+      "heading_deg": 60.0,
+      "speed_mps": 7.72,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 25.8,
+          "lon_deg": 54.25
+        },
+        "radius_m": 3000
+      }
+    },
+    {
+      "id": 2,
+      "name": "USS Simpson (FFG-56)",
+      "side": 1,
+      "platform": "USA-FFG-OHP",
+      "position": {
+        "lat_deg": 25.78,
+        "lon_deg": 54.22
+      },
+      "heading_deg": 60.0,
+      "speed_mps": 7.72,
+      "mission": {
+        "kind": "escort",
+        "escorted": 1,
+        "bearing_deg": 210.0,
+        "range_m": 3000
+      }
+    },
+    {
+      "id": 3,
+      "name": "USS Bagley (FF-1069)",
+      "side": 1,
+      "platform": "USA-FF-KNOX",
+      "position": {
+        "lat_deg": 25.82,
+        "lon_deg": 54.22
+      },
+      "heading_deg": 60.0,
+      "speed_mps": 7.72,
+      "mission": {
+        "kind": "escort",
+        "escorted": 1,
+        "bearing_deg": 300.0,
+        "range_m": 3000
+      }
+    },
+    {
+      "id": 4,
+      "name": "IRIS Joshan (P225)",
+      "side": 2,
+      "platform": "IRN-PTG-KAMAN",
+      "position": {
+        "lat_deg": 25.95,
+        "lon_deg": 54.4
+      },
+      "heading_deg": 230.0,
+      "speed_mps": 12.86,
+      "mission": {
+        "kind": "ferry",
+        "destination": {
+          "lat_deg": 25.8,
+          "lon_deg": 54.25
+        }
+      }
+    },
+    {
+      "id": 5,
+      "name": "IRIS Sahand (F74)",
+      "side": 2,
+      "platform": "IRN-FF-SAAM",
+      "position": {
+        "lat_deg": 26.45,
+        "lon_deg": 55.95
+      },
+      "heading_deg": 90.0,
+      "speed_mps": 10.29,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 26.45,
+          "lon_deg": 55.95
+        },
+        "radius_m": 8000
+      }
+    },
+    {
+      "id": 6,
+      "name": "IRIS Sabalan (F73)",
+      "side": 2,
+      "platform": "IRN-FF-SAAM",
+      "position": {
+        "lat_deg": 26.3,
+        "lon_deg": 55.7
+      },
+      "heading_deg": 90.0,
+      "speed_mps": 7.72,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 26.3,
+          "lon_deg": 55.7
+        },
+        "radius_m": 8000
+      }
+    },
+    {
+      "id": 7,
+      "name": "A-6E Intruder (VA-95), lead",
+      "side": 1,
+      "platform": "USA-A6E",
+      "loadout": "USA-A6E/ASUW",
+      "position": {
+        "lat_deg": 26.1,
+        "lon_deg": 56.6
+      },
+      "altitude_m": 300.0,
+      "heading_deg": 300.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 26.45,
+          "lon_deg": 56.13
+        },
+        "radius_m": 4000
+      }
+    },
+    {
+      "id": 8,
+      "name": "A-6E Intruder (VA-95), wing",
+      "side": 1,
+      "platform": "USA-A6E",
+      "loadout": "USA-A6E/ASUW",
+      "position": {
+        "lat_deg": 26.08,
+        "lon_deg": 56.62
+      },
+      "altitude_m": 300.0,
+      "heading_deg": 300.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 26.45,
+          "lon_deg": 56.13
+        },
+        "radius_m": 4000
+      }
+    },
+    {
+      "id": 9,
+      "name": "A-6E Intruder (VA-95), strike",
+      "side": 1,
+      "platform": "USA-A6E",
+      "loadout": "USA-A6E/STRIKE",
+      "position": {
+        "lat_deg": 26.0,
+        "lon_deg": 56.6
+      },
+      "altitude_m": 600.0,
+      "heading_deg": 290.0,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 26.3,
+          "lon_deg": 55.88
+        },
+        "radius_m": 4000
+      }
+    }
+  ]
+}

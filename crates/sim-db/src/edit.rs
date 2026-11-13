@@ -319,7 +319,8 @@ mod tests {
             .any(|(id, name)| id == "SEN-RDR-NAV" && !name.is_empty()));
         // The platform listing holds platforms only, not an aircraft's loadouts.
         let platforms = record_ids(&set, RecordKind::Platform);
-        assert!(platforms.iter().all(|(id, _)| id.starts_with("GEN-")));
+        assert!(platforms.iter().all(|(id, _)| !id.contains('/')));
+        assert!(platforms.iter().any(|(id, _)| id == "PHL-FF-RIZAL"));
 
         let w = record(&set, RecordKind::Weapon, "WPN-GUN-30").unwrap();
         assert_eq!(w.file, "weapons.json");

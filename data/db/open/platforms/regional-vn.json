@@ -1,0 +1,639 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, Vietnam (Phase 4 slice 13, tranche 2): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "VNM-FF-GEPARD",
+   "name": "Gepard 3.9-class frigate (Vietnam, batch I)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "VNM-VPN",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 102.4,
+   "displacement_t": 2500,
+   "draft_m": 5.7,
+   "max_speed_kn": 29,
+   "cruise_speed_kn": 10,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -5
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Kh-35 quadruple launchers (2x4)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-KH35"
+     ]
+    },
+    {
+     "name": "AK-176M 76 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "AK-630M CIWS (2)",
+     "height_m": 12,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Palma CIWS (Sosna-R)",
+     "height_m": 11,
+     "weapons": [
+      "WPN-SAM-PD"
+     ]
+    },
+    {
+     "name": "PK-16 decoy launchers (4)",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Kh-35 quadruple launchers (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-KH35": 8
+     }
+    },
+    {
+     "name": "AK-176M 76 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "AK-630M CIWS (2)",
+     "capacity": 80,
+     "contents": {
+      "WPN-CIWS": 80
+     }
+    },
+    {
+     "name": "Palma CIWS (Sosna-R)",
+     "capacity": 8,
+     "contents": {
+      "WPN-SAM-PD": 8
+     }
+    },
+    {
+     "name": "PK-16 decoy launchers (4)",
+     "capacity": 64,
+     "contents": {
+      "WPN-DECOY-CHAFF": 64
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Gepard-class frigate\", https://en.wikipedia.org/wiki/Gepard-class_frigate (accessed 2026-11-13): Gepard 3.9: 2,500 t, about 102.4 m, 5.7 m draught, 29 kn, 4,000 nmi at 10 kn, complement 94; MR-231-1 Pal, Mineral-ME, Pozitiv-ME1 3D, 5P-10E Laska fire control, MGK-335EM-03 sonar; Bell Shroud intercept, 2 Bell Squat jammers, 4 x 16-barrel PK-16 decoy launchers; AK-176M 76 mm, 2 AK-630M, 2x4 Kh-35 (VPN batches I and II), Palma CIWS with 8 Sosna-R (VPN configuration); torpedo tubes not fitted on batch I. Sosna-R modelled by the generic point-defence SAM. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-VNM-BELLSQUAT"
+   ]
+  },
+  {
+   "id": "VNM-SSK-KILO",
+   "name": "Kilo-class submarine (Vietnam, Project 636.1)",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "VNM-VPN",
+   "propulsion": "PROP-DE-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 73.8,
+   "displacement_t": 3950,
+   "draft_m": 6.2,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 7,
+   "accel_mps2": 0.05,
+   "endurance_nm": 6000,
+   "max_depth_m": 300,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 200,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 105,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 118,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "533 mm torpedo tubes (6)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-KALIBR-ASM",
+      "WPN-TORP-HW"
+     ]
+    },
+    {
+     "name": "Countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "533 mm torpedo tubes (6)",
+     "capacity": 18,
+     "contents": {
+      "WPN-TORP-HW": 14,
+      "WPN-KALIBR-ASM": 4
+     }
+    },
+    {
+     "name": "Countermeasures",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Kilo-class submarine\", https://en.wikipedia.org/wiki/Kilo-class_submarine (accessed 2026-11-13): Project 636: 3,950 t submerged (636.3 figure), 73.8 m, 6.2 m draft, 20 kn submerged, 6,000-7,500 nmi at 7 kn snorkelling (6,000 used), test depth 240 m operational and 300 m maximum, complement 52; 6 x 533 mm tubes, 18 torpedoes, 4 Kalibr/Club missiles (some versions; the Vietnamese boats' fit is not confirmed by the source and is assumed), Strela-3 or Igla-1 SAMs (export boats may not carry them; not modelled). Six boats in Vietnamese service. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "VNM-PGG-MOLNIYA",
+   "name": "Molniya-class corvette (Project 1241.8, Tarantul V)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "VNM-VPN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 56.1,
+   "displacement_t": 500,
+   "draft_m": 2.2,
+   "max_speed_kn": 29,
+   "cruise_speed_kn": 14,
+   "accel_mps2": 0.15,
+   "endurance_nm": 1650,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 11
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 10
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Kh-35 Uran-E launchers (4x4)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-KH35"
+     ]
+    },
+    {
+     "name": "AK-176 76 mm gun",
+     "height_m": 6,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "AK-630 CIWS (2)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Igla-M launcher",
+     "height_m": 7,
+     "weapons": [
+      "WPN-IGLA"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Kh-35 Uran-E launchers (4x4)",
+     "capacity": 16,
+     "contents": {
+      "WPN-KH35": 16
+     }
+    },
+    {
+     "name": "AK-176 76 mm gun",
+     "capacity": 314,
+     "contents": {
+      "WPN-GUN-76": 314
+     }
+    },
+    {
+     "name": "AK-630 CIWS (2)",
+     "capacity": 80,
+     "contents": {
+      "WPN-CIWS": 80
+     }
+    },
+    {
+     "name": "Igla-M launcher",
+     "capacity": 4,
+     "contents": {
+      "WPN-IGLA": 4
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Tarantul-class corvette\", https://en.wikipedia.org/wiki/Tarantul-class_corvette (accessed 2026-11-13): Vietnamese Molniya: 500 t full load, 56.1 m, 2.2 m draught, 29+ kn, 1,650 nmi at 14 kn, complement 44, two CODAD diesels; 3Ts-25E radar, 3R-60U fire control; the Vietnamese ships carry an AK-176 76 mm gun (314 rounds), 16 Uran-E anti-ship missiles, four Igla-M missiles and two AK-630 (body text). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "VNM-PG-TT400",
+   "name": "TT-400TP gunboat",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "VNM-VPN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 54.16,
+   "displacement_t": 455,
+   "draft_m": 2.7,
+   "max_speed_kn": 32,
+   "cruise_speed_kn": 14,
+   "accel_mps2": 0.15,
+   "endurance_nm": 2500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 10
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 10
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 7
+    }
+   ],
+   "launchers": [
+    {
+     "name": "AK-176 76 mm gun",
+     "height_m": 6,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "AK-630 CIWS",
+     "height_m": 8,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "AK-176 76 mm gun",
+     "capacity": 300,
+     "contents": {
+      "WPN-GUN-76": 300
+     }
+    },
+    {
+     "name": "AK-630 CIWS",
+     "capacity": 40,
+     "contents": {
+      "WPN-CIWS": 40
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"TT-400TP gunboat\", https://en.wikipedia.org/wiki/TT-400TP_gunboat (accessed 2026-11-13): 455 t full load, 54.16 m, 2.7 m draught, up to 32 kn, 2,500 miles (unit not stated; taken as nautical miles), crew 28; MR-123 Vympel (Bass Tilt) fire control; AK-176 76 mm, AK-630 30 mm, 2 KPVT 14.5 mm (not modelled). Cruise speed not given (14 kn assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "VNM-CG-HAMILTON",
+   "name": "Ex-US Hamilton-class cutter (Vietnam Coast Guard, CSB 8020)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "VNM-VCG",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 115.2,
+   "displacement_t": 3250,
+   "draft_m": 4.6,
+   "max_speed_kn": 29,
+   "cruise_speed_kn": 12,
+   "accel_mps2": 0.05,
+   "endurance_nm": 12166,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 25
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Otobreda 76 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "M242 25 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Otobreda 76 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "M242 25 mm guns (2)",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"USCGC Morgenthau\", https://en.wikipedia.org/wiki/USCGC_Morgenthau (accessed 2026-11-13): commissioned by the Vietnam Coast Guard as CSB 8020 in 2017; 3,250 t, 378 ft (115.2 m), 15 ft (4.6 m) draught, 29 kn, 14,000 mi (12,166 nmi), complement 160; AN/SPS-40 air search; Otobreda 76 mm, 25 mm M242 Bushmasters (Phalanx removed before transfer). Cruise speed not given (12 kn assumed, as the Philippine Del Pilar). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  }
+ ]
+}

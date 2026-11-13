@@ -189,6 +189,7 @@ end
 |---|---|
 | `command_post` | `range_m`, `unit` (carried by), `subordinates` (empty = all), `alternate`, `handover_s`, `orders_in_gap` (`lose` or `queue`) |
 | `sheltering_port`, `anchorage`, `refuelling_point` | `radius_m`, `berths` (0 = no limit), `services: { repair, rearm, refuel }` |
+| `airbase` | `air: { runways, interval_s, parking, deck, fixed_wing, aviation_fuel_t }`; `unit` for a ship's deck. Aircraft take `base`, `airborne`, `readiness` (`ready`, `alert15`, `alert60`, `maintenance`), `maintenance_s` and `loadout` ([air-operations.md](../models/air-operations.md)) |
 
 **Zones:**
 

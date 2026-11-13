@@ -10,6 +10,7 @@ mod angle;
 mod ellipsoid;
 mod horizon;
 pub mod land;
+pub mod terrain;
 mod vincenty;
 
 pub use angle::{normalize_azimuth_deg, normalize_lon_deg};

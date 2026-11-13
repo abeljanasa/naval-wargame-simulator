@@ -35,6 +35,8 @@ pub enum AarError {
     Decode(#[from] rmp_serde::decode::Error),
     #[error("the record was made with coastline {0:?}, which this build does not have")]
     UnknownLandMask(String),
+    #[error("the record was made with terrain pack(s) {0:?}, which are not installed")]
+    UnknownTerrain(String),
     #[error(transparent)]
     Sim(#[from] sim_core::SimError),
 }

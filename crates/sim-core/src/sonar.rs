@@ -24,6 +24,8 @@ use sim_sensors::{
     DIPPING_MAX_SPEED_MPS,
 };
 
+/// Directivity index of a sonobuoy hydrophone, dB (omnidirectional with a little DIFAR gain).
+pub const BUOY_DI_DB: f64 = 3.0;
 /// Target strength of a submarine for active sonar, dB (generic).
 pub const TARGET_STRENGTH_SUBMARINE_DB: f64 = 15.0;
 /// Target strength of a surface ship for active sonar, dB (generic).
@@ -93,7 +95,49 @@ pub(crate) fn sonar_pass(
     log: &mut EventLog,
     bearings: &mut BearingTable,
     fresh: &mut FreshBearings,
+    zones: &[sim_events::WeatherZone],
+    (ac, terrain): (
+        &crate::acoustics::Acoustics,
+        Option<&sim_geo::terrain::Terrain>,
+    ),
 ) {
+    // Sound-velocity profiles in force this scan (`docs/models/acoustics.md`): by region and
+    // season; with none, the Phase 2 law below holds unchanged.
+    #[allow(clippy::cast_possible_truncation)]
+    let month = sim_sensors::acoustics::month_of(env.start_unix_s + tick.0 as i64);
+    let svps: std::collections::BTreeMap<u32, sim_sensors::acoustics::Svp> = ac
+        .profiles
+        .iter()
+        .filter_map(|p| {
+            sim_sensors::acoustics::Svp::new(p.points.clone())
+                .ok()
+                .map(|s| (p.id, s))
+        })
+        .collect();
+    // One-way loss and the path it took, from a source at `src` (depth `zs`) to a receiver at
+    // `rcv` (depth `zr`).
+    let propagate = |rcv: sim_geo::GeoPoint,
+                     src: sim_geo::GeoPoint,
+                     zr: f64,
+                     zs: f64,
+                     range: f64,
+                     f_khz: f64| {
+        let svp = sim_events::profile_at(&ac.profiles, rcv, month).and_then(|p| svps.get(&p.id));
+        let water = terrain.and_then(|t| {
+            t.depth_m(sim_geo::GeoPoint::new(
+                (rcv.lat_deg + src.lat_deg) / 2.0,
+                (rcv.lon_deg + src.lon_deg) / 2.0,
+            ))
+        });
+        match svp {
+            Some(svp) => {
+                let (tl, path) =
+                    sim_sensors::acoustics::transmission_loss(svp, f_khz, zs, zr, range, water);
+                (tl, Some(path), water)
+            }
+            None => (transmission_loss_db(range, f_khz), None, water),
+        }
+    };
     // The loudest active sonar each unit is transmitting with, if any.
     let pinging: Vec<Option<f64>> = all
         .iter()
@@ -109,7 +153,9 @@ pub(crate) fn sonar_pass(
                         && s.active
                         && sonar_usable(s.kind, o.domain, o.position.altitude_m, o.speed_mps)
                 })
-                .map(|s| sonar_params(s.kind, true).active_sl_db)
+                .map(|s| {
+                    sim_sensors::sonar_params_with(s.kind, true, s.sonar.as_ref()).active_sl_db
+                })
                 .fold(None, |acc: Option<f64>, sl| {
                     Some(acc.map_or(sl, |a| a.max(sl)))
                 })
@@ -125,15 +171,21 @@ pub(crate) fn sonar_pass(
         return;
     }
     by_lat.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-    let ambient = ambient_noise_db(env.sea_state);
     let mut candidates: Vec<usize> = Vec::new();
     for (oi, obs) in all.iter().enumerate() {
+        // Ambient noise from the sea state where the listener is.
+        let ambient =
+            ambient_noise_db(crate::detection::local_env(env, zones, obs.position.point).sea_state);
         for s in obs.sensors.0.iter().filter(|s| is_sonar(s.kind)) {
             if !sonar_usable(s.kind, obs.domain, obs.position.altitude_m, obs.speed_mps) {
                 continue;
             }
+            // A towed array listens only streamed, ready, and at or below 15 kn.
+            if s.kind == SensorKind::SonarTowed && !ac.towed_usable(obs.id, obs.speed_mps, tick) {
+                continue;
+            }
             let active = s.active && obs.emits;
-            let p = sonar_params(s.kind, s.active);
+            let p = sim_sensors::sonar_params_with(s.kind, s.active, s.sonar.as_ref());
             let nl = power_sum_db(ambient, noise_at_speed_db(p.self_noise_db, obs.speed_mps));
             let err = measurement_error(s.kind);
             let lat0 = obs.position.point.lat_deg;
@@ -159,11 +211,28 @@ pub(crate) fn sonar_pass(
                 if range < s.min_range_m || range > s.max_range_m {
                     continue;
                 }
-                let tl = transmission_loss_db(range, p.frequency_khz);
+                let (tl, path, water) = propagate(
+                    obs.position.point,
+                    tgt.position.point,
+                    crate::acoustics::sensor_depth_m(s.kind, obs.domain, obs.position.altitude_m),
+                    crate::acoustics::source_depth_m(tgt.domain, tgt.position.altitude_m),
+                    range,
+                    p.frequency_khz,
+                );
                 let (sl, se) = if active {
                     let sl = p.active_sl_db;
                     let ts = target_strength_db(tgt.domain);
-                    (sl, active_se_db(sl, tl, ts, nl, p.di_db, p.dt_db))
+                    if path.is_some() {
+                        // With a profile, reverberation joins the noise in masking the echo.
+                        let sea =
+                            crate::detection::local_env(env, zones, obs.position.point).sea_state;
+                        let rl =
+                            sim_sensors::acoustics::reverberation_db(sl, tl, range, sea, water);
+                        let masking = power_sum_db(nl - p.di_db, rl);
+                        (sl, sl - 2.0 * tl + ts - masking - p.dt_db)
+                    } else {
+                        (sl, active_se_db(sl, tl, ts, nl, p.di_db, p.dt_db))
+                    }
                 } else {
                     let radiated = noise_at_speed_db(tgt.radiated_noise_db, tgt.speed_mps);
                     let sl = pinging[i].map_or(radiated, |ping| power_sum_db(radiated, ping));
@@ -206,6 +275,7 @@ pub(crate) fn sonar_pass(
                         detected,
                         range_error_m: range_error,
                         bearing_error_deg: bearing_error,
+                        path,
                     },
                 );
                 let Some(bearing_err) = bearing_error else {
@@ -266,6 +336,92 @@ pub(crate) fn sonar_pass(
                         },
                     );
                 }
+            }
+        }
+    }
+    // Laid sonobuoys: passive listeners at their hydrophone depth, hearing other sides'
+    // waterborne units. Each reports a bearing from where it floats, so a field of buoys fixes a
+    // target where their bearings cross.
+    let buoy_params = sonar_params(SensorKind::Sonobuoy, false);
+    for b in &ac.buoys {
+        if tick >= b.expires {
+            continue;
+        }
+        let nl = ambient_noise_db(crate::detection::local_env(env, zones, b.position).sea_state);
+        let err = measurement_error(SensorKind::Sonobuoy);
+        let listener = crate::ids::UnitId(crate::acoustics::BUOY_OBSERVER_BASE + u64::from(b.id));
+        for (i, tgt) in all.iter().enumerate() {
+            if tgt.side == b.side || !waterborne(tgt.domain) {
+                continue;
+            }
+            let inv = inverse(b.position, tgt.position.point);
+            let range = inv.distance_m;
+            if range > b.max_range_m {
+                continue;
+            }
+            let (tl, path, _) = propagate(
+                b.position,
+                tgt.position.point,
+                b.depth_m,
+                crate::acoustics::source_depth_m(tgt.domain, tgt.position.altitude_m),
+                range,
+                buoy_params.frequency_khz,
+            );
+            let sl = noise_at_speed_db(tgt.radiated_noise_db, tgt.speed_mps);
+            let se = passive_se_db(sl, tl, nl, BUOY_DI_DB, buoy_params.dt_db);
+            let pd = pd_from_se(se);
+            let draw = rng.uniform(StreamId::Sensors);
+            let detected = draw < pd;
+            let bearing_error = detected.then(|| {
+                let (n, _) = gaussian_pair(
+                    rng.uniform(StreamId::Sensors),
+                    rng.uniform(StreamId::Sensors),
+                );
+                n * err.bearing_sigma_deg
+            });
+            log.push(
+                tick,
+                SimEventKind::SonarAttempt {
+                    observer: b.owner,
+                    sensor: format!("{}#{}", b.sensor_id, b.id),
+                    target: tgt.id,
+                    active: false,
+                    range_m: range,
+                    sl_db: sl,
+                    tl_db: tl,
+                    nl_db: nl,
+                    di_db: BUOY_DI_DB,
+                    dt_db: buoy_params.dt_db,
+                    se_db: se,
+                    pd,
+                    draw,
+                    detected,
+                    range_error_m: None,
+                    bearing_error_deg: bearing_error,
+                    path,
+                },
+            );
+            if let Some(e) = bearing_error {
+                note_bearing(
+                    fresh,
+                    bearings,
+                    b.side,
+                    listener,
+                    tgt.id,
+                    i,
+                    BearingLine {
+                        from: b.position,
+                        bearing_deg: normalize_azimuth_deg(inv.azimuth1_deg + e),
+                        sigma_deg: err.bearing_sigma_deg,
+                    },
+                    tick,
+                    ACOUSTIC_LABEL,
+                    Identification {
+                        classification: Classification::Domain,
+                        platform: None,
+                        category: None,
+                    },
+                );
             }
         }
     }

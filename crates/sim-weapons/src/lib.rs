@@ -164,9 +164,23 @@ pub struct WeaponSpec {
     pub base_ph: f64,
     /// Target domains: any of `surface`, `subsurface`, `air`, `land`.
     pub target_domains: Vec<String>,
+    /// Ranges against particular target domains, m, where they are shorter than `max_range_m`
+    /// (a gun against aircraft). Empty: `max_range_m` for every domain.
+    #[serde(default)]
+    pub max_range_by_target: std::collections::BTreeMap<String, f64>,
 }
 
 impl WeaponSpec {
+    /// The weapon's maximum range against a target domain (`surface`, `air`, …).
+    #[must_use]
+    pub fn max_range_for(&self, domain: &str) -> f64 {
+        self.max_range_by_target
+            .get(domain)
+            .copied()
+            .unwrap_or(self.max_range_m)
+            .min(self.max_range_m)
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         let ok = self.min_range_m.is_finite()
             && self.max_range_m.is_finite()
@@ -376,6 +390,7 @@ mod pd_tests {
             warhead_kg: 0.0,
             base_ph: 0.3,
             target_domains: domains.iter().map(|d| (*d).to_owned()).collect(),
+            max_range_by_target: std::collections::BTreeMap::new(),
         }
     }
 

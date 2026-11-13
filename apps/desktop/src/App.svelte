@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import type { Map as MapLibreMap } from "maplibre-gl";
   import type { MapboxOverlay } from "@deck.gl/mapbox";
   import {
     createMap,
     declutter,
     labelCandidates,
+    laneLayers,
     outcomeLayers,
     outcomeText,
     buildLayers,
@@ -23,8 +24,29 @@
   } from "./lib/map";
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
+  import { commands } from "./lib/bindings";
+  import { lanesFromGeoJson, navigableWidthM, type Lane } from "./lib/lanes";
+  import { weatherAt, weatherLayers, weatherText, type WeatherZone } from "./lib/weather";
+  import {
+    buoyLayers,
+    profileText,
+    svpFromCsv,
+    svpProblem,
+    towedText,
+    type SoundProfile,
+  } from "./lib/acoustics";
+  import {
+    imageryCredit,
+    imageryStatus,
+    installImagery,
+    rescanImagery,
+    setImagery,
+    type ImageryStatus,
+  } from "./lib/imagery";
   import type {
     Audience,
+    ChokeDepths_Serialize as ChokeDepths,
+    GeoPoint,
     CommsView,
     Emcon,
     Facility,
@@ -34,10 +56,26 @@
     Zone,
   } from "./lib/bindings";
   import AarPanel from "./lib/AarPanel.svelte";
+  import AirPanel from "./lib/AirPanel.svelte";
+  import { airborneText, bingoText } from "./lib/air";
   import ScenarioEditor from "./lib/ScenarioEditor.svelte";
   import { editor } from "./lib/editor.svelte";
   import DbBrowser from "./lib/DbBrowser.svelte";
   import Menubar, { type Menu } from "./lib/Menubar.svelte";
+  import {
+    TerrainLayers,
+    cellText,
+    coversText,
+    heightText,
+    installTerrainPack,
+    profilePaths,
+    terrainStatus,
+    waterText,
+    waterTight,
+    type TerrainStatus,
+    type TerrainView,
+    type WaterView,
+  } from "./lib/terrain";
 
   let mapEl: HTMLElement;
   let map: MapLibreMap | null = null;
@@ -77,6 +115,230 @@
   /** White cell: the kind and radius of a zone to add on the map. */
   let newZoneKind = $state<"sense" | "engage">("sense");
   let newZoneKm = $state(20);
+
+  // Charted depths of the facilities, for the white cell's Planning tab.
+  let chartDepths = $state<Map<number, number | null>>(new Map());
+  $effect(() => {
+    const n = (sim.session?.facilities ?? []).length;
+    const packs = terrain?.packs.length ?? 0;
+    void n;
+    if (rightTab !== "planning" || packs === 0) return;
+    void commands.facilityDepths().then((r) => {
+      if (r.status === "ok") {
+        chartDepths = new Map(r.data.map((d) => [d.facility, d.chart_m]));
+      }
+    });
+  });
+
+  // Imagery base layer (slice 6): the chosen pack, remembered per viewer like the theme.
+  let imagery = $state<ImageryStatus | null>(null);
+  let imageryFile = $state<string>(readImageryFile());
+  let showImagery = $state(false);
+  let imageryError = $state("");
+  let imageryInput = $state<HTMLInputElement>();
+
+  function readImageryFile(): string {
+    try {
+      return localStorage.getItem("nws-imagery") ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  function chooseImagery(file: string) {
+    imageryFile = file;
+    try {
+      localStorage.setItem("nws-imagery", file);
+    } catch {
+      // Storage unavailable: the choice lasts for this session only.
+    }
+  }
+
+  const activeImagery = $derived(imagery?.packs.find((p) => p.file === imageryFile) ?? null);
+
+  $effect(() => {
+    const pack = activeImagery;
+    if (map) setImagery(map, pack ? $state.snapshot(pack) : null);
+  });
+
+  async function installImageryFile(file: File | undefined) {
+    if (!file) return;
+    imageryError = "";
+    showImagery = true;
+    try {
+      imagery = await installImagery(file);
+      const added = imagery.packs.find((p) => p.file.endsWith(file.name) || p.name === file.name);
+      if (added) chooseImagery(added.file);
+    } catch (e) {
+      imageryError = `${file.name} was not installed: ${String(e)}`;
+    }
+  }
+
+  // Weather zones (slice 7): the white cell edits them in the Planning tab.
+  let newWeatherKm = $state(40);
+
+  function editWeather(change: (z: WeatherZone[]) => void) {
+    const zones = structuredClone($state.snapshot(sim.weatherZones)) as WeatherZone[];
+    change(zones);
+    void commands.orderWeather(zones).then((r) => {
+      if (r.status === "error") sim.error = r.error;
+    });
+  }
+
+  function addWeatherOnMap() {
+    sim.pick("Click the centre of the weather zone", (p) => {
+      editWeather((zs) => {
+        const id = Math.max(0, ...zs.map((z) => z.id)) + 1;
+        zs.push({
+          id,
+          name: `Weather ${id}`,
+          area: { shape: "circle", centre: p, radius_m: Math.max(1, newWeatherKm) * 1000 },
+          sea_state: Math.min(9, (sim.environment?.sea_state ?? 3) + 2),
+          wind_kn: 30,
+          wind_from_deg: 0,
+          visibility_km: 10,
+          rain_mm_h: 4,
+          cloud_base_m: null,
+        });
+      });
+    });
+  }
+
+  // Acoustics (slice 8): sound profiles for the white cell; towed arrays and sonobuoys for any
+  // seat with the gear.
+  let profileInput = $state<HTMLInputElement>();
+  let profileNotes = $state<string[]>([]);
+  let buoyDrops = $state<GeoPoint[] | null>(null);
+  let buoysDeep = $state(false);
+
+  function editProfiles(change: (p: SoundProfile[]) => void) {
+    const profiles = structuredClone($state.snapshot(sim.soundProfiles)) as SoundProfile[];
+    change(profiles);
+    void commands.orderSoundProfiles(profiles).then((r) => {
+      if (r.status === "error") sim.error = r.error;
+    });
+  }
+
+  async function importProfile(file: File | undefined) {
+    if (!file) return;
+    const { points, notes } = svpFromCsv(await file.text());
+    const problem = svpProblem(points);
+    profileNotes = problem ? [...notes, `${file.name} was not added: ${problem}`] : notes;
+    if (problem) return;
+    editProfiles((ps) => {
+      const id = Math.max(0, ...ps.map((p) => p.id)) + 1;
+      ps.push({ id, name: file.name.replace(/\.[^.]*$/, ""), area: null, months: [], points });
+    });
+  }
+
+  function orderTowed(unit: number, streamed: boolean) {
+    void commands.orderTowed(unit, streamed).then((r) => {
+      if (r.status === "error") sim.error = r.error;
+    });
+  }
+
+  /** Picks sonobuoy drop points one by one; "Lay" sends the unit through them. */
+  function pickBuoyPoint() {
+    const pts = buoyDrops;
+    if (!pts) return;
+    sim.pick(`Sonobuoys: click drop point ${pts.length + 1}, then Lay`, (p) => {
+      buoyDrops = [...pts, p];
+      pickBuoyPoint();
+    });
+  }
+
+  function layBuoys(unit: number) {
+    const pts = buoyDrops ?? [];
+    buoyDrops = null;
+    sim.picking = null;
+    if (!pts.length) return;
+    void commands.orderSonobuoys(unit, pts, buoysDeep).then((r) => {
+      if (r.status === "error") sim.error = r.error;
+    });
+  }
+
+  /** A number from a weather field, kept within limits. */
+  const fieldNum = (v: string, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, Number(v) || 0));
+
+  // Shipping lanes and choke points (slice 5), for the white cell's Planning tab.
+  let laneInput = $state<HTMLInputElement>();
+  let laneNotes = $state<string[]>([]);
+  let drawingLane = $state<GeoPoint[] | null>(null);
+  let chokes = $state<ChokeDepths[]>([]);
+  let chokeDraft = $state(10);
+  $effect(() => {
+    const key = `${(sim.session?.zones ?? []).length}|${(sim.session?.lanes ?? []).length}|${terrain?.packs.length ?? 0}`;
+    void key;
+    if (rightTab !== "planning") return;
+    void commands.chokeDepths().then((r) => {
+      if (r.status === "ok") chokes = r.data;
+    });
+  });
+
+  function editLanes(change: (l: Lane[]) => void) {
+    const lanes = structuredClone($state.snapshot(sim.session?.lanes ?? [])) as Lane[];
+    change(lanes);
+    void sim.setPlanning(
+      structuredClone($state.snapshot(sim.session?.facilities ?? [])),
+      structuredClone($state.snapshot(sim.session?.zones ?? [])),
+      lanes,
+    );
+  }
+
+  function nextLaneId(): number {
+    return Math.max(0, ...(sim.session?.lanes ?? []).map((l) => l.id)) + 1;
+  }
+
+  /** Draws a lane point by point on the map; "Finish lane" adds it. */
+  function drawLanePoint() {
+    const pts = drawingLane;
+    if (!pts) return;
+    sim.pick(`Lane: click point ${pts.length + 1} on the map, then Finish lane`, (p) => {
+      drawingLane = [...pts, p];
+      drawLanePoint();
+    });
+  }
+
+  function finishLane() {
+    const pts = drawingLane ?? [];
+    drawingLane = null;
+    sim.picking = null;
+    if (pts.length < 2) return;
+    const id = nextLaneId();
+    editLanes((ls) =>
+      ls.push({
+        id,
+        name: `Lane ${id}`,
+        points: pts,
+        width_m: 2000,
+        ships_per_day: null,
+        source: null,
+        choke_point: null,
+      }),
+    );
+  }
+
+  async function importLanes(file: File | undefined) {
+    if (!file) return;
+    const { lanes, notes } = lanesFromGeoJson(await file.text(), nextLaneId(), file.name);
+    laneNotes = notes;
+    if (lanes.length) editLanes((ls) => ls.push(...lanes));
+  }
+
+  const chokeSection = (c: ChokeDepths) =>
+    profilePaths(
+      {
+        draft_m: chokeDraft,
+        here_m: null,
+        least_m: null,
+        least_at_m: null,
+        charted: true,
+        profile: c.section,
+      },
+      240,
+      48,
+    );
 
   function editPlanning(change: (f: Facility[], z: Zone[]) => void) {
     const facilities = structuredClone($state.snapshot(sim.session?.facilities ?? []));
@@ -162,8 +424,13 @@
     return `${c.status.replaceAll("_", " ")}${post}: orders will not get through`;
   }
 
+  /** A unit's name, on the map or parked at an airbase. */
   function unitName(id: number): string {
-    return sim.units.find((u) => u.id === id)?.name ?? `unit ${id}`;
+    return (
+      sim.units.find((u) => u.id === id)?.name ??
+      sim.airBases.flatMap((b) => b.aircraft).find((a) => a.unit === id)?.name ??
+      `unit ${id}`
+    );
   }
 
   function seatRoleText(s: Seat): string {
@@ -212,6 +479,110 @@
     }
   }
 
+  // Terrain and bathymetry (lib/terrain.ts): which layers show, remembered like the theme.
+  let terrainView = $state<TerrainView>(readTerrainView());
+  let terrain = $state<TerrainStatus | null>(null);
+
+  // Depth under the selected unit and along its route (terrain packs), refreshed as it moves.
+  // The reload key is a derived string, so the effect re-runs only when the unit or its route
+  // changes, not on every snapshot. The last reading stays shown while a new one loads, so the
+  // Water row does not blink at fast time steps; it is cleared only for a different unit.
+  let water = $state<WaterView | null>(null);
+  let waterFor: number | null = null;
+  const waterKey = $derived(
+    `${String(sim.selected)}|${String(sim.selectedUnit?.route?.next)}|${String(sim.selectedUnit?.route?.waypoints.length)}|${String(terrain?.packs.length ?? 0)}`,
+  );
+  $effect(() => {
+    void waterKey;
+    const id = untrack(() => sim.selected);
+    if (id !== waterFor) {
+      water = null;
+      waterFor = id;
+    }
+    if (id === null || (untrack(() => terrain?.packs.length) ?? 0) === 0) {
+      water = null;
+      return;
+    }
+    let live = true;
+    const load = async () => {
+      const r = await commands.routeDepths(id);
+      if (live && sim.selected === id) water = r.status === "ok" ? r.data : null;
+    };
+    void load();
+    const timer = setInterval(() => void load(), 5000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  });
+  const waterProfile = $derived(water ? profilePaths(water, 240, 48) : null);
+  let terrainLayers = $state<TerrainLayers | null>(null);
+  let terrainReadout = $state("");
+  let showTerrain = $state(false);
+  let terrainError = $state("");
+  let terrainInput: HTMLInputElement;
+
+  function readTerrainView(): TerrainView {
+    const all = { depth: true, contours: true, relief: true };
+    try {
+      const v = JSON.parse(
+        localStorage.getItem("nws-terrain") ?? "null",
+      ) as Partial<TerrainView> | null;
+      return { ...all, ...(v ?? {}) };
+    } catch {
+      return all;
+    }
+  }
+
+  function toggleTerrain(k: keyof TerrainView) {
+    terrainView = { ...terrainView, [k]: !terrainView[k] };
+    try {
+      localStorage.setItem("nws-terrain", JSON.stringify(terrainView));
+    } catch {
+      // Storage unavailable: the choice lasts for this session only.
+    }
+  }
+
+  /** Asks the host which packs it has; again each second while it is still reading them. */
+  async function refreshTerrain() {
+    try {
+      terrain = await terrainStatus();
+    } catch {
+      return;
+    }
+    if (terrain?.loading) setTimeout(() => void refreshTerrain(), 1000);
+  }
+
+  async function installPack(files: FileList | null) {
+    const list = Array.from(files ?? []);
+    const pack = list.find((f) => f.name.endsWith(".nwsterrain"));
+    const sha = list.find((f) => f.name.endsWith(".sha256")) ?? null;
+    terrainError = "";
+    showTerrain = true;
+    if (!pack) {
+      terrainError = "Choose a .nwsterrain pack, together with its .sha256 file.";
+      return;
+    }
+    try {
+      terrain = await installTerrainPack(pack, sha);
+    } catch (e) {
+      terrainError = `${pack.name} was not installed: ${String(e)}`;
+    }
+  }
+
+  const terrainCredit = $derived(
+    [...new Set((terrain?.packs ?? []).map((p) => p.credit))].join("; "),
+  );
+
+  $effect(() => {
+    // Read everything first: an optional call skips its arguments while there is no map yet,
+    // and the effect would then never run again.
+    const view = { ...terrainView };
+    const available = (terrain?.packs.length ?? 0) > 0;
+    const t = theme;
+    terrainLayers?.set(view, t, available);
+  });
+
   $effect(() => {
     document.documentElement.dataset.theme = theme;
     if (map) setMapTheme(map, theme);
@@ -222,6 +593,12 @@
     map = created.map;
     overlay = created.overlay;
     setMapTheme(map, theme);
+    terrainLayers = new TerrainLayers(map, () => terrainCredit);
+    map.on("mousemove", (e) => {
+      const h = terrainLayers?.heightAt(e.lngLat.lng, e.lngLat.lat) ?? null;
+      terrainReadout = h === null ? "" : heightText(h);
+    });
+    map.on("mouseout", () => (terrainReadout = ""));
     map.on("click", (e) => {
       const p = { lat_deg: e.lngLat.lat, lon_deg: e.lngLat.lng };
       if (editor.open && editor.deliver(p)) return;
@@ -238,6 +615,10 @@
         relayout();
       });
     });
+    void refreshTerrain();
+    void imageryStatus()
+      .then((s) => (imagery = s))
+      .catch(() => {});
     sim.start().catch((e: unknown) => {
       startError = `Cannot connect to the simulation engine: ${String(e)}`;
     });
@@ -354,6 +735,9 @@
           hiddenLabels,
           symbolStyle,
         }),
+        ...weatherLayers(sim.weatherZones),
+        ...buoyLayers(sim.sonobuoys),
+        ...laneLayers(sim.session?.lanes ?? [], hiddenLabels),
         ...referenceLayers(sim.session?.reference_points ?? [], undefined, hiddenLabels),
         ...outcomeLayers(sim.outcomes, n(clock?.game_time_s ?? 0)),
       ],
@@ -397,7 +781,7 @@
   // ---- Layout: menus, panel tabs, dialogs ----
 
   type LeftTab = "picture" | "messages" | "coverage";
-  type RightTab = "unit" | "injects" | "events" | "planning" | "seats" | "log" | "review";
+  type RightTab = "unit" | "air" | "injects" | "events" | "planning" | "seats" | "log" | "review";
   let leftTab = $state<LeftTab>("picture");
   let rightTab = $state<RightTab>("unit");
   let showDb = $state(false);
@@ -410,6 +794,7 @@
   /** The right-hand tabs this seat has. */
   const rightTabs = $derived<{ key: RightTab; label: string }[]>([
     { key: "unit", label: "Unit" },
+    ...(sim.airBases.length > 0 ? ([{ key: "air", label: "Air" }] as const) : []),
     ...(isWhiteCell
       ? ([
           { key: "injects", label: "Injects" },
@@ -469,6 +854,17 @@
           disabled: !sim.controlsTime,
           onselect: () => editInput.click(),
         },
+        {
+          label: "Install imagery pack…",
+          disabled: !sim.controlsTime,
+          onselect: () => imageryInput?.click(),
+        },
+        {
+          label: "Install terrain pack…",
+          disabled: !sim.controlsTime,
+          separatorBefore: true,
+          onselect: () => terrainInput.click(),
+        },
       ],
     },
     {
@@ -485,6 +881,31 @@
           checked: symbolStyle === "figures",
           onselect: toggleSymbols,
         },
+        {
+          label: "Depth shading",
+          separatorBefore: true,
+          checked: terrainView.depth,
+          onselect: () => toggleTerrain("depth"),
+        },
+        {
+          label: "Depth contours",
+          checked: terrainView.contours,
+          onselect: () => toggleTerrain("contours"),
+        },
+        {
+          label: "Relief",
+          checked: terrainView.relief,
+          onselect: () => toggleTerrain("relief"),
+        },
+        { label: "Terrain packs…", onselect: () => (showTerrain = true) },
+        {
+          label: "Imagery",
+          separatorBefore: true,
+          checked: activeImagery !== null,
+          disabled: (imagery?.packs.length ?? 0) === 0,
+          onselect: () => chooseImagery(activeImagery ? "" : (imagery?.packs[0]?.file ?? "")),
+        },
+        { label: "Imagery packs…", onselect: () => (showImagery = true) },
         { label: "Picture", separatorBefore: true, onselect: () => (leftTab = "picture") },
         { label: "Messages", onselect: () => (leftTab = "messages") },
         {
@@ -648,6 +1069,19 @@
     }}
   />
 
+  <input
+    bind:this={terrainInput}
+    class="visually-hidden"
+    type="file"
+    multiple
+    accept=".nwsterrain,.sha256"
+    aria-label="Terrain pack and its .sha256 file"
+    onchange={(e) => {
+      void installPack(e.currentTarget.files);
+      e.currentTarget.value = "";
+    }}
+  />
+
   <aside class="panel left" aria-label="Picture">
     <div class="tabs" role="tablist" aria-label="Picture panels">
       <button role="tab" aria-selected={leftTab === "picture"} onclick={() => (leftTab = "picture")}
@@ -741,6 +1175,7 @@
           <ul class="zones" aria-label="Sense coverage">
             {#each senseZones as z (z.id)}
               {@const cov = sim.coverage.find((c) => c.zone === z.id)}
+              {@const task = sim.sensorTasking.find((t) => t.zone === z.id)}
               <li>
                 <label class="inline">
                   <input
@@ -751,6 +1186,14 @@
                   {z.name}{z.layer ? ` (${z.layer})` : ""}
                 </label>
                 {#if cov}<span>{Math.round(n(cov.fraction) * 100)} % covered</span>{/if}
+                {#if task}
+                  <span class="dim"
+                    >goal {Math.round(n(task.goal) * 100)} %{task.units.length
+                      ? `; tasked: ${task.units.map(unitName).join(", ")}`
+                      : ""}</span
+                  >
+                  {#if task.short}<span class="hurt">short: no sensor left to send</span>{/if}
+                {/if}
               </li>
             {/each}
           </ul>
@@ -815,6 +1258,100 @@
                     none
                   {/if}
                 </dd>
+                {#if sim.weatherZones.length > 0}
+                  {@const w = weatherAt(sim.environment, sim.weatherZones, u.position)}
+                  <dt>Weather</dt>
+                  <dd>
+                    {w.zone
+                      ? `${w.zone.name}: ${weatherText(w.zone)}`
+                      : `sea state ${w.sea_state} (outside the weather zones)`}
+                  </dd>
+                {/if}
+                {#if u.towed}
+                  <dt>Towed array</dt>
+                  <dd>
+                    {towedText(u.towed)}
+                    <button
+                      type="button"
+                      class="inline-action"
+                      onclick={() => orderTowed(u.id, !u.towed?.streamed)}
+                      >{u.towed.streamed ? "Recover" : "Stream"}</button
+                    >
+                  </dd>
+                {/if}
+                {#if u.air}
+                  <dt>Air</dt>
+                  <dd>
+                    {airborneText(u.air)}{bingoText(u.air) ? `, ${bingoText(u.air)}` : ""}
+                    {#if u.air.state !== "returning"}
+                      <button
+                        type="button"
+                        class="inline-action"
+                        onclick={() =>
+                          void commands.orderRecall(u.id, null).then((r) => {
+                            if (r.status === "error") sim.error = r.error;
+                          })}>Recall</button
+                      >
+                    {/if}
+                  </dd>
+                {/if}
+                {#if u.sonobuoys_left != null}
+                  <dt>Sonobuoys</dt>
+                  <dd>
+                    {u.sonobuoys_left} left
+                    {#if buoyDrops}
+                      <span class="dim">{buoyDrops.length} points</span>
+                      <label class="inline"
+                        ><input type="checkbox" bind:checked={buoysDeep} /> deep (300 m)</label
+                      >
+                      <button type="button" class="inline-action" onclick={() => layBuoys(u.id)}
+                        >Lay</button
+                      >
+                      <button
+                        type="button"
+                        class="inline-action"
+                        onclick={() => {
+                          buoyDrops = null;
+                          sim.picking = null;
+                        }}>Cancel</button
+                      >
+                    {:else if (u.sonobuoys_left ?? 0) > 0}
+                      <button
+                        type="button"
+                        class="inline-action"
+                        onclick={() => {
+                          buoyDrops = [];
+                          pickBuoyPoint();
+                        }}>Lay on the map</button
+                      >
+                    {/if}
+                  </dd>
+                {/if}
+                {#if water && (u.domain === "surface" || u.domain === "subsurface")}
+                  <dt>Water</dt>
+                  <dd class:hurt={waterTight(water)}>
+                    {waterText(water)}
+                    {#if waterProfile && waterProfile.bed}
+                      <svg
+                        class="water-profile"
+                        viewBox="0 0 240 48"
+                        role="img"
+                        aria-label="Depth along the route"
+                      >
+                        <path class="bed" d={waterProfile.bed} />
+                        {#if waterProfile.draftY !== null}
+                          <line
+                            class="draft"
+                            x1="0"
+                            x2="240"
+                            y1={waterProfile.draftY}
+                            y2={waterProfile.draftY}
+                          />
+                        {/if}
+                      </svg>
+                    {/if}
+                  </dd>
+                {/if}
                 <dt>Condition</dt>
                 <dd class:hurt={u.status !== "operational"}>
                   {u.status.replaceAll("_", " ")} · {Math.round(n(u.damage_fraction) * 100)} % damage{u.fires >
@@ -1058,6 +1595,8 @@
               </ul>
             </section>
           {/if}
+        {:else if rightTab === "air"}
+          <AirPanel />
         {:else if rightTab === "injects"}
           <section>
             <h3>Inject library</h3>
@@ -1172,6 +1711,38 @@
               {#each sim.session?.facilities ?? [] as f, i (f.id)}
                 <li class="stacked">
                   <span>{f.name} <span class="dim">({f.kind.replaceAll("_", " ")})</span></span>
+                  {#if f.kind !== "command_post" && f.unit == null}
+                    <span class="row tight">
+                      <label class="inline">
+                        Depth (m)
+                        <input
+                          class="depth"
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          placeholder={chartDepths.get(f.id) != null
+                            ? `chart ${Math.round(chartDepths.get(f.id) ?? 0)}`
+                            : "any"}
+                          value={f.depth_m ?? ""}
+                          aria-label={`Depth at ${f.name} (blank: from the chart)`}
+                          onchange={(e) => {
+                            const v = e.currentTarget.value.trim();
+                            editPlanning((fs) => {
+                              const x = fs[i];
+                              if (x) x.depth_m = v === "" ? null : Math.max(0.1, Number(v));
+                            });
+                          }}
+                        />
+                      </label>
+                      <span class="dim">
+                        {f.depth_m != null
+                          ? "set by the planner"
+                          : chartDepths.get(f.id) != null
+                            ? "from the chart"
+                            : "no limit"}
+                      </span>
+                    </span>
+                  {/if}
                   <span class="row tight">
                     {#if f.kind !== "command_post"}
                       {#each ["repair", "rearm", "refuel"] as const as sv (sv)}
@@ -1203,11 +1774,377 @@
             </ul>
           </section>
           <section>
+            <h3>Weather</h3>
+            <ul class="zones" aria-label="Weather zones">
+              {#each sim.weatherZones as z, i (z.id)}
+                <li class="stacked">
+                  <span>
+                    <input
+                      class="lane-name"
+                      value={z.name}
+                      aria-label="Weather zone name"
+                      onchange={(e) => {
+                        const v = e.currentTarget.value.trim();
+                        editWeather((zs) => {
+                          const x = zs[i];
+                          if (x && v) x.name = v;
+                        });
+                      }}
+                    />
+                    <span class="dim">{weatherText(z)}</span>
+                  </span>
+                  <span class="row tight weather-fields">
+                    <label class="inline"
+                      >Sea state <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        max="9"
+                        value={z.sea_state}
+                        onchange={(e) => {
+                          const v = Math.round(fieldNum(e.currentTarget.value, 0, 9));
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.sea_state = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Wind (kn) <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        value={n(z.wind_kn)}
+                        onchange={(e) => {
+                          const v = fieldNum(e.currentTarget.value, 0, 200);
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.wind_kn = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >from (°) <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        max="359"
+                        value={n(z.wind_from_deg)}
+                        onchange={(e) => {
+                          const v = fieldNum(e.currentTarget.value, 0, 359);
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.wind_from_deg = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Visibility (km) <input
+                        class="depth"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={n(z.visibility_km)}
+                        onchange={(e) => {
+                          const v = fieldNum(e.currentTarget.value, 0.1, 100);
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.visibility_km = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Rain (mm/h) <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        value={n(z.rain_mm_h)}
+                        onchange={(e) => {
+                          const v = fieldNum(e.currentTarget.value, 0, 500);
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.rain_mm_h = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Cloud base (m) <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        placeholder="none"
+                        value={z.cloud_base_m ?? ""}
+                        onchange={(e) => {
+                          const raw = e.currentTarget.value.trim();
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.cloud_base_m = raw === "" ? null : fieldNum(raw, 0, 20000);
+                          });
+                        }}
+                      /></label
+                    >
+                    <button
+                      type="button"
+                      onclick={() => editWeather((zs) => void zs.splice(i, 1))}
+                      aria-label={`Remove ${z.name}`}>Remove</button
+                    >
+                  </span>
+                </li>
+              {:else}
+                <li class="empty">
+                  No weather zones: sea state {sim.environment?.sea_state ?? 0} everywhere.
+                </li>
+              {/each}
+            </ul>
+            <div class="row tight">
+              <label class="inline"
+                >Radius
+                <input
+                  type="number"
+                  min="1"
+                  bind:value={newWeatherKm}
+                  aria-label="Radius of the weather zone to add, km"
+                  style="width: 4.5em"
+                /> km</label
+              >
+              <button type="button" onclick={addWeatherOnMap}>Add on the map</button>
+            </div>
+          </section>
+          <section>
+            <h3>Sound profiles</h3>
+            <ul class="zones" aria-label="Sound profiles">
+              {#each sim.soundProfiles as p, i (p.id)}
+                <li class="stacked">
+                  <span>
+                    <input
+                      class="lane-name"
+                      value={p.name}
+                      aria-label="Sound profile name"
+                      onchange={(e) => {
+                        const name = e.currentTarget.value.trim();
+                        if (name) editProfiles((ps) => void (ps[i] && (ps[i].name = name)));
+                      }}
+                    />
+                    <span class="dim">{profileText(p)}</span>
+                  </span>
+                  <span class="row tight">
+                    <button
+                      type="button"
+                      onclick={() => editProfiles((ps) => void ps.splice(i, 1))}
+                      aria-label={`Remove ${p.name}`}>Remove</button
+                    >
+                  </span>
+                </li>
+              {:else}
+                <li class="empty">
+                  No sound profiles: sound spreads by the simple law everywhere.
+                </li>
+              {/each}
+            </ul>
+            {#each profileNotes as note, i (i)}
+              <p class="dim">{note}</p>
+            {/each}
+            <div class="row tight">
+              <button type="button" onclick={() => profileInput?.click()}>Import CSV…</button>
+            </div>
+            <input
+              bind:this={profileInput}
+              class="visually-hidden"
+              type="file"
+              accept=".csv,.txt,text/csv,text/plain"
+              aria-label="Sound-velocity profile (CSV of depth and speed)"
+              onchange={(e) => {
+                void importProfile(e.currentTarget.files?.[0]);
+                e.currentTarget.value = "";
+              }}
+            />
+          </section>
+          <section>
+            <h3>Shipping lanes</h3>
+            <ul class="zones" aria-label="Shipping lanes">
+              {#each sim.session?.lanes ?? [] as l, i (l.id)}
+                <li class="stacked">
+                  <span>
+                    <input
+                      class="lane-name"
+                      value={l.name}
+                      aria-label="Lane name"
+                      onchange={(e) => {
+                        const v = e.currentTarget.value.trim();
+                        editLanes((ls) => {
+                          const x = ls[i];
+                          if (x && v) x.name = v;
+                        });
+                      }}
+                    />
+                    <span class="dim">{l.source ?? "drawn here"}</span>
+                  </span>
+                  <span class="row tight">
+                    <label class="inline"
+                      >Width (km)
+                      <input
+                        class="depth"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={(n(l.width_m) / 1000).toFixed(1)}
+                        onchange={(e) => {
+                          const v = Number(e.currentTarget.value);
+                          editLanes((ls) => {
+                            const x = ls[i];
+                            if (x && v > 0) x.width_m = v * 1000;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Ships/day
+                      <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        value={l.ships_per_day ?? ""}
+                        placeholder="—"
+                        onchange={(e) => {
+                          const v = e.currentTarget.value.trim();
+                          editLanes((ls) => {
+                            const x = ls[i];
+                            if (!x) return;
+                            x.ships_per_day = v === "" ? null : Math.max(0, Number(v));
+                            if (x.ships_per_day !== null && !x.source)
+                              x.source = "planner's estimate";
+                          });
+                        }}
+                      /></label
+                    >
+                    <button
+                      type="button"
+                      onclick={() => editLanes((ls) => void ls.splice(i, 1))}
+                      aria-label={`Remove ${l.name}`}>Remove</button
+                    >
+                  </span>
+                </li>
+              {:else}
+                <li class="empty">No lanes.</li>
+              {/each}
+            </ul>
+            {#each laneNotes as note (note)}
+              <p class="dim">{note}</p>
+            {/each}
+            <div class="row tight">
+              {#if drawingLane}
+                <span class="dim">{drawingLane.length} points</span>
+                <button type="button" onclick={finishLane}>Finish lane</button>
+              {:else}
+                <button
+                  type="button"
+                  onclick={() => {
+                    drawingLane = [];
+                    drawLanePoint();
+                  }}>Draw on the map</button
+                >
+                <button type="button" onclick={() => laneInput?.click()}>Import GeoJSON…</button>
+              {/if}
+            </div>
+            <input
+              bind:this={laneInput}
+              class="visually-hidden"
+              type="file"
+              accept=".geojson,.json,application/geo+json,application/json"
+              aria-label="Shipping lanes (GeoJSON)"
+              onchange={(e) => {
+                void importLanes(e.currentTarget.files?.[0]);
+                e.currentTarget.value = "";
+              }}
+            />
+          </section>
+          {#if chokes.length > 0}
+            <section>
+              <h3>Choke points</h3>
+              <label class="inline"
+                >Draft (m)
+                <input
+                  class="depth"
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  bind:value={chokeDraft}
+                /></label
+              >
+              {#each chokes as c (c.choke_point)}
+                {@const sec = chokeSection(c)}
+                <div class="choke">
+                  <strong>{c.choke_point}</strong>
+                  <span class="dim">
+                    {#if c.least_m == null}
+                      no chart here
+                    {:else}
+                      least {Math.round(n(c.least_m))} m · typical {Math.round(n(c.median_m))} m · deepest
+                      {Math.round(n(c.deepest_m))} m · {(
+                        navigableWidthM(c.section, chokeDraft + 1) / 1000
+                      ).toFixed(1)} km wide for a {chokeDraft} m draft
+                    {/if}
+                    {#if c.lanes.length}
+                      · {c.lanes.length} lane{c.lanes.length > 1 ? "s" : ""}, {Math.round(
+                        n(c.traffic_per_day),
+                      )} ships a day
+                    {/if}
+                  </span>
+                  {#if c.least_m != null && sec.bed}
+                    <svg
+                      class="water-profile"
+                      viewBox="0 0 240 48"
+                      role="img"
+                      aria-label={`Depth across ${c.choke_point}`}
+                    >
+                      <path class="bed" d={sec.bed} />
+                      {#if sec.draftY !== null}
+                        <line class="draft" x1="0" x2="240" y1={sec.draftY} y2={sec.draftY} />
+                      {/if}
+                    </svg>
+                  {/if}
+                </div>
+              {/each}
+            </section>
+          {/if}
+          <section>
             <h3>Zones</h3>
             <ul class="zones" aria-label="Zone rules">
               {#each sim.session?.zones ?? [] as z (z.id)}
                 <li class="stacked">
                   <span>{z.name} <span class="dim">({z.kind})</span></span>
+                  {#if z.kind === "sense"}
+                    <label class="inline"
+                      >Coverage goal
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="5"
+                        style="width: 4.5em"
+                        aria-label={`Coverage goal of ${z.name}, per cent`}
+                        value={z.coverage_goal == null ? "" : Math.round(n(z.coverage_goal) * 100)}
+                        onchange={(e) => {
+                          const v = Number(e.currentTarget.value);
+                          editPlanning((_, zs) => {
+                            const k = zs.find((x) => x.id === z.id);
+                            if (!k) return;
+                            k.coverage_goal =
+                              e.currentTarget.value === "" || !(v > 0)
+                                ? null
+                                : Math.min(100, v) / 100;
+                            if (k.coverage_goal == null) k.assets = [];
+                          });
+                        }}
+                      />
+                      %</label
+                    >
+                  {/if}
                   <span class="row tight">
                     <select
                       aria-label={`Weapons control in ${z.name}`}
@@ -1363,6 +2300,9 @@
     {:else}
       <span class="dim">Space run/pause · 1–7 compression · . step · Esc deselect</span>
     {/if}
+    {#if terrainReadout}
+      <span class="terrain-readout">{terrainReadout}</span>
+    {/if}
   </footer>
 
   {#if showDb}
@@ -1382,6 +2322,156 @@
           >Close</button
         >
         <DbBrowser />
+      </div>
+    </div>
+  {/if}
+
+  <input
+    bind:this={imageryInput}
+    class="visually-hidden"
+    type="file"
+    accept=".mbtiles,.pmtiles"
+    aria-label="Imagery tile pack"
+    onchange={(e) => {
+      void installImageryFile(e.currentTarget.files?.[0]);
+      e.currentTarget.value = "";
+    }}
+  />
+
+  {#if showImagery}
+    <div class="dialog-backdrop" role="presentation" onclick={() => (showImagery = false)}>
+      <div
+        class="dialog"
+        role="dialog"
+        aria-label="Imagery packs"
+        aria-modal="true"
+        tabindex="-1"
+        onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => {
+          if (e.key === "Escape") showImagery = false;
+        }}
+      >
+        <h2>Imagery packs</h2>
+        {#if imageryError}
+          <p class="error" role="alert">{imageryError}</p>
+        {/if}
+        {#if (imagery?.packs.length ?? 0) === 0}
+          <p>
+            No imagery is installed. The map uses its own coastline and depth shading. To add the
+            licensed imagery, choose File › Install imagery pack… (an <code>.mbtiles</code> or
+            <code>.pmtiles</code> file up to 1 GB), or copy larger packs into the folder below and press
+            Read the folder again.
+          </p>
+        {:else}
+          <fieldset class="imagery-packs">
+            <legend>Show on the map</legend>
+            <label class="inline">
+              <input
+                type="radio"
+                name="imagery"
+                checked={activeImagery === null}
+                onchange={() => chooseImagery("")}
+              />
+              None
+            </label>
+            {#each imagery?.packs ?? [] as p (p.file)}
+              <label class="inline">
+                <input
+                  type="radio"
+                  name="imagery"
+                  checked={activeImagery?.file === p.file}
+                  onchange={() => chooseImagery(p.file)}
+                />
+                <span>
+                  {p.name}
+                  <span class="dim">
+                    · {p.format.toUpperCase()}, zoom {p.min_zoom}–{p.max_zoom} · {imageryCredit(p)}
+                  </span>
+                </span>
+              </label>
+            {/each}
+          </fieldset>
+          <p class="dim">Nothing is fetched from a network: tiles come from these files only.</p>
+        {/if}
+        {#each imagery?.problems ?? [] as problem (problem)}
+          <p class="error">Not used: {problem}</p>
+        {/each}
+        {#if imagery?.folder}
+          <p class="dim">Imagery packs are kept in {imagery.folder}</p>
+        {/if}
+        <div class="row tight">
+          <button
+            type="button"
+            onclick={() =>
+              void rescanImagery().then((s) => {
+                imagery = s;
+              })}>Read the folder again</button
+          >
+          <button onclick={() => (showImagery = false)}>Close</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if showTerrain}
+    <div class="dialog-backdrop" role="presentation" onclick={() => (showTerrain = false)}>
+      <div
+        class="dialog"
+        role="dialog"
+        aria-label="Terrain packs"
+        aria-modal="true"
+        tabindex="-1"
+        onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => {
+          if (e.key === "Escape") showTerrain = false;
+        }}
+      >
+        <h2>Terrain packs</h2>
+        {#if terrainError}
+          <p class="error" role="alert">{terrainError}</p>
+        {/if}
+        {#if terrain?.loading}
+          <p class="dim">Reading the packs…</p>
+        {:else if !terrain || terrain.packs.length === 0}
+          <p>
+            No terrain packs are installed, so the map has no depth shading and the exercise runs
+            without depths. Install a pack with File › Install terrain pack…, choosing the
+            <code>.nwsterrain</code> file and its <code>.sha256</code> file together.
+          </p>
+        {:else}
+          <table class="terrain-packs">
+            <thead>
+              <tr><th>Pack</th><th>Cell</th><th>Covers</th><th>From</th></tr>
+            </thead>
+            <tbody>
+              {#each terrain.packs as p (p.id)}
+                <tr>
+                  <td title={`SHA-256 ${p.sha256}`}>{p.name}</td>
+                  <td>{cellText(p.cell_arcsec)}</td>
+                  <td>{coversText(p.bounds_deg)}</td>
+                  <td>{p.bundled ? "with the app" : "installed"}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <p>
+            {#if terrain.in_use}
+              This exercise runs with these packs.
+            {:else}
+              This exercise started before the packs were read; the next scenario you open uses
+              them.
+            {/if}
+            Depths are for planning, not for navigation.
+          </p>
+          <p class="dim">{terrainCredit}</p>
+        {/if}
+        {#each terrain?.problems ?? [] as problem (problem)}
+          <p class="error">Not used: {problem}</p>
+        {/each}
+        {#if terrain?.folder}
+          <p class="dim">Installed packs are kept in {terrain.folder}</p>
+        {/if}
+        <button onclick={() => (showTerrain = false)}>Close</button>
       </div>
     </div>
   {/if}
@@ -1794,6 +2884,62 @@
   }
 
   /* Status bar: what needs your attention, or what the keys do. */
+  .water-profile {
+    display: block;
+    width: 100%;
+    max-width: 240px;
+    height: 48px;
+    margin-top: 4px;
+    background: color-mix(in srgb, #2b6f8a 35%, transparent);
+    border-radius: 2px;
+  }
+  .water-profile .bed {
+    fill: #8a7356;
+  }
+  .water-profile .draft {
+    stroke: var(--warn);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+  }
+  input.depth {
+    width: 6em;
+  }
+  input.lane-name {
+    width: 12em;
+  }
+  .weather-fields {
+    flex-wrap: wrap;
+  }
+  .inline-action {
+    margin-left: 6px;
+    padding: 0 8px;
+    font-size: 0.85em;
+  }
+  .choke {
+    margin: 6px 0;
+  }
+  .imagery-packs {
+    display: grid;
+    gap: 6px;
+    border: none;
+    padding: 0;
+    margin: 8px 0;
+  }
+  .statusbar .terrain-readout {
+    margin-left: auto;
+    padding-left: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+  .terrain-packs {
+    border-collapse: collapse;
+    margin: 8px 0;
+    font-size: 13px;
+  }
+  .terrain-packs th,
+  .terrain-packs td {
+    text-align: left;
+    padding: 3px 12px 3px 0;
+  }
   .statusbar {
     grid-area: status;
     display: flex;

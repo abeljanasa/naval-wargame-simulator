@@ -11,9 +11,11 @@ default = []
 specta = ["dep:specta"]
 
 [dependencies]
+flate2.workspace = true
 libm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 specta = { workspace = true, optional = true }
 
 [dev-dependencies]

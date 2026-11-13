@@ -9,8 +9,10 @@
 //! next to land to keep clearance), then shortens the cell path into a few straight legs that stay
 //! clear of the coast.
 
+use crate::terrain::Terrain;
 use crate::GeoPoint;
-use std::collections::BinaryHeap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::{Arc, OnceLock};
 
 /// Raster resolution of the bundled mask: 1/30° (≈ 3.7 km at the equator).
@@ -39,6 +41,42 @@ impl std::fmt::Display for PlanError {
             PlanError::NoSeaRoute => "no sea route to the waypoint",
             PlanError::TooFar => "the leg is too long to plan around land",
         })
+    }
+}
+
+/// Water a unit must not plan through: shallower than `min_depth_m` (its draft plus under-keel
+/// clearance) on the terrain packs (`docs/models/shallow-water.md`).
+#[derive(Debug, Clone, Copy)]
+pub struct DepthLimit<'a> {
+    pub terrain: &'a Terrain,
+    pub min_depth_m: f64,
+}
+
+/// A planned route.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoutePlan {
+    /// The given waypoints, in order, with turning points added where legs were replanned.
+    pub waypoints: Vec<GeoPoint>,
+    /// Legs replanned (round land or shallow water).
+    pub replanned: usize,
+    /// Legs with no route deep enough for the depth limit: planned round land only, so the unit
+    /// may meet water too shallow for it.
+    pub shallow_legs: usize,
+}
+
+/// Cells too shallow for one leg, worked out as the search reaches them. Cells within 2 of the
+/// leg's ends are exempt, so legs can start and finish in harbours and inshore anchorages.
+struct Shallow<'a> {
+    limit: DepthLimit<'a>,
+    start: (i64, i64),
+    goal: (i64, i64),
+    cache: RefCell<BTreeMap<(i64, i64), bool>>,
+}
+
+impl Shallow<'_> {
+    fn exempt(&self, (r, c): (i64, i64)) -> bool {
+        let near = |(r0, c0): (i64, i64)| (r - r0).abs().max((c - c0).abs()) <= 2;
+        near(self.start) || near(self.goal)
     }
 }
 
@@ -240,6 +278,62 @@ impl LandMask {
         self.bit(&self.near_land, row, col)
     }
 
+    /// True if any of 3 × 3 points across the cell is shallower than the limit (land on the
+    /// terrain counts). No terrain data there counts as deep enough.
+    fn shallow_cell(&self, sh: &Shallow<'_>, row: i64, col: i64) -> bool {
+        let key = (row, col.rem_euclid(self.cols));
+        if let Some(&v) = sh.cache.borrow().get(&key) {
+            return v;
+        }
+        let centre = self.cell_centre(row, col);
+        let step = 1.0 / (3.0 * self.per_deg);
+        let mut shallow = false;
+        'grid: for i in -1i32..=1 {
+            for j in -1i32..=1 {
+                let p = GeoPoint::new(
+                    (centre.lat_deg + f64::from(i) * step).clamp(-90.0, 90.0),
+                    centre.lon_deg + f64::from(j) * step,
+                );
+                if sh
+                    .limit
+                    .terrain
+                    .height_m(p)
+                    .is_some_and(|h| -h < sh.limit.min_depth_m)
+                {
+                    shallow = true;
+                    break 'grid;
+                }
+            }
+        }
+        sh.cache.borrow_mut().insert(key, shallow);
+        shallow
+    }
+
+    /// A cell the route may not enter: land, or (with a depth limit) too shallow away from the
+    /// leg's ends.
+    fn near_shallow(&self, sh: Option<&Shallow<'_>>, row: i64, col: i64) -> bool {
+        let Some(sh) = sh else {
+            return false;
+        };
+        (-1..=1).any(|dr| {
+            (-1..=1).any(|dc| {
+                let (r, c) = (row + dr, col + dc);
+                !sh.exempt((r, c)) && self.shallow_cell(sh, r, c)
+            })
+        })
+    }
+
+    /// A cell to keep clear of where possible: next to land, or (with a depth limit) next to
+    /// water too shallow, so turns and dead reckoning keep a margin.
+    fn near_hazard(&self, sh: Option<&Shallow<'_>>, row: i64, col: i64) -> bool {
+        self.near_land_cell(row, col) || self.near_shallow(sh, row, col)
+    }
+
+    fn blocked(&self, sh: Option<&Shallow<'_>>, row: i64, col: i64) -> bool {
+        self.land_cell(row, col)
+            || sh.is_some_and(|sh| !sh.exempt((row, col)) && self.shallow_cell(sh, row, col))
+    }
+
     /// True if the point lies in a land cell.
     #[must_use]
     pub fn is_land(&self, p: GeoPoint) -> bool {
@@ -256,7 +350,12 @@ impl LandMask {
 
     /// True if the straight cell line from (r0,c0) to (r1,c1) (columns unwrapped) stays in water and
     /// away from the coast, except near its own two ends (so legs may start and end close inshore).
-    fn line_clear(&self, (r0, c0): (i64, i64), (r1, c1): (i64, i64)) -> bool {
+    fn line_clear(
+        &self,
+        sh: Option<&Shallow<'_>>,
+        (r0, c0): (i64, i64),
+        (r1, c1): (i64, i64),
+    ) -> bool {
         let dr = r1 - r0;
         let dc = c1 - c0;
         let n = 4 * dr.abs().max(dc.abs()).max(1);
@@ -267,12 +366,12 @@ impl LandMask {
             let r = (r0 as f64 + 0.5 + t * dr as f64).floor() as i64;
             #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
             let c = (c0 as f64 + 0.5 + t * dc as f64).floor() as i64;
-            if self.land_cell(r, c) {
+            if self.blocked(sh, r, c) {
                 return false;
             }
             let near_end =
                 (r - r0).abs().max((c - c0).abs()) <= 2 || (r - r1).abs().max((c - c1).abs()) <= 2;
-            if !near_end && self.near_land_cell(r, c) {
+            if !near_end && self.near_hazard(sh, r, c) {
                 return false;
             }
         }
@@ -287,28 +386,56 @@ impl LandMask {
         from: GeoPoint,
         waypoints: &[GeoPoint],
     ) -> Result<(Vec<GeoPoint>, usize), PlanError> {
+        self.plan_route_for(from, waypoints, None)
+            .map(|p| (p.waypoints, p.replanned))
+    }
+
+    /// As [`LandMask::plan_route`], also keeping out of water shallower than `limit`. A leg with
+    /// no route deep enough is planned round land only and counted in `shallow_legs`.
+    pub fn plan_route_for(
+        &self,
+        from: GeoPoint,
+        waypoints: &[GeoPoint],
+        limit: Option<DepthLimit<'_>>,
+    ) -> Result<RoutePlan, PlanError> {
         if self.is_land(from) {
             return Err(PlanError::StartOnLand);
         }
-        let mut out = Vec::with_capacity(waypoints.len());
-        let mut replanned = 0;
+        let mut plan = RoutePlan {
+            waypoints: Vec::with_capacity(waypoints.len()),
+            replanned: 0,
+            shallow_legs: 0,
+        };
         let mut at = from;
         for &wp in waypoints {
             if self.is_land(wp) {
                 return Err(PlanError::WaypointOnLand);
             }
-            let leg = self.plan_leg(at, wp)?;
+            let deep = limit.map(|l| self.plan_leg(at, wp, Some(l)));
+            let leg = match deep {
+                Some(Ok(leg)) => leg,
+                Some(Err(_)) => {
+                    plan.shallow_legs += 1;
+                    self.plan_leg(at, wp, None)?
+                }
+                None => self.plan_leg(at, wp, None)?,
+            };
             if leg.len() > 1 {
-                replanned += 1;
+                plan.replanned += 1;
             }
-            out.extend(leg);
+            plan.waypoints.extend(leg);
             at = wp;
         }
-        Ok((out, replanned))
+        Ok(plan)
     }
 
     /// One leg: `[b]` when the straight line is clear, else intermediate turning points then `b`.
-    fn plan_leg(&self, a: GeoPoint, b: GeoPoint) -> Result<Vec<GeoPoint>, PlanError> {
+    fn plan_leg(
+        &self,
+        a: GeoPoint,
+        b: GeoPoint,
+        limit: Option<DepthLimit<'_>>,
+    ) -> Result<Vec<GeoPoint>, PlanError> {
         let start = (self.row_of(a.lat_deg), self.col_of(a.lon_deg));
         let gr = self.row_of(b.lat_deg);
         let mut gc = self.col_of(b.lon_deg);
@@ -319,16 +446,23 @@ impl LandMask {
             gc += self.cols;
         }
         let goal = (gr, gc);
-        if self.line_clear(start, goal) {
+        let shallow = limit.map(|limit| Shallow {
+            limit,
+            start,
+            goal,
+            cache: RefCell::new(BTreeMap::new()),
+        });
+        let sh = shallow.as_ref();
+        if self.line_clear(sh, start, goal) {
             return Ok(vec![b]);
         }
         let span = (goal.0 - start.0).abs().max((goal.1 - start.1).abs());
         let mut last_err = PlanError::NoSeaRoute;
         for margin in [span / 2 + 60, span * 2 + 180] {
-            match self.astar(start, goal, margin) {
+            match self.astar(sh, start, goal, margin) {
                 Ok(path) => {
                     let mut pts: Vec<GeoPoint> = self
-                        .shorten(&path)
+                        .shorten(sh, &path)
                         .into_iter()
                         .map(|(r, c)| self.cell_centre(r, c))
                         .collect();
@@ -345,6 +479,7 @@ impl LandMask {
     /// A* over water cells in a bounding region; returns the cell path start..=goal.
     fn astar(
         &self,
+        sh: Option<&Shallow<'_>>,
         start: (i64, i64),
         goal: (i64, i64),
         margin: i64,
@@ -404,14 +539,14 @@ impl LandMask {
             let g_cur = g[cur_us];
             for (dr, dc, base) in STEPS {
                 let (nr, nc) = (r + dr, c + dc);
-                if nr < r_lo || nr > r_hi || nc < c_lo || nc > c_hi || self.land_cell(nr, nc) {
+                if nr < r_lo || nr > r_hi || nc < c_lo || nc > c_hi || self.blocked(sh, nr, nc) {
                     continue;
                 }
                 // No corner-cutting between two land cells.
                 if dr != 0 && dc != 0 && (self.land_cell(r + dr, c) || self.land_cell(r, c + dc)) {
                     continue;
                 }
-                let cost = if self.near_land_cell(nr, nc) {
+                let cost = if self.near_hazard(sh, nr, nc) {
                     base * COASTAL_PENALTY
                 } else {
                     base
@@ -433,12 +568,12 @@ impl LandMask {
     }
 
     /// Greedy string-pulling: from each kept cell, jump to the farthest later cell in clear sight.
-    fn shorten(&self, path: &[(i64, i64)]) -> Vec<(i64, i64)> {
+    fn shorten(&self, sh: Option<&Shallow<'_>>, path: &[(i64, i64)]) -> Vec<(i64, i64)> {
         let mut out = Vec::new();
         let mut i = 0;
         while i + 1 < path.len() {
             let mut j = path.len() - 1;
-            while j > i + 1 && !self.line_clear(path[i], path[j]) {
+            while j > i + 1 && !self.line_clear(sh, path[i], path[j]) {
                 j -= 1;
             }
             out.push(path[j]);
@@ -565,5 +700,108 @@ mod tests {
             engine == desktop,
             "data/maps and the desktop basemap must be the same file"
         );
+    }
+
+    /// A world of 100 m water with a 5 m bank along the meridian (longitudes −1° to 1°), cut by
+    /// a deep channel at 20–22°N when `channel` is set.
+    fn bank(channel: bool) -> crate::terrain::Terrain {
+        use crate::terrain::{encode, PackHeader, Terrain, TerrainPack};
+        let (rows, cols) = (180u32, 360u32);
+        let heights: Vec<i16> = (0..rows * cols)
+            .map(|i| {
+                let lat = -89.5 + f64::from(i / cols);
+                let lon = -179.5 + f64::from(i % cols);
+                let in_bank = lon.abs() < 1.0;
+                let in_channel = channel && (20.0..=22.0).contains(&lat);
+                if in_bank && !in_channel {
+                    -5
+                } else {
+                    -100
+                }
+            })
+            .collect();
+        let header = PackHeader {
+            name: "bank".into(),
+            source: "test".into(),
+            credit: "test".into(),
+            lat0: -89 * 36_000 - 18_000,
+            lon0: -179 * 36_000 - 18_000,
+            cell: 36_000,
+            rows,
+            cols,
+            min_m: -100,
+            max_m: -5,
+        };
+        let pack = TerrainPack::decode(&encode(&header, &heights).unwrap()).unwrap();
+        Terrain::new(vec![Arc::new(pack)]).unwrap()
+    }
+
+    #[test]
+    fn deep_draft_routes_round_a_shallow_bank() {
+        let mask = LandMask::empty("open");
+        let terrain = bank(true);
+        let (from, to) = (GeoPoint::new(0.0, -5.0), GeoPoint::new(0.0, 5.0));
+        let deep = DepthLimit {
+            terrain: &terrain,
+            min_depth_m: 8.0,
+        };
+        let plan = mask.plan_route_for(from, &[to], Some(deep)).unwrap();
+        assert_eq!(plan.shallow_legs, 0);
+        assert_eq!(plan.replanned, 1);
+        assert_eq!(plan.waypoints.last(), Some(&to));
+        // It crosses the meridian only through the channel, and stays out of the bank.
+        let mut at = from;
+        for &wp in &plan.waypoints {
+            for k in 0..=200 {
+                let t = f64::from(k) / 200.0;
+                let p = GeoPoint::new(
+                    at.lat_deg + t * (wp.lat_deg - at.lat_deg),
+                    at.lon_deg + t * (wp.lon_deg - at.lon_deg),
+                );
+                if p.lon_deg.abs() < 1.0 {
+                    assert!(
+                        (19.0..=23.0).contains(&p.lat_deg),
+                        "crossed the bank at {p:?}"
+                    );
+                }
+            }
+            at = wp;
+        }
+        // A shallow draft goes straight across, as does a route planned without a limit.
+        let shallow = DepthLimit {
+            terrain: &terrain,
+            min_depth_m: 3.0,
+        };
+        let plan = mask.plan_route_for(from, &[to], Some(shallow)).unwrap();
+        assert_eq!((plan.waypoints.as_slice(), plan.replanned), (&[to][..], 0));
+        assert_eq!(mask.plan_route(from, &[to]).unwrap(), (vec![to], 0));
+    }
+
+    #[test]
+    fn no_deep_route_falls_back_and_says_so() {
+        let mask = LandMask::empty("open");
+        let terrain = bank(false);
+        let (from, to) = (GeoPoint::new(0.0, -5.0), GeoPoint::new(0.0, 5.0));
+        let limit = DepthLimit {
+            terrain: &terrain,
+            min_depth_m: 8.0,
+        };
+        let plan = mask.plan_route_for(from, &[to], Some(limit)).unwrap();
+        assert_eq!(plan.shallow_legs, 1);
+        assert_eq!(plan.waypoints, vec![to]);
+    }
+
+    #[test]
+    fn a_leg_may_start_and_end_in_shallow_water() {
+        // Inside the bank at both ends, 1° apart along it: within 2 cells of the ends.
+        let mask = LandMask::empty("open");
+        let terrain = bank(false);
+        let limit = DepthLimit {
+            terrain: &terrain,
+            min_depth_m: 8.0,
+        };
+        let (from, to) = (GeoPoint::new(0.0, 0.0), GeoPoint::new(1.5, 0.0));
+        let plan = mask.plan_route_for(from, &[to], Some(limit)).unwrap();
+        assert_eq!((plan.waypoints, plan.shallow_legs), (vec![to], 0));
     }
 }

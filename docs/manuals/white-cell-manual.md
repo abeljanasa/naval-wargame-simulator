@@ -41,7 +41,8 @@ Choose the **White cell** seat (toolbar, **Seat**) to see ground truth: every si
 - **Unit**: the selected unit, with **Override** (Repair, Destroy, Remove) and weapons in flight (Hit, Miss);
 - **Injects**: the inject library and free messages;
 - **Events**;
-- **Planning**: command posts, facilities and zones in play;
+- **Air**: every side's airbases and their aircraft, with the same launch, cancel and readiness controls the sides have (each order is logged);
+- **Planning**: weather zones (add one on the map with a radius, then set its sea state, wind, visibility, rain and cloud base; each change is a logged order); sound profiles (import a CSV of depth and sound speed, one pair per line; it applies everywhere, all year, until a scenario gives areas and months; each change is a logged order); command posts, facilities and zones in play; shipping lanes (draw them on the map, or import GeoJSON; traffic figures need a source); each choke point's water (least, typical and deepest depth, a section across it, and how wide the water is for a draft you enter);
 - **Seats**;
 - **Log**: the override log;
 - **Review**: replay and AAR.
@@ -110,7 +111,7 @@ Scenarios with a planning layer add decision points you can exploit:
 - **Fuel** (scenarios with the fuel model): AI units low on fuel head for the nearest refuelling point or oiler. Queues at a busy point show in the timeline (*waiting for a berth*). Closing a depot's refuel service is a strong logistics inject.
 - **Weather:** raising the sea state (an event, or the scenario) sends small ships to shelter. Ships at an anchorage whose holding limit is exceeded leave it.
 - **Action groups:** sinking a leader hands the group to its next ship, with the group's mission.
-- **Coverage:** the left panel's **Coverage** tab shows any side's sense-zone coverage and gaps, for planning a decision point.
+- **Coverage:** the left panel's **Coverage** tab shows any side's sense-zone coverage and gaps, for planning a decision point. Set a sense zone's **coverage goal** in the Planning tab (*Coverage goal %*, a logged order; empty to stop) and the engine tasks that side's free sensors to keep it; each decision is on the timeline.
 
 ## 5. Exercise review and AAR
 
@@ -123,7 +124,7 @@ On the **Review** tab (or **Exercise › Review and AAR**), for the control stat
 | **Back to live** | Returns every window to the live exercise, still paused. |
 | **Save record** | Saves the exercise (`.nwsrec`): the scenario and every order, override and inject. Keep it with the exercise papers. |
 | Open a record | Opens a saved record for review on any machine with this build. |
-| **AAR tables** | Summary by side, losses with cause, weapons expended against effective, detections, and the timeline. Click a row to jump the replay there. **Save CSV** exports the open table. |
+| **AAR tables** | Summary by side, losses with cause, weapons expended against effective, detections, choke-point **transits** (lane, traffic, water, draft and a low/moderate/high risk; with lanes or terrain packs), and the timeline. Click a row to jump the replay there. **Save CSV** exports the open table. |
 
 **"Replay: matches the recorded run"** confirms the replay is exactly what happened. A red warning means the record was altered, or was made by a different build; treat that replay's details with care.
 

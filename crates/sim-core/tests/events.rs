@@ -43,6 +43,8 @@ fn spawn(id: u64, side: u16, at: GeoPoint, speed_mps: f64, route: Vec<GeoPoint>)
         mission: None,
         fuel: None,
         draft_m: None,
+        displacement_t: None,
+        air: None,
     }
 }
 
@@ -287,6 +289,7 @@ fn a_contact_trigger_fires_when_a_side_gains_a_track() {
     let mut sim = Simulation::new(5);
     let mut blue = spawn(1, 1, GeoPoint::new(0.0, 0.0), 0.0, vec![]);
     blue.sensors = vec![SensorSpec {
+        sonar: None,
         sensor_id: "R".into(),
         kind: SensorKind::Radar,
         mount_height_m: 25.0,

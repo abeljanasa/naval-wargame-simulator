@@ -33,24 +33,25 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 
 - [ ] Satellite imagery layers (needs a licensed imagery source).
 - [ ] Terrain elevation and bathymetry packs (GEBCO/SRTM), then:
-  - radar terrain masking;
-  - depths for ports and anchorages from bathymetry;
+  - ~~radar terrain masking~~ (Phase 4 slice 4, DL-0040);
+  - ~~depths for ports and anchorages from bathymetry~~ (Phase 4 slice 3, DL-0039);
   - choke points that inherit depth and shipping lanes;
-  - shallow-water routing.
-- [ ] Airbases and air operations: aircraft fuel and tanking, aircraft loadout choice, runways at facilities.
+  - ~~shallow-water routing~~ (Phase 4 slice 3, DL-0039).
+- [x] Airbases and air operations: aircraft fuel and tanking, aircraft loadout choice, runways at facilities (Phase 4 slices 9–11, DL-0046).
 - [ ] Automatic sense-zone sensor placement and tasking (§7.1, analysis phase).
 
 ## Phase 2, deferred from slices
 
-- [ ] Radar terrain masking (needs bundled elevation data, with GEBCO/SRTM in Phase 4).
-- [ ] Low air targets over land should see land clutter (needs a land-mask lookup in detection).
+- [x] Radar terrain masking, also for ESM, optical, comms and coverage (Phase 4 slice 4, [DL-0040](design-log/DL-0040-terrain-masking.md)).
+- [x] Low air targets over land see land clutter (Phase 4 slice 4, DL-0040).
 - [ ] ECM equipment (jammers) in the platform database, with soft kill in slice 9; until then jammers are given per unit in scenarios.
 - [ ] Track velocity estimation and association errors (tracks model limitations).
 - [ ] Acoustic figures (radiated noise, sonar frequency, DI, DT, source level) as platform-database fields; generic defaults in code until then.
 - [ ] Sonobuoy laying and towed-array streaming states (missions, slice 10); active-sonar reverberation.
 - [x] Weapons in flight as detectable, engageable targets (Phase 3 slice 15); salvo deconfliction within an action group (slice 16).
 - [ ] Seeker re-attack, and salvo deconfliction across ships that are not in a group.
-- [ ] Aircraft loadout choice (air operations, Phase 4); damage location and compartments.
+- [x] Aircraft loadout choice (Phase 4 slice 10, DL-0046).
+- [ ] Damage location and compartments.
 
 ## Phase 1, still to do (Gate 1: "units move and detect")
 
@@ -59,7 +60,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [x] In-app database browser: search, record detail with source citation, confidence and marking, and validation feedback (DL-0009).
 - [x] In-app database *editing* for platform records: record diff, citation entry, live validation while typing. It writes the JSON source (ADR-0004, DL-0037).
 - [x] Editing sensors and weapons in the app, in the same record editor (`sensors.json`, `weapons.json`).
-- [ ] Planning-layer facility attributes still to do: runways (air operations, Phase 4). Berths, repair, rearm, fuel and draft limits (planner-entered depth, DL-0032) are done.
+- [x] Planning-layer facility attributes: runways (airbases, Phase 4 slice 9), berths, repair, rearm, fuel and draft limits (planner-entered depth, DL-0032).
 - [x] Release scan (`sim-db scan`), run in the release workflow.
 - [x] Installers, signed when secrets are configured, plus SBOMs and a `cargo deny` licence audit (docs/build/releasing.md).
 - [x] Air-gapped vendored build, with the engine verified offline (docs/build/air-gapped.md).
@@ -77,7 +78,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [x] Turn-rate / turning-circle limits on movement (geodesy-and-movement model doc §Turning).
 - [ ] Turn performance as platform-database fields (generic class values are derived in scenario resolution today).
 - [x] Land blocking with route planning round the coastline (DL-0008, land-avoidance model doc).
-- [ ] Shallow water and draft limits (needs bundled GEBCO bathymetry).
+- [x] Shallow water and draft limits: routing by draft, shoal guard, chart depths (Phase 4 slice 3, [DL-0039](design-log/DL-0039-shallow-water.md)).
 - [x] Snapshot diffs on the UI stream: full picture first and after seat/scenario changes, then changed units + removed ids.
 - [x] Scenario loading from file in the desktop app (webview reads the file; engine validates; 5 MB limit; no filesystem permission).
 - [x] Front-end unit tests (Vitest, 8 tests) and an end-to-end smoke test of the real UI against a mocked backend (Playwright, 11 checks); both in CI.

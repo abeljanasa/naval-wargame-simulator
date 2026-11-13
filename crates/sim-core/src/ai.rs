@@ -55,15 +55,26 @@ pub struct MissionState {
 }
 
 pub(crate) fn set_route(world: &mut World, e: Entity, unit: UnitId, to: GeoPoint, tick: Tick) {
-    let (domain, from) = match (world.get::<Unit>(e), world.get::<Position>(e)) {
-        (Some(u), Some(p)) => (u.domain, p.point),
+    let (domain, draft, from) = match (world.get::<Unit>(e), world.get::<Position>(e)) {
+        (Some(u), Some(p)) => (u.domain, u.draft_m, p.point),
         _ => return,
     };
-    match plan_sea_route(world, domain, from, &[to]) {
-        Ok((planned, _)) => {
+    match plan_sea_route(world, domain, draft, from, &[to]) {
+        Ok(planned) => {
             if let Some(mut r) = world.get_mut::<Route>(e) {
-                r.waypoints = planned;
+                r.waypoints = planned.waypoints;
                 r.next = 0;
+                r.charted = planned.charted;
+            }
+            if planned.shallow_legs > 0 {
+                #[allow(clippy::cast_possible_truncation)]
+                world.resource_mut::<EventLog>().push(
+                    tick,
+                    SimEventKind::RouteShallow {
+                        unit,
+                        legs: planned.shallow_legs as u32,
+                    },
+                );
             }
         }
         Err(reason) => world

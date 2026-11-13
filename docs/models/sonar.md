@@ -1,6 +1,6 @@
 # Model: Sonar: passive and active sonar equations
 
-> Phase 2 slice 5. The textbook sonar equations with original-design simplifications and generic values; **not SME-validated**. No sound-velocity profile, layers or convergence zones: those are Phase 4.
+> Phase 2 slice 5. The textbook sonar equations with original-design simplifications and generic values; **not SME-validated**. With a sound-velocity profile in force, transmission loss, depths, reverberation, towed arrays and sonobuoys follow [acoustics.md](acoustics.md) (Phase 4 slice 8); without one, this page holds unchanged.
 
 - **Code:** `crates/sim-sensors/src/sonar.rs` (equations), `crates/sim-core/src/sonar.rs` (sonar pass of the detection system)
 - **Tests:** unit tests in `sim-sensors` (hand values); engine tests in `crates/sim-core/tests/detection.rs` (sonar section)
@@ -38,7 +38,7 @@ Generic figures by sensor kind (all original design):
 - An active-capable sonar (database `is_active`) **transmits while the unit's EMCON is active**, and listens passively when EMCON is silent.
 - **Active** detections give range (σ 200 m) and bearing (σ 2°): a position measurement fused into the track, classified to domain.
 - **Passive** detections give a bearing (σ 2°). It goes into the same pool as ESM bearings, so bearings from two or more of a side's units in one scan triangulate into a fix ([esm.md](esm.md)). Passive sonar classifies to domain: it tells surface from submerged.
-- Sonars work from ships and submarines. A **dipping sonar** works only with its helicopter at or below 100 m and 2 m/s (hovering). **Sonobuoys** must be laid first, which comes with missions (slice 10), so they are not usable yet.
+- Sonars work from ships and submarines. A **dipping sonar** works only with its helicopter at or below 100 m and 2 m/s (hovering). **Sonobuoys** listen once laid ([acoustics.md](acoustics.md)).
 - Targets are surface ships and submarines at any depth.
 - Every attempt logs SL, TL, NL, DI, DT, SE, Pd, the draw and the measurement errors (`SonarAttempt`).
 

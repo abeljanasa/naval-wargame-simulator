@@ -8,13 +8,46 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      gebco_dataset:
+        description: "GEBCO dataset id on NOAA CoastWatch ERDDAP for the world terrain layer"
+        default: GEBCO_2020
+      gebco_credit:
+        description: "The credit its licence asks for (shown with the map)"
+        default: "GEBCO Compilation Group (2020) GEBCO 2020 Grid (doi:10.5285/a29c5465-b138-234d-e053-6c86abc040b9)"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # The world terrain layer (4 arc-minutes) is built from its online source for every release, so
+  # each release carries the current GEBCO grid (docs/build/releasing.md). It is not kept in the
+  # repository.
+  terrain:
+    name: World terrain layer (from GEBCO online)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+      - name: Build nws-batch
+        run: cargo build --release --locked -p nws-batch
+      - name: Download GEBCO and build the pack
+        shell: bash
+        env:
+          GEBCO_DATASET: ${{ inputs.gebco_dataset || 'GEBCO_2020' }}
+          GEBCO_CREDIT: ${{ inputs.gebco_credit || 'GEBCO Compilation Group (2020) GEBCO 2020 Grid (doi:10.5285/a29c5465-b138-234d-e053-6c86abc040b9)' }}
+          NWS_BATCH: target/release/nws-batch.exe
+        run: scripts/terrain/world-layer.sh terrain-pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terrain-world
+          path: terrain-pack/
+          if-no-files-found: error
+
   bundle:
     name: Installers (${{ matrix.os }})
+    needs: terrain
     strategy:
       fail-fast: false
       matrix:
@@ -51,11 +84,17 @@ jobs:
             echo "::warning::APPLE_CERTIFICATE not configured: macOS build is ad-hoc signed (tauri.conf.json), not notarised (ADR-0008)"
           fi
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: terrain-world
+          path: apps/desktop/src-tauri/terrain
+
+      # tauri.terrain.json bundles src-tauri/terrain/ as the app's built-in terrain folder.
       - name: Build installers
         working-directory: apps/desktop
         run: |
           npm ci
-          npx tauri build
+          npx tauri build --config src-tauri/tauri.terrain.json
 
       - name: Sign Windows installers (only if configured)
         if: runner.os == 'Windows'
@@ -99,12 +138,15 @@ jobs:
       - name: Scenarios and SHA-256 sums
         shell: bash
         run: |
-          mkdir -p release-extra/scenarios
+          mkdir -p release-extra/scenarios release-extra/terrain
           cp data/scenarios/*.json release-extra/scenarios/
+          # The world layer also ships on its own, to install or check separately.
+          cp apps/desktop/src-tauri/terrain/* release-extra/terrain/
           if command -v sha256sum >/dev/null; then sum="sha256sum"; else sum="shasum -a 256"; fi
           {
             find target/release/bundle -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' \) -print0
             find release-extra/scenarios -type f -name '*.json' -print0
+            find release-extra/terrain -type f -name '*.nwsterrain' -print0
           } | sort -z | xargs -0 $sum > "release-extra/SHA256SUMS-${{ matrix.os }}.txt"
           cat "release-extra/SHA256SUMS-${{ matrix.os }}.txt"
 

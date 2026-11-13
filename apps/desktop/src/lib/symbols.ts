@@ -4,6 +4,7 @@
 // friend). Colour reinforces affiliation. Drawn here from scratch; not copied from any product.
 
 import type { Domain } from "./bindings";
+import { NAMED_CODE } from "./named-classes";
 
 export type Affiliation = "friend" | "hostile" | "neutral" | "unknown";
 
@@ -124,7 +125,7 @@ const CATEGORY_CODE: Record<string, string> = {
 /** The code inside the frame: by class, else by category, else none. */
 export function functionCode(platform?: string | null, category?: string | null): string {
   return (
-    (platform ? CLASS_CODE[platform] : undefined) ??
+    (platform ? (CLASS_CODE[platform] ?? NAMED_CODE[platform]) : undefined) ??
     (category ? CATEGORY_CODE[category] : undefined) ??
     ""
   );

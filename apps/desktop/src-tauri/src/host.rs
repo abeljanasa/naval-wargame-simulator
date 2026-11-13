@@ -20,8 +20,10 @@ use sim_core::{
     SimEventKind, Simulation, Snapshot, Tick, UnitId, UnitView, Viewer, WeaponTrackView,
     WeaponView, ZoneCoverage,
 };
+use sim_geo::terrain::Terrain;
 use sim_scenario::Scenario;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// The label of the control-station window.
@@ -70,6 +72,16 @@ pub struct SnapshotUpdate {
     pub contacts: Vec<ContactView>,
     /// Sea state and weather (small; sent every frame).
     pub environment: Environment,
+    /// Weather zones (small; sent every frame).
+    pub weather_zones: Vec<sim_core::WeatherZone>,
+    /// Sound-velocity profiles in force (small; sent every frame).
+    pub sound_profiles: Vec<sim_core::SoundProfile>,
+    /// The viewer's laid sonobuoys (sent whole).
+    pub sonobuoys: Vec<sim_core::SonobuoyView>,
+    /// The viewer's airbases and the aircraft parked there (sent whole).
+    pub air_bases: Vec<sim_core::AirBaseView>,
+    /// The viewer's sense zones with coverage goals and the units tasked to them.
+    pub sensor_tasking: Vec<sim_core::TaskingView>,
     /// The viewer's recent ESM bearing lines (sent whole, like contacts).
     pub bearings: Vec<BearingView>,
     /// The viewer's weapons in flight (sent whole).
@@ -160,6 +172,14 @@ impl Station {
     }
 }
 
+/// A facility's depth from the terrain packs (`chart_m`, `None` where no pack covers or for a
+/// facility on a unit). The planner's `depth_m`, when set, is used instead.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+pub struct FacilityDepth {
+    pub facility: u32,
+    pub chart_m: Option<f64>,
+}
+
 pub struct Host {
     pub scenario: Scenario,
     platforms: sim_db::PlatformDb,
@@ -179,6 +199,10 @@ pub struct Host {
     /// The planning layer in force: the scenario's, with the white cell's changes.
     pub zones: Vec<sim_core::Zone>,
     pub facilities: Vec<sim_core::Facility>,
+    /// Shipping lanes in play (public: every seat sees them).
+    pub lanes: Vec<sim_core::Lane>,
+    /// Terrain and bathymetry packs for new exercises and replays (`None`: none installed).
+    terrain: Option<Arc<Terrain>>,
 }
 
 const IN_REVIEW: &str = "reviewing a replay: return to the live exercise first";
@@ -195,8 +219,10 @@ fn viewer_of(seat: &Seat) -> Viewer {
 fn start(
     scenario: &Scenario,
     platforms: &sim_db::PlatformDb,
+    terrain: Option<&Arc<Terrain>>,
 ) -> Result<(Simulation, BTreeMap<u32, Seat>, u32), sim_scenario::ScenarioError> {
     let mut sim = scenario.build(None, platforms)?;
+    sim.set_terrain(terrain.cloned());
     let seats = scenario.seats_or_default();
     if scenario.seats.is_empty() {
         sim.submit(Command {
@@ -226,8 +252,9 @@ impl Host {
         scenario: Scenario,
         platforms: sim_db::PlatformDb,
     ) -> Result<Self, sim_scenario::ScenarioError> {
-        let (sim, seats, first) = start(&scenario, &platforms)?;
+        let (sim, seats, first) = start(&scenario, &platforms, None)?;
         let zones = scenario.zones.clone();
+        let lanes = scenario.lanes.clone();
         let facilities = scenario.facilities.clone();
         Ok(Self {
             scenario,
@@ -243,7 +270,84 @@ impl Host {
             replay: None,
             zones,
             facilities,
+            lanes,
+            terrain: None,
         })
+    }
+
+    /// Uses these terrain packs for exercises started from now on. The current exercise takes
+    /// them too if it has not started (still at its starting picture, not under review), so its
+    /// record matches a straight run with them. Returns whether it did.
+    pub fn set_terrain(&mut self, terrain: Option<Arc<Terrain>>) -> bool {
+        self.terrain = terrain;
+        if self.replay.is_some() || self.sim.tick().0 > 1 {
+            return false;
+        }
+        match start(&self.scenario, &self.platforms, self.terrain.as_ref()) {
+            Ok((sim, seats, _)) => {
+                self.sim = sim;
+                self.seats = seats;
+                for st in self.stations.values_mut() {
+                    st.last_sent = None;
+                }
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// The water under a unit and along the rest of its route, as this window's seat sees it
+    /// (its own units; any unit for the white cell). `None` without terrain packs.
+    pub fn route_depths(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+    ) -> Result<Option<sim_core::RouteDepths>, String> {
+        let viewer = viewer_of(self.seat_of(label)?);
+        let sim = match &mut self.replay {
+            Some(r) => r.sim_mut(),
+            None => &mut self.sim,
+        };
+        Ok(sim.route_depths(unit, viewer))
+    }
+
+    /// Each fixed facility's depth from the terrain packs (white cell only): what the engine
+    /// uses when the planner has not set one.
+    pub fn facility_depths(&self, label: &str) -> Result<Vec<FacilityDepth>, String> {
+        if !matches!(self.seat_of(label)?.role, SeatRole::WhiteCell) {
+            return Err("only the white cell sees the planning layer".into());
+        }
+        let Some(t) = self.sim.terrain() else {
+            return Ok(Vec::new());
+        };
+        Ok(self
+            .facilities
+            .iter()
+            .map(|f| FacilityDepth {
+                facility: f.id,
+                chart_m: sim_core::chart_depth_m(t, f),
+            })
+            .collect())
+    }
+
+    /// The water of every choke point (white cell only): depths and a section across each.
+    pub fn choke_depths(&mut self, label: &str) -> Result<Vec<sim_core::ChokeDepths>, String> {
+        if !matches!(self.seat_of(label)?.role, SeatRole::WhiteCell) {
+            return Err("only the white cell sees the planning layer".into());
+        }
+        Ok(match &mut self.replay {
+            Some(r) => r.sim_mut().choke_depths(),
+            None => self.sim.choke_depths(),
+        })
+    }
+
+    /// The terrain id the live exercise (or the replay under review) runs with.
+    #[must_use]
+    pub fn terrain_in_use(&self) -> Option<String> {
+        match &self.replay {
+            Some(r) => r.record().terrain.clone(),
+            None => self.sim.terrain_id(),
+        }
     }
 
     /// Replaces the running scenario. The new one is fully built first, so a scenario that fails
@@ -251,12 +355,13 @@ impl Host {
     /// the main window at the first side's seat. Returns the seat windows to close (their seats
     /// belonged to the old scenario).
     pub fn load(&mut self, scenario: Scenario) -> Result<Vec<String>, sim_scenario::ScenarioError> {
-        let (sim, seats, first) = start(&scenario, &self.platforms)?;
+        let (sim, seats, first) = start(&scenario, &self.platforms, self.terrain.as_ref())?;
         self.scenario = scenario;
         self.sim = sim;
         self.seats = seats;
         self.replay = None;
         self.zones = self.scenario.zones.clone();
+        self.lanes = self.scenario.lanes.clone();
         self.facilities = self.scenario.facilities.clone();
         let closing: Vec<String> = self
             .stations
@@ -404,7 +509,8 @@ impl Host {
             return Err("already reviewing a replay".into());
         }
         let record = self.capture();
-        let replay = Replay::open(record, &self.side_names()).map_err(|e| e.to_string())?;
+        let replay = Replay::open_with_terrain(record, &self.side_names(), self.terrain.clone())
+            .map_err(|e| e.to_string())?;
         self.enter_review(replay)
     }
 
@@ -436,7 +542,8 @@ impl Host {
             .iter()
             .map(|s| (s.id, s.name.clone()))
             .collect();
-        let replay = Replay::open(record, &sides).map_err(|e| e.to_string())?;
+        let replay = Replay::open_with_terrain(record, &sides, self.terrain.clone())
+            .map_err(|e| e.to_string())?;
         let closing = self.load(scenario).map_err(|e| e.to_string())?;
         self.enter_review(replay)?;
         Ok(closing)
@@ -859,6 +966,7 @@ impl Host {
         let seq = self.order(
             label,
             CommandPayload::SetPlanning {
+                lanes: None,
                 facilities: self.facilities.clone(),
                 zones: zones.clone(),
                 action_groups: None,
@@ -875,21 +983,29 @@ impl Host {
         label: &str,
         facilities: Vec<sim_core::Facility>,
         zones: Vec<sim_core::Zone>,
+        lanes: Option<Vec<sim_core::Lane>>,
     ) -> Result<u64, String> {
         if self.seat_of(label)?.role != SeatRole::WhiteCell {
             return Err("only the white cell changes the planning layer".into());
         }
         sim_core::validate_planning(&facilities, &zones)?;
+        if let Some(l) = &lanes {
+            sim_core::validate_lanes(l)?;
+        }
         let seq = self.order(
             label,
             CommandPayload::SetPlanning {
                 facilities: facilities.clone(),
                 zones: zones.clone(),
                 action_groups: None,
+                lanes: lanes.clone(),
             },
         )?;
         self.facilities = facilities;
         self.zones = zones;
+        if let Some(l) = lanes {
+            self.lanes = l;
+        }
         Ok(seq)
     }
 
@@ -906,6 +1022,100 @@ impl Host {
             }
             _ => Ok(self.sim.zone_coverage(zone)),
         }
+    }
+
+    /// White cell: replaces the weather zones (`docs/models/weather.md`).
+    pub fn order_weather(
+        &mut self,
+        label: &str,
+        zones: Vec<sim_core::WeatherZone>,
+    ) -> Result<u64, String> {
+        if self.seat_of(label)?.role != SeatRole::WhiteCell {
+            return Err("only the white cell changes the weather".into());
+        }
+        for z in &zones {
+            z.validate()?;
+        }
+        self.order(label, CommandPayload::SetWeather { zones })
+    }
+
+    /// Replaces the sound-velocity profiles (white cell only; `docs/models/acoustics.md`).
+    pub fn order_sound_profiles(
+        &mut self,
+        label: &str,
+        profiles: Vec<sim_core::SoundProfile>,
+    ) -> Result<u64, String> {
+        if self.seat_of(label)?.role != SeatRole::WhiteCell {
+            return Err("only the white cell sets sound profiles".into());
+        }
+        self.order(label, CommandPayload::SetSoundProfiles { profiles })
+    }
+
+    /// Streams or recovers a unit's towed array.
+    pub fn order_towed(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+        streamed: bool,
+    ) -> Result<u64, String> {
+        self.order(label, CommandPayload::StreamTowedArray { unit, streamed })
+    }
+
+    /// Launches a parked aircraft on a sortie (`docs/models/air-operations.md`).
+    pub fn order_sortie(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+        mission: Mission,
+        loadout: Option<String>,
+    ) -> Result<u64, String> {
+        self.order(
+            label,
+            CommandPayload::LaunchSortie {
+                unit,
+                mission,
+                loadout,
+            },
+        )
+    }
+
+    /// Recalls an aircraft (cancels a launch, or brings it home).
+    pub fn order_recall(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+        base: Option<u32>,
+    ) -> Result<u64, String> {
+        self.order(label, CommandPayload::RecallAircraft { unit, base })
+    }
+
+    /// Sets a parked aircraft's readiness.
+    pub fn order_readiness(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+        readiness: sim_core::Readiness,
+        maintenance_s: Option<f64>,
+    ) -> Result<u64, String> {
+        self.order(
+            label,
+            CommandPayload::SetReadiness {
+                unit,
+                readiness,
+                maintenance_s,
+            },
+        )
+    }
+
+    /// Sends a unit through `points`, laying a sonobuoy at each.
+    pub fn order_sonobuoys(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+        points: Vec<GeoPoint>,
+        deep: bool,
+    ) -> Result<u64, String> {
+        self.order(label, CommandPayload::LaySonobuoys { unit, points, deep })
     }
 
     pub fn order_facilitate(&mut self, label: &str, action: Facilitation) -> Result<u64, String> {
@@ -947,14 +1157,51 @@ impl Host {
     }
 }
 
-/// Reasons a station's orders were refused since the last call.
-fn refusals(sim: &Simulation, st: &mut Station) -> Vec<String> {
+/// Reasons a station's orders were refused since the last call, and warnings about the units it
+/// sees as its own (`units`): routes with no water deep enough, and stops for land or shoal water.
+fn refusals(sim: &Simulation, st: &mut Station, units: &[UnitView]) -> Vec<String> {
     let events = sim.events();
+    let name = |id: &UnitId| units.iter().find(|u| u.id == *id).map(|u| u.name.clone());
     let mut out = Vec::new();
     for e in &events[st.events_seen.min(events.len())..] {
         match &e.kind {
             SimEventKind::CommandRejected { seq, reason } if st.pending.remove(seq) => {
                 out.push(reason.clone());
+            }
+            SimEventKind::RouteShallow { unit, .. } => {
+                if let Some(n) = name(unit) {
+                    out.push(format!(
+                        "{n}: no route deep enough for its draft. It is routed round land only and may meet shoal water"
+                    ));
+                }
+            }
+            SimEventKind::ShoalAhead { unit, depth_m } => {
+                if let Some(n) = name(unit) {
+                    out.push(format!(
+                        "{n} stopped: {depth_m:.0} m of water ahead, less than its draft"
+                    ));
+                }
+            }
+            SimEventKind::LandAhead { unit } => {
+                if let Some(n) = name(unit) {
+                    out.push(format!("{n} stopped: land ahead"));
+                }
+            }
+            // Collisions (docs/models/collisions.md). The other hull is named only if it is
+            // the seat's own; otherwise it is "another vessel". Giving way is routine seamanship,
+            // not a warning: it stays in the event log, and the new course shows on the map.
+            SimEventKind::Collision {
+                a, b, closing_mps, ..
+            } => {
+                for (me, other) in [(a, b), (b, a)] {
+                    if let Some(n) = name(me) {
+                        let them = name(other).unwrap_or_else(|| "another vessel".into());
+                        let kn = closing_mps * 3600.0 / 1852.0;
+                        out.push(format!(
+                            "{n} collided with {them} at {kn:.0} kn and stopped; see its damage"
+                        ));
+                    }
+                }
             }
             SimEventKind::CommandApplied { seq } => {
                 st.pending.remove(seq);
@@ -968,7 +1215,16 @@ fn refusals(sim: &Simulation, st: &mut Station) -> Vec<String> {
 
 fn update_station(sim: &mut Simulation, viewer: Viewer, st: &mut Station) -> SnapshotUpdate {
     let snap = sim.snapshot(viewer);
-    let refusals = refusals(sim, st);
+    let own: Vec<UnitView> = snap
+        .units
+        .iter()
+        .filter(|u| match viewer {
+            Viewer::WhiteCell => true,
+            Viewer::Side { side } => u.side == side,
+        })
+        .cloned()
+        .collect();
+    let refusals = refusals(sim, st, &own);
     let update = match &st.last_sent {
         Some(prev) if prev.viewer == snap.viewer => {
             let old: BTreeMap<UnitId, &UnitView> = prev.units.iter().map(|u| (u.id, u)).collect();
@@ -1011,6 +1267,11 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
         removed: vec![],
         contacts: snap.contacts.clone(),
         environment: snap.environment,
+        weather_zones: snap.weather_zones.clone(),
+        sound_profiles: snap.sound_profiles.clone(),
+        sonobuoys: snap.sonobuoys.clone(),
+        air_bases: snap.air_bases.clone(),
+        sensor_tasking: snap.sensor_tasking.clone(),
         bearings: snap.bearings.clone(),
         weapons: snap.weapons.clone(),
         refusals,
@@ -1457,12 +1718,12 @@ mod tests {
         let removed = facilities.remove(free).id;
         let zones = h.zones.clone();
         assert!(
-            h.order_planning(M, facilities.clone(), zones.clone())
+            h.order_planning(M, facilities.clone(), zones.clone(), None)
                 .is_err(),
             "a side's seat may not"
         );
         h.set_seat(M, seat_named(&h, "White cell")).unwrap();
-        h.order_planning(M, facilities.clone(), zones.clone())
+        h.order_planning(M, facilities.clone(), zones.clone(), None)
             .unwrap();
         h.step(M, 1).unwrap();
         assert!(h.update(M).unwrap().refusals.is_empty());

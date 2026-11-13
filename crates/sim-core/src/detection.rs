@@ -34,7 +34,8 @@ use crate::time::{SimClock, Tick};
 use bevy_ecs::prelude::*;
 use serde::{Deserialize, Serialize};
 use sim_c2::Emcon;
-use sim_geo::{chord_m, ecef_surface, inverse, radar_horizon_m, GeoPoint};
+use sim_geo::terrain::Terrain;
+use sim_geo::{chord_m, ecef_surface, inverse, normalize_azimuth_deg, radar_horizon_m, GeoPoint};
 use sim_sensors::{
     clutter_loss_db, detection_range_with_loss_m, gaussian_pair, in_main_beam, jamming_to_noise,
     measured_point, measurement_error, pd_jammed, radar_classification, Classification,
@@ -82,6 +83,9 @@ pub struct SensorSpec {
     /// Sonar: capable of active transmission (database `is_active`).
     #[serde(default)]
     pub active: bool,
+    /// Sonar: its own acoustic figures from the database (`None`: generic figures by kind).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sonar: Option<sim_sensors::SonarFigures>,
 }
 
 impl SensorSpec {
@@ -115,6 +119,17 @@ impl SensorSpec {
                 "sensor {} has an invalid radar reference",
                 self.sensor_id
             ));
+        }
+        if let Some(f) = &self.sonar {
+            let finite = [f.di_db, f.dt_db, f.source_level_db, f.self_noise_db]
+                .into_iter()
+                .all(|v| v.is_none_or(f64::is_finite));
+            if !finite || !positive(f.frequency_khz) {
+                return Err(format!(
+                    "sensor {} has invalid sonar figures",
+                    self.sensor_id
+                ));
+            }
         }
         Ok(())
     }
@@ -166,13 +181,15 @@ pub fn domain_speed_bound_mps(domain: Option<Domain>) -> f64 {
     }
 }
 
-/// What a radar sees a target against: low targets compete with sea or land clutter.
-/// Low air targets are treated as over the sea (no land mask lookup yet).
+/// What a radar sees a target against: low targets compete with sea or land clutter. A low air
+/// target over land (on the terrain packs) competes with land clutter; `altitude_m` is its height
+/// above the ground or sea below it.
 #[must_use]
-pub fn clutter_background(domain: Domain, altitude_m: f64) -> ClutterBackground {
+pub fn clutter_background(domain: Domain, altitude_m: f64, over_land: bool) -> ClutterBackground {
     match domain {
         Domain::Land => ClutterBackground::Land,
         Domain::Surface | Domain::Subsurface => ClutterBackground::Sea,
+        Domain::Air if altitude_m <= CLUTTER_CEILING_M && over_land => ClutterBackground::Land,
         Domain::Air if altitude_m <= CLUTTER_CEILING_M => ClutterBackground::Sea,
         Domain::Air => ClutterBackground::None,
     }
@@ -198,6 +215,27 @@ pub fn sensor_height_m(mount_height_m: f64, domain: Domain, altitude_m: f64) -> 
         Domain::Subsurface if altitude_m < 0.0 => None,
         _ => Some(mount_height_m.max(0.0)),
     }
+}
+
+/// A track's position is kept every this many ticks (s) for its course estimate…
+pub const COURSE_SAMPLE_TICKS: u64 = 15;
+/// …over the last this many ticks (s).
+pub const COURSE_WINDOW_TICKS: u64 = 360;
+/// Fewest samples, and shortest span (s), a course needs.
+pub const COURSE_MIN_SAMPLES: usize = 6;
+pub const COURSE_MIN_SPAN_TICKS: u64 = 75;
+/// A fitted speed below this (m/s, about 2 kn) gives no course: stopped or too slow to tell.
+pub const COURSE_MIN_SPEED_MPS: f64 = 1.0;
+/// The fitted speed must be at least this many standard errors, so measurement jitter is not
+/// taken for movement.
+pub const COURSE_MIN_SIGNIFICANCE: f64 = 3.0;
+
+/// A track's estimated course and speed, from the movement of its own position estimate (what
+/// the side has measured, never the target's true heading).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct TrackCourse {
+    pub course_deg: f64,
+    pub speed_mps: f64,
 }
 
 /// A side's contact on another side's unit. The holding side never sees the target's [`UnitId`];
@@ -226,9 +264,107 @@ pub struct Contact {
     pub platform: Option<String>,
     pub detected_by: UnitId,
     pub sensor_id: String,
+    /// The track's recent positions, one every [`COURSE_SAMPLE_TICKS`] over the last
+    /// [`COURSE_WINDOW_TICKS`] (format 27; none in older saves).
+    #[serde(default)]
+    pub history: Vec<(Tick, GeoPoint)>,
+    /// Estimated course and speed, once the track's movement is clear (format 27).
+    #[serde(default)]
+    pub course: Option<TrackCourse>,
+}
+
+/// Least-squares velocity of `samples` (time s, east m, north m): the slopes of east and north
+/// against time, and the standard error of the speed. `None` if the times do not vary or there
+/// are too few samples for an error.
+#[allow(clippy::cast_precision_loss)]
+#[must_use]
+pub fn fit_velocity(samples: &[(f64, f64, f64)]) -> Option<([f64; 2], f64)> {
+    let n = samples.len();
+    if n < 3 {
+        return None;
+    }
+    let nf = n as f64;
+    let t_mean = samples.iter().map(|s| s.0).sum::<f64>() / nf;
+    let e_mean = samples.iter().map(|s| s.1).sum::<f64>() / nf;
+    let n_mean = samples.iter().map(|s| s.2).sum::<f64>() / nf;
+    let stt: f64 = samples.iter().map(|s| (s.0 - t_mean).powi(2)).sum();
+    if stt <= 0.0 {
+        return None;
+    }
+    let ve = samples
+        .iter()
+        .map(|s| (s.0 - t_mean) * (s.1 - e_mean))
+        .sum::<f64>()
+        / stt;
+    let vn = samples
+        .iter()
+        .map(|s| (s.0 - t_mean) * (s.2 - n_mean))
+        .sum::<f64>()
+        / stt;
+    // Residual variance per axis, pooled; the slope's variance is that over Σ(t − t̄)².
+    let rss: f64 = samples
+        .iter()
+        .map(|s| {
+            let de = s.1 - (e_mean + ve * (s.0 - t_mean));
+            let dn = s.2 - (n_mean + vn * (s.0 - t_mean));
+            de * de + dn * dn
+        })
+        .sum();
+    let var_axis = rss / (2.0 * (nf - 2.0));
+    Some(([ve, vn], (var_axis / stt).sqrt()))
 }
 
 impl Contact {
+    /// Updates the estimated course after a position update at `tick`. The track's position is
+    /// kept every [`COURSE_SAMPLE_TICKS`] over [`COURSE_WINDOW_TICKS`]; a straight line fitted
+    /// through them by least squares gives the velocity. The course is its direction once there
+    /// are [`COURSE_MIN_SAMPLES`] samples over [`COURSE_MIN_SPAN_TICKS`], and the fitted speed is
+    /// at least [`COURSE_MIN_SPEED_MPS`] and [`COURSE_MIN_SIGNIFICANCE`] standard errors;
+    /// otherwise there is none (newly acquired, stopped, or too slow to tell).
+    pub(crate) fn update_course(&mut self, tick: Tick) {
+        if self
+            .history
+            .last()
+            .is_none_or(|(t, _)| tick.0.saturating_sub(t.0) >= COURSE_SAMPLE_TICKS)
+        {
+            self.history.push((tick, self.position));
+        }
+        self.history
+            .retain(|(t, _)| tick.0.saturating_sub(t.0) <= COURSE_WINDOW_TICKS);
+        self.course = None;
+        let (Some((t0, _)), Some((t1, origin))) = (self.history.first(), self.history.last())
+        else {
+            return;
+        };
+        if self.history.len() < COURSE_MIN_SAMPLES || t1.0 - t0.0 < COURSE_MIN_SPAN_TICKS {
+            return;
+        }
+        #[allow(clippy::cast_precision_loss)]
+        let samples: Vec<(f64, f64, f64)> = self
+            .history
+            .iter()
+            .map(|(t, p)| {
+                let inv = inverse(*origin, *p);
+                let az = inv.azimuth1_deg.to_radians();
+                (
+                    t.0 as f64,
+                    inv.distance_m * libm::sin(az),
+                    inv.distance_m * libm::cos(az),
+                )
+            })
+            .collect();
+        let Some(([ve, vn], se)) = fit_velocity(&samples) else {
+            return;
+        };
+        let speed = libm::hypot(ve, vn);
+        if speed >= COURSE_MIN_SPEED_MPS && speed >= COURSE_MIN_SIGNIFICANCE * se {
+            self.course = Some(TrackCourse {
+                course_deg: normalize_azimuth_deg(libm::atan2(ve, vn).to_degrees()),
+                speed_mps: speed,
+            });
+        }
+    }
+
     /// The estimate at `now`, with the error grown for the time since the last update.
     #[must_use]
     pub fn estimate_at(&self, now: Tick) -> TrackEstimate {
@@ -314,6 +450,7 @@ impl ContactTable {
             c.position = post.position;
             c.cov = post.cov;
             c.last_seen = tick;
+            c.update_course(tick);
             c.raise(
                 m.classification,
                 m.category.as_ref(),
@@ -348,6 +485,8 @@ impl ContactTable {
                     .filter(|_| m.classification >= Classification::Class),
                 detected_by: m.observer,
                 sensor_id: m.sensor_id.to_owned(),
+                history: vec![(tick, m.point)],
+                course: None,
             },
         );
         Some(number)
@@ -422,6 +561,45 @@ impl ContactTable {
     }
 }
 
+/// Ground height under a point on the terrain packs, metres above sea level (0 at sea or with
+/// no packs).
+pub(crate) fn ground_m(terrain: Option<&Terrain>, p: GeoPoint) -> f64 {
+    terrain
+        .and_then(|t| t.height_m(p))
+        .map_or(0.0, |h| h.max(0.0))
+}
+
+/// Whether terrain blocks the line of sight between two points, heights above sea level
+/// (`docs/models/terrain-masking.md`). Never without terrain packs.
+pub(crate) fn terrain_masks(
+    terrain: Option<&Terrain>,
+    a: GeoPoint,
+    h_a: f64,
+    b: GeoPoint,
+    h_b: f64,
+    distance_m: f64,
+) -> bool {
+    terrain.is_some_and(|t| t.masks(a, h_a, b, h_b, distance_m))
+}
+
+/// The weather zones in force (`docs/models/weather.md`); empty: the scenario-wide weather only.
+#[derive(Debug, Clone, Default, Resource)]
+pub struct Weather(pub Vec<sim_events::WeatherZone>);
+
+/// The scenario-wide environment with the sea state and visibility of the weather at `p`.
+#[must_use]
+pub fn local_env(env: Environment, zones: &[sim_events::WeatherZone], p: GeoPoint) -> Environment {
+    if zones.is_empty() {
+        return env;
+    }
+    let w = sim_events::weather_at(&env, zones, p);
+    Environment {
+        sea_state: w.sea_state,
+        visibility_km: w.visibility_km,
+        ..env
+    }
+}
+
 pub(crate) struct Observed<'a> {
     pub(crate) id: UnitId,
     pub(crate) side: SideId,
@@ -438,6 +616,9 @@ pub(crate) struct Observed<'a> {
     pub(crate) platform: Option<&'a str>,
     pub(crate) category: Option<&'a str>,
     pub(crate) length_m: f64,
+    /// The ground under a land unit (terrain packs), added to its heights for terrain masking:
+    /// a site's mast stands on its hill. 0 for every other domain.
+    pub(crate) ground_m: f64,
 }
 
 // A bevy system takes its world access as parameters; grouping them would only hide that.
@@ -452,6 +633,10 @@ pub(crate) fn detection_system(
     env: Res<EnvState>,
     mut bearings: ResMut<BearingTable>,
     library: Res<EmitterLibrary>,
+    terrain: Res<crate::sim::TerrainRes>,
+    weather: Res<Weather>,
+    acoustics: Res<crate::acoustics::Acoustics>,
+    mut tma: ResMut<crate::tma::Tma>,
     units: Query<(
         &Unit,
         &Position,
@@ -466,6 +651,8 @@ pub(crate) fn detection_system(
     if !tick.is_multiple_of(SENSOR_PERIOD_TICKS) {
         return;
     }
+    let terrain = terrain.0.as_deref();
+    let zones = weather.0.as_slice();
     let mut all: Vec<Observed<'_>> = units
         .iter()
         .map(|(u, p, s, sig, j, k)| Observed {
@@ -486,6 +673,11 @@ pub(crate) fn detection_system(
             length_m: sig
                 .length_m
                 .unwrap_or_else(|| crate::optical::default_length_m(u.domain)),
+            ground_m: if u.domain == Domain::Land {
+                ground_m(terrain, p.point)
+            } else {
+                0.0
+            },
         })
         .collect();
     all.sort_by_key(|o| o.id);
@@ -593,12 +785,40 @@ pub(crate) fn detection_system(
                 if range > horizon {
                     continue;
                 }
+                // Terrain masking (terrain packs): land between the radar and the target.
+                if terrain_masks(
+                    terrain,
+                    obs.position.point,
+                    h_s + obs.ground_m,
+                    tgt.position.point,
+                    h_t + tgt.ground_m,
+                    range,
+                ) {
+                    continue;
+                }
+                let ground_below = if tgt.domain == Domain::Air {
+                    ground_m(terrain, tgt.position.point)
+                } else {
+                    0.0
+                };
+                // Sea clutter from the sea where the target is; rain loss along the path.
                 let clutter_db = clutter_loss_db(
-                    clutter_background(tgt.domain, tgt.position.altitude_m),
-                    env.sea_state,
+                    clutter_background(
+                        tgt.domain,
+                        tgt.position.altitude_m - ground_below,
+                        ground_below > 0.0,
+                    ),
+                    local_env(env, zones, tgt.position.point).sea_state,
                     clutter_per_step,
                 );
-                let weather_db = env.weather_loss_db;
+                let weather_db = env.weather_loss_db
+                    + sim_events::weather::path_rain_loss_db(
+                        &env,
+                        zones,
+                        obs.position.point,
+                        tgt.position.point,
+                        range,
+                    );
                 let r50 = detection_range_with_loss_m(
                     ref_range,
                     ref_rcs,
@@ -690,6 +910,7 @@ pub(crate) fn detection_system(
         &mut bearings,
         &library,
         &mut fresh,
+        terrain,
     );
     sonar_pass(
         &all,
@@ -701,6 +922,8 @@ pub(crate) fn detection_system(
         &mut log,
         &mut bearings,
         &mut fresh,
+        zones,
+        (&acoustics, terrain),
     );
     optical_pass(
         &all,
@@ -712,8 +935,18 @@ pub(crate) fn detection_system(
         &mut log,
         &mut bearings,
         &mut fresh,
+        terrain,
+        zones,
     );
-    resolve_bearings(fresh, &all, tick, &mut contacts, &mut log, &mut bearings);
+    resolve_bearings(
+        fresh,
+        &all,
+        tick,
+        &mut contacts,
+        &mut log,
+        &mut bearings,
+        &mut tma,
+    );
     for (side, number, target) in contacts.expire(tick) {
         log.push(
             tick,
@@ -729,6 +962,68 @@ pub(crate) fn detection_system(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn track(sigma_m: f64) -> Contact {
+        Contact {
+            number: 1,
+            target: UnitId(2),
+            first_seen: Tick(0),
+            last_seen: Tick(0),
+            position: GeoPoint::new(0.0, 0.0),
+            cov: Cov2::isotropic(sigma_m),
+            classification: Classification::Category,
+            domain: Some(Domain::Surface),
+            category: None,
+            platform: None,
+            detected_by: UnitId(1),
+            sensor_id: "R".into(),
+            history: Vec::new(),
+            course: None,
+        }
+    }
+
+    /// Feeds positions along `course` at `speed` m/s plus a fixed ±`jitter` m zig-zag across
+    /// track, one update every 5 s for `secs`, and returns the course estimate.
+    fn run_track(course: f64, speed: f64, jitter: f64, secs: u64) -> Option<TrackCourse> {
+        let mut c = track(100.0);
+        let start = GeoPoint::new(0.0, 0.0);
+        for t in (0..=secs).step_by(5) {
+            #[allow(clippy::cast_precision_loss)]
+            let along = sim_geo::direct(start, course, speed * t as f64).point;
+            let side = if (t / 5) % 2 == 0 { jitter } else { -jitter };
+            c.position = sim_geo::direct(along, course + 90.0, side).point;
+            c.update_course(Tick(t));
+        }
+        c.course
+    }
+
+    #[test]
+    fn a_track_gets_its_course_from_a_line_through_its_positions() {
+        // Exact positions east at 8 m/s: course 090°, speed 8 m/s, to the flat-plane error.
+        let k = run_track(90.0, 8.0, 0.0, 300).unwrap();
+        assert!((k.course_deg - 90.0).abs() < 0.01, "{k:?}");
+        assert!((k.speed_mps - 8.0).abs() < 0.01, "{k:?}");
+        // ±300 m of jitter across track averages out over the window.
+        let k = run_track(225.0, 8.0, 300.0, 360).unwrap();
+        assert!((k.course_deg - 225.0).abs() < 5.0, "{k:?}");
+        // Newly acquired (under the minimum span): no course yet.
+        assert_eq!(run_track(90.0, 8.0, 0.0, 60), None);
+        // Stopped, with the same jitter: the fitted speed is not significant, so no course.
+        assert_eq!(run_track(0.0, 0.0, 300.0, 360), None);
+    }
+
+    #[test]
+    fn fit_velocity_by_hand() {
+        // (0, 0, 0), (10, 10, 20), (20, 20, 40): east 1 m/s, north 2 m/s, no residual.
+        let (v, se) =
+            fit_velocity(&[(0.0, 0.0, 0.0), (10.0, 10.0, 20.0), (20.0, 20.0, 40.0)]).unwrap();
+        assert!(
+            (v[0] - 1.0).abs() < 1e-12 && (v[1] - 2.0).abs() < 1e-12,
+            "{v:?}"
+        );
+        assert!(se.abs() < 1e-12);
+        assert!(fit_velocity(&[(5.0, 0.0, 0.0), (5.0, 1.0, 1.0), (5.0, 2.0, 2.0)]).is_none());
+    }
 
     #[test]
     fn submerged_targets_and_radars_are_excluded() {

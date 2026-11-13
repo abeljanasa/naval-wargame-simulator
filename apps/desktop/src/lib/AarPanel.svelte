@@ -22,6 +22,8 @@
     { key: "losses", label: "Losses" },
     { key: "weapons", label: "Weapons" },
     { key: "detections", label: "Detections" },
+    { key: "transits", label: "Transits" },
+    { key: "sorties", label: "Sorties" },
     { key: "timeline", label: "Timeline" },
   ];
 
@@ -36,10 +38,12 @@
     "damage",
     "loss",
     "mine",
+    "air",
     "override",
     "facilitation",
     "event",
     "script_error",
+    "tasking",
   ];
 
   async function openTables() {
@@ -189,6 +193,63 @@
               </tr>
             {:else}
               <tr><td colspan="9" class="dim">No weapons fired.</td></tr>
+            {/each}
+          </tbody>
+        </table>
+      {:else if tab === "sorties"}
+        <table>
+          <thead>
+            <tr>
+              <th>Launched</th><th>Aircraft</th><th>Base</th><th>Mission</th><th>Loadout</th><th
+                >Flight</th
+              ><th>Outcome</th><th>From tankers</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each view.report.sorties ?? [] as r, i (i)}
+              <tr class:link={sim.replaying} onclick={() => seekTo(n(r.launched))}>
+                <td class="mono">{gameTime(n(r.launched))}</td><td>{r.unit_name}</td><td
+                  >{r.base}</td
+                ><td>{r.mission}</td><td>{r.loadout ?? "—"}</td>
+                <td class="mono"
+                  >{Math.round((n(r.ended ?? view.report.end_tick) - n(r.launched)) / 60)} min</td
+                >
+                <td>{r.outcome}</td>
+                <td class="mono"
+                  >{n(r.tanker_fuel_t) > 0 ? `${n(r.tanker_fuel_t).toFixed(1)} t` : "—"}</td
+                >
+              </tr>
+            {:else}
+              <tr><td colspan="8" class="dim">No sorties flown.</td></tr>
+            {/each}
+          </tbody>
+        </table>
+      {:else if tab === "transits"}
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th><th>Choke point</th><th>Unit</th><th>Lane</th><th>Traffic/day</th><th
+                >Water</th
+              ><th>Draft</th><th>Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each view.report.transits ?? [] as r, i (i)}
+              <tr class:link={sim.replaying} onclick={() => seekTo(n(r.tick))}>
+                <td class="mono">{gameTime(n(r.tick))}</td><td>{r.choke_point}</td><td
+                  >{r.unit_name}</td
+                ><td>{r.lane ?? "—"}</td><td class="mono">{Math.round(n(r.traffic_per_day))}</td>
+                <td class="mono">{r.depth_m == null ? "—" : `${Math.round(n(r.depth_m))} m`}</td>
+                <td class="mono">{r.draft_m == null ? "—" : `${n(r.draft_m).toFixed(1)} m`}</td>
+                <td class="risk {r.risk}">{r.risk}</td>
+              </tr>
+            {:else}
+              <tr
+                ><td colspan="8" class="dim"
+                  >No assessed transits. Choke points are assessed when they have shipping lanes or
+                  terrain packs are installed.</td
+                ></tr
+              >
             {/each}
           </tbody>
         </table>
@@ -348,5 +409,12 @@
     align-items: center;
     gap: 8px;
     margin: 4px 0 8px;
+  }
+  .risk.high {
+    color: var(--danger, #e05a4f);
+    font-weight: 600;
+  }
+  .risk.moderate {
+    color: var(--warn);
   }
 </style>

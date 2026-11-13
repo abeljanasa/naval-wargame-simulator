@@ -41,6 +41,8 @@ fn ship(at: GeoPoint, heading: f64, speed: f64) -> Command {
             mission: None,
             fuel: None,
             draft_m: None,
+            displacement_t: None,
+            air: None,
         }),
     }
 }

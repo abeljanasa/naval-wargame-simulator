@@ -35,6 +35,7 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::SingleThreadedExecutor;
 use sim_c2::track_affiliation;
 use sim_geo::land::LandMask;
+use sim_geo::terrain::Terrain;
 use sim_geo::GeoPoint;
 use sim_weapons::Status;
 use std::collections::BTreeMap;
@@ -74,20 +75,58 @@ impl CommandLog {
 #[derive(Debug, Default, Clone, Resource)]
 pub(crate) struct LandMaskRes(pub(crate) Option<Arc<LandMask>>);
 
-/// Plans `waypoints` from `from` around land for ships and submarines. Returns the route to store
-/// and, when legs were replanned, how many.
+/// Heights and depths from terrain and bathymetry packs (Phase 4 slice 2). `None` = no packs:
+/// models that need a depth fall back to their scenario values.
+#[derive(Debug, Default, Clone, Resource)]
+pub(crate) struct TerrainRes(pub(crate) Option<Arc<Terrain>>);
+
+/// A route as planned: the waypoints to store, legs replanned, and legs with no route deep
+/// enough for the unit's draft (planned round land only).
+pub(crate) struct SeaRoute {
+    pub(crate) waypoints: Vec<GeoPoint>,
+    pub(crate) replanned: usize,
+    pub(crate) shallow_legs: usize,
+    /// Every leg was planned deep enough for the unit's draft.
+    pub(crate) charted: bool,
+}
+
+/// Plans `waypoints` from `from` round land for ships and submarines, and, with terrain packs
+/// and a known draft, out of water shallower than the draft plus under-keel clearance
+/// (`docs/models/shallow-water.md`).
 pub(crate) fn plan_sea_route(
     world: &World,
     domain: Domain,
+    draft_m: Option<f64>,
     from: GeoPoint,
     waypoints: &[GeoPoint],
-) -> Result<(Vec<GeoPoint>, usize), String> {
+) -> Result<SeaRoute, String> {
     let mask = world.resource::<LandMaskRes>().0.clone();
+    let terrain = world.resource::<TerrainRes>().0.clone();
     match (mask, domain) {
-        (Some(mask), Domain::Surface | Domain::Subsurface) if !waypoints.is_empty() => mask
-            .plan_route(from, waypoints)
-            .map_err(|e| format!("route refused: {e}")),
-        _ => Ok((waypoints.to_vec(), 0)),
+        (Some(mask), Domain::Surface | Domain::Subsurface) if !waypoints.is_empty() => {
+            let limit = match (&terrain, draft_m) {
+                (Some(t), Some(d)) if d > 0.0 => Some(sim_geo::land::DepthLimit {
+                    terrain: t,
+                    min_depth_m: d + crate::planning::UNDER_KEEL_CLEARANCE_M,
+                }),
+                _ => None,
+            };
+            let charted = limit.is_some();
+            mask.plan_route_for(from, waypoints, limit)
+                .map(|p| SeaRoute {
+                    charted: charted && p.shallow_legs == 0,
+                    waypoints: p.waypoints,
+                    replanned: p.replanned,
+                    shallow_legs: p.shallow_legs,
+                })
+                .map_err(|e| format!("route refused: {e}"))
+        }
+        _ => Ok(SeaRoute {
+            waypoints: waypoints.to_vec(),
+            replanned: 0,
+            shallow_legs: 0,
+            charted: false,
+        }),
     }
 }
 
@@ -124,6 +163,13 @@ impl Simulation {
         world.insert_resource(ContactTable::default());
         world.insert_resource(C2State::default());
         world.insert_resource(EnvState::default());
+        world.insert_resource(crate::detection::Weather::default());
+        world.insert_resource(crate::acoustics::Acoustics::default());
+        world.insert_resource(crate::tma::Tma::default());
+        world.insert_resource(crate::collision::Avoidance::default());
+        world.insert_resource(crate::air::Air::default());
+        world.insert_resource(crate::tasking::Tasking::default());
+        world.insert_resource(crate::collision::PendingCollisions::default());
         world.insert_resource(BearingTable::default());
         world.insert_resource(WeaponCatalog::default());
         world.insert_resource(WeaponsInFlight::default());
@@ -136,6 +182,7 @@ impl Simulation {
         world.insert_resource(PlanningLayer::default());
         world.insert_resource(EmitterLibrary::default());
         world.insert_resource(LandMaskRes::default());
+        world.insert_resource(TerrainRes::default());
         world.insert_resource(crate::weapon_tracks::WeaponTracks::default());
         Self {
             world,
@@ -163,6 +210,65 @@ impl Simulation {
             .0
             .as_ref()
             .map(|m| m.id().to_owned())
+    }
+
+    /// Use these terrain and bathymetry packs from now on. Like the coastline, part of the state
+    /// hash (by id) and not saved: set it again after loading a save.
+    pub fn set_terrain(&mut self, terrain: Option<Arc<Terrain>>) {
+        self.world.insert_resource(TerrainRes(terrain));
+    }
+
+    /// The id of the terrain in use, if any (record it to replay the run).
+    #[must_use]
+    pub fn terrain_id(&self) -> Option<String> {
+        self.terrain().map(|t| t.id().to_owned())
+    }
+
+    /// The water of every choke point the planning layer names, by name (display only).
+    #[must_use]
+    pub fn choke_depths(&self) -> Vec<crate::lanes::ChokeDepths> {
+        let layer = self.world.resource::<PlanningLayer>();
+        let names: std::collections::BTreeSet<&str> = layer
+            .zones
+            .iter()
+            .filter_map(|z| z.choke_point.as_deref())
+            .collect();
+        names
+            .into_iter()
+            .filter_map(|n| crate::lanes::choke_depths(layer, self.terrain().map(|t| &**t), n))
+            .collect()
+    }
+
+    /// The shipping lanes in play.
+    #[must_use]
+    pub fn lanes(&self) -> Vec<crate::lanes::Lane> {
+        self.world.resource::<PlanningLayer>().lanes.clone()
+    }
+
+    /// The terrain in use, if any.
+    #[must_use]
+    pub fn terrain(&self) -> Option<&Arc<Terrain>> {
+        self.world.resource::<TerrainRes>().0.as_ref()
+    }
+
+    /// The water under `unit` and along the rest of its route, from the terrain packs, when
+    /// `viewer` sees the unit as its own (any unit for the white cell). `None` without terrain.
+    #[must_use]
+    pub fn route_depths(&self, unit: UnitId, viewer: Viewer) -> Option<crate::depths::RouteDepths> {
+        let terrain = self.terrain()?;
+        let e = *self.world.resource::<UnitIndex>().0.get(&unit)?;
+        let u = self.world.get::<Unit>(e)?;
+        if let Viewer::Side { side } = viewer {
+            if u.side != side {
+                return None;
+            }
+        }
+        Some(crate::depths::route_depths(
+            terrain,
+            u,
+            self.world.get::<Position>(e)?,
+            self.world.get::<Route>(e)?,
+        ))
     }
 
     #[must_use]
@@ -300,6 +406,14 @@ impl Simulation {
         let c2 = self.world.resource::<C2State>().clone();
         let planning = self.world.resource::<PlanningLayer>().clone();
         let records = self.unit_records();
+        let acoustics = self.world.resource::<crate::acoustics::Acoustics>().clone();
+        let air_units: BTreeMap<UnitId, crate::air::AirUnitView> = self
+            .world
+            .resource::<crate::air::Air>()
+            .aircraft
+            .keys()
+            .filter_map(|id| crate::air::unit_view(&self.world, *id).map(|v| (*id, v)))
+            .collect();
         let side_of: BTreeMap<UnitId, SideId> =
             records.iter().map(|r| (r.unit.id, r.unit.side)).collect();
         let units = records
@@ -332,6 +446,25 @@ impl Simulation {
                     mission: r.mission.mission.clone(),
                     mission_complete: r.mission.complete,
                     fuel_fraction: r.fuel.map(|f| f.fraction()),
+                    towed: r
+                        .sensors
+                        .0
+                        .iter()
+                        .any(|s| s.kind == sim_sensors::SensorKind::SonarTowed)
+                        .then(|| acoustics.towed_view(r.unit.id, tick)),
+                    sonobuoys_left: r
+                        .sensors
+                        .0
+                        .iter()
+                        .any(|s| s.kind == sim_sensors::SensorKind::Sonobuoy)
+                        .then(|| {
+                            acoustics
+                                .loads
+                                .get(&r.unit.id)
+                                .copied()
+                                .unwrap_or(crate::acoustics::BUOY_LOAD)
+                        }),
+                    air: air_units.get(&r.unit.id).cloned(),
                     stores: r
                         .magazine
                         .0
@@ -381,6 +514,8 @@ impl Simulation {
                 last_seen_s: c.last_seen.seconds(),
                 detected_by: c.detected_by,
                 sensor_id: c.sensor_id.clone(),
+                course_deg: c.course.map(|k| k.course_deg),
+                speed_mps: c.course.map(|k| k.speed_mps),
             })
             .collect();
         Snapshot {
@@ -404,6 +539,31 @@ impl Simulation {
                 })
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
+            weather_zones: self.world.resource::<crate::detection::Weather>().0.clone(),
+            sound_profiles: acoustics.profiles.clone(),
+            sensor_tasking: crate::tasking::views(
+                &self.world,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+            ),
+            air_bases: crate::air::base_views(
+                &self.world,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+                tick,
+            ),
+            sonobuoys: crate::acoustics::buoy_views(
+                &acoustics,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+                tick,
+            ),
             outcomes: crate::outcomes::visible(
                 self.world.resource::<crate::outcomes::OutcomeFeed>(),
                 tick,
@@ -526,6 +686,11 @@ impl Simulation {
                 .as_ref()
                 .map(|m| m.id()),
         );
+        // Only when set, so runs without packs keep their hashes (and the golden files).
+        if let Some(t) = self.terrain() {
+            h.str("terrain");
+            h.str(t.id());
+        }
         for r in self.unit_records() {
             h.u64(r.unit.id.0);
             h.u16(r.unit.side.0);
@@ -582,6 +747,19 @@ impl Simulation {
                 h.opt_f64(s.clutter_db_per_sea_state);
                 h.opt_f64(s.beamwidth_deg);
                 h.u8(u8::from(s.active));
+                // Only when the database gives them, so existing sonars keep their hashes.
+                if let Some(f) = &s.sonar {
+                    h.str("sonar");
+                    for v in [
+                        f.frequency_khz,
+                        f.di_db,
+                        f.dt_db,
+                        f.source_level_db,
+                        f.self_noise_db,
+                    ] {
+                        h.opt_f64(v);
+                    }
+                }
             }
             h.opt_f64(r.jammer.map(|j| j.jn_db_at_1km));
             // Hashed only when present, so units without fuel keep their hashes.
@@ -591,6 +769,11 @@ impl Simulation {
                 h.f64(f.cruise_mps);
                 h.f64(f.fuel_t);
                 h.f64(f.bingo);
+                // Aviation fuel only, so ships keep their hashes.
+                if f.kind == crate::fuel::FuelKind::Aviation {
+                    h.str("aviation");
+                    h.f64(f.idle_fraction);
+                }
             }
         }
         let catalog = self.world.resource::<WeaponCatalog>();
@@ -603,6 +786,14 @@ impl Simulation {
             h.f64(w.speed_mps);
             h.f64(w.warhead_kg);
             h.f64(w.base_ph);
+            // Per-domain ranges only when given, so catalogues without them keep their hashes.
+            if !w.max_range_by_target.is_empty() {
+                h.str("ranges");
+                for (d, r) in &w.max_range_by_target {
+                    h.str(d);
+                    h.f64(*r);
+                }
+            }
         }
         let wif = self.world.resource::<WeaponsInFlight>();
         h.u64(wif.next_id);
@@ -732,6 +923,73 @@ impl Simulation {
                 }
             }
         }
+        // Weather zones only when there are any, so runs without them keep their hashes.
+        // Acoustic state only when used, so runs without it keep their hashes.
+        let ac = self.world.resource::<crate::acoustics::Acoustics>();
+        if *ac != crate::acoustics::Acoustics::default() {
+            h.str("acoustics");
+            if let Ok(bytes) = rmp_serde::to_vec(ac) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
+        // Avoidance state only when some hull is giving way, so runs without it keep their hashes.
+        let av = &self.world.resource::<crate::collision::Avoidance>().0;
+        if !av.is_empty() {
+            h.str("avoidance");
+            h.u64(av.len() as u64);
+            for (u, s) in av {
+                h.u64(u.0);
+                h.u64(s.other.map_or(0, |o| o.0 + 1));
+                h.opt_f64(s.resume_deg);
+            }
+        }
+        // Sensor tasking only when used, so runs without coverage goals keep their hashes.
+        // TMA histories only when there are any, so runs without passive acoustic bearings keep
+        // their hashes.
+        let tma = self.world.resource::<crate::tma::Tma>();
+        if !tma.is_empty() {
+            h.str("tma");
+            if let Ok(bytes) = rmp_serde::to_vec(tma) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
+        let tasking = self.world.resource::<crate::tasking::Tasking>();
+        if !tasking.is_empty() {
+            h.str("tasking");
+            if let Ok(bytes) = rmp_serde::to_vec(tasking) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
+        // Air operations only when used, so runs without aircraft bases keep their hashes.
+        let air = self.world.resource::<crate::air::Air>();
+        if !air.is_empty() {
+            h.str("air");
+            if let Ok(bytes) = rmp_serde::to_vec(air) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
+        let zones = &self.world.resource::<crate::detection::Weather>().0;
+        if !zones.is_empty() {
+            h.str("weather");
+            if let Ok(bytes) = rmp_serde::to_vec(zones) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
         let env = self.world.resource::<EnvState>().0;
         h.u8(env.sea_state);
         h.f64(env.weather_loss_db);
@@ -777,6 +1035,20 @@ impl Simulation {
             h.opt_str(c.platform.as_deref());
             h.u64(c.detected_by.0);
             h.str(&c.sensor_id);
+            // The course estimate only when present (older states have none).
+            if !c.history.is_empty() {
+                h.str("history");
+                for (t, p) in &c.history {
+                    h.u64(t.0);
+                    h.f64(p.lat_deg);
+                    h.f64(p.lon_deg);
+                }
+            }
+            if let Some(k) = c.course {
+                h.str("course");
+                h.f64(k.course_deg);
+                h.f64(k.speed_mps);
+            }
         }
         h.finish()
     }
@@ -814,6 +1086,12 @@ impl Simulation {
             next_contact_numbers: self.world.resource::<ContactTable>().next_numbers(),
             c2: self.world.resource::<C2State>().clone(),
             environment: self.world.resource::<EnvState>().0,
+            weather: self.world.resource::<crate::detection::Weather>().0.clone(),
+            acoustics: self.world.resource::<crate::acoustics::Acoustics>().clone(),
+            avoidance: self.world.resource::<crate::collision::Avoidance>().clone(),
+            air: self.world.resource::<crate::air::Air>().clone(),
+            tasking: self.world.resource::<crate::tasking::Tasking>().clone(),
+            tma: self.world.resource::<crate::tma::Tma>().clone(),
             bearings: self.world.resource::<BearingTable>().clone(),
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
@@ -860,6 +1138,13 @@ impl Simulation {
         sim.world.insert_resource(log);
         sim.world.insert_resource(save.c2);
         sim.world.insert_resource(EnvState(save.environment));
+        sim.world
+            .insert_resource(crate::detection::Weather(save.weather.clone()));
+        sim.world.insert_resource(save.acoustics.clone());
+        sim.world.insert_resource(save.tma.clone());
+        sim.world.insert_resource(save.avoidance.clone());
+        sim.world.insert_resource(save.air.clone());
+        sim.world.insert_resource(save.tasking.clone());
         sim.world.insert_resource(save.bearings);
         sim.world.insert_resource(save.emitter_library);
         sim.world.insert_resource(save.weapon_catalog);
@@ -881,40 +1166,8 @@ impl Simulation {
         let mut index = BTreeMap::new();
         for r in save.units {
             let id = r.unit.id;
-            let signature = r.signature.unwrap_or(Signature {
-                rcs_m2: default_rcs_m2(r.unit.domain),
-                radiated_noise_db: None,
-                length_m: None,
-            });
-            let health = r
-                .health
-                .unwrap_or_else(|| Health::new(default_damage_profile(r.unit.domain)));
-            // Saves before format 17 have no loadout: take what the unit has now.
-            let loadout = r.loadout.unwrap_or_else(|| Loadout {
-                sensors: r.sensors.0.clone(),
-                max_speed_mps: r.kinematics.max_speed_mps,
-                stores: r.magazine.0.clone(),
-            });
-            let fuel = r.fuel;
-            let e = sim
-                .world
-                .spawn((
-                    r.unit,
-                    r.position,
-                    r.kinematics,
-                    r.route,
-                    r.sensors,
-                    signature,
-                    Jammer(r.jammer),
-                    health,
-                    r.magazine,
-                    r.mission,
-                    loadout,
-                ))
-                .id();
-            if let Some(f) = fuel {
-                sim.world.entity_mut(e).insert(f);
-            }
+            // Saves before format 17 have no loadout: `spawn_record` takes what the unit has now.
+            let e = spawn_record(&mut sim.world, r);
             if index.insert(id, e).is_some() {
                 return Err(SimError::CorruptSave(format!("duplicate unit {id}")));
             }
@@ -922,6 +1175,83 @@ impl Simulation {
         sim.world.insert_resource(UnitIndex(index));
         Ok(sim)
     }
+}
+
+fn spawn_parts(
+    world: &mut World,
+    r: UnitRecord,
+    signature: Signature,
+    health: Health,
+    loadout: Loadout,
+) -> Entity {
+    let fuel = r.fuel;
+    let e = world
+        .spawn((
+            r.unit,
+            r.position,
+            r.kinematics,
+            r.route,
+            r.sensors,
+            signature,
+            Jammer(r.jammer),
+            health,
+            r.magazine,
+            r.mission,
+            loadout,
+        ))
+        .id();
+    if let Some(f) = fuel {
+        world.entity_mut(e).insert(f);
+    }
+    e
+}
+
+/// Puts a unit back in the world from its record (an aircraft launching from a hangar).
+pub(crate) fn spawn_record(world: &mut World, r: UnitRecord) -> Entity {
+    let id = r.unit.id;
+    let signature = r.signature.unwrap_or(Signature {
+        rcs_m2: default_rcs_m2(r.unit.domain),
+        radiated_noise_db: None,
+        length_m: None,
+    });
+    let health = r
+        .health
+        .clone()
+        .unwrap_or_else(|| Health::new(default_damage_profile(r.unit.domain)));
+    let loadout = r.loadout.clone().unwrap_or_else(|| Loadout {
+        sensors: r.sensors.0.clone(),
+        max_speed_mps: r.kinematics.max_speed_mps,
+        stores: r.magazine.0.clone(),
+    });
+    let e = spawn_parts(world, r, signature, health, loadout);
+    world.resource_mut::<UnitIndex>().0.insert(id, e);
+    e
+}
+
+/// Takes a unit out of the world as a record (an aircraft landing in a hangar).
+pub(crate) fn take_record(world: &mut World, e: Entity) -> Option<UnitRecord> {
+    let r = UnitRecord {
+        unit: world.get::<Unit>(e)?.clone(),
+        position: *world.get::<Position>(e)?,
+        kinematics: *world.get::<Kinematics>(e)?,
+        route: world.get::<Route>(e)?.clone(),
+        sensors: world.get::<SensorSuite>(e)?.clone(),
+        signature: world.get::<Signature>(e).copied(),
+        jammer: world.get::<Jammer>(e).and_then(|j| j.0),
+        magazine: world.get::<Magazine>(e)?.clone(),
+        health: world.get::<Health>(e).cloned(),
+        mission: world.get::<MissionState>(e).cloned().unwrap_or_default(),
+        loadout: world.get::<Loadout>(e).cloned(),
+        fuel: world.get::<crate::fuel::Fuel>(e).copied(),
+    };
+    world.despawn(e);
+    world.resource_mut::<UnitIndex>().0.remove(&r.unit.id);
+    Some(r)
+}
+
+/// The side an order acts for: `None` for the scenario, white cell and scripts.
+fn issuer_side(cmd: &Command) -> Option<SideId> {
+    (!cmd.issuer.is_privileged()).then(|| cmd.side.unwrap_or(SideId(0)))
 }
 
 fn hash_mission(h: &mut StateHash, m: &MissionState) {
@@ -1010,7 +1340,10 @@ fn build_schedule() -> Schedule {
     schedule.add_systems(
         (
             apply_commands_system,
+            crate::air::air_system,
             movement_system,
+            crate::collision::collision_system,
+            crate::acoustics::sonobuoy_system,
             crate::weapon_tracks::weapon_tracks_system,
             point_defence_system,
             weapons_system,
@@ -1019,6 +1352,7 @@ fn build_schedule() -> Schedule {
             detection_system,
             ai_system,
             planning_system,
+            crate::tasking::tasking_system,
             scenario_events_system,
             advance_clock_system,
         )
@@ -1072,17 +1406,24 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
         }
         CommandPayload::SetRoute { unit, waypoints } => {
             let entity = authorised_entity(world, cmd, *unit)?;
-            let (domain, from) = match (world.get::<Unit>(entity), world.get::<Position>(entity)) {
-                (Some(u), Some(p)) => (u.domain, p.point),
-                _ => return Err(format!("{unit} has no position")),
-            };
-            let (planned, replanned) = plan_sea_route(world, domain, from, waypoints)?;
+            let (domain, draft, from) =
+                match (world.get::<Unit>(entity), world.get::<Position>(entity)) {
+                    (Some(u), Some(p)) => (u.domain, u.draft_m, p.point),
+                    _ => return Err(format!("{unit} has no position")),
+                };
+            let SeaRoute {
+                waypoints: planned,
+                replanned,
+                shallow_legs,
+                charted,
+            } = plan_sea_route(world, domain, draft, from, waypoints)?;
             let count = planned.len();
             let mut route = world
                 .get_mut::<Route>(entity)
                 .ok_or_else(|| format!("{unit} has no route component"))?;
             route.waypoints = planned;
             route.next = 0;
+            route.charted = charted;
             if replanned > 0 {
                 let tick = world.resource::<SimClock>().tick;
                 #[allow(clippy::cast_possible_truncation)]
@@ -1092,6 +1433,17 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
                         unit: *unit,
                         legs: replanned as u32,
                         waypoints: count as u32,
+                    },
+                );
+            }
+            if shallow_legs > 0 {
+                let tick = world.resource::<SimClock>().tick;
+                #[allow(clippy::cast_possible_truncation)]
+                world.resource_mut::<EventLog>().push(
+                    tick,
+                    SimEventKind::RouteShallow {
+                        unit: *unit,
+                        legs: shallow_legs as u32,
                     },
                 );
             }
@@ -1161,14 +1513,23 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             facilities,
             zones,
             action_groups,
+            lanes,
         } => {
             if !cmd.issuer.is_privileged() {
                 return Err("only the scenario or white cell may set the planning layer".into());
+            }
+            if let Some(lanes) = lanes {
+                crate::lanes::validate_lanes(lanes)?;
             }
             let mut layer = world.resource_mut::<PlanningLayer>();
             layer.set(facilities.clone(), zones.clone());
             if let Some(groups) = action_groups {
                 layer.action_groups.clone_from(groups);
+            }
+            if let Some(lanes) = lanes {
+                let mut lanes = lanes.clone();
+                lanes.sort_by_key(|l| l.id);
+                layer.lanes = lanes;
             }
             Ok(())
         }
@@ -1255,6 +1616,44 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             world.insert_resource(EnvState(*environment));
             Ok(())
         }
+        CommandPayload::SetSoundProfiles { profiles } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set sound profiles".into());
+            }
+            crate::acoustics::set_profiles(world, profiles)
+        }
+        CommandPayload::StreamTowedArray { unit, streamed } => {
+            let entity = authorised_entity(world, cmd, *unit)?;
+            crate::acoustics::order_towed(world, entity, *unit, *streamed)
+        }
+        CommandPayload::LaunchSortie {
+            unit,
+            mission,
+            loadout,
+        } => crate::air::order_launch(world, issuer_side(cmd), *unit, mission, loadout.as_deref()),
+        CommandPayload::RecallAircraft { unit, base } => {
+            crate::air::order_recall(world, issuer_side(cmd), *unit, *base)
+        }
+        CommandPayload::SetReadiness {
+            unit,
+            readiness,
+            maintenance_s,
+        } => {
+            crate::air::order_readiness(world, issuer_side(cmd), *unit, *readiness, *maintenance_s)
+        }
+        CommandPayload::LaySonobuoys { unit, points, deep } => {
+            let entity = authorised_entity(world, cmd, *unit)?;
+            crate::acoustics::order_buoys(world, entity, *unit, points, *deep)
+        }
+        CommandPayload::SetWeather { zones } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set the weather".into());
+            }
+            let mut zones = zones.clone();
+            zones.sort_by_key(|z| z.id);
+            world.insert_resource(crate::detection::Weather(zones));
+            Ok(())
+        }
         CommandPayload::SetDoctrine { scope, doctrine } => match scope {
             DoctrineScope::Side { side } => {
                 authorised_side(cmd, *side)?;
@@ -1320,19 +1719,26 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
     // A scenario route that crosses land is planned round it; one that cannot be planned is dropped
     // (the unit still spawns, holding its course) and the reason is logged.
     let tick = world.resource::<SimClock>().tick;
-    let (route, route_note) = match plan_sea_route(world, s.domain, s.position, &s.route) {
-        Ok((planned, 0)) => (planned, None),
-        #[allow(clippy::cast_possible_truncation)]
-        Ok((planned, legs)) => {
-            let n = planned.len() as u32;
-            (
-                planned,
-                Some(SimEventKind::RouteReplanned {
+    let mut shallow_note = None;
+    let mut charted = false;
+    let (route, route_note) = match plan_sea_route(world, s.domain, s.draft_m, s.position, &s.route)
+    {
+        Ok(planned) => {
+            charted = planned.charted;
+            #[allow(clippy::cast_possible_truncation)]
+            if planned.shallow_legs > 0 {
+                shallow_note = Some(SimEventKind::RouteShallow {
                     unit: s.id,
-                    legs: legs as u32,
-                    waypoints: n,
-                }),
-            )
+                    legs: planned.shallow_legs as u32,
+                });
+            }
+            #[allow(clippy::cast_possible_truncation)]
+            let note = (planned.replanned > 0).then_some(SimEventKind::RouteReplanned {
+                unit: s.id,
+                legs: planned.replanned as u32,
+                waypoints: planned.waypoints.len() as u32,
+            });
+            (planned.waypoints, note)
         }
         Err(reason) => (
             Vec::new(),
@@ -1351,6 +1757,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 group: s.group.clone(),
                 doctrine: s.doctrine,
                 draft_m: s.draft_m,
+                displacement_t: s.displacement_t,
             },
             Position {
                 point: s.position,
@@ -1391,6 +1798,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             Route {
                 waypoints: route,
                 next: 0,
+                charted,
             },
         ))
         .id();
@@ -1400,10 +1808,13 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             .insert(crate::fuel::Fuel::from_spec(f));
     }
     world.resource_mut::<UnitIndex>().0.insert(s.id, entity);
+    if let Some(a) = &s.air {
+        crate::air::register(world, s.id, a)?;
+    }
     world
         .resource_mut::<EventLog>()
         .push(tick, SimEventKind::UnitSpawned { unit: s.id });
-    if let Some(note) = route_note {
+    for note in [route_note, shallow_note].into_iter().flatten() {
         world.resource_mut::<EventLog>().push(tick, note);
     }
     Ok(())

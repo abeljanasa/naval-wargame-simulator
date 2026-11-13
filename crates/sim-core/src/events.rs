@@ -77,9 +77,117 @@ pub enum SimEventKind {
         unit: UnitId,
         reason: String,
     },
+    /// Two hulls collided (`docs/models/collisions.md`); both stop. Each one's damage roll, if
+    /// it takes one, follows as `DamageTaken`.
+    Collision {
+        a: UnitId,
+        b: UnitId,
+        closing_mps: f64,
+        /// Share of each hull's damage points the collision costs it.
+        damage_fraction_a: f64,
+        damage_fraction_b: f64,
+    },
+    /// A ship or submarine began to give way to `other`: `turn_deg` to starboard of its course,
+    /// and slowed if turning alone did not clear.
+    CollisionAvoidance {
+        unit: UnitId,
+        other: UnitId,
+        turn_deg: f64,
+        slowed: bool,
+    },
+    /// A parked aircraft was tasked; it launches in `ready_in_s` once a runway is free
+    /// (`docs/models/air-operations.md`).
+    SortieOrdered {
+        unit: UnitId,
+        ready_in_s: f64,
+        loadout: Option<String>,
+    },
+    /// An aircraft took off from `base` on a sortie.
+    SortieLaunched {
+        unit: UnitId,
+        base: u32,
+        loadout: Option<String>,
+        mission: String,
+    },
+    /// An aircraft turned for `base`: mission complete, target gone, weapons expended, bingo
+    /// fuel, recalled.
+    AircraftReturning {
+        unit: UnitId,
+        base: u32,
+        reason: String,
+    },
+    /// An aircraft landed at `base`, took `fuel_t` of aviation fuel, and turns round.
+    AircraftRecovered {
+        unit: UnitId,
+        base: u32,
+        fuel_t: f64,
+        turnaround_s: f64,
+    },
+    /// An aircraft reached bingo fuel; it heads for a tanker, if one is nearer than a base.
+    BingoFuel {
+        unit: UnitId,
+        fuel_t: f64,
+        tanker: Option<UnitId>,
+    },
+    /// A receiver took a tanker's hose.
+    TankingStarted {
+        receiver: UnitId,
+        tanker: UnitId,
+    },
+    /// A receiver left the tanker with `fuel_t` aboard, having taken `taken_t`.
+    TankingComplete {
+        receiver: UnitId,
+        tanker: UnitId,
+        fuel_t: f64,
+        taken_t: f64,
+    },
+    /// An aircraft was lost other than to a weapon: out of fuel, or with its carrier.
+    AircraftLost {
+        unit: UnitId,
+        reason: String,
+    },
+    /// A parked aircraft's readiness changed.
+    ReadinessChanged {
+        unit: UnitId,
+        readiness: crate::air::Readiness,
+    },
+    /// The engine tasked a sensor to a sense zone short of its coverage goal: `unit` goes to
+    /// `station` (`docs/models/sensor-tasking.md`).
+    SensorTasked {
+        zone: u32,
+        unit: UnitId,
+        station: sim_geo::GeoPoint,
+        reach_m: f64,
+        /// Coverage before this task, and projected with it.
+        coverage: f64,
+        projected: f64,
+    },
+    /// A sense zone is short of its coverage goal and the side has nothing left to send.
+    CoverageShortfall {
+        zone: u32,
+        coverage: f64,
+        goal: f64,
+    },
+    /// A sense zone that was short is back at its coverage goal.
+    CoverageGoalMet {
+        zone: u32,
+        coverage: f64,
+    },
     /// A ship or submarine stopped rather than run onto land.
     LandAhead {
         unit: UnitId,
+    },
+    /// No route deep enough for the unit's draft: `legs` legs were planned round land only and
+    /// may cross water too shallow for it (terrain packs, `docs/models/shallow-water.md`).
+    RouteShallow {
+        unit: UnitId,
+        legs: u32,
+    },
+    /// A ship or submarine stopped rather than run into water shallower than its draft
+    /// (`depth_m` there, from the terrain packs).
+    ShoalAhead {
+        unit: UnitId,
+        depth_m: f64,
     },
     /// One ESM intercept draw against one emitter, with every model input.
     EsmIntercept {
@@ -115,6 +223,26 @@ pub enum SimEventKind {
         detected: bool,
         range_error_m: Option<f64>,
         bearing_error_deg: Option<f64>,
+        /// The path the sound took, with a sound-velocity profile in force
+        /// (`docs/models/acoustics.md`); `None` under the Phase 2 law.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        path: Option<sim_sensors::acoustics::AcousticPath>,
+    },
+    /// A towed array ordered streamed or recovered; ready after `ready_s`.
+    TowedArray {
+        unit: UnitId,
+        streamed: bool,
+        ready_s: u64,
+    },
+    /// A sonobuoy laid.
+    SonobuoyLaid {
+        unit: UnitId,
+        buoy: u32,
+        position: sim_geo::GeoPoint,
+    },
+    /// A sonobuoy's life ended.
+    SonobuoyExpired {
+        buoy: u32,
     },
     /// One visual, EO or IR detection draw.
     OpticalAttempt {
@@ -303,6 +431,17 @@ pub enum SimEventKind {
         target: UnitId,
         bearings: u32,
     },
+    /// One observer's passive acoustic bearings, taken over minutes while it manoeuvred, ranged
+    /// a target (single-platform TMA, `docs/models/tma.md`). Sent once per bearing history.
+    TmaSolution {
+        side: SideId,
+        target: UnitId,
+        observer: UnitId,
+        bearings: u32,
+        range_m: f64,
+        /// One-sigma position error (semi-major axis), m.
+        error_m: f64,
+    },
     ContactLost {
         side: SideId,
         number: u32,
@@ -443,6 +582,18 @@ pub enum SimEventKind {
     ChokePointTransit {
         choke_point: String,
         unit: UnitId,
+    },
+    /// The transit just logged, assessed (`docs/models/choke-points.md`): the choke point's
+    /// lane traffic, the lane the unit is in, the water under it and its draft. Only with lanes
+    /// or terrain packs.
+    TransitAssessed {
+        choke_point: String,
+        unit: UnitId,
+        lane: Option<String>,
+        traffic_per_day: f64,
+        depth_m: Option<f64>,
+        draft_m: Option<f64>,
+        risk: crate::lanes::TransitRisk,
     },
     /// A mission-killed unit was sent to a port for repair.
     DivertedToPort {

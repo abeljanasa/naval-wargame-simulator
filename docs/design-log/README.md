@@ -33,6 +33,21 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
 | [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
 | [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0052](DL-0052-contact-course.md) | Contact course estimate from the track's own movement (line fit, significance test); contacts drawn flat, turned to it | Client request + public statistics literature + original design |
+| [DL-0051](DL-0051-weapon-target-ranges.md) | Weapon ranges by target domain (a gun against aircraft): migration 0005, engagement and point-defence checks | Gate 4 finding + open gun figures + original design |
+| [DL-0050](DL-0050-single-observer-tma.md) | Single-observer target motion analysis: maximum-likelihood bearings-only ranging from one observer's passive acoustic bearings | Gate 4 finding + textbook bearings-only tracking + original design |
+| [DL-0049](DL-0049-model-validation.md) | Model validation against historical engagements: validation specs, outcome measures, Wilson intervals, Gate 4 drafts | Project spec §12, §13 + public accounts of the engagements + public statistics literature + original design |
+| [DL-0048](DL-0048-regional-database.md) | Regional database first tranche (Philippine Navy and Coast Guard, PLAN and China Coast Guard, historical platforms) and ECM records | Project spec §3, §9 + ADR-0007 + cited public sources + original design |
+| [DL-0047](DL-0047-sensor-tasking.md) | Automatic sense-zone tasking: coverage goals, greedy tasking of free ships, submarines and parked aircraft, release and relief | Project spec §7.1 + coverage model + original design |
+| [DL-0046](DL-0046-air-operations.md) | Air operations: airbases and decks, readiness, sorties and loadouts, runway slots, turnaround, aircraft fuel, bingo and tanking | Project spec §13 + public readiness and tanking practice + original design |
+| [DL-0045](DL-0045-collisions.md) | Ship collisions (damage by closing speed and mass) and collision avoidance by the rules of the road, own side included | COLREGS + public collision reports + original design |
+| [DL-0044](DL-0044-acoustics.md) | Ocean acoustics: sound-velocity profiles, layers, convergence zones, bottom bounce, reverberation; towed arrays and sonobuoys | Project spec §13 + public underwater-acoustics textbooks + original design |
+| [DL-0043](DL-0043-weather-zones.md) | Weather zones: local sea state, rain loss, visibility, low cloud, speed in heavy seas | Project spec §6 + ITU-R P.838 + original design |
+| [DL-0042](DL-0042-imagery.md) | Offline imagery layer: MBTiles and PMTiles packs served by the app, attribution shown | ADR-0007 + MBTiles 1.3 and PMTiles v3 specifications + original design |
+| [DL-0041](DL-0041-choke-points-and-lanes.md) | Choke points: depth sections, shipping lanes with sourced traffic, transit risk in the AAR | Project spec §7 + ADR-0007 + original design |
+| [DL-0040](DL-0040-terrain-masking.md) | Terrain masking of radar, ESM, optical, comms and coverage; land clutter for low aircraft over land | Project spec §6 + 4/3-earth path profiling + original design |
+| [DL-0039](DL-0039-shallow-water.md) | Shallow water: routing by draft, shoal guard off the charted route, chart depths of facilities, depth along the route | Project spec §6 + seamanship + original design |
+| [DL-0038](DL-0038-terrain-packs.md) | Terrain and bathymetry packs: format, sampling, install, map layers | Project spec §6, §14 + GEBCO 2020 + netCDF classic spec + original design |
 | [DL-0037](DL-0037-db-editing-and-rehearsal.md) | Database record editing, symbol function codes, fixes from the pilot rehearsal | Project spec §9, §10 + ADR-0004 + original design |
 | [DL-0036](DL-0036-desktop-facilitation.md) | Event forms, polygon drawing, live planning edits, day/night shading | Project spec §10 + original design |
 | [DL-0035](DL-0035-action-groups.md) | Surface action groups in the core | Project spec §7.1 + original design |

@@ -21,6 +21,7 @@ Gate 3 (master prompt §13, §16): **a navy TTX pilot on the release build.** Th
   - self-signed signing (ADR-0008);
   - the Windows-only air-gapped run (the macOS check was skipped by the client).
 - **Closing the gate:** [pilot report template](pilot-report-template.md) and [panel sign-off](sign-off.md).
+- **Phase 4 started early (2026-11-12), by the client's decision,** on `phase-4/analysis` ([plan](../plan/phase-4.md)). This branch stays as reviewed; pilot fixes land here and are merged forward.
 
 ## Definition of done (§16)
 

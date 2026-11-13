@@ -44,6 +44,11 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
                 mission: None,
                 reserve: false,
                 fuel_level: None,
+                base: None,
+                airborne: false,
+                readiness: None,
+                maintenance_s: None,
+                loadout: None,
             }
         })
         .collect();
@@ -79,6 +84,9 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
         facilities: vec![],
         zones: vec![],
         action_groups: vec![],
+        lanes: vec![],
+        weather_zones: vec![],
+        sound_profiles: vec![],
         fuel: false,
     }
 }

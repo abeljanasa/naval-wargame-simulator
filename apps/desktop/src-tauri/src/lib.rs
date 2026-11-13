@@ -4,6 +4,8 @@
 #![forbid(unsafe_code)]
 
 mod host;
+mod imagery;
+mod terrain;
 
 use host::{AarView, ClockStatus, Host, SnapshotUpdate, TimeCompression, MAIN_WINDOW};
 use serde::{Deserialize, Serialize};
@@ -29,7 +31,138 @@ const MAX_MODE_BUDGET: Duration = Duration::from_millis(25);
 
 type SharedHost = Arc<Mutex<Host>>;
 
-fn lock(h: &SharedHost) -> MutexGuard<'_, Host> {
+/// Terrain and bathymetry packs on this machine (`terrain.rs`). Read at start-up on a thread of
+/// its own. Lock order: this before the host.
+#[derive(Default)]
+pub struct TerrainState {
+    dirs: Option<terrain::TerrainDirs>,
+    loading: bool,
+    loaded: terrain::Loaded,
+    terrain: Option<Arc<sim_geo::terrain::Terrain>>,
+}
+type SharedTerrain = Arc<Mutex<TerrainState>>;
+
+fn terrain_status_of(t: &TerrainState, h: &Host) -> terrain::TerrainStatus {
+    terrain::TerrainStatus {
+        loading: t.loading,
+        packs: t.loaded.infos(),
+        in_use: h.terrain_in_use(),
+        problems: t.loaded.problems.clone(),
+        folder: t
+            .dirs
+            .as_ref()
+            .map(|d| d.installed.display().to_string())
+            .unwrap_or_default(),
+    }
+}
+
+/// The water of every choke point, for the white cell's planning tab.
+#[tauri::command]
+#[specta::specta]
+fn choke_depths(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+) -> Result<Vec<sim_core::ChokeDepths>, String> {
+    lock(&host).choke_depths(window.label())
+}
+
+/// The water under a unit and along the rest of its route (`None` without terrain packs).
+#[tauri::command]
+#[specta::specta]
+fn route_depths(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+) -> Result<Option<sim_core::RouteDepths>, String> {
+    lock(&host).route_depths(window.label(), unit)
+}
+
+/// Each facility's charted depth, for the white cell's planning tab.
+#[tauri::command]
+#[specta::specta]
+fn facility_depths(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+) -> Result<Vec<host::FacilityDepth>, String> {
+    lock(&host).facility_depths(window.label())
+}
+
+/// The terrain packs on this machine and the ones the current exercise uses.
+#[tauri::command]
+#[specta::specta]
+fn terrain_status(
+    host: State<'_, SharedHost>,
+    terrain: State<'_, SharedTerrain>,
+) -> terrain::TerrainStatus {
+    let t = lock(&terrain);
+    terrain_status_of(&t, &lock(&host))
+}
+
+/// Installs a terrain pack the user picked. Raw IPC (outside the typed bindings, see
+/// `src/lib/terrain.ts`): the body is the pack's bytes, the `x-sha256` header the line from its
+/// `.sha256` file. The pack is checked against it before it is copied in.
+#[tauri::command]
+fn install_terrain_pack(
+    window: WebviewWindow,
+    request: tauri::ipc::Request<'_>,
+    host: State<'_, SharedHost>,
+    terrain: State<'_, SharedTerrain>,
+) -> Result<terrain::TerrainStatus, String> {
+    if !lock(&host).controls_time(window.label()) {
+        return Err("only the white cell installs terrain packs".into());
+    }
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("send the pack as raw bytes".into());
+    };
+    let sha = request
+        .headers()
+        .get("x-sha256")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    let mut t = lock(&terrain);
+    let dirs = t.dirs.clone().ok_or("terrain folders are not set up yet")?;
+    terrain::install(&dirs, bytes, sha)?;
+    t.loaded = terrain::load(&dirs);
+    t.terrain = t.loaded.terrain();
+    let mut h = lock(&host);
+    h.set_terrain(t.terrain.clone());
+    Ok(terrain_status_of(&t, &h))
+}
+
+/// Largest terrain grid the map asks for, each way.
+const MAX_TERRAIN_GRID: usize = 2048;
+
+/// Heights for the map's depth shading, contours and relief: `cols` columns from `west` to
+/// `east` at each latitude in `lats` (north first). Raw IPC: the response is `i16`
+/// little-endian, `i16::MIN` where no pack covers; empty when no packs are installed.
+#[tauri::command]
+fn terrain_grid(
+    terrain: State<'_, SharedTerrain>,
+    west: f64,
+    east: f64,
+    lats: Vec<f64>,
+    cols: u32,
+) -> Result<tauri::ipc::Response, String> {
+    if lats.len() > MAX_TERRAIN_GRID || cols as usize > MAX_TERRAIN_GRID {
+        return Err(format!(
+            "at most {MAX_TERRAIN_GRID} × {MAX_TERRAIN_GRID} cells"
+        ));
+    }
+    if !(west.is_finite() && east.is_finite() && lats.iter().all(|l| l.is_finite())) {
+        return Err("the grid's edges must be numbers".into());
+    }
+    let Some(t) = lock(&terrain).terrain.clone() else {
+        return Ok(tauri::ipc::Response::new(Vec::new()));
+    };
+    let heights = t.sample_grid(&lats, west, east, cols);
+    let mut bytes = Vec::with_capacity(heights.len() * 2);
+    for h in heights {
+        bytes.extend_from_slice(&h.to_le_bytes());
+    }
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+fn lock<T>(h: &Mutex<T>) -> MutexGuard<'_, T> {
     // A panic while holding the lock would leave the sim mid-tick. The simulation step itself never
     // panics on valid input, so we recover the guard rather than crash the UI.
     h.lock().unwrap_or_else(PoisonError::into_inner)
@@ -70,6 +203,8 @@ pub struct SessionInfo {
     pub zones: Vec<sim_core::Zone>,
     /// Surface action groups this window's seat may see.
     pub action_groups: Vec<sim_scenario::ActionGroup>,
+    /// Shipping lanes (public: every seat sees them).
+    pub lanes: Vec<sim_core::Lane>,
 }
 
 #[tauri::command]
@@ -486,6 +621,7 @@ fn session_info(h: &Host, label: &str) -> Result<SessionInfo, String> {
             .filter(|g| sees(h.viewer(label), g.side))
             .cloned()
             .collect(),
+        lanes: h.lanes.clone(),
     })
 }
 
@@ -872,9 +1008,10 @@ fn order_planning(
     host: State<'_, SharedHost>,
     facilities: Vec<sim_core::Facility>,
     zones: Vec<sim_core::Zone>,
+    lanes: Option<Vec<sim_core::Lane>>,
 ) -> Result<SessionInfo, String> {
     let mut h = lock(&host);
-    h.order_planning(window.label(), facilities, zones)?;
+    h.order_planning(window.label(), facilities, zones, lanes)?;
     session_info(&h, window.label())
 }
 
@@ -962,6 +1099,103 @@ fn order_facilitate(
         .map_err(|e| e.to_string())
 }
 
+/// Replaces the weather zones (white cell only).
+#[tauri::command]
+#[specta::specta]
+fn order_weather(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    zones: Vec<sim_core::WeatherZone>,
+) -> Result<(), String> {
+    lock(&host).order_weather(window.label(), zones).map(|_| ())
+}
+
+/// Replaces the sound-velocity profiles (white cell only).
+#[tauri::command]
+#[specta::specta]
+fn order_sound_profiles(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    profiles: Vec<sim_core::SoundProfile>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_sound_profiles(window.label(), profiles)
+        .map(|_| ())
+}
+
+/// Streams (`true`) or recovers a unit's towed array; either takes ten minutes.
+#[tauri::command]
+#[specta::specta]
+fn order_towed(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    streamed: bool,
+) -> Result<(), String> {
+    lock(&host)
+        .order_towed(window.label(), unit, streamed)
+        .map(|_| ())
+}
+
+/// Sends a unit through `points`, laying a sonobuoy at each (`deep`: hydrophones at 300 m).
+#[tauri::command]
+#[specta::specta]
+fn order_sonobuoys(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    points: Vec<GeoPoint>,
+    deep: bool,
+) -> Result<(), String> {
+    lock(&host)
+        .order_sonobuoys(window.label(), unit, points, deep)
+        .map(|_| ())
+}
+
+/// Launches a parked aircraft on a sortie; the loadout defaults to the mission's.
+#[tauri::command]
+#[specta::specta]
+fn order_sortie(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    mission: Mission,
+    loadout: Option<String>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_sortie(window.label(), unit, mission, loadout)
+        .map(|_| ())
+}
+
+/// Recalls an aircraft: cancels a launch, or brings it back to `base` (default its own).
+#[tauri::command]
+#[specta::specta]
+fn order_recall(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    base: Option<u32>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_recall(window.label(), unit, base)
+        .map(|_| ())
+}
+
+/// Sets a parked aircraft's readiness (with a maintenance period, if given).
+#[tauri::command]
+#[specta::specta]
+fn order_readiness(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    readiness: sim_core::Readiness,
+    maintenance_s: Option<f64>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_readiness(window.label(), unit, readiness, maintenance_s)
+        .map(|_| ())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -1004,6 +1238,19 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             open_record,
             get_aar,
             aar_csv,
+            terrain_status,
+            route_depths,
+            facility_depths,
+            choke_depths,
+            imagery_status,
+            order_weather,
+            order_sound_profiles,
+            order_towed,
+            order_sonobuoys,
+            order_sortie,
+            order_recall,
+            order_readiness,
+            rescan_imagery,
         ])
         .events(collect_events![FrameEvent])
 }
@@ -1064,6 +1311,134 @@ fn spawn_runner(app: tauri::AppHandle, host: SharedHost) {
         .unwrap_or_else(|e| eprintln!("failed to start simulation thread: {e}"));
 }
 
+type SharedImagery = Arc<Mutex<imagery::Imagery>>;
+
+/// The imagery packs on this machine (`imagery.rs`).
+#[tauri::command]
+#[specta::specta]
+fn imagery_status(imagery: State<'_, SharedImagery>) -> imagery::ImageryStatus {
+    lock(&imagery).status()
+}
+
+/// Reads the imagery folder again (after packs were copied into it by hand).
+#[tauri::command]
+#[specta::specta]
+fn rescan_imagery(imagery: State<'_, SharedImagery>) -> imagery::ImageryStatus {
+    let mut im = lock(&imagery);
+    im.rescan();
+    im.status()
+}
+
+/// Installs an imagery pack the user picked. Raw IPC (outside the typed bindings): the body is
+/// the pack, the `x-file-name` header its file name.
+#[tauri::command]
+fn install_imagery(
+    window: WebviewWindow,
+    request: tauri::ipc::Request<'_>,
+    host: State<'_, SharedHost>,
+    imagery: State<'_, SharedImagery>,
+) -> Result<imagery::ImageryStatus, String> {
+    if !lock(&host).controls_time(window.label()) {
+        return Err("only the white cell installs imagery".into());
+    }
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("send the pack as raw bytes".into());
+    };
+    let name = request
+        .headers()
+        .get("x-file-name")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let mut im = lock(&imagery);
+    let folder = im
+        .folder
+        .clone()
+        .ok_or("the imagery folder is not set up")?;
+    imagery::install(&folder, &name, bytes)?;
+    im.rescan();
+    Ok(im.status())
+}
+
+/// Serves `nwstiles://localhost/<file>/<z>/<x>/<y>` from the installed packs: the map's imagery
+/// layer, from this machine only.
+fn tile_response(imagery: &SharedImagery, path: &str) -> tauri::http::Response<Vec<u8>> {
+    let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    let found = match parts.as_slice() {
+        [file, z, x, y] => {
+            let file = percent_decode(file);
+            let y = y.split('.').next().unwrap_or_default();
+            match (z.parse::<u8>(), x.parse::<u32>(), y.parse::<u32>()) {
+                (Ok(z), Ok(x), Ok(y)) if z <= 30 => lock(imagery).tile(&file, z, x, y),
+                _ => None,
+            }
+        }
+        _ => None,
+    };
+    let builder = tauri::http::Response::builder().header("Access-Control-Allow-Origin", "*");
+    let response = match found {
+        Some((bytes, mime)) => builder
+            .header(tauri::http::header::CONTENT_TYPE, mime)
+            .body(bytes),
+        None => builder
+            .status(tauri::http::StatusCode::NOT_FOUND)
+            .body(Vec::new()),
+    };
+    response.unwrap_or_default()
+}
+
+/// Undoes the `%XX` escapes of a URL path segment.
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Finds the terrain folders and reads the packs on a thread of their own (a regional pack takes
+/// a second or two), then gives them to the host.
+fn start_terrain(app: &tauri::App, shared: &SharedTerrain, host: &SharedHost) {
+    let Ok(data) = app.path().app_data_dir() else {
+        eprintln!("warning: no app data folder; terrain packs cannot be installed");
+        return;
+    };
+    let dirs = terrain::TerrainDirs {
+        bundled: app.path().resource_dir().ok().map(|d| d.join("terrain")),
+        installed: data.join("terrain"),
+    };
+    {
+        let mut t = lock(shared);
+        t.dirs = Some(dirs.clone());
+        t.loading = true;
+    }
+    let (for_thread, host) = (shared.clone(), host.clone());
+    let spawned = std::thread::Builder::new()
+        .name("terrain-load".into())
+        .spawn(move || {
+            let loaded = terrain::load(&dirs);
+            let mut t = lock(&for_thread);
+            t.terrain = loaded.terrain();
+            t.loaded = loaded;
+            t.loading = false;
+            lock(&host).set_terrain(t.terrain.clone());
+        });
+    if let Err(e) = spawned {
+        eprintln!("warning: could not read terrain packs: {e}");
+        lock(shared).loading = false;
+    }
+}
+
 /// Desktop entry point.
 // `tauri::generate_context!` expands to code that uses `HashMap`. That is app wiring, not
 // simulation logic, so the determinism ban (ADR-0003) does not apply here.
@@ -1099,9 +1474,28 @@ pub fn run() {
         }
     };
 
+    let shared_terrain: SharedTerrain = Arc::new(Mutex::new(TerrainState::default()));
+    let shared_imagery: SharedImagery = Arc::new(Mutex::new(imagery::Imagery::default()));
+    // The typed commands, plus the two raw-bytes terrain commands that have no typed binding.
+    let typed = builder.invoke_handler();
+    let raw: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
+        Box::new(tauri::generate_handler![
+            install_terrain_pack,
+            terrain_grid,
+            install_imagery
+        ]);
     let result = tauri::Builder::default()
-        .invoke_handler(builder.invoke_handler())
+        .invoke_handler(move |invoke| match invoke.message.command() {
+            "install_terrain_pack" | "terrain_grid" | "install_imagery" => raw(invoke),
+            _ => typed(invoke),
+        })
         .manage(host.clone())
+        .manage(shared_terrain.clone())
+        .manage(shared_imagery.clone())
+        .register_uri_scheme_protocol("nwstiles", {
+            let imagery = shared_imagery.clone();
+            move |_ctx, request| tile_response(&imagery, request.uri().path())
+        })
         .manage(DbSources(Mutex::new(sim_db::embedded::source_set())))
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -1110,6 +1504,12 @@ pub fn run() {
         })
         .setup(move |app| {
             builder.mount_events(app);
+            start_terrain(app, &shared_terrain, &host);
+            if let Ok(data) = app.path().app_data_dir() {
+                let mut im = lock(&shared_imagery);
+                im.folder = Some(data.join("imagery"));
+                im.rescan();
+            }
             spawn_runner(
                 app.handle().clone(),
                 app.state::<SharedHost>().inner().clone(),

@@ -35,6 +35,43 @@ pub struct SonarParams {
     pub self_noise_db: f64,
 }
 
+/// A sonar's own acoustic figures from the database (migration 0003); each overrides the
+/// generic figure of its kind when given.
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct SonarFigures {
+    #[serde(default)]
+    pub frequency_khz: Option<f64>,
+    #[serde(default)]
+    pub di_db: Option<f64>,
+    #[serde(default)]
+    pub dt_db: Option<f64>,
+    #[serde(default)]
+    pub source_level_db: Option<f64>,
+    #[serde(default)]
+    pub self_noise_db: Option<f64>,
+}
+
+/// [`sonar_params`] with a sonar's own figures, where it has them.
+#[must_use]
+pub fn sonar_params_with(
+    kind: SensorKind,
+    active_capable: bool,
+    own: Option<&SonarFigures>,
+) -> SonarParams {
+    let g = sonar_params(kind, active_capable);
+    let Some(o) = own else {
+        return g;
+    };
+    SonarParams {
+        frequency_khz: o.frequency_khz.unwrap_or(g.frequency_khz),
+        di_db: o.di_db.unwrap_or(g.di_db),
+        dt_db: o.dt_db.unwrap_or(g.dt_db),
+        active_sl_db: o.source_level_db.unwrap_or(g.active_sl_db),
+        self_noise_db: o.self_noise_db.unwrap_or(g.self_noise_db),
+    }
+}
+
 /// Generic figures by kind. Active-capable hull sonars work in the medium-frequency band;
 /// passive hull arrays (submarine bow arrays) listen lower.
 #[must_use]

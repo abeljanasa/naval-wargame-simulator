@@ -62,6 +62,8 @@ pub enum FacilityKind {
     RefuellingPoint,
     ShelteringPort,
     Anchorage,
+    /// An airfield, or a ship's flight deck (Phase 4 slice 9, `docs/models/air-operations.md`).
+    Airbase,
 }
 
 /// What happens to a player's order issued while a command post is down and its alternate has
@@ -165,6 +167,9 @@ pub struct Facility {
     /// Anchorages: AI-run units whose mission is complete hold here until tasked again.
     #[serde(default)]
     pub staging: bool,
+    /// Airbases: runways or deck, parking and aviation fuel (Phase 4 slice 9).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub air: Option<crate::air::AirField>,
 }
 
 /// What a zone governs.
@@ -203,6 +208,13 @@ pub struct Zone {
     /// Sense zones: the sensor types this layer is for; coverage counts only these (empty: all).
     #[serde(default)]
     pub sensors: Vec<crate::detection::SensorKind>,
+    /// Sense zones: the share of the zone to keep covered; the engine tasks free sensors to keep
+    /// it (Phase 4 slice 12, `docs/models/sensor-tasking.md`). `None`: players task them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage_goal: Option<f64>,
+    /// Sense zones with a goal: the units the engine may task for it (empty: any free unit).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<UnitId>,
 }
 
 /// A zone's layer in a choke point's defence: sense far out, engage in the inner layers.
@@ -581,6 +593,10 @@ pub struct PlanningLayer {
     /// Surface action groups, in order.
     #[serde(default)]
     pub action_groups: Vec<ActionGroup>,
+    /// Shipping lanes (`lanes.rs`), sorted by id. Last, and left out when empty, so layers
+    /// without lanes serialise (and hash) as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lanes: Vec<crate::lanes::Lane>,
 }
 
 /// Checks a planning layer before it is set.
@@ -613,11 +629,11 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         if f.unit.is_some()
             && !matches!(
                 f.kind,
-                FacilityKind::CommandPost | FacilityKind::RefuellingPoint
+                FacilityKind::CommandPost | FacilityKind::RefuellingPoint | FacilityKind::Airbase
             )
         {
             return Err(format!(
-                "facility {:?}: only command posts and refuelling points are carried by a unit",
+                "facility {:?}: only command posts, refuelling points and airbases are carried by a unit",
                 f.name
             ));
         }
@@ -638,6 +654,15 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
                 "facility {:?} needs a depth > 0 and a holding limit of sea state 0-9",
                 f.name
             ));
+        }
+        if (f.kind == FacilityKind::Airbase) != f.air.is_some() {
+            return Err(format!(
+                "facility {:?}: an airbase needs its airfield, and only an airbase has one",
+                f.name
+            ));
+        }
+        if let Some(a) = &f.air {
+            a.validate(&f.name)?;
         }
         if f.staging && f.kind != FacilityKind::Anchorage {
             return Err(format!(
@@ -691,6 +716,20 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         z.area
             .validate()
             .map_err(|e| format!("zone {:?}: {e}", z.name))?;
+        if let Some(g) = z.coverage_goal {
+            if z.kind != ZoneKind::Sense || !(g.is_finite() && g > 0.0 && g <= 1.0) {
+                return Err(format!(
+                    "zone {:?}: a coverage goal is for sense zones, a share above 0 and at most 1",
+                    z.name
+                ));
+            }
+        }
+        if !z.assets.is_empty() && z.coverage_goal.is_none() {
+            return Err(format!(
+                "zone {:?}: units to task need a coverage goal",
+                z.name
+            ));
+        }
         if z.kind == ZoneKind::Engage && !z.sensors.is_empty() {
             return Err(format!(
                 "zone {:?}: only sense zones list sensor types",
@@ -766,7 +805,7 @@ impl PlanningLayer {
             .map(|t| (t - self.issued.get(&f.id).copied().unwrap_or(0.0)).max(0.0))
     }
 
-    fn facility(&self, id: u32) -> Option<&Facility> {
+    pub(crate) fn facility(&self, id: u32) -> Option<&Facility> {
         self.facilities.iter().find(|f| f.id == id)
     }
 
@@ -796,7 +835,7 @@ fn position_of(world: &World, unit: UnitId) -> Option<GeoPoint> {
 }
 
 /// Where a command post is now (`None`: carried by a unit that has been lost).
-fn post_position(world: &World, f: &Facility) -> Option<GeoPoint> {
+pub(crate) fn post_position(world: &World, f: &Facility) -> Option<GeoPoint> {
     match f.unit {
         Some(u) => position_of(world, u),
         None => Some(f.position),
@@ -1271,15 +1310,15 @@ fn choke_transits(world: &mut World, tick: Tick) {
     if chokes.is_empty() {
         return;
     }
-    let mut units: Vec<(UnitId, SideId, GeoPoint)> = world
+    let mut units: Vec<(UnitId, SideId, GeoPoint, Option<f64>)> = world
         .query::<(&Unit, &Position)>()
         .iter(world)
-        .map(|(u, p)| (u.id, u.side, p.point))
+        .map(|(u, p)| (u.id, u.side, p.point, u.draft_m))
         .collect();
     units.sort_by_key(|u| u.0);
     let mut now_inside = BTreeSet::new();
     for (name, (owner, areas)) in &chokes {
-        for &(id, side, at) in &units {
+        for &(id, side, at, _) in &units {
             if side != *owner && areas.iter().any(|a| a.contains(at)) {
                 now_inside.insert((name.clone(), id));
             }
@@ -1291,9 +1330,44 @@ fn choke_transits(world: &mut World, tick: Tick) {
     };
     world.resource_mut::<PlanningLayer>().inside = now_inside;
     for (choke_point, unit) in entered {
-        world
-            .resource_mut::<EventLog>()
-            .push(tick, SimEventKind::ChokePointTransit { choke_point, unit });
+        // The transit's traffic, lane and under-keel margin (lanes or terrain packs only).
+        let assessment = units
+            .iter()
+            .find(|u| u.0 == unit)
+            .and_then(|&(_, _, at, draft)| {
+                let areas = &chokes.get(&choke_point)?.1;
+                crate::lanes::assess(
+                    world.resource::<PlanningLayer>(),
+                    world.resource::<crate::sim::TerrainRes>().0.as_deref(),
+                    &choke_point,
+                    areas,
+                    at,
+                    draft,
+                )
+                .map(|a| (a, draft))
+            });
+        let mut log = world.resource_mut::<EventLog>();
+        log.push(
+            tick,
+            SimEventKind::ChokePointTransit {
+                choke_point: choke_point.clone(),
+                unit,
+            },
+        );
+        if let Some((a, draft_m)) = assessment {
+            log.push(
+                tick,
+                SimEventKind::TransitAssessed {
+                    choke_point,
+                    unit,
+                    lane: a.lane,
+                    traffic_per_day: a.traffic_per_day,
+                    depth_m: a.depth_m,
+                    draft_m,
+                    risk: a.risk,
+                },
+            );
+        }
     }
 }
 
@@ -1334,6 +1408,76 @@ fn inside(f: &Facility, at: GeoPoint, p: GeoPoint) -> bool {
     }
 }
 
+/// Sample points across a facility's water (each way), for its chart depth.
+const CHART_GRID: u32 = 9;
+
+/// A fixed facility's depth from the terrain packs: the deepest water among a 9 × 9 grid over
+/// its area (its polygon or circle, else `radius_m` round its position) and its position, as a
+/// port or anchorage has its berths in its best water. `None` for a facility on a unit, or where
+/// no pack covers. The planner's `depth_m`, when set, is used instead
+/// (`docs/models/shallow-water.md`).
+#[must_use]
+pub fn chart_depth_m(terrain: &sim_geo::terrain::Terrain, f: &Facility) -> Option<f64> {
+    if f.unit.is_some() {
+        return None;
+    }
+    let area = f.area.clone().unwrap_or(Area::Circle {
+        centre: f.position,
+        radius_m: f.radius_m.max(1.0),
+    });
+    let (south, west, north, east) = match &area {
+        Area::Circle { centre, radius_m } => {
+            let dlat = radius_m / 111_320.0;
+            let dlon = radius_m / (111_320.0 * libm::cos(centre.lat_deg.to_radians()).max(0.01));
+            (
+                centre.lat_deg - dlat,
+                centre.lon_deg - dlon,
+                centre.lat_deg + dlat,
+                centre.lon_deg + dlon,
+            )
+        }
+        Area::Polygon { points } => points.iter().fold(
+            (f64::MAX, f64::MAX, f64::MIN, f64::MIN),
+            |(s, w, n, e), p| {
+                (
+                    s.min(p.lat_deg),
+                    w.min(p.lon_deg),
+                    n.max(p.lat_deg),
+                    e.max(p.lon_deg),
+                )
+            },
+        ),
+    };
+    let mut deepest: Option<f64> = terrain.depth_m(f.position);
+    for i in 0..CHART_GRID {
+        for j in 0..CHART_GRID {
+            let t = |k: u32| f64::from(k) / f64::from(CHART_GRID - 1);
+            let p = GeoPoint::new(
+                (south + t(i) * (north - south)).clamp(-90.0, 90.0),
+                west + t(j) * (east - west),
+            );
+            if !area.contains(p) {
+                continue;
+            }
+            if let Some(d) = terrain.depth_m(p) {
+                deepest = Some(deepest.map_or(d, |x: f64| x.max(d)));
+            }
+        }
+    }
+    deepest
+}
+
+/// The facility as the engine uses it: the planner's depth if set, else its chart depth.
+fn charted(world: &World, f: &Facility) -> Facility {
+    let mut f = f.clone();
+    if f.depth_m.is_none() {
+        if let Some(t) = &world.resource::<crate::sim::TerrainRes>().0 {
+            f.depth_m = chart_depth_m(t, &f);
+        }
+    }
+    f
+}
+
 /// Whether a unit of this draft can use the facility: draft plus under-keel clearance within its
 /// depth. Unknown draft or depth always fits.
 fn fits(f: &Facility, draft_m: Option<f64>) -> bool {
@@ -1344,6 +1488,21 @@ fn fits(f: &Facility, draft_m: Option<f64>) -> bool {
 }
 
 /// Whether the sea state exceeds the facility's holding limit.
+/// The sea state at `p`: its weather zone's, else `default` (the scenario-wide one).
+fn sea_at(world: &World, p: GeoPoint, default: u8) -> u8 {
+    let zones = &world.resource::<crate::detection::Weather>().0;
+    if zones.is_empty() {
+        return default;
+    }
+    let env = world.resource::<crate::detection::EnvState>().0;
+    crate::detection::local_env(env, zones, p).sea_state
+}
+
+/// Whether the sea state at the facility exceeds its holding limit.
+fn over_limit_at(world: &World, f: &Facility, sea_state: u8) -> bool {
+    over_limit(f, sea_at(world, f.position, sea_state))
+}
+
 fn over_limit(f: &Facility, sea_state: u8) -> bool {
     f.max_sea_state.is_some_and(|m| sea_state > m)
 }
@@ -1374,6 +1533,9 @@ fn threatened(world: &World, e: Entity, sea_state: u8) -> bool {
     let length = sig
         .length_m
         .unwrap_or_else(|| crate::optical::default_length_m(u.domain));
+    let sea_state = world
+        .get::<Position>(e)
+        .map_or(sea_state, |p| sea_at(world, p.point, sea_state));
     u.domain == crate::components::Domain::Surface && sea_state >= weather_limit(length)
 }
 
@@ -1424,7 +1586,8 @@ fn weather_changes(world: &mut World, tick: Tick, sea: u8) {
                     .push(tick, SimEventKind::WeatherEased { unit: id });
             }
             DivertReason::Staging
-                if threatened(world, e, sea) || f.as_ref().is_some_and(|f| over_limit(f, sea)) =>
+                if threatened(world, e, sea)
+                    || f.as_ref().is_some_and(|f| over_limit_at(world, f, sea)) =>
             {
                 world.resource_mut::<PlanningLayer>().diverted.remove(&id);
             }
@@ -1439,14 +1602,17 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason, sea: u8) {
         layer
             .facilities
             .iter()
-            .filter(|f| f.kind != FacilityKind::CommandPost && !over_limit(f, sea))
+            .filter(|f| {
+                !matches!(f.kind, FacilityKind::CommandPost | FacilityKind::Airbase)
+                    && !over_limit_at(world, f, sea)
+            })
             .filter(|f| match reason {
                 DivertReason::Repair => f.services.repair,
                 DivertReason::Fuel => f.services.refuel && layer.fuel_left(f) != Some(0.0),
                 DivertReason::Weather => f.kind == FacilityKind::ShelteringPort,
                 DivertReason::Staging => f.kind == FacilityKind::Anchorage && f.staging,
             })
-            .filter_map(|f| post_position(world, f).map(|p| (f.clone(), p)))
+            .filter_map(|f| post_position(world, f).map(|p| (charted(world, f), p)))
             .collect()
     };
     if points.is_empty() {
@@ -1462,8 +1628,10 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason, sea: u8) {
             Option<&crate::fuel::Fuel>,
         )>()
         .iter(world)
-        .filter(|(_, _, _, h, m, fuel)| {
-            m.mission.is_some()
+        .filter(|(_, u, _, h, m, fuel)| {
+            // Aircraft go to their airbases (air operations), not to these.
+            u.domain != crate::components::Domain::Air
+                && m.mission.is_some()
                 && match reason {
                     DivertReason::Repair => h.status == Status::MissionKilled,
                     DivertReason::Fuel => {
@@ -1547,6 +1715,7 @@ fn hold_alongside(world: &mut World, tick: Tick) {
                 if let Some(mut r) = world.get_mut::<Route>(e) {
                     r.waypoints = vec![ahead];
                     r.next = 0;
+                    r.charted = false;
                 }
                 if let Some(mut k) = world.get_mut::<Kinematics>(e) {
                     k.ordered_speed_mps = ok.speed_mps.min(k.max_speed_mps);
@@ -1625,7 +1794,7 @@ fn serve(world: &mut World, tick: Tick) {
                 .and_then(|u| world.resource::<UnitIndex>().0.get(&u).copied())
                 .and_then(|o| world.get::<Kinematics>(o))
                 .map(|k| k.speed_mps);
-            Some((f.clone(), at, carrier))
+            Some((charted(world, f), at, carrier))
         })
         .collect();
     let (alongside, waiting) = alongside(world, &facilities);

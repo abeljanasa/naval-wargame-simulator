@@ -83,6 +83,44 @@ pub struct DetectionRow {
     pub held_s: f64,
 }
 
+/// One choke-point transit, assessed (`docs/models/choke-points.md`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct TransitRow {
+    pub tick: Tick,
+    pub choke_point: String,
+    pub unit: UnitId,
+    pub unit_name: String,
+    pub side: Option<SideId>,
+    /// The lane the unit was in, if any.
+    pub lane: Option<String>,
+    /// The choke point's lanes' traffic, ships per day.
+    pub traffic_per_day: f64,
+    /// Water under the unit as it entered (terrain packs), and its draft.
+    pub depth_m: Option<f64>,
+    pub draft_m: Option<f64>,
+    pub risk: sim_core::TransitRisk,
+}
+
+/// One sortie (`docs/models/air-operations.md`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct SortieRow {
+    pub launched: Tick,
+    pub unit: UnitId,
+    pub unit_name: String,
+    pub side: Option<SideId>,
+    pub base: String,
+    pub mission: String,
+    pub loadout: Option<String>,
+    /// When it landed or was lost (`None`: still flying at the end).
+    pub ended: Option<Tick>,
+    /// Recovered, lost (and why), or airborne at the end.
+    pub outcome: String,
+    /// Fuel taken from tankers, t.
+    pub tanker_fuel_t: f64,
+}
+
 /// What a timeline entry is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -98,6 +136,10 @@ pub enum TimelineKind {
     Damage,
     Loss,
     Mine,
+    /// Air operations: sorties, recoveries, bingo, tanking.
+    Air,
+    /// Automatic sense-zone tasking: sensors sent, goals short or met.
+    Tasking,
     Override,
     Facilitation,
     Event,
@@ -125,6 +167,12 @@ pub struct AarReport {
     pub losses: Vec<LossRow>,
     pub weapons: Vec<WeaponRow>,
     pub detections: Vec<DetectionRow>,
+    /// Choke-point transits with lanes or terrain packs (older reports: none).
+    #[serde(default)]
+    pub transits: Vec<TransitRow>,
+    /// Sorties flown (older reports: none).
+    #[serde(default)]
+    pub sorties: Vec<SortieRow>,
     pub timeline: Vec<TimelineEntry>,
 }
 
@@ -157,10 +205,23 @@ struct Builder<'a> {
     last_hit: BTreeMap<UnitId, Credit>,
     /// White-cell overrides that can destroy a unit, with their tick and reason.
     adjudicated: BTreeMap<UnitId, (Tick, String)>,
+    /// Hulls in a collision, with its tick and the other hull (a loss that tick is the
+    /// collision's, not the last weapon's).
+    collided: BTreeMap<UnitId, (Tick, UnitId)>,
+    /// Aircraft lost other than to a weapon (out of fuel, with their carrier), and why.
+    air_lost: BTreeMap<UnitId, (Tick, String)>,
+    /// Airbase names, from the planning layer in the log.
+    bases: BTreeMap<u32, String>,
+    /// Zone names and sides, from the planning layer in the log.
+    zones: BTreeMap<u32, (String, SideId)>,
+    sorties: Vec<SortieRow>,
+    /// The open sortie of each aircraft in the air, by index in `sorties`.
+    flying: BTreeMap<UnitId, usize>,
     intercepted: BTreeSet<u64>,
     losses: Vec<LossRow>,
     open_contacts: BTreeMap<(SideId, u32), usize>,
     detections: Vec<DetectionRow>,
+    transits: Vec<TransitRow>,
     timeline: Vec<TimelineEntry>,
 }
 
@@ -177,10 +238,17 @@ impl<'a> Builder<'a> {
             pending_hit: None,
             last_hit: BTreeMap::new(),
             adjudicated: BTreeMap::new(),
+            collided: BTreeMap::new(),
+            air_lost: BTreeMap::new(),
+            bases: BTreeMap::new(),
+            zones: BTreeMap::new(),
+            sorties: Vec::new(),
+            flying: BTreeMap::new(),
             intercepted: BTreeSet::new(),
             losses: Vec::new(),
             open_contacts: BTreeMap::new(),
             detections: Vec::new(),
+            transits: Vec::new(),
             timeline: Vec::new(),
         };
         // Every unit that could appear, and the seat names, from the log (by sequence number).
@@ -192,6 +260,16 @@ impl<'a> Builder<'a> {
                 CommandPayload::SetEvents { reserves, .. } => {
                     for s in reserves {
                         b.units.insert(s.id, info(s));
+                    }
+                }
+                CommandPayload::SetPlanning {
+                    facilities, zones, ..
+                } => {
+                    for f in facilities {
+                        b.bases.insert(f.id, f.name.clone());
+                    }
+                    for z in zones {
+                        b.zones.insert(z.id, (z.name.clone(), z.side));
                     }
                 }
                 CommandPayload::SetSeats { seats } => {
@@ -307,6 +385,52 @@ impl<'a> Builder<'a> {
                 "set sea state {} and weather loss {:.1} dB",
                 environment.sea_state, environment.weather_loss_db
             ),
+            CommandPayload::SetWeather { zones } => match zones.len() {
+                0 => "cleared the weather zones".into(),
+                n => format!(
+                    "set {n} weather zone{} ({})",
+                    if n == 1 { "" } else { "s" },
+                    zones
+                        .iter()
+                        .map(|z| format!("{}: sea state {}", z.name, z.sea_state))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            },
+            CommandPayload::SetSoundProfiles { profiles } => {
+                format!("set {} sound-velocity profile(s)", profiles.len())
+            }
+            CommandPayload::StreamTowedArray { unit, streamed } => format!(
+                "{}: {} the towed array",
+                self.unit_name(*unit),
+                if *streamed { "stream" } else { "recover" }
+            ),
+            CommandPayload::LaunchSortie {
+                unit,
+                mission,
+                loadout,
+            } => format!(
+                "launched {} on a {} sortie{}",
+                n(unit),
+                sim_core::mission_name(mission),
+                loadout
+                    .as_deref()
+                    .map(|l| format!(" with {l}"))
+                    .unwrap_or_default()
+            ),
+            CommandPayload::RecallAircraft { unit, .. } => format!("recalled {}", n(unit)),
+            CommandPayload::SetReadiness {
+                unit, readiness, ..
+            } => format!(
+                "set {} to {}",
+                n(unit),
+                sim_core::readiness_text(*readiness)
+            ),
+            CommandPayload::LaySonobuoys { unit, points, .. } => format!(
+                "{}: lay {} sonobuoy(s)",
+                self.unit_name(*unit),
+                points.len()
+            ),
             CommandPayload::SetEmitterLibrary { .. } => "set the emitter library".into(),
             CommandPayload::SetWeaponCatalog { .. } => "set the weapon catalogue".into(),
             CommandPayload::Engage {
@@ -420,6 +544,16 @@ impl<'a> Builder<'a> {
         if let Some((at, reason)) = self.adjudicated.remove(&unit) {
             if at == tick {
                 return (format!("white cell: {reason}"), None);
+            }
+        }
+        if let Some((at, why)) = self.air_lost.remove(&unit) {
+            if at == tick {
+                return (why, None);
+            }
+        }
+        if let Some((at, other)) = self.collided.remove(&unit) {
+            if at == tick {
+                return (format!("collision with {}", self.unit_name(other)), None);
             }
         }
         match self.last_hit.get(&unit).cloned() {
@@ -552,6 +686,23 @@ impl<'a> Builder<'a> {
                     Some(*side),
                     format!("{} gained C{number} ({target_name})", self.side_name(*side)),
                 );
+            }
+            SimEventKind::TmaSolution {
+                side,
+                target,
+                observer,
+                bearings,
+                range_m,
+                error_m,
+            } => {
+                let text = format!(
+                    "{} ranged {} by TMA: {:.1} km ± {:.1} km from {bearings} bearings",
+                    self.unit_name(*observer),
+                    self.unit_name(*target),
+                    range_m / 1000.0,
+                    error_m / 1000.0
+                );
+                self.note(t, TimelineKind::Contact, Some(*side), text);
             }
             SimEventKind::ContactLost {
                 side,
@@ -743,7 +894,149 @@ impl<'a> Builder<'a> {
             }
             SimEventKind::UnitDestroyed { unit } => {
                 let (cause, by) = self.credit_kill(t, *unit);
+                if let Some(i) = self.flying.remove(unit) {
+                    self.sorties[i].ended = Some(t);
+                    self.sorties[i].outcome = format!("lost: {cause}");
+                }
                 self.loss(t, *unit, false, cause, by);
+            }
+            SimEventKind::Collision {
+                a,
+                b,
+                closing_mps,
+                damage_fraction_a,
+                damage_fraction_b,
+            } => {
+                // Collision damage follows; it is nobody's weapon hit.
+                self.pending_hit = None;
+                self.collided.insert(*a, (t, *b));
+                self.collided.insert(*b, (t, *a));
+                let (na, nb) = (self.unit_name(*a), self.unit_name(*b));
+                let kn = closing_mps * 3600.0 / 1852.0;
+                let text = format!(
+                    "{na} and {nb} collided at {kn:.0} kn closing ({:.0} % and {:.0} % of their damage points)",
+                    damage_fraction_a * 100.0,
+                    damage_fraction_b * 100.0
+                );
+                self.note(t, TimelineKind::Damage, self.unit_side(*a), text);
+            }
+            SimEventKind::SortieLaunched {
+                unit,
+                base,
+                loadout,
+                mission,
+            } => {
+                let name = self.unit_name(*unit);
+                let base_name = self.base_name(*base);
+                self.flying.insert(*unit, self.sorties.len());
+                self.sorties.push(SortieRow {
+                    launched: t,
+                    unit: *unit,
+                    unit_name: name.clone(),
+                    side: self.unit_side(*unit),
+                    base: base_name.clone(),
+                    mission: mission.clone(),
+                    loadout: loadout.clone(),
+                    ended: None,
+                    outcome: String::new(),
+                    tanker_fuel_t: 0.0,
+                });
+                let with = loadout
+                    .as_deref()
+                    .map(|l| format!(" with {l}"))
+                    .unwrap_or_default();
+                self.note(
+                    t,
+                    TimelineKind::Air,
+                    self.unit_side(*unit),
+                    format!("{name} took off from {base_name} on a {mission} sortie{with}"),
+                );
+            }
+            SimEventKind::AircraftReturning { unit, base, reason } => {
+                let text = format!(
+                    "{} returning to {}: {reason}",
+                    self.unit_name(*unit),
+                    self.base_name(*base)
+                );
+                self.note(t, TimelineKind::Air, self.unit_side(*unit), text);
+            }
+            SimEventKind::AircraftRecovered {
+                unit, base, fuel_t, ..
+            } => {
+                let base_name = self.base_name(*base);
+                if let Some(i) = self.flying.remove(unit) {
+                    self.sorties[i].ended = Some(t);
+                    self.sorties[i].outcome = format!("recovered at {base_name}");
+                }
+                let text = format!(
+                    "{} landed at {base_name} and took {fuel_t:.1} t of fuel",
+                    self.unit_name(*unit)
+                );
+                self.note(t, TimelineKind::Air, self.unit_side(*unit), text);
+            }
+            SimEventKind::BingoFuel { unit, tanker, .. } => {
+                let to = tanker.map_or_else(
+                    || "for home".to_owned(),
+                    |k| format!("for the tanker {}", self.unit_name(k)),
+                );
+                let text = format!("{} at bingo fuel, heading {to}", self.unit_name(*unit));
+                self.note(t, TimelineKind::Air, self.unit_side(*unit), text);
+            }
+            SimEventKind::TankingComplete {
+                receiver,
+                tanker,
+                taken_t,
+                ..
+            } => {
+                if let Some(i) = self.flying.get(receiver) {
+                    self.sorties[*i].tanker_fuel_t += taken_t;
+                }
+                let text = format!(
+                    "{} took {taken_t:.1} t from {}",
+                    self.unit_name(*receiver),
+                    self.unit_name(*tanker)
+                );
+                self.note(t, TimelineKind::Air, self.unit_side(*receiver), text);
+            }
+            SimEventKind::SensorTasked {
+                zone,
+                unit,
+                coverage,
+                projected,
+                ..
+            } => {
+                let (name, side) = self.zone_of(*zone);
+                let text = format!(
+                    "{} tasked to watch {name} (coverage {:.0} % → {:.0} %)",
+                    self.unit_name(*unit),
+                    coverage * 100.0,
+                    projected * 100.0
+                );
+                self.note(t, TimelineKind::Tasking, side, text);
+            }
+            SimEventKind::CoverageShortfall {
+                zone,
+                coverage,
+                goal,
+            } => {
+                let (name, side) = self.zone_of(*zone);
+                let text = format!(
+                    "{name} short of its coverage goal ({:.0} % of {:.0} %): no sensor left to send",
+                    coverage * 100.0,
+                    goal * 100.0
+                );
+                self.note(t, TimelineKind::Tasking, side, text);
+            }
+            SimEventKind::CoverageGoalMet { zone, coverage } => {
+                let (name, side) = self.zone_of(*zone);
+                let text = format!(
+                    "{name} back at its coverage goal ({:.0} %)",
+                    coverage * 100.0
+                );
+                self.note(t, TimelineKind::Tasking, side, text);
+            }
+            SimEventKind::AircraftLost { unit, reason } => {
+                self.air_lost.insert(*unit, (t, reason.clone()));
             }
             SimEventKind::MineEncounter {
                 unit,
@@ -985,6 +1278,51 @@ impl<'a> Builder<'a> {
                     format!("{name} engaged C{contact} with {weapon} in engage zone {zone}"),
                 );
             }
+            SimEventKind::TransitAssessed {
+                choke_point,
+                unit,
+                lane,
+                traffic_per_day,
+                depth_m,
+                draft_m,
+                risk,
+            } => {
+                let name = self.unit_name(*unit);
+                let risk_word = match risk {
+                    sim_core::TransitRisk::Low => "low",
+                    sim_core::TransitRisk::Moderate => "moderate",
+                    sim_core::TransitRisk::High => "high",
+                };
+                let lane_text = lane
+                    .as_ref()
+                    .map_or_else(String::new, |l| format!(" in lane {l}"));
+                let water = match (depth_m, draft_m) {
+                    (Some(d), Some(k)) => format!(", {d:.0} m of water for a {k:.1} m draft"),
+                    (Some(d), None) => format!(", {d:.0} m of water"),
+                    _ => String::new(),
+                };
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!(
+                        "{name}: transit of {choke_point}{lane_text}, {traffic_per_day:.0} ships a \
+                         day{water}: {risk_word} risk"
+                    ),
+                );
+                self.transits.push(TransitRow {
+                    tick: t,
+                    choke_point: choke_point.clone(),
+                    unit: *unit,
+                    unit_name: name,
+                    side: self.unit_side(*unit),
+                    lane: lane.clone(),
+                    traffic_per_day: *traffic_per_day,
+                    depth_m: *depth_m,
+                    draft_m: *draft_m,
+                    risk: *risk,
+                });
+            }
             SimEventKind::ChokePointTransit { choke_point, unit } => {
                 let name = self.unit_name(*unit);
                 self.note(
@@ -1046,7 +1384,24 @@ impl<'a> Builder<'a> {
         }
     }
 
+    fn zone_of(&self, id: u32) -> (String, Option<SideId>) {
+        self.zones.get(&id).map_or_else(
+            || (format!("zone {id}"), None),
+            |(n, s)| (n.clone(), Some(*s)),
+        )
+    }
+
+    fn base_name(&self, id: u32) -> String {
+        self.bases
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| format!("airbase {id}"))
+    }
+
     fn finish(mut self, end: Tick) -> AarReport {
+        for i in std::mem::take(&mut self.flying).into_values() {
+            self.sorties[i].outcome = "airborne at the end".into();
+        }
         for row in &mut self.detections {
             let until = row.lost.unwrap_or(end);
             row.held_s = until.seconds() - row.gained.seconds();
@@ -1067,6 +1422,8 @@ impl<'a> Builder<'a> {
             losses: self.losses,
             weapons: self.weapons.into_values().collect(),
             detections: self.detections,
+            transits: self.transits,
+            sorties: self.sorties,
             timeline: self.timeline,
         }
     }

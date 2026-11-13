@@ -2,6 +2,255 @@
 
 ## [Unreleased]
 
+### Added (contacts on the map)
+
+- **Contacts are drawn like own units once their course is known.** Each track estimates its course and speed from its own movement: a least-squares line through its positions over the last 6 minutes, accepted when the speed is significant ([DL-0052](docs/design-log/DL-0052-contact-course.md)).
+  - A classified contact with a course lies flat on the map, turned to it, and keeps it when the view is rotated or tilted.
+  - A newly acquired, stopped or unclassified contact faces the screen.
+  - Classified contacts carry the affiliation badge beside their label.
+- `ContactView` gains `course_deg` and `speed_mps`. Track histories are saved and hashed; golden replays re-blessed, with engagement outcomes unchanged.
+
+### Fixed (map)
+
+- **Unit figures keep their heading when the map is rotated or tilted.** Ship, submarine, aircraft and weapon figures were drawn facing the screen, so after a right-drag they still pointed up the screen, not along their heading. They now lie flat on the map, turned to the heading.
+- **The affiliation badge is drawn beside the unit's name.** It was a tiny frame in the corner of each figure that read as a stray dot, and would have orbited the ship once figures turned with the map. It is now a screen-facing APP-6 frame, 13 px, at the start of the label.
+
+### Added (Gate 4 fixes)
+
+- **Single-observer target motion analysis** ([DL-0050](docs/design-log/DL-0050-single-observer-tma.md), [tma.md](docs/models/tma.md)): a submarine, or any unit with passive sonar, now ranges a target from its own bearings over time once it has manoeuvred.
+  - The estimate is a maximum-likelihood bearings-only fit of a constant-velocity target, from up to 15 minutes of bearings.
+  - It enters the track with its covariance; a `TmaSolution` event goes on the AAR timeline.
+  - An observer that has not manoeuvred is refused (the range is unobservable).
+- **Weapon ranges by target domain** ([DL-0051](docs/design-log/DL-0051-weapon-target-ranges.md)): new table `weapon_target_ranges` (migration 0005) and rule `weapon.target_ranges`.
+  - Engagements and point defence use the range against the target's domain.
+  - Generic guns reach aircraft at 12 km (127 mm-class) and 8 km (76 mm-class), against 24 and 16 km for ships.
+
+### Changed
+
+- **Gate 4 reports regenerated (200 runs each).**
+  - Hangor–Khukri: Khukri sunk in 77 % of runs (0 % before).
+  - Praying Mantis: Sahand sunk 29 % (3 %), Sabalan disabled 60 % (8 %), US losses mean 1.2 (2.9).
+  - The remaining differences are listed in `docs/gate4/README.md`.
+- **Golden replays re-blessed:** gun air ranges join the weapon catalogue hash, and TMA histories the state hash where passive sonar hears a target.
+
+### Fixed
+
+- **The unit inspector's Water row no longer blinks at high time compression.** Its depth reading reloaded on every snapshot and was blanked while it loaded. It now reloads only when the unit or its route changes, and every 5 s, keeping the last reading on screen meanwhile. Measured at Max: 65 blinks in 15 s before, none after; the app also runs faster, since it no longer refetches every frame.
+- **Named classes and weapons from the regional database are drawn properly on the map.**
+  - Classes like `PHL-FF-RIZAL` now get their own figure and function code, rather than a plain ship with no code.
+  - Named missiles and torpedoes in flight are drawn by their kind, rather than as gun shells.
+  - The lookup (`apps/desktop/src/lib/named-classes.ts`) is generated from the database; the symbol tests fail for any class or weapon missing from it.
+
+### Added (Phase 4, slice 13: regional database, third tranche)
+
+- **Malaysia:** Lekiu frigate, Kedah OPV, Keris littoral mission ship, Scorpène submarine; the MMEA's Tun Fatimah OPV.
+- **Indonesia:** Martadinata frigate, Bung Tomo corvette, Nagapasa submarine, Sampari attack craft; Bakamla's Tanjung Datu.
+- **Australia:** Hobart destroyer, Anzac frigate, Collins submarine, Arafura OPV.
+- **South Korea:** Sejong the Great destroyer, Daegu frigate, Son Won-il and Dosan Ahn Changho submarines, Yoon Youngha patrol vessel.
+- **Taiwan:** Kang Ding and Cheng Kung frigates, Tuo Chiang corvette, Hai Lung submarine, Kuang Hua VI missile boat; the Coast Guard Administration's Chiayi.
+- **Named weapons:** Exocet MM40 Block 2 and 3, SM39 Exocet, VL Seawolf, Black Shark, Hsiung Feng II and III, TC-2N, K-SAAM, K745 Blue Shark, Red Shark, MU90, A244/S.
+- **ECM:** the Lekiu's Scimitar, the Martadinata's Scorpion 2L and the Korean Sonata suite.
+- 113 platforms in all. Golden replays re-blessed: the emitter library grows with the database (DL-0048).
+
+### Added (Phase 4, slice 13: regional database, second tranche)
+
+- **Vietnam People's Navy and Coast Guard:** Gepard 3.9 frigate, Kilo (Project 636.1) submarine, Molniya corvette, TT-400TP gunboat, and the ex-US Hamilton-class cutter CSB 8020.
+- **US Navy and Coast Guard:** Arleigh Burke Flight IIA, Independence-class LCS, Virginia-class submarine, Legend-class cutter, P-8A and F/A-18E/F with loadouts.
+- **JMSDF and Japan Coast Guard:** Maya, Akizuki (2010), Mogami, Taigei, Izumo, Shikishima and the P-1 with loadouts.
+- **Named weapons:** Kh-35 Uran-E, 3M-54E Klub-S, SM-2MR, SM-6, ESSM, NSM, Mk 48, Mk 54, RAM, Type 90, Type 17, Type 89, Harpoon Block II, Hellfire, Igla.
+- **ECM:** the Gepard's Bell Squat jammers and the Mogami's NOLQ-3E.
+- Each record cites its open source; assumed VLS splits and loads are stated in the citation. 88 platforms in all.
+- Golden replays re-blessed: the emitter library grows with the database (DL-0048).
+
+### Added (Phase 4, slice 14: model validation and the Gate 4 drafts)
+
+- **`nws-batch validate`:** runs a historical engagement's scenario many times and compares the outcomes with the record. Writes `report.md`, `validation.json` and `runs.csv`.
+  - Measures: unit lost, survives or disabled; losses, weapons fired, hits and time to first hit by side.
+  - Verdicts: P(record) with a 95 % Wilson interval for yes/no measures; the 5–95 % range for counts. Every difference is listed for the SMEs to explain.
+- **Two draft engagements** for SME review (`data/validation/`): *Hangor* and *Khukri* (1971) and Operation Praying Mantis (1988), with sources and assumptions.
+- **Gate 4 review pack** (`docs/gate4/`) with the 200-run reports. Two model limitations found:
+  - a lone submarine cannot attack on passive sonar (no single-platform TMA);
+  - guns engage aircraft at their surface range.
+- **Duel-test index** extended to the Phase 4 models.
+- The Monte Carlo runner takes any per-run measure (`run_with`).
+
+### Added (Phase 4, slice 13: regional database, first tranche)
+
+- **Philippine Navy and Coast Guard:** *Jose Rizal* and *Miguel Malvar* frigates, *Del Pilar* OPV, *Acero* attack craft, *Teresa Magbanua* and *Parola* response vessels.
+- **PLAN (Southern Theater) and China Coast Guard:** Type 054A, 052D, 056A, 039A/B, the *Zhaotou* cutter and the coast-guard Type 056.
+- **Historical platforms** for Gate 4: *Hangor*, *Khukri*, *Saam*, *Kaman*, *Belknap*, *Oliver Hazard Perry*, *Knox*, A-6E with loadouts.
+- **Named weapons:** C-802A, YJ-83, YJ-18, HHQ-16, HHQ-9, Mistral, VL MICA, Spike NLOS, Harpoon 1, SM-1MR, Skipper, Sea Killer 2, Limbo.
+- **Every specific record cites its open source** (a URL, DOI or ISBN), with confidence C, or D for estimates; signatures carry their own provenance.
+- **ECM equipment as records** (migration 0004): noise and deception jammers fitted to platforms. A unit jams with its platform's ECM unless the scenario gives it a jammer.
+
+### Changed
+
+- `provenance.not_generic` is now an error for a specific record without a citation, instead of a warning for every specific record. New rule: `ecm.values`.
+- Golden replays re-blessed: the ESM emitter library lists every database class carrying a radar, and the new classes reuse generic radars (DL-0048).
+
+### Added (Phase 4, slice 12: automatic sense-zone tasking)
+
+- **Coverage goals:** a sense zone may carry a goal (a share of its area) and the units the engine may use for it.
+- **Tasking every 5 minutes:** below the goal, the engine tasks the side's free units, greedily by the uncovered cells each would cover, until the projected coverage meets the goal.
+  - Free ships and submarines get a Support mission at the chosen station.
+  - Parked aircraft are launched on a patrol sortie round it.
+- **Release and relief:** a unit given another mission, recalled, home at bingo or lost is released, and the next pass sends a relief. Units with missions are never taken.
+- **Logged:** each tasking, shortfall and goal regained, on the AAR timeline (kind `tasking`). Saved (format 27) and hashed only with goals; golden replays unchanged.
+- **Desktop:** goals, tasked units and shortfalls on the Coverage tab; goals set in the Planning tab and the scenario editor.
+
+### Added (Phase 4, slices 9–11: air operations)
+
+- **Airbases:** a facility kind `airbase`, ashore or carried by a ship (a carrier, or a frigate's helicopter deck), with runways or deck spots, a launch interval, parking and aviation fuel.
+  - Aircraft with a `base` start parked there at a readiness: ready, alert 15, alert 60 or maintenance.
+  - Parked aircraft are off the map; aircraft aboard a ship that is sunk are lost with it.
+- **Sorties:** launch orders give a mission and the loadout for it (by role, from the database) or a named one.
+  - A launch waits for readiness, rearming (2 min a weapon) and a runway slot; recoveries go first.
+  - Aircraft return when the mission is done, the weapons are spent, the target is gone, at bingo, or when recalled.
+  - They land, refuel from the base's stock, rearm, and turn round (20 or 40 min, plus 2 min a weapon).
+- **Aircraft fuel** (with the fuel model): aviation fuel from take-off mass and range; takeoff and climb allowance; cruise, loiter and dash by the fuel law with an idle share of 0.6.
+  - Bingo is the fuel to the nearest base plus a 10 % reserve; an aircraft out of fuel is lost.
+- **Tankers:** two hoses at 1 t/min, a queue, and the tanker's own bingo. Aircraft at bingo go to a tanker on station when it is nearer than a base, and resume their mission.
+- **Fuel types:** marine and aviation; ships and aircraft each refuel only where their fuel is.
+- **AAR:** a Sorties table (CSV too) and air events on the timeline. Saved (format 27) and hashed only with aircraft; golden replays unchanged.
+- **Desktop:** an Air tab (bases, aircraft, readiness, launch, cancel), an Air row with Recall in the unit inspector, airbases on the map (`AIR`) and in the scenario editor.
+
+### Added: ship collisions and collision avoidance
+
+- **Collisions:** ships and submarines whose depths overlap collide within half their combined lengths.
+  - Both stop. Each takes the weapon hit's damage roll for a share of its damage points: (other's mass / total)² × (closing speed / 14 m/s)², calibrated on USS *Fitzgerald*.
+  - A hard collision holes the hull and floods as a torpedo does.
+  - Logged, on the AAR timeline, and a loss to it is "collision with …".
+- **Collision avoidance** by the rules of the road, own side included:
+  - the give-way ship (overtaking, crossing with the other to starboard, head-on, or meeting a stopped ship) turns to starboard just enough to pass at a safe distance, or slows;
+  - at close quarters everyone acts;
+  - it then comes back to its route or ordered heading.
+
+  Ships do not see another side's submerged submarine.
+- **Golden replays re-blessed:** in four shipped scenarios Blue's ships now give way to each other; none has a collision. With avoidance off, the old hashes are reproduced exactly.
+- Platform displacement now reaches the engine (for mass). Saves stay format 27.
+
+### Added (Phase 4, slice 8: acoustics)
+
+- **Sound-velocity profiles** by area and month, from the scenario (`sound_profiles`) or the white cell (Planning tab, CSV import). Without one, the Phase 2 sonar law holds unchanged.
+- **Propagation paths**, the least loss of:
+  - surface duct;
+  - direct, with a shadow zone beyond the direct-path reach;
+  - cross-layer;
+  - convergence zones (closed-form trace of the limiting ray);
+  - bottom bounce over the terrain packs' depths.
+
+  Each sonar attempt logs its path.
+- **Reverberation** masks active sonar echoes (surface or sea floor scattering) when a profile is in force.
+- **Sonar figures in the database** (migration 0003): frequency, DI, DT, source level and self-noise per sonar, with a validation rule.
+- **Towed arrays** stream and recover in ten minutes and listen at 15 kn or less; **sonobuoys** are laid through drop points (60 m or 300 m), listen for four hours, and give bearings that cross into fixes.
+- Saved (format 27) and hashed only when used; golden replays unchanged.
+- **Desktop:** towed-array and sonobuoy controls in the unit panel, buoys on the map, sound profiles in the white cell's Planning tab.
+
+### Added (Phase 4, slice 7: weather zones)
+
+- **Weather zones:** areas with their own sea state, wind, visibility, rain and cloud base.
+  - The scenario-wide weather holds outside them; older scenarios are one global zone and unchanged.
+  - Zones are set in the scenario (`weather_zones`), by events (`set_weather`) and by the white cell (Planning tab).
+  - They are saved (format 27), hashed when present, and shown to every seat.
+- **Local effects:**
+  - sea clutter from the target's sea;
+  - two-way rain loss along radar paths (X-band power law);
+  - optical range from the least visibility along the path;
+  - low cloud hides aircraft from the eye and EO/IR;
+  - sonar noise from the listener's sea;
+  - weapon Ph from the target's sea;
+  - sheltering by the sea at the unit and the facility.
+- **Heavy seas slow surface hulls** near and above their weather limit: 85 % one step below, 60 % at or above.
+- **Desktop:** zones on the map, the selected unit's weather in the unit panel, and zone editing in the white cell's Planning tab.
+
+### Added (Phase 4, slice 6: offline imagery layer)
+
+- **Imagery base layer** from the client's licensed tile pack: MBTiles or PMTiles v3, raster (PNG, JPEG, WebP).
+  - The app serves the tiles itself through its own `nwstiles` scheme; the content security policy allows only that scheme, so nothing is fetched from a network.
+  - The pack's attribution is shown with the map; a pack that gives none is flagged.
+- **Menus:** **File › Install imagery pack…** (up to 1 GB; larger packs are copied into the imagery folder), **View › Imagery** and **View › Imagery packs…**.
+- **Drawing order:** the land fill hides and the depth shading dims while imagery shows; the coastline and the picture stay on top.
+- **Checked with a generated test pattern**, since the client's pack has not arrived yet. No new crates.
+
+### Added (Phase 4, slice 5: choke points, depths and lanes)
+
+- **Shipping lanes** in the planning layer and in scenarios (`lanes`): a centreline, a width, a choke point, and traffic in ships per day.
+  - A traffic figure must name its source (a licensed data set, a chart, or "planner's estimate"), or it is refused.
+  - The white cell draws lanes on the map or imports them from GeoJSON; an imported traffic figure without a source is dropped.
+  - Lanes show on the map for every seat.
+- **Choke points' water:** least, typical and deepest depth, a section across the choke point (square to its lane), and the navigable width for a draft. All are in the white cell's Planning tab.
+- **Transit risk:** each transit of a choke point with lanes or terrain packs is assessed (`TransitAssessed`): lane, traffic, water under the keel, draft, and low, moderate or high risk.
+  - The AAR has a new *Transits* table and `transits.csv`.
+- **Unchanged:** without lanes, the planning layer hashes as before, and the golden replays are unchanged.
+
+### Added (Phase 4, slice 4: terrain masking)
+
+- **Terrain masking** (terrain packs): land between the two ends of a line of sight blocks radar, ESM and optical detection, line-of-sight radio links, and sense coverage.
+  - The test is one 4/3-earth path profile, sampled every 500 m.
+  - Land sites and posts ashore stand on the ground, so a radar on a hill sees over lower land.
+- **Land clutter** for aircraft at or below 150 m above land; they were treated as over the sea before.
+- **Unchanged:** without packs nothing changes, and the golden replays are unchanged.
+
+### Added (release: world terrain layer from its online source)
+
+- **The installers carry the 4′ world terrain layer**, built by each release from GEBCO on NOAA ERDDAP (`scripts/terrain/world-layer.sh`, the new `terrain` job in the release workflow), so the map stays current.
+  - A manual release run takes the GEBCO dataset id and credit, so a newer grid is a run away.
+  - The pack also ships beside the installers, in `release-extra/terrain/`, with its `.sha256`, the download's SHA-256 and the date (`SOURCE.txt`).
+- **`nws-batch terrain build --source --credit`** records the data set and its credit in the pack.
+
+### Added (Phase 4, slice 3: shallow water and depths)
+
+- **Routing by draft:**
+  - With terrain packs, ships and submarines are routed round water shallower than their draft plus 1 m: 3 × 3 samples per cell of the 1/30° planning grid, with a one-cell clearance like the coast's.
+  - Harbour ends of a leg (2 cells) are left to the planner's waypoints.
+  - When no route is deep enough, the order still stands, routed round land only, with a `RouteShallow` warning to the seat.
+- **Shoal guard, off the navigable graph:**
+  - A unit with no charted route (none, finished, uncharted, or with a shallow leg) stops rather than move into water shallower than its draft (`ShoalAhead`).
+  - A unit on a charted route is trusted.
+  - Seats now see "stopped: land ahead" and "stopped: N m of water ahead" warnings for their own units.
+- **Chart depths for ports and anchorages:** the deepest water in the facility's area, used for draft checks unless the planner sets a depth.
+  - The white cell's Planning tab shows each chart depth and takes an override.
+- **Depth along the route:** `Simulation::route_depths`, shown in the unit panel as a *Water* row and a profile against the draft.
+- **`nws-batch run | mc | aar --terrain <pack>…`** runs, and replays, with terrain packs.
+- **Save format 26** (`Route::charted`); format 25 saves still load.
+- **Unchanged:** without packs, everything behaves as before, and the golden replays are unchanged.
+
+### Added (Phase 4, slice 2: terrain and bathymetry packs)
+
+- **Terrain packs** (`.nwsterrain`):
+  - Integer-grid heights from GEBCO 2020, whose land heights are SRTM15+. The packs and the raw downloads stay outside the repository; their SHA-256 sums are in the data dictionary.
+  - Two packs are built: the Philippine area at 15″ (30.5 MB) and the world at 4′ (17.5 MB). The world layer measured 64.5 MB at 2′, so 4′ is the installer layer.
+- **`nws-batch terrain build | info | sample`:**
+  - builds a pack from a GEBCO netCDF-3 file (the reader is our own, so there is no C library);
+  - averages blocks for coarser layers;
+  - writes a `.sha256` file next to the pack.
+- **Engine:**
+  - Deterministic bilinear sampling, with a 20,000-sample golden on both CI operating systems.
+  - The finest covering pack wins.
+  - The terrain id is in the state hash when packs are set; runs without packs keep their hashes and every golden replay is unchanged.
+  - Exercise records store the terrain id, and a replay refuses packs that differ, naming the ones it needs.
+- **Desktop:**
+  - **File › Install terrain pack…** checks the pack against its `.sha256` file before copying it in.
+  - Packs are read at start-up, and one that no longer matches its `.sha256` is set aside with the reason.
+  - **View › Depth shading / Depth contours / Relief** draw layers below the coastline and every unit.
+  - **View › Terrain packs…** lists what is installed. The status bar shows the depth or height under the cursor, and the map credits GEBCO.
+- **New direct dependencies:** `flate2` (pure-Rust backend) and `sha2`. Both were already in the lockfile, so no new crates.
+
+### Added (Phase 4, slice 1: Monte Carlo batch)
+
+- **`nws-batch mc <scenario> --runs N [--seed S] [--threads T] --out <dir>`** runs a scenario for N seeds in parallel. Each run is independent and deterministic, so the results don't depend on the thread count, and a test checks this.
+- **Default measures of effectiveness**, until the client names its own:
+  - per side: losses, time to first detection, weapons fired per kill, choke-point transits;
+  - for the whole run: cargo delivered.
+- **Outputs:**
+  - `runs.csv`: one row per seed, with its final hash;
+  - `summary.csv`: n, mean, SD, 95 % CI, min, median, max;
+  - `summary.json`: the same, plus a ten-bin histogram per measure.
+- **Speed:** 20 four-hour runs of the Mindoro pilot take 89 s on 12 cores.
+- **`runs.parquet`** (Apache Parquet): `seed`, `final_hash`, and one nullable Float64 column per measure.
+- **New dependencies:** `parquet`, `arrow-array` and `arrow-schema` 60.1 (Apache-2.0, compression features off). `cargo deny` passes.
+- **Scaling:** 12 one-hour runs take 2.8 s on 1 thread and 0.9 s on 12, with identical results.
+
 ### Added (map)
 
 - **Units drawn as figures of what they are** (default; **View › Unit figures**, off for APP-6 frames):

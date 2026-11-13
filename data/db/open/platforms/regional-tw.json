@@ -1,0 +1,863 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, Taiwan (Phase 4 slice 13, tranche 3): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "TWN-FFG-KANGDING",
+   "name": "Kang Ding-class frigate (La Fayette type, after the combat-system upgrade)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "TWN-ROCN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 125,
+   "displacement_t": 3800,
+   "draft_m": 4.1,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -5
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -80
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Hsiung Feng II launchers (2x4)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-HF2"
+     ]
+    },
+    {
+     "name": "Hua Yang VLS (8 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-TC2N"
+     ]
+    },
+    {
+     "name": "Oto Melara 76 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Bofors 40 mm L70 guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 14,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Mk 32 torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Hsiung Feng II launchers (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-HF2": 8
+     }
+    },
+    {
+     "name": "Hua Yang VLS (8 cells)",
+     "capacity": 32,
+     "contents": {
+      "WPN-TC2N": 32
+     }
+    },
+    {
+     "name": "Oto Melara 76 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Bofors 40 mm L70 guns (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 40,
+     "contents": {
+      "WPN-CIWS": 40
+     }
+    },
+    {
+     "name": "Mk 32 torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Kang Ding-class frigate\", https://en.wikipedia.org/wiki/Kang_Ding-class_frigate (accessed 2026-11-13): 3,800 t full load, 125 m, 4.1 m draught, 25 kn, 4,000 nmi at 15 kn, complement 141; DRBV-26D Jupiter-II air search, Type 997 Artisan, PASEO NS EO, 2 Castor-2C fire control, Spherion bow sonar, CAPTAS-1 towed array; 8 Hsiung Feng II, 8-cell Hua Yang VLS with 32 quad-packed TC-2N, 2 Mk 32 tubes, Oto Melara 76 mm, 2 Bofors 40 mm L70, Phalanx. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "TWN-FFG-CHENGKUNG",
+   "name": "Cheng Kung-class frigate (Perry type)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "TWN-ROCN",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 138.7,
+   "displacement_t": 4267,
+   "draft_m": 5.5,
+   "max_speed_kn": 29,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.05,
+   "endurance_nm": 5000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 25
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -5
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 13 launcher",
+     "height_m": 6,
+     "weapons": [
+      "WPN-SM1MR"
+     ]
+    },
+    {
+     "name": "Hsiung Feng II and III launchers",
+     "height_m": 7,
+     "weapons": [
+      "WPN-HF2",
+      "WPN-HF3"
+     ]
+    },
+    {
+     "name": "Oto Melara 76 mm/62 gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Bofors 40 mm L70 guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 14,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Mk 36 SRBOC launchers",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 13 launcher",
+     "capacity": 40,
+     "contents": {
+      "WPN-SM1MR": 40
+     }
+    },
+    {
+     "name": "Hsiung Feng II and III launchers",
+     "capacity": 8,
+     "contents": {
+      "WPN-HF2": 4,
+      "WPN-HF3": 4
+     }
+    },
+    {
+     "name": "Oto Melara 76 mm/62 gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Bofors 40 mm L70 guns (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 40,
+     "contents": {
+      "WPN-CIWS": 40
+     }
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    },
+    {
+     "name": "Mk 36 SRBOC launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Cheng Kung-class frigate\", https://en.wikipedia.org/wiki/Cheng_Kung-class_frigate (accessed 2026-11-13): 4,200 LT (4,267 t) full load, 455 ft (138.7 m), 18 ft (5.5 m) draft, 29 kn, 5,000 nmi at 18 kn, complement 235; AN/SPS-49, AN/SPS-55, Mk 92 fire control, SQS-56 sonar, SLQ-32(V)2, Mk 36 SRBOC, SLQ-25 Nixie; Mk 13 launcher (Standard MR; load not given, 40 assumed), 2 triple Mk 32 (Mk 46; generic lightweight torpedo), Oto Melara 76 mm/62, 2 Bofors 40 mm L70, Phalanx, 4 Hsiung Feng II and 4 Hsiung Feng III. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "TWN-PGG-TUOCHIANG",
+   "name": "Tuo Chiang-class corvette (Flight I)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "TWN-ROCN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-SMALL-CRAFT",
+   "length_m": 65,
+   "displacement_t": 685,
+   "draft_m": 2.1,
+   "max_speed_kn": 45,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.15,
+   "endurance_nm": 1500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 10
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "TC-2N launchers (16)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-TC2N"
+     ]
+    },
+    {
+     "name": "Hsiung Feng II and III launchers",
+     "height_m": 5,
+     "weapons": [
+      "WPN-HF2",
+      "WPN-HF3"
+     ]
+    },
+    {
+     "name": "Otobreda 76 mm gun",
+     "height_m": 6,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 8,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Chaff dispensers (12)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "TC-2N launchers (16)",
+     "capacity": 16,
+     "contents": {
+      "WPN-TC2N": 16
+     }
+    },
+    {
+     "name": "Hsiung Feng II and III launchers",
+     "capacity": 12,
+     "contents": {
+      "WPN-HF2": 8,
+      "WPN-HF3": 4
+     }
+    },
+    {
+     "name": "Otobreda 76 mm gun",
+     "capacity": 250,
+     "contents": {
+      "WPN-GUN-76": 250
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 40,
+     "contents": {
+      "WPN-CIWS": 40
+     }
+    },
+    {
+     "name": "Chaff dispensers (12)",
+     "capacity": 12,
+     "contents": {
+      "WPN-DECOY-CHAFF": 12
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Tuo Chiang-class corvette\", https://en.wikipedia.org/wiki/Tuo_Chiang-class_corvette (accessed 2026-11-13): improved hull 685 t full load, 65 m, 2.1 m draught, 45 kn fully armed, complement 41; CS/MPQ-90 Sea Bee Eye AESA (surface search and fire control), STIR 1.2 EO Mk2, 12 chaff dispensers; Flight I: 16 TC-2N, 8 Hsiung Feng II, 4 Hsiung Feng III, Otobreda 76 mm, Phalanx. Range and cruise speed not given (generic small combatant). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "TWN-SSK-HAILUNG",
+   "name": "Hai Lung-class submarine",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "TWN-ROCN",
+   "propulsion": "PROP-DE-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 66.9,
+   "displacement_t": 2660,
+   "draft_m": 6.7,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 8,
+   "accel_mps2": 0.05,
+   "endurance_nm": 8000,
+   "max_depth_m": 300,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 200,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 105,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 118,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-SON-SUB-TAS",
+     "height_m": -150
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "21 in torpedo tubes (6)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-HARPOON-2",
+      "WPN-MK48",
+      "WPN-TORP-HW"
+     ]
+    },
+    {
+     "name": "Countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "21 in torpedo tubes (6)",
+     "capacity": 28,
+     "contents": {
+      "WPN-TORP-HW": 12,
+      "WPN-MK48": 12,
+      "WPN-HARPOON-2": 4
+     }
+    },
+    {
+     "name": "Countermeasures",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Hai Lung-class submarine\", https://en.wikipedia.org/wiki/Hai_Lung-class_submarine (accessed 2026-11-13): 2,660 t submerged, 66.9 m, 6.7 m draught, 20 kn submerged, test depth 300 m, complement 67; Type 1001 radar, Octopus sonar, Type 20026 towed array, TIMNEX 4CH ESM; 6 x 21 in tubes, 28 torpedoes and missiles (SUT 264, Mk 48, UGM-84 Harpoon; 12, 12 and 4 assumed; SUT modelled by the generic heavyweight torpedo, the 2014 Harpoon by Block II). Range not given (generic). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "TWN-PGG-KUANGHUA6",
+   "name": "Kuang Hua VI-class missile boat",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "TWN-ROCN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-SMALL-CRAFT",
+   "length_m": 34.2,
+   "displacement_t": 171,
+   "draft_m": 3,
+   "max_speed_kn": 33,
+   "cruise_speed_kn": 12,
+   "accel_mps2": 0.15,
+   "endurance_nm": 1000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 7
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 5
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Hsiung Feng II launchers (4)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-HF2"
+     ]
+    },
+    {
+     "name": "T-75 20 mm cannon",
+     "height_m": 5,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "AV-2 decoy launchers (2)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Hsiung Feng II launchers (4)",
+     "capacity": 4,
+     "contents": {
+      "WPN-HF2": 4
+     }
+    },
+    {
+     "name": "T-75 20 mm cannon",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "AV-2 decoy launchers (2)",
+     "capacity": 8,
+     "contents": {
+      "WPN-DECOY-CHAFF": 8
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Kuang Hua VI-class missile boat\", https://en.wikipedia.org/wiki/Kuang_Hua_VI-class_missile_boat (accessed 2026-11-13): 171 t, 34.2 m, 3 m draught (as given), 33 kn, 1,000 nmi at 12 kn, complement 19, 2 AV-2 decoy launchers; 4 Hsiung Feng II, T-75 20 mm. Sensors not given (navigation radar assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "TWN-CG-CHIAYI",
+   "name": "Chiayi-class patrol vessel (Coast Guard Administration)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "TWN-CGA",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 125,
+   "displacement_t": 5044,
+   "max_speed_kn": 24,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 10000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 1500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    }
+   ],
+   "launchers": [
+    {
+     "name": "20 mm RWS (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "20 mm RWS (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Chiayi-class patrol vessel\", https://en.wikipedia.org/wiki/Chiayi-class_patrol_vessel (accessed 2026-11-13): 5,044 t, 125 m, 24 kn, >10,000 nmi, hangar; 2.75 in rocket RWS (not modelled), 2 20 mm RWS, 3 water cannons. Draught and sensors not given (navigation radar assumed); cruise speed not given (15 kn assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  }
+ ]
+}

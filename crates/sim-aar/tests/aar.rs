@@ -242,6 +242,7 @@ fn report_accounts_for_every_shot_and_loss() {
         (AarTable::Losses, r.losses.len()),
         (AarTable::Weapons, r.weapons.len()),
         (AarTable::Detections, r.detections.len()),
+        (AarTable::Transits, r.transits.len()),
         (AarTable::Timeline, r.timeline.len()),
     ];
     for (table, n) in rows {
@@ -349,8 +350,9 @@ fn hit_and_miss_feedback_follows_fog_of_war() {
     let (s, _) = load("phase3-pilot.json");
     let db = sim_db::embedded::open_platform_db().unwrap();
     let mut sim = s.build(None, &db).unwrap();
-    // Cinder is sunk by Bastion's missile at 01:52:49 (6769 s) in the reference run.
-    sim.run_until(sim_core::Tick(6775));
+    // Cinder is sunk at 02:06:30 (7590 s) in the reference run (since collision avoidance,
+    // docs/models/collisions.md: Blue's ships give way to each other on the way in).
+    sim.run_until(sim_core::Tick(7596));
     let wc = sim.snapshot(sim_core::Viewer::WhiteCell).outcomes;
     let sunk = wc
         .iter()
@@ -380,4 +382,57 @@ fn hit_and_miss_feedback_follows_fog_of_war() {
     assert!(red
         .iter()
         .all(|o| o.shooter.is_none() && o.shooter_name.is_none()));
+}
+
+/// A small synthetic pack (no data files in the repository).
+fn tiny_terrain(depth: i16) -> std::sync::Arc<sim_geo::terrain::Terrain> {
+    use sim_geo::terrain::{encode, PackHeader, Terrain, TerrainPack};
+    let header = PackHeader {
+        name: "test-shelf".into(),
+        source: "test".into(),
+        credit: "test".into(),
+        lat0: 0,
+        lon0: 0,
+        cell: 36_000,
+        rows: 2,
+        cols: 2,
+        min_m: depth,
+        max_m: depth,
+    };
+    let pack = TerrainPack::decode(&encode(&header, &[depth; 4]).unwrap()).unwrap();
+    std::sync::Arc::new(Terrain::new(vec![std::sync::Arc::new(pack)]).unwrap())
+}
+
+#[test]
+fn terrain_is_hashed_recorded_and_needed_to_replay() {
+    let (s, text, mut live) = surface_action();
+    let without = live.state_hash();
+    live.set_terrain(Some(tiny_terrain(-50)));
+    assert_ne!(
+        live.state_hash(),
+        without,
+        "the terrain id is in the state hash"
+    );
+    let record = ExerciseRecord::capture(&mut live, &s.name, &text);
+    let id = live.terrain_id().unwrap();
+    assert_eq!(record.terrain.as_deref(), Some(id.as_str()));
+    let back = ExerciseRecord::from_bytes(&record.to_bytes().unwrap()).unwrap();
+    assert_eq!(back.terrain, record.terrain);
+
+    // Without the packs, or with different ones, the record does not open.
+    assert!(matches!(
+        Replay::open(record.clone(), &sides(&s)),
+        Err(AarError::UnknownTerrain(_))
+    ));
+    assert!(matches!(
+        Replay::open_with_terrain(record.clone(), &sides(&s), Some(tiny_terrain(-51))),
+        Err(AarError::UnknownTerrain(_))
+    ));
+    // With the same packs it replays and verifies, also after seeking back to a keyframe.
+    let mut replay =
+        Replay::open_with_terrain(record, &sides(&s), Some(tiny_terrain(-50))).unwrap();
+    assert!(replay.verified());
+    replay.seek(Tick(1_000)).unwrap();
+    replay.seek(Tick(3_600)).unwrap();
+    assert_eq!(replay.sim_mut().state_hash(), back.final_hash);
 }

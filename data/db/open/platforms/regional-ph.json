@@ -1,0 +1,737 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, Philippines (Phase 4 slice 13): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "PHL-FF-RIZAL",
+   "name": "Jose Rizal-class frigate (HDF-2600)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "PHL-PN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 107.5,
+   "displacement_t": 2600,
+   "draft_m": 3.65,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "C-Star canisters (2x2)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-CSTAR"
+     ]
+    },
+    {
+     "name": "Simbad-RC twin Mistral launchers (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-MISTRAL"
+     ]
+    },
+    {
+     "name": "76/62 Super Rapid gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "SMASH 30 mm remote weapon station",
+     "height_m": 10,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "C-Guard decoy launchers",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "C-Star canisters (2x2)",
+     "capacity": 4,
+     "contents": {
+      "WPN-CSTAR": 4
+     }
+    },
+    {
+     "name": "Simbad-RC twin Mistral launchers (2)",
+     "capacity": 4,
+     "contents": {
+      "WPN-MISTRAL": 4
+     }
+    },
+    {
+     "name": "76/62 Super Rapid gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "SMASH 30 mm remote weapon station",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "Triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    },
+    {
+     "name": "C-Guard decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Jose Rizal-class frigate\", https://en.wikipedia.org/wiki/Jose_Rizal-class_frigate (accessed 2026-11-13): 2,600 t, 107.5 m, 3.65 m draft, 25 kn, 4,500 nm at 15 kn; TRS-3D radar, SharpEye, NA-25X fire control, PASEO EO, Model 997 sonar, NS9300A ESM; 2x2 C-Star, 2 Simbad-RC (Mistral), 76/62 SR, SMASH 30 mm, 2x3 torpedo tubes (K745), C-Guard decoys. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "PHL-FFG-MALVAR",
+   "name": "Miguel Malvar-class frigate (HDC-3100)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "PHL-PN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 118.4,
+   "displacement_t": 3200,
+   "draft_m": 3.7,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 19
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 17
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "16-cell VLS",
+     "height_m": 5,
+     "weapons": [
+      "WPN-VLMICA"
+     ]
+    },
+    {
+     "name": "C-Star canisters (2x4)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-CSTAR"
+     ]
+    },
+    {
+     "name": "76 mm Super Rapid gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Gokdeniz CIWS",
+     "height_m": 12,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "C-Guard decoy launchers",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "16-cell VLS",
+     "capacity": 16,
+     "contents": {
+      "WPN-VLMICA": 16
+     }
+    },
+    {
+     "name": "C-Star canisters (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-CSTAR": 8
+     }
+    },
+    {
+     "name": "76 mm Super Rapid gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Gokdeniz CIWS",
+     "capacity": 40,
+     "contents": {
+      "WPN-CIWS": 40
+     }
+    },
+    {
+     "name": "Triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    },
+    {
+     "name": "C-Guard decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Miguel Malvar-class frigate\", https://en.wikipedia.org/wiki/Miguel_Malvar-class_frigate (accessed 2026-11-13): 3,200 t, 118.4 m, 3.7 m draft, 25 kn, 4,500 nm at 15 kn; EL/M-2258 ALPHA AESA, SharpEye, NA-25X, PASEO XLR, Model 997 sonar, Aquamarine R/C-ESM; 16-cell VLS (VL MICA), 8 C-Star, 76 mm SR, Gokdeniz CIWS, 2x3 torpedo tubes (K745), C-Guard decoys. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "PHL-PS-DELPILAR",
+   "name": "Del Pilar-class offshore patrol vessel (ex-Hamilton)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "PHL-PN",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 115.2,
+   "displacement_t": 3250,
+   "draft_m": 4.6,
+   "max_speed_kn": 29,
+   "cruise_speed_kn": 12,
+   "accel_mps2": 0.05,
+   "endurance_nm": 12500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 25
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 25
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "76/62 gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Mk 38 25 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Mk 36 SRBOC decoy launchers",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "76/62 gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Mk 38 25 mm guns (2)",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "Mk 36 SRBOC decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Del Pilar-class offshore patrol vessel\", https://en.wikipedia.org/wiki/Gregorio_del_Pilar-class_offshore_patrol_vessel (accessed 2026-11-13): 3,250 t, 115.2 m, 4.6 m draft, 29 kn, 12,500 nm at 12 kn; SeaGIRAFFE AMB (AN/SPS-77), SharpEye or Furuno, Mk 92 fire control, SeaFLIR 230, ELAC Hunter sonar, NS9003A R-ESM; 76/62 gun, Mk 38 25 mm, Mk 36 SRBOC. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "PHL-PG-ACERO",
+   "name": "Acero-class fast attack interdiction craft (Shaldag Mk V), Spike-fitted",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "PHL-PN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-SMALL-CRAFT",
+   "length_m": 32.65,
+   "displacement_t": 95,
+   "draft_m": 1.25,
+   "max_speed_kn": 40,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.15,
+   "endurance_nm": 1000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 7
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 5
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Typhoon MLS-NLOS launcher",
+     "height_m": 4,
+     "weapons": [
+      "WPN-SPIKE-NLOS"
+     ]
+    },
+    {
+     "name": "Mk 44 30 mm on Typhoon Mk 30-C",
+     "height_m": 5,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Typhoon MLS-NLOS launcher",
+     "capacity": 8,
+     "contents": {
+      "WPN-SPIKE-NLOS": 8
+     }
+    },
+    {
+     "name": "Mk 44 30 mm on Typhoon Mk 30-C",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Acero-class gunboat\", https://en.wikipedia.org/wiki/Acero-class_patrol_gunboat (accessed 2026-11-13): 95 t, 32.65 m, 1.25 m draft, >40 kn, 1,000 nm at 15 kn; Furuno X-band radar, Toplite EOTS; Typhoon MLS-NLOS with 8 Spike-NLOS (four ships), Mk 44 30 mm on Typhoon Mk 30-C. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "PHL-CG-MAGBANUA",
+   "name": "Teresa Magbanua-class multi-role response vessel",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "PHL-PCG",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 96.6,
+   "draft_m": 4.3,
+   "max_speed_kn": 24,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 1500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    }
+   ],
+   "launchers": [],
+   "magazines": [],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Teresa Magbanua-class patrol vessel\", https://en.wikipedia.org/wiki/Teresa_Magbanua-class_patrol_vessel (accessed 2026-11-13): 96.6 m, 4.3 m draft, >24 kn, >4,000 nm at cruising speed (cruise speed not given: 15 kn assumed), 2,260 GT (no displacement given); Furuno X/S-band radars, NAVICS DF, FLIR EO/IR; unarmed (SMASH 30 mm to be installed); hangar and deck for an H145. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "PHL-CG-PAROLA",
+   "name": "Parola-class multi-role response vessel (44 m)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "PHL-PCG",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-SMALL-CRAFT",
+   "length_m": 44.5,
+   "displacement_t": 321,
+   "draft_m": 4.0,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.15,
+   "endurance_nm": 1500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 10
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 7
+    }
+   ],
+   "launchers": [],
+   "magazines": [],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Parola-class patrol vessel\", https://en.wikipedia.org/wiki/Parola-class_patrol_vessel (accessed 2026-11-13): 321 t, 44.5 m, 4 m draft, 25 kn, 1,500 nm (speed not given: 15 kn assumed); Furuno FAR X and S-band radars, R&S DDF205 radio monitoring; machine guns only (not modelled). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  }
+ ]
+}

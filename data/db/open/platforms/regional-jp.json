@@ -1,0 +1,1020 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, Japan (Phase 4 slice 13, tranche 2): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "JPN-DDG-MAYA",
+   "name": "Maya-class destroyer",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "JPN-JMSDF",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-DESTROYER",
+   "length_m": 170,
+   "displacement_t": 10250,
+   "draft_m": 6.4,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.06,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 10000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MFR",
+     "height_m": 32
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-SON-HULL-LF",
+     "height_m": -8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 41 VLS (96 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-ASW-ROCKET",
+      "WPN-ESSM",
+      "WPN-SM2MR",
+      "WPN-SM6"
+     ]
+    },
+    {
+     "name": "Type 17 quadruple canisters (2x4)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-TYPE17"
+     ]
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS (2)",
+     "height_m": 15,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "HOS-303 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Mk 137 decoy launchers (4)",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 41 VLS (96 cells)",
+     "capacity": 96,
+     "contents": {
+      "WPN-SM2MR": 56,
+      "WPN-SM6": 8,
+      "WPN-ESSM": 16,
+      "WPN-ASW-ROCKET": 16
+     }
+    },
+    {
+     "name": "Type 17 quadruple canisters (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-TYPE17": 8
+     }
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Phalanx CIWS (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-CIWS": 120
+     }
+    },
+    {
+     "name": "HOS-303 triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    },
+    {
+     "name": "Mk 137 decoy launchers (4)",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Maya-class destroyer\", https://en.wikipedia.org/wiki/Maya-class_destroyer (accessed 2026-11-13): 10,250 t full load, 170 m, 6.4 m draft, about 30 kn, complement 300; AN/SPY-1D(V), AN/SPQ-9B, 3 AN/SPG-62, AN/SQQ-89 with SQS-53C, Mk 46 optical sight, NOLQ-2C intercept, 4 Mk 137 launchers; 96 Mk 41 cells (SM-2MR, SM-3, SM-6, Type 07 VL-ASROC, ESSM; split not given: 56 SM-2MR, 8 SM-6, 16 ESSM in 4 cells, 16 VL-ASROC assumed; SM-3 not modelled), 8 Type 17, 5 in/62 Mk 45 Mod 4, 2 Phalanx, 2 HOS-303 triple tubes. Range not given. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "JPN-DD-AKIZUKI",
+   "name": "Akizuki-class destroyer (2010)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "JPN-JMSDF",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-DESTROYER",
+   "length_m": 150.5,
+   "displacement_t": 6800,
+   "draft_m": 5.3,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.06,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 10000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MFR",
+     "height_m": 28
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -6
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 41 VLS (32 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-ASW-ROCKET",
+      "WPN-ESSM"
+     ]
+    },
+    {
+     "name": "Type 90 canisters (2x4)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-TYPE90"
+     ]
+    },
+    {
+     "name": "Mk 45 Mod 4 127 mm gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS (2)",
+     "height_m": 14,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "HOS-303 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Decoy launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 41 VLS (32 cells)",
+     "capacity": 80,
+     "contents": {
+      "WPN-ESSM": 64,
+      "WPN-ASW-ROCKET": 16
+     }
+    },
+    {
+     "name": "Type 90 canisters (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-TYPE90": 8
+     }
+    },
+    {
+     "name": "Mk 45 Mod 4 127 mm gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Phalanx CIWS (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-CIWS": 120
+     }
+    },
+    {
+     "name": "HOS-303 triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    },
+    {
+     "name": "Decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Akizuki-class destroyer (2010)\", https://en.wikipedia.org/wiki/Akizuki-class_destroyer_(2010) (accessed 2026-11-13): 6,800 t full load, 150.5 m, 5.3 m draft, 30 kn, complement 200; FCS-3A, OPS-20C, OQQ-22 ASW system, NOLQ-3D EW; Mk 45 Mod 4 127 mm, 8 Type 90, 2 Phalanx Block 1B, 2 HOS-303 triple tubes, 32-cell Mk 41 (ESSM and VL-ASROC; split not given: 64 ESSM in 16 cells and 16 VL-ASROC assumed). Range not given. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "JPN-FFM-MOGAMI",
+   "name": "Mogami-class frigate",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "JPN-JMSDF",
+   "propulsion": "PROP-CODAG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 132.5,
+   "displacement_t": 5500,
+   "draft_m": 4.5,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 16,
+   "accel_mps2": 0.05,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MFR",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -80
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 41 VLS (16 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-ASW-ROCKET"
+     ]
+    },
+    {
+     "name": "Type 17 canisters (2x4)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-TYPE17"
+     ]
+    },
+    {
+     "name": "5 in Mk 45 Mod 4 gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "SeaRAM (11 cells)",
+     "height_m": 14,
+     "weapons": [
+      "WPN-RAM"
+     ]
+    },
+    {
+     "name": "Torpedo launchers",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Chaff dispensers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 41 VLS (16 cells)",
+     "capacity": 16,
+     "contents": {
+      "WPN-ASW-ROCKET": 16
+     }
+    },
+    {
+     "name": "Type 17 canisters (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-TYPE17": 8
+     }
+    },
+    {
+     "name": "5 in Mk 45 Mod 4 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "SeaRAM (11 cells)",
+     "capacity": 11,
+     "contents": {
+      "WPN-RAM": 11
+     }
+    },
+    {
+     "name": "Torpedo launchers",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    },
+    {
+     "name": "Chaff dispensers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Mogami-class frigate\", https://en.wikipedia.org/wiki/Mogami-class_frigate (accessed 2026-11-13): 5,500 t full load, 132.5 m, about 4.5 m draft, over 30 kn, crew about 90, one MT30 and two MAN diesels; OPY-2 X-band AESA, OAX-3 EO/IR, OQQ-25 (VDS and towed array), NOLQ-3E with electronic attack; 5 in Mk 45 Mod 4, 8 Type 17, SeaRAM, Type 12 torpedoes (6 assumed), 16 Mk 41 cells (Type 07 VL-ASROC). Range not given. The VDS is modelled by the towed array record. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-JPN-NOLQ3E"
+   ]
+  },
+  {
+   "id": "JPN-SSK-TAIGEI",
+   "name": "Taigei-class submarine",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "JPN-JMSDF",
+   "propulsion": "PROP-DE-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 84.0,
+   "displacement_t": 3000,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 8,
+   "accel_mps2": 0.05,
+   "max_depth_m": 300,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 200,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 105,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 118,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-SON-SUB-TAS",
+     "height_m": -150
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "HU-606 533 mm torpedo tubes (6)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-HARPOON-2",
+      "WPN-TYPE89"
+     ]
+    },
+    {
+     "name": "Countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "HU-606 533 mm torpedo tubes (6)",
+     "capacity": 20,
+     "contents": {
+      "WPN-TYPE89": 16,
+      "WPN-HARPOON-2": 4
+     }
+    },
+    {
+     "name": "Countermeasures",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Taigei-class submarine\", https://en.wikipedia.org/wiki/Taigei-class_submarine (accessed 2026-11-13): 3,000 t surfaced, 84.0 m, 20.0 kn, complement 70, lithium-ion batteries; ZQQ-8 sonar suite (bow, flank and fibre-optic towed arrays), ZPS-6H surface radar, NZLR-2 ESM, non-penetrating periscope; 6 HU-606 533 mm tubes with Type 89 and Type 18 torpedoes and UGM-84L Harpoon Block II. Draught as given (10.4 m) appears to be hull depth and is not used; test depth, range and weapon load not given (generic SSK depth and load). Type 18 modelled by the Type 89. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "JPN-DDH-IZUMO",
+   "name": "Izumo-class helicopter destroyer (light carrier conversion)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "JPN-JMSDF",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-AMPHIB",
+   "length_m": 248,
+   "displacement_t": 26000,
+   "draft_m": 7.5,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.03,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 30000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 165,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 28
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -7
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Phalanx CIWS (2)",
+     "height_m": 20,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "SeaRAM (2x11 cells)",
+     "height_m": 20,
+     "weapons": [
+      "WPN-RAM"
+     ]
+    },
+    {
+     "name": "Mk 36 SRBOC launchers",
+     "height_m": 15,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    },
+    {
+     "name": "Torpedo decoys",
+     "height_m": 3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Phalanx CIWS (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-CIWS": 120
+     }
+    },
+    {
+     "name": "SeaRAM (2x11 cells)",
+     "capacity": 22,
+     "contents": {
+      "WPN-RAM": 22
+     }
+    },
+    {
+     "name": "Mk 36 SRBOC launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    },
+    {
+     "name": "Torpedo decoys",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Izumo-class destroyer\", https://en.wikipedia.org/wiki/Izumo-class_destroyer (accessed 2026-11-13): 26,000 t full load, 248 m, 7.5 m draft, 30 kn, complement 520; OPS-50 AESA, OPS-28 surface search, OQQ-23 bow sonar, NOLQ-3D-1 EW, Mk 36 SRBOC, torpedo decoys; 2 Phalanx, 2 SeaRAM; 7 ASW and 2 SAR helicopters, or 12 or more F-35B after conversion (aircraft are given in scenarios). Range not given. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "JPN-CG-SHIKISHIMA",
+   "name": "Shikishima-class patrol vessel (Japan Coast Guard)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "JPN-JCG",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CRUISER",
+   "length_m": 150.0,
+   "displacement_t": 9300,
+   "draft_m": 9.0,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.06,
+   "endurance_nm": 20000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 15000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 18
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Oerlikon 35 mm twin cannons (2)",
+     "height_m": 11,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "JM61 20 mm guns (2)",
+     "height_m": 12,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Oerlikon 35 mm twin cannons (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    },
+    {
+     "name": "JM61 20 mm guns (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Shikishima-class patrol vessel\", https://en.wikipedia.org/wiki/Shikishima-class_patrol_vessel (accessed 2026-11-13): 9,300 t full load, 150.0 m, 9.0 m draft, 25 kn, 20,000 nmi, four diesels; OPS-14 2D air search, JMA 8303 surface search, MS 1596 navigation; 2 twin Oerlikon 35 mm, 2 JM61 20 mm; two AS332 helicopters. Cruise speed not given (15 kn assumed); the 35 mm and 20 mm are modelled by the generic 30 mm gun. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "JPN-P1",
+   "name": "Kawasaki P-1 maritime patrol aircraft",
+   "category": "mpa",
+   "domain": "air",
+   "service": "JPN-JMSDF",
+   "propulsion": "PROP-TURBOFAN",
+   "damage_profile": "DMG-AIRCRAFT-LARGE",
+   "displacement_t": 79.7,
+   "max_speed_kn": 538,
+   "cruise_speed_kn": 450,
+   "accel_mps2": 2,
+   "endurance_nm": 4320,
+   "max_altitude_m": 13520,
+   "hardpoints": 16,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 50,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "ir",
+     "value": 6,
+     "unit": "kw_sr",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MAR-AIR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-ESM-AIR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-EO-AIR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-SONOBUOY",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 0
+    }
+   ],
+   "launchers": [],
+   "magazines": [],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Kawasaki P-1\", https://en.wikipedia.org/wiki/Kawasaki_P-1 (accessed 2026-11-13): max take-off 79,700 kg, 996 km/h (538 kn), cruise 833 km/h (450 kn), range 8,000 km (4,320 nmi), combat range 2,500 km, ceiling 13,520 m, 8 external and 8 internal stations; Harpoon, Type 97 and Type 12 torpedoes, sonobuoys. Torpedoes modelled by the generic lightweight torpedo; loadout counts are assumptions within the stations. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "loadouts": [
+    {
+     "id": "JPN-P1/ASW",
+     "name": "Anti-submarine: lightweight torpedoes",
+     "role": "asw",
+     "items": {
+      "WPN-TORP-LW": 8
+     }
+    },
+    {
+     "id": "JPN-P1/ASUW",
+     "name": "Anti-surface: Harpoon Block II",
+     "role": "asuw",
+     "items": {
+      "WPN-HARPOON-2": 4,
+      "WPN-TORP-LW": 4
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -12,3 +12,6 @@ sbom-rust.json
 # Signing keys never enter the repository (ADR-0008).
 *.pfx
 *.p12
+
+# The world terrain layer, fetched and built by scripts/terrain/world-layer.sh for releases.
+/apps/desktop/src-tauri/terrain/
