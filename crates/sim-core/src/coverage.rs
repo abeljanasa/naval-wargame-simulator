@@ -31,8 +31,8 @@ use sim_events::Area;
 use sim_geo::{inverse, radar_horizon_m, GeoPoint};
 use sim_sensors::{
     ambient_noise_db, clutter_loss_db, detection_range_with_loss_m, light, mad_r50_m,
-    noise_at_speed_db, optical_r50_m, power_sum_db, sonar_params, sun_elevation_deg,
-    transmission_loss_db, Environment, DEFAULT_CLUTTER_DB_PER_SEA_STATE,
+    noise_at_speed_db, optical_r50_m, power_sum_db, sun_elevation_deg, transmission_loss_db,
+    Environment, DEFAULT_CLUTTER_DB_PER_SEA_STATE,
 };
 
 /// Cells per side of the sampling grid.
@@ -98,7 +98,7 @@ struct Reach {
 /// Passive sonar R₅₀ (signal excess 0) against the reference submarine, by bisection on range:
 /// transmission loss grows with range, so SE falls monotonically.
 fn sonar_reach_m(s: &SensorSpec, own_speed_mps: f64, env: Environment) -> f64 {
-    let p = sonar_params(s.kind, s.active);
+    let p = sim_sensors::sonar_params_with(s.kind, s.active, s.sonar.as_ref());
     let nl = power_sum_db(
         ambient_noise_db(env.sea_state),
         noise_at_speed_db(p.self_noise_db, own_speed_mps),

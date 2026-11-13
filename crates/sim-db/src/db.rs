@@ -73,6 +73,9 @@ pub struct MountedSensor {
     pub beamwidth_deg: Option<f64>,
     /// Capable of active transmission.
     pub is_active: bool,
+    /// Sonar acoustic figures (migration 0003): frequency kHz, DI dB, DT dB, source level dB,
+    /// self-noise dB at 10 kn.
+    pub sonar: [Option<f64>; 5],
 }
 
 const SUMMARY_COLS: &str = "id, name, category, domain, max_speed_mps, cruise_speed_mps, accel_mps2, max_altitude_m, max_depth_m, length_m, draft_m, endurance_m, displacement_t";
@@ -166,7 +169,8 @@ impl PlatformDb {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.kind, m.height_m, s.min_range_m, s.max_range_m, s.ref_detect_range_m,
                     s.ref_target_rcs_m2, s.max_target_altitude_m, s.clutter_db_per_sea_state,
-                    s.beamwidth_deg, s.is_active
+                    s.beamwidth_deg, s.is_active, s.sonar_frequency_khz, s.sonar_di_db,
+                    s.sonar_dt_db, s.sonar_source_level_db, s.sonar_self_noise_db
                FROM mounts m JOIN sensors s ON s.id = m.sensor_id
               WHERE m.platform_id = ?1 AND m.kind = 'sensor'
               ORDER BY m.id",
@@ -185,6 +189,7 @@ impl PlatformDb {
                     clutter_db_per_sea_state: r.get(8)?,
                     beamwidth_deg: r.get(9)?,
                     is_active: r.get(10)?,
+                    sonar: [r.get(11)?, r.get(12)?, r.get(13)?, r.get(14)?, r.get(15)?],
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

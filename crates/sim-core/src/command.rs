@@ -185,6 +185,24 @@ pub enum CommandPayload {
     SetWeather {
         zones: Vec<sim_events::WeatherZone>,
     },
+    /// Replaces the sound-velocity profiles (`docs/models/acoustics.md`). Scenario and white
+    /// cell.
+    SetSoundProfiles {
+        profiles: Vec<sim_events::SoundProfile>,
+    },
+    /// Streams (`true`) or recovers a unit's towed array; either takes ten minutes.
+    StreamTowedArray {
+        unit: UnitId,
+        streamed: bool,
+    },
+    /// The unit flies or steams through `points`, laying a sonobuoy at each (`deep`: hydrophones
+    /// at 300 m, else 60 m).
+    LaySonobuoys {
+        unit: UnitId,
+        points: Vec<GeoPoint>,
+        #[serde(default)]
+        deep: bool,
+    },
     /// Replaces the ESM emitter library (built from the platform database). Scenario and white
     /// cell only.
     SetEmitterLibrary {
@@ -288,12 +306,15 @@ impl CommandPayload {
             | CommandPayload::Engage { shooter: unit, .. }
             | CommandPayload::AssignMission { unit, .. }
             | CommandPayload::LayMines { unit, .. }
+            | CommandPayload::StreamTowedArray { unit, .. }
+            | CommandPayload::LaySonobuoys { unit, .. }
             | CommandPayload::DetachFromGroup { unit }
             | CommandPayload::JoinGroup { unit, .. } => Some(*unit),
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
             | CommandPayload::SetEnvironment { .. }
             | CommandPayload::SetWeather { .. }
+            | CommandPayload::SetSoundProfiles { .. }
             | CommandPayload::SetEmitterLibrary { .. }
             | CommandPayload::SetWeaponCatalog { .. }
             | CommandPayload::CreateMinefield { .. }
@@ -391,6 +412,10 @@ impl CommandPayload {
             CommandPayload::SetDoctrine { .. } => Ok(()),
             CommandPayload::SetEnvironment { environment } => environment.validate(),
             CommandPayload::SetWeather { zones } => sim_events::validate_weather(zones),
+            CommandPayload::SetSoundProfiles { profiles } => {
+                sim_events::validate_profiles(profiles)
+            }
+            CommandPayload::LaySonobuoys { points, .. } => check_points(points),
             CommandPayload::SetWeaponCatalog { weapons } => {
                 weapons.iter().try_for_each(WeaponSpec::validate)
             }
@@ -463,6 +488,7 @@ impl CommandPayload {
                     action.validate()
                 }
             }
+            CommandPayload::StreamTowedArray { .. } => Ok(()),
             CommandPayload::LayMines {
                 mines, radius_m, ..
             } => {

@@ -237,6 +237,53 @@ pub fn speed_factor(sea_state: u8, limit: u8) -> f64 {
     }
 }
 
+/// A sound-velocity profile for a region and season (`docs/models/acoustics.md`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct SoundProfile {
+    pub id: u32,
+    pub name: String,
+    /// Where it applies (`None`: everywhere).
+    #[serde(default)]
+    pub area: Option<Area>,
+    /// The months it applies in, 1–12 (empty: all year).
+    #[serde(default)]
+    pub months: Vec<u8>,
+    pub points: Vec<sim_sensors::acoustics::SvpPoint>,
+}
+
+/// Checks profiles: unique ids, a name, valid points, area and months.
+pub fn validate_profiles(profiles: &[SoundProfile]) -> Result<(), String> {
+    let mut ids = std::collections::BTreeSet::new();
+    for p in profiles {
+        if !ids.insert(p.id) {
+            return Err(format!("duplicate sound profile id {}", p.id));
+        }
+        if p.name.trim().is_empty() {
+            return Err(format!("sound profile {} has no name", p.id));
+        }
+        if let Some(a) = &p.area {
+            a.validate()?;
+        }
+        if p.months.iter().any(|m| !(1..=12).contains(m)) {
+            return Err(format!("sound profile {:?}: months are 1–12", p.name));
+        }
+        sim_sensors::acoustics::validate_svp(&p.points)
+            .map_err(|e| format!("sound profile {:?}: {e}", p.name))?;
+    }
+    Ok(())
+}
+
+/// The profile in force at `p` in `month`: the highest id whose area and months match.
+#[must_use]
+pub fn profile_at(profiles: &[SoundProfile], p: GeoPoint, month: u8) -> Option<&SoundProfile> {
+    profiles
+        .iter()
+        .filter(|s| s.area.as_ref().is_none_or(|a| a.contains(p)))
+        .filter(|s| s.months.is_empty() || s.months.contains(&month))
+        .max_by_key(|s| s.id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,6 +363,50 @@ mod tests {
         assert_eq!(speed_factor(6, 7), 0.85);
         assert_eq!(speed_factor(7, 7), 0.6);
         assert_eq!(speed_factor(9, 8), 0.6);
+    }
+
+    #[test]
+    fn the_profile_for_a_place_and_month() {
+        use sim_sensors::acoustics::SvpPoint;
+        let pts = vec![
+            SvpPoint {
+                depth_m: 0.0,
+                speed_mps: 1530.0,
+            },
+            SvpPoint {
+                depth_m: 500.0,
+                speed_mps: 1500.0,
+            },
+        ];
+        let everywhere = SoundProfile {
+            id: 1,
+            name: "Basin".into(),
+            area: None,
+            months: vec![],
+            points: pts.clone(),
+        };
+        let summer = SoundProfile {
+            id: 2,
+            name: "Strait, summer".into(),
+            area: Some(Area::Circle {
+                centre: GeoPoint::new(12.0, 121.0),
+                radius_m: 50_000.0,
+            }),
+            months: vec![6, 7, 8],
+            points: pts,
+        };
+        let ps = vec![everywhere, summer];
+        assert!(validate_profiles(&ps).is_ok());
+        assert_eq!(
+            profile_at(&ps, GeoPoint::new(12.0, 121.0), 7).unwrap().id,
+            2
+        );
+        assert_eq!(
+            profile_at(&ps, GeoPoint::new(12.0, 121.0), 11).unwrap().id,
+            1
+        );
+        assert_eq!(profile_at(&ps, GeoPoint::new(0.0, 0.0), 7).unwrap().id, 1);
+        assert!(profile_at(&[], GeoPoint::new(0.0, 0.0), 7).is_none());
     }
 
     #[test]

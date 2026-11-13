@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod acoustics;
 mod classify;
 mod esm;
 mod kind;
@@ -36,7 +37,8 @@ pub use radar::{
 };
 pub use sonar::{
     active_se_db, ambient_noise_db, noise_at_speed_db, passive_se_db, pd_from_se, power_sum_db,
-    sonar_params, thorp_absorption_db_per_km, transmission_loss_db, SonarParams,
-    DIPPING_MAX_ALTITUDE_M, DIPPING_MAX_SPEED_MPS, SE_SIGMA_DB, SPREADING_TRANSITION_M,
+    sonar_params, sonar_params_with, thorp_absorption_db_per_km, transmission_loss_db,
+    SonarFigures, SonarParams, DIPPING_MAX_ALTITUDE_M, DIPPING_MAX_SPEED_MPS, SE_SIGMA_DB,
+    SPREADING_TRANSITION_M,
 };
 pub use track::{measured_point, Cov2, ErrorEllipse, TrackEstimate};

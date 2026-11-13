@@ -178,6 +178,9 @@ pub struct Scenario {
     /// Weather zones over the scenario-wide weather (Phase 4 slice 7, `docs/models/weather.md`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub weather_zones: Vec<sim_core::WeatherZone>,
+    /// Sound-velocity profiles by region and season (Phase 4 slice 8, `docs/models/acoustics.md`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sound_profiles: Vec<sim_core::SoundProfile>,
     pub units: Vec<ScenarioUnit>,
     /// Scenario events, checked every tick (`docs/models/events.md`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -744,6 +747,11 @@ impl Scenario {
                 zones: self.weather_zones.clone(),
             });
         }
+        if !self.sound_profiles.is_empty() {
+            c2.push(CommandPayload::SetSoundProfiles {
+                profiles: self.sound_profiles.clone(),
+            });
+        }
         for s in &self.sides {
             for p in &s.postures {
                 c2.push(CommandPayload::SetPosture {
@@ -934,6 +942,15 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
                         clutter_db_per_sea_state: s.clutter_db_per_sea_state,
                         beamwidth_deg: s.beamwidth_deg,
                         active: s.is_active,
+                        sonar: s.sonar.iter().any(Option::is_some).then(|| {
+                            sim_core::SonarFigures {
+                                frequency_khz: s.sonar[0],
+                                di_db: s.sonar[1],
+                                dt_db: s.sonar[2],
+                                source_level_db: s.sonar[3],
+                                self_noise_db: s.sonar[4],
+                            }
+                        }),
                     })
                 })
                 .collect::<Result<Vec<_>, ScenarioError>>()?;

@@ -71,6 +71,12 @@ pub struct UnitView {
     pub mission_complete: bool,
     /// Fraction of fuel left, for units with a fuel model.
     pub fuel_fraction: Option<f64>,
+    /// The towed array's state, for units with one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub towed: Option<crate::acoustics::TowedView>,
+    /// Sonobuoys left, for units that carry them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sonobuoys_left: Option<u32>,
 }
 
 /// Rounds of one weapon carried.
@@ -151,6 +157,12 @@ pub struct Snapshot {
     /// Weather zones, known to every side (empty: the scenario-wide weather only).
     #[serde(default)]
     pub weather_zones: Vec<sim_events::WeatherZone>,
+    /// The viewer's laid sonobuoys (every side's for the white cell).
+    #[serde(default)]
+    pub sonobuoys: Vec<crate::acoustics::SonobuoyView>,
+    /// Sound-velocity profiles in force (every seat sees them, like the weather).
+    #[serde(default)]
+    pub sound_profiles: Vec<sim_events::SoundProfile>,
     /// Side viewer: that side's recent ESM bearing lines. White cell: every side's.
     pub bearings: Vec<BearingView>,
     /// Side viewer: its own weapons in flight. White cell: every weapon in flight.

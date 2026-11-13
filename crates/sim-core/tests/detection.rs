@@ -10,6 +10,7 @@ const R50_REF: f64 = 120_000.0;
 
 fn radar() -> SensorSpec {
     SensorSpec {
+        sonar: None,
         sensor_id: "TEST-RADAR".into(),
         kind: SensorKind::Radar,
         mount_height_m: 25.0,
@@ -871,6 +872,7 @@ fn environment_is_set_by_the_white_cell_and_shown_to_every_side() {
 
 fn esm_sensor() -> SensorSpec {
     SensorSpec {
+        sonar: None,
         sensor_id: "TEST-ESM".into(),
         kind: SensorKind::Esm,
         mount_height_m: 25.0,
@@ -1066,6 +1068,7 @@ fn esm_raises_a_radar_track_to_category() {
 
 fn sonar(id: &str, kind: SensorKind, active: bool, max_range_m: f64) -> SensorSpec {
     SensorSpec {
+        sonar: None,
         sensor_id: id.into(),
         kind,
         mount_height_m: -10.0,
@@ -1323,6 +1326,7 @@ const NOV10: i64 = 1_794_268_800;
 
 fn optical(id: &str, kind: SensorKind, max_range_m: f64) -> SensorSpec {
     SensorSpec {
+        sonar: None,
         sensor_id: id.into(),
         kind,
         mount_height_m: 15.0,
@@ -1481,6 +1485,7 @@ fn mad_finds_a_submerged_submarine_that_the_eye_cannot() {
     let mut sim = Simulation::new(54);
     set_time(&mut sim, NOV10 + 43_200, 40.0);
     let mad = SensorSpec {
+        sonar: None,
         max_range_m: 1_500.0,
         max_target_altitude_m: 0.0,
         ..optical("TEST-MAD", SensorKind::Mad, 1_500.0)

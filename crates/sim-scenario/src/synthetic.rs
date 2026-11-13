@@ -81,6 +81,7 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
         action_groups: vec![],
         lanes: vec![],
         weather_zones: vec![],
+        sound_profiles: vec![],
         fuel: false,
     }
 }

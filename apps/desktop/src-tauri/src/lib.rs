@@ -1110,6 +1110,48 @@ fn order_weather(
     lock(&host).order_weather(window.label(), zones).map(|_| ())
 }
 
+/// Replaces the sound-velocity profiles (white cell only).
+#[tauri::command]
+#[specta::specta]
+fn order_sound_profiles(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    profiles: Vec<sim_core::SoundProfile>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_sound_profiles(window.label(), profiles)
+        .map(|_| ())
+}
+
+/// Streams (`true`) or recovers a unit's towed array; either takes ten minutes.
+#[tauri::command]
+#[specta::specta]
+fn order_towed(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    streamed: bool,
+) -> Result<(), String> {
+    lock(&host)
+        .order_towed(window.label(), unit, streamed)
+        .map(|_| ())
+}
+
+/// Sends a unit through `points`, laying a sonobuoy at each (`deep`: hydrophones at 300 m).
+#[tauri::command]
+#[specta::specta]
+fn order_sonobuoys(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    points: Vec<GeoPoint>,
+    deep: bool,
+) -> Result<(), String> {
+    lock(&host)
+        .order_sonobuoys(window.label(), unit, points, deep)
+        .map(|_| ())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -1158,6 +1200,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             choke_depths,
             imagery_status,
             order_weather,
+            order_sound_profiles,
+            order_towed,
+            order_sonobuoys,
             rescan_imagery,
         ])
         .events(collect_events![FrameEvent])

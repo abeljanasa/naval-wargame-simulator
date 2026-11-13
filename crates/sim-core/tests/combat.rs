@@ -15,6 +15,7 @@ const ORIGIN: GeoPoint = GeoPoint {
 
 fn radar() -> SensorSpec {
     SensorSpec {
+        sonar: None,
         sensor_id: "TEST-RADAR".into(),
         kind: SensorKind::Radar,
         mount_height_m: 25.0,
@@ -2574,6 +2575,7 @@ fn sense_zone_coverage_follows_the_radar_horizon_and_emcon() {
 
 fn sensor(kind: SensorKind, max_range_m: f64) -> SensorSpec {
     SensorSpec {
+        sonar: None,
         sensor_id: format!("TEST-{kind:?}"),
         kind,
         mount_height_m: 20.0,

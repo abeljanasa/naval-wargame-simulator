@@ -177,6 +177,17 @@ struct Sensor {
     /// Radar: two-way half-power beamwidth, degrees (migration 0002).
     #[serde(default)]
     beamwidth_deg: Option<f64>,
+    /// Sonar acoustic figures (migration 0003); the generic figures by kind when absent.
+    #[serde(default)]
+    sonar_frequency_khz: Option<f64>,
+    #[serde(default)]
+    sonar_di_db: Option<f64>,
+    #[serde(default)]
+    sonar_dt_db: Option<f64>,
+    #[serde(default)]
+    sonar_source_level_db: Option<f64>,
+    #[serde(default)]
+    sonar_self_noise_db: Option<f64>,
     provenance: Option<ProvenanceSpec>,
 }
 
@@ -506,13 +517,15 @@ fn insert_sensors(tx: &Transaction<'_>, f: &SensorsFile) -> Result<usize, DbErro
         )?;
         let (c, conf, cl, g, by, at) = prov_params!(p);
         tx.execute(
-            &format!("INSERT INTO sensors (id, name, kind, role, band, is_active, min_range_m, max_range_m, ref_detect_range_m, ref_target_rcs_m2, max_target_altitude_m, scan_period_s, clutter_db_per_sea_state, beamwidth_deg, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)"),
+            &format!("INSERT INTO sensors (id, name, kind, role, band, is_active, min_range_m, max_range_m, ref_detect_range_m, ref_target_rcs_m2, max_target_altitude_m, scan_period_s, clutter_db_per_sea_state, beamwidth_deg, sonar_frequency_khz, sonar_di_db, sonar_dt_db, sonar_source_level_db, sonar_self_noise_db, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)"),
             params![
                 s.id, s.name, s.kind, s.role, s.band, s.active,
                 s.min_range_km * M_PER_KM, s.max_range_km * M_PER_KM,
                 s.ref_detect_range_km.map(|r| r * M_PER_KM), s.ref_target_rcs_m2,
                 s.max_target_altitude_m, s.scan_period_s,
                 s.clutter_db_per_sea_state, s.beamwidth_deg,
+                s.sonar_frequency_khz, s.sonar_di_db, s.sonar_dt_db, s.sonar_source_level_db,
+                s.sonar_self_noise_db,
                 c, conf, cl, g, by, at
             ],
         )?;

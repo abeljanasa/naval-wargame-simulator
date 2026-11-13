@@ -124,6 +124,7 @@ const FAULTS: &[(&str, &str, &str)] = &[
     ("sensor range order", "UPDATE sensors SET min_range_m = max_range_m WHERE id = 'SEN-VISUAL'", "sensor.range_order"),
     ("half a radar reference", "UPDATE sensors SET ref_target_rcs_m2 = NULL WHERE id = 'SEN-RDR-NAV'", "sensor.reference_range"),
     ("radar field on a non-radar", "UPDATE sensors SET beamwidth_deg = 2 WHERE id = 'SEN-VISUAL'", "sensor.radar_fields"),
+    ("sonar field on a non-sonar", "UPDATE sensors SET sonar_di_db = 10 WHERE id = 'SEN-VISUAL'", "sensor.sonar_fields"),
     ("radar without clutter figure", "UPDATE sensors SET clutter_db_per_sea_state = NULL WHERE id = 'SEN-RDR-NAV'", "sensor.radar_defaults"),
     ("radar without reference","UPDATE sensors SET ref_target_rcs_m2 = NULL, ref_detect_range_m = NULL WHERE id = 'SEN-RDR-NAV'", "sensor.radar_reference"),
     ("weapon range order", "UPDATE weapons SET min_range_m = max_range_m WHERE id = 'WPN-SAM-MR'", "weapon.range_order"),

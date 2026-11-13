@@ -164,6 +164,7 @@ impl Simulation {
         world.insert_resource(C2State::default());
         world.insert_resource(EnvState::default());
         world.insert_resource(crate::detection::Weather::default());
+        world.insert_resource(crate::acoustics::Acoustics::default());
         world.insert_resource(BearingTable::default());
         world.insert_resource(WeaponCatalog::default());
         world.insert_resource(WeaponsInFlight::default());
@@ -400,6 +401,7 @@ impl Simulation {
         let c2 = self.world.resource::<C2State>().clone();
         let planning = self.world.resource::<PlanningLayer>().clone();
         let records = self.unit_records();
+        let acoustics = self.world.resource::<crate::acoustics::Acoustics>().clone();
         let side_of: BTreeMap<UnitId, SideId> =
             records.iter().map(|r| (r.unit.id, r.unit.side)).collect();
         let units = records
@@ -432,6 +434,24 @@ impl Simulation {
                     mission: r.mission.mission.clone(),
                     mission_complete: r.mission.complete,
                     fuel_fraction: r.fuel.map(|f| f.fraction()),
+                    towed: r
+                        .sensors
+                        .0
+                        .iter()
+                        .any(|s| s.kind == sim_sensors::SensorKind::SonarTowed)
+                        .then(|| acoustics.towed_view(r.unit.id, tick)),
+                    sonobuoys_left: r
+                        .sensors
+                        .0
+                        .iter()
+                        .any(|s| s.kind == sim_sensors::SensorKind::Sonobuoy)
+                        .then(|| {
+                            acoustics
+                                .loads
+                                .get(&r.unit.id)
+                                .copied()
+                                .unwrap_or(crate::acoustics::BUOY_LOAD)
+                        }),
                     stores: r
                         .magazine
                         .0
@@ -505,6 +525,15 @@ impl Simulation {
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
             weather_zones: self.world.resource::<crate::detection::Weather>().0.clone(),
+            sound_profiles: acoustics.profiles.clone(),
+            sonobuoys: crate::acoustics::buoy_views(
+                &acoustics,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+                tick,
+            ),
             outcomes: crate::outcomes::visible(
                 self.world.resource::<crate::outcomes::OutcomeFeed>(),
                 tick,
@@ -688,6 +717,19 @@ impl Simulation {
                 h.opt_f64(s.clutter_db_per_sea_state);
                 h.opt_f64(s.beamwidth_deg);
                 h.u8(u8::from(s.active));
+                // Only when the database gives them, so existing sonars keep their hashes.
+                if let Some(f) = &s.sonar {
+                    h.str("sonar");
+                    for v in [
+                        f.frequency_khz,
+                        f.di_db,
+                        f.dt_db,
+                        f.source_level_db,
+                        f.self_noise_db,
+                    ] {
+                        h.opt_f64(v);
+                    }
+                }
             }
             h.opt_f64(r.jammer.map(|j| j.jn_db_at_1km));
             // Hashed only when present, so units without fuel keep their hashes.
@@ -839,6 +881,17 @@ impl Simulation {
             }
         }
         // Weather zones only when there are any, so runs without them keep their hashes.
+        // Acoustic state only when used, so runs without it keep their hashes.
+        let ac = self.world.resource::<crate::acoustics::Acoustics>();
+        if *ac != crate::acoustics::Acoustics::default() {
+            h.str("acoustics");
+            if let Ok(bytes) = rmp_serde::to_vec(ac) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
         let zones = &self.world.resource::<crate::detection::Weather>().0;
         if !zones.is_empty() {
             h.str("weather");
@@ -932,6 +985,7 @@ impl Simulation {
             c2: self.world.resource::<C2State>().clone(),
             environment: self.world.resource::<EnvState>().0,
             weather: self.world.resource::<crate::detection::Weather>().0.clone(),
+            acoustics: self.world.resource::<crate::acoustics::Acoustics>().clone(),
             bearings: self.world.resource::<BearingTable>().clone(),
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
@@ -980,6 +1034,7 @@ impl Simulation {
         sim.world.insert_resource(EnvState(save.environment));
         sim.world
             .insert_resource(crate::detection::Weather(save.weather.clone()));
+        sim.world.insert_resource(save.acoustics.clone());
         sim.world.insert_resource(save.bearings);
         sim.world.insert_resource(save.emitter_library);
         sim.world.insert_resource(save.weapon_catalog);
@@ -1131,6 +1186,7 @@ fn build_schedule() -> Schedule {
         (
             apply_commands_system,
             movement_system,
+            crate::acoustics::sonobuoy_system,
             crate::weapon_tracks::weapon_tracks_system,
             point_defence_system,
             weapons_system,
@@ -1401,6 +1457,20 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             }
             world.insert_resource(EnvState(*environment));
             Ok(())
+        }
+        CommandPayload::SetSoundProfiles { profiles } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set sound profiles".into());
+            }
+            crate::acoustics::set_profiles(world, profiles)
+        }
+        CommandPayload::StreamTowedArray { unit, streamed } => {
+            let entity = authorised_entity(world, cmd, *unit)?;
+            crate::acoustics::order_towed(world, entity, *unit, *streamed)
+        }
+        CommandPayload::LaySonobuoys { unit, points, deep } => {
+            let entity = authorised_entity(world, cmd, *unit)?;
+            crate::acoustics::order_buoys(world, entity, *unit, points, *deep)
         }
         CommandPayload::SetWeather { zones } => {
             if !cmd.issuer.is_privileged() {

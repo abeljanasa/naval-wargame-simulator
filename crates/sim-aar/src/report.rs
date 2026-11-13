@@ -343,6 +343,19 @@ impl<'a> Builder<'a> {
                         .join(", ")
                 ),
             },
+            CommandPayload::SetSoundProfiles { profiles } => {
+                format!("set {} sound-velocity profile(s)", profiles.len())
+            }
+            CommandPayload::StreamTowedArray { unit, streamed } => format!(
+                "{}: {} the towed array",
+                self.unit_name(*unit),
+                if *streamed { "stream" } else { "recover" }
+            ),
+            CommandPayload::LaySonobuoys { unit, points, .. } => format!(
+                "{}: lay {} sonobuoy(s)",
+                self.unit_name(*unit),
+                points.len()
+            ),
             CommandPayload::SetEmitterLibrary { .. } => "set the emitter library".into(),
             CommandPayload::SetWeaponCatalog { .. } => "set the weapon catalogue".into(),
             CommandPayload::Engage {

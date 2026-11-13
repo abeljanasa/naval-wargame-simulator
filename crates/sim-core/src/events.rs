@@ -127,6 +127,26 @@ pub enum SimEventKind {
         detected: bool,
         range_error_m: Option<f64>,
         bearing_error_deg: Option<f64>,
+        /// The path the sound took, with a sound-velocity profile in force
+        /// (`docs/models/acoustics.md`); `None` under the Phase 2 law.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        path: Option<sim_sensors::acoustics::AcousticPath>,
+    },
+    /// A towed array ordered streamed or recovered; ready after `ready_s`.
+    TowedArray {
+        unit: UnitId,
+        streamed: bool,
+        ready_s: u64,
+    },
+    /// A sonobuoy laid.
+    SonobuoyLaid {
+        unit: UnitId,
+        buoy: u32,
+        position: sim_geo::GeoPoint,
+    },
+    /// A sonobuoy's life ended.
+    SonobuoyExpired {
+        buoy: u32,
     },
     /// One visual, EO or IR detection draw.
     OpticalAttempt {

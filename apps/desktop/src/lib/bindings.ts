@@ -120,6 +120,12 @@ export const commands = {
 	imageryStatus: () => __TAURI_INVOKE<ImageryStatus_Serialize>("imagery_status"),
 	/**  Replaces the weather zones (white cell only). */
 	orderWeather: (zones: WeatherZone_Deserialize[]) => typedError<null, string>(__TAURI_INVOKE("order_weather", { zones })),
+	/**  Replaces the sound-velocity profiles (white cell only). */
+	orderSoundProfiles: (profiles: SoundProfile_Deserialize[]) => typedError<null, string>(__TAURI_INVOKE("order_sound_profiles", { profiles })),
+	/**  Streams (`true`) or recovers a unit's towed array; either takes ten minutes. */
+	orderTowed: (unit: UnitId, streamed: boolean) => typedError<null, string>(__TAURI_INVOKE("order_towed", { unit, streamed })),
+	/**  Sends a unit through `points`, laying a sonobuoy at each (`deep`: hydrophones at 300 m). */
+	orderSonobuoys: (unit: UnitId, points: GeoPoint[], deep: boolean) => typedError<null, string>(__TAURI_INVOKE("order_sonobuoys", { unit, points, deep })),
 	/**  Reads the imagery folder again (after packs were copied into it by hand). */
 	rescanImagery: () => __TAURI_INVOKE<ImageryStatus_Serialize>("rescan_imagery"),
 };
@@ -1702,6 +1708,8 @@ export type Scenario_Deserialize = {
 	environment?: Environment_Deserialize,
 	/**  Weather zones over the scenario-wide weather (Phase 4 slice 7, `docs/models/weather.md`). */
 	weather_zones?: WeatherZone_Deserialize[],
+	/**  Sound-velocity profiles by region and season (Phase 4 slice 8, `docs/models/acoustics.md`). */
+	sound_profiles?: SoundProfile_Deserialize[],
 	units: ScenarioUnit_Deserialize[],
 	/**  Scenario events, checked every tick (`docs/models/events.md`). */
 	events?: ScenarioEvent_Deserialize[],
@@ -1743,6 +1751,8 @@ export type Scenario_Serialize = {
 	environment?: Environment_Serialize,
 	/**  Weather zones over the scenario-wide weather (Phase 4 slice 7, `docs/models/weather.md`). */
 	weather_zones?: WeatherZone_Serialize[],
+	/**  Sound-velocity profiles by region and season (Phase 4 slice 8, `docs/models/acoustics.md`). */
+	sound_profiles?: SoundProfile_Serialize[],
 	units: ScenarioUnit_Serialize[],
 	/**  Scenario events, checked every tick (`docs/models/events.md`). */
 	events?: ScenarioEvent_Serialize[],
@@ -1940,6 +1950,10 @@ export type SnapshotUpdate_Deserialize = {
 	environment: Environment_Deserialize,
 	/**  Weather zones (small; sent every frame). */
 	weather_zones: WeatherZone_Deserialize[],
+	/**  Sound-velocity profiles in force (small; sent every frame). */
+	sound_profiles: SoundProfile_Deserialize[],
+	/**  The viewer's laid sonobuoys (sent whole). */
+	sonobuoys: SonobuoyView[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -1984,6 +1998,10 @@ export type SnapshotUpdate_Serialize = {
 	environment: Environment_Serialize,
 	/**  Weather zones (small; sent every frame). */
 	weather_zones: WeatherZone_Serialize[],
+	/**  Sound-velocity profiles in force (small; sent every frame). */
+	sound_profiles: SoundProfile_Serialize[],
+	/**  The viewer's laid sonobuoys (sent whole). */
+	sonobuoys: SonobuoyView[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -2012,6 +2030,41 @@ export type SnapshotUpdate_Serialize = {
 	outcomes: Outcome_Serialize[],
 };
 
+/**  A laid sonobuoy, as a seat sees it. */
+export type SonobuoyView = {
+	id: number,
+	side: SideId,
+	position: GeoPoint,
+	depth_m: number | null,
+	/**  Seconds of life left. */
+	life_s: number | null,
+};
+
+/**  A sound-velocity profile for a region and season (`docs/models/acoustics.md`). */
+export type SoundProfile = SoundProfile_Serialize | SoundProfile_Deserialize;
+
+/**  A sound-velocity profile for a region and season (`docs/models/acoustics.md`). */
+export type SoundProfile_Deserialize = {
+	id: number,
+	name: string,
+	/**  Where it applies (`None`: everywhere). */
+	area?: Area | null,
+	/**  The months it applies in, 1–12 (empty: all year). */
+	months?: number[],
+	points: SvpPoint[],
+};
+
+/**  A sound-velocity profile for a region and season (`docs/models/acoustics.md`). */
+export type SoundProfile_Serialize = {
+	id: number,
+	name: string,
+	/**  Where it applies (`None`: everywhere). */
+	area: Area | null,
+	/**  The months it applies in, 1–12 (empty: all year). */
+	months: number[],
+	points: SvpPoint[],
+};
+
 /**  What a unit can still do. */
 export type Status = "operational" | 
 /**
@@ -2026,6 +2079,12 @@ export type Status = "operational" |
 export type StoreView = {
 	weapon: string,
 	count: number,
+};
+
+/**  One point of a sound-velocity profile. */
+export type SvpPoint = {
+	depth_m: number | null,
+	speed_mps: number | null,
 };
 
 /**  Systems a critical hit can knock out. */
@@ -2105,6 +2164,14 @@ export type TimelineEntry_Serialize = {
 
 /**  What a timeline entry is about. */
 export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | "override" | "facilitation" | "event" | "script_error";
+
+/**  A towed array, as a seat sees it. */
+export type TowedView = {
+	/**  Streamed (or streaming); else recovered (or recovering). */
+	streamed: boolean,
+	/**  Seconds until the ordered state is reached (0: there). */
+	ready_in_s: number | null,
+};
 
 /**  A transit's risk. */
 export type TransitRisk = "low" | "moderate" | "high";
@@ -2221,6 +2288,10 @@ export type UnitView_Deserialize = {
 	mission_complete: boolean,
 	/**  Fraction of fuel left, for units with a fuel model. */
 	fuel_fraction?: number | null,
+	/**  The towed array's state, for units with one. */
+	towed?: TowedView | null,
+	/**  Sonobuoys left, for units that carry them. */
+	sonobuoys_left?: number | null,
 };
 
 export type UnitView_Serialize = {
@@ -2255,6 +2326,10 @@ export type UnitView_Serialize = {
 	mission_complete: boolean,
 	/**  Fraction of fuel left, for units with a fuel model. */
 	fuel_fraction: number | null,
+	/**  The towed array's state, for units with one. */
+	towed?: TowedView,
+	/**  Sonobuoys left, for units that carry them. */
+	sonobuoys_left?: number,
 };
 
 /**  Whose picture a snapshot shows. */

@@ -21,10 +21,15 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0002_radar_clutter_beamwidth",
         sql: include_str!("../migrations/0002_radar_clutter_beamwidth.sql"),
     },
+    Migration {
+        version: 3,
+        name: "0003_sonar_acoustics",
+        sql: include_str!("../migrations/0003_sonar_acoustics.sql"),
+    },
 ];
 
 /// Schema version produced by applying every migration.
-pub const LATEST_VERSION: u32 = 2;
+pub const LATEST_VERSION: u32 = 3;
 
 pub fn schema_version(conn: &Connection) -> Result<u32, DbError> {
     Ok(conn.pragma_query_value(None, "user_version", |r| r.get(0))?)

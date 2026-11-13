@@ -71,7 +71,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   keyframe shows the same hit and miss markers as a straight run. Older saves load with none.
 /// * 26: a route records whether it was charted (planned deep enough for the unit's draft).
 ///   Older saves load with uncharted routes.
-/// * 27: weather zones. Older saves load with none.
+/// * 27: weather zones, sound profiles, towed-array states and sonobuoys. Older saves load
+///   with none.
 pub const SAVE_FORMAT_VERSION: u32 = 27;
 
 /// Every component of one unit.
@@ -127,6 +128,9 @@ pub struct SaveGame {
     /// Weather zones (format 27). Older saves load with none.
     #[serde(default)]
     pub weather: Vec<sim_events::WeatherZone>,
+    /// Sound profiles, towed arrays and sonobuoys (format 27). Older saves load with none.
+    #[serde(default)]
+    pub acoustics: crate::acoustics::Acoustics,
     #[serde(default)]
     pub bearings: BearingTable,
     #[serde(default)]

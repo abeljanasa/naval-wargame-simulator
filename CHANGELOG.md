@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 8: acoustics)
+
+- **Sound-velocity profiles** by area and month, from the scenario (`sound_profiles`) or the white cell (Planning tab, CSV import). Without one, the Phase 2 sonar law holds unchanged.
+- **Propagation paths**, the least loss of:
+  - surface duct;
+  - direct, with a shadow zone beyond the direct-path reach;
+  - cross-layer;
+  - convergence zones (closed-form trace of the limiting ray);
+  - bottom bounce over the terrain packs' depths.
+
+  Each sonar attempt logs its path.
+- **Reverberation** masks active sonar echoes (surface or sea floor scattering) when a profile is in force.
+- **Sonar figures in the database** (migration 0003): frequency, DI, DT, source level and self-noise per sonar, with a validation rule.
+- **Towed arrays** stream and recover in ten minutes and listen at 15 kn or less; **sonobuoys** are laid through drop points (60 m or 300 m), listen for four hours, and give bearings that cross into fixes.
+- Saved (format 27) and hashed only when used; golden replays unchanged.
+- **Desktop:** towed-array and sonobuoy controls in the unit panel, buoys on the map, sound profiles in the white cell's Planning tab.
+
 ### Added (Phase 4, slice 7: weather zones)
 
 - **Weather zones:** areas with their own sea state, wind, visibility, rain and cloud base.

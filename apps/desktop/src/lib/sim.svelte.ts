@@ -3,6 +3,8 @@
 
 import {
   type WeatherZone_Serialize as WeatherZone,
+  type SoundProfile_Serialize as SoundProfile,
+  type SonobuoyView,
   type Lane_Deserialize as Lane,
   type Outcome,
   type ActionGroup,
@@ -59,6 +61,10 @@ class SimSession {
   environment = $state<Environment | null>(null);
   /** Weather zones over the scenario-wide weather (every seat sees them). */
   weatherZones = $state<WeatherZone[]>([]);
+  /** Sound-velocity profiles in force (every seat sees them). */
+  soundProfiles = $state<SoundProfile[]>([]);
+  /** The seat's laid sonobuoys. */
+  sonobuoys = $state<SonobuoyView[]>([]);
   /** The seat's recent ESM bearing lines. */
   bearings = $state<BearingView[]>([]);
   /** The seat's missiles and torpedoes in flight. */
@@ -165,6 +171,8 @@ class SimSession {
     this.allContacts = u.contacts;
     this.environment = u.environment;
     this.weatherZones = (u.weather_zones ?? []) as WeatherZone[];
+    this.soundProfiles = (u.sound_profiles ?? []) as SoundProfile[];
+    this.sonobuoys = u.sonobuoys ?? [];
     this.bearings = u.bearings;
     this.weapons = u.weapons;
     this.minefields = u.minefields;

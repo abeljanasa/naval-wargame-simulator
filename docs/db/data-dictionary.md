@@ -1,6 +1,6 @@
 # Platform database: data dictionary
 
-- **Schema:** `crates/sim-db/migrations/` (version 1)
+- **Schema:** `crates/sim-db/migrations/` (version 3)
 - **Source data:** `data/db/open/`
 - **Format decision:** [ADR-0004](../adr/0004-platform-database-format.md)
 
@@ -46,7 +46,7 @@ Phase 1 ships only generic classes (`GEN-*`), all with confidence D. Each value 
 | `propulsion` | `id` | Propulsion type and fuel |
 | `damage_profiles` | `id` | Damage points, mission-kill fraction, fire and flooding susceptibility (0–1). Used by the Phase 2 damage model |
 | `comms_systems` | `id` | Comms kind, range (m), data-link flag |
-| `sensors` | `id` | Kind, role, band, active/passive, min and max range (m), radar reference range (m) at a reference RCS (m²), highest target altitude covered (m); radars also carry clutter loss per sea-state step (dB) and beamwidth (°), added in migration 0002 |
+| `sensors` | `id` | Kind, role, band, active/passive, min and max range (m), radar reference range (m) at a reference RCS (m²), highest target altitude covered (m); radars also carry clutter loss per sea-state step (dB) and beamwidth (°), added in migration 0002; sonars may carry frequency (kHz), directivity index, detection threshold, active source level and self-noise at 10 kn (dB), added in migration 0003 ([acoustics](../models/acoustics.md)) |
 | `weapons` | `id` | Kind, guidance, min and max range (m), speed (m/s), warhead (kg), base Ph (0–1), target domains |
 | `platforms` | `id` | Category, domain, service, propulsion, damage profile, dimensions, speeds (m/s), acceleration (m/s²), endurance (m), ceiling (m), max depth (m), hardpoints |
 | `platform_signatures` | (platform, kind, aspect, speed band) | RCS (m²), IR (kW/sr), acoustic source level (dB re 1 µPa @ 1 m), visual (m) |
@@ -72,6 +72,7 @@ Run `cargo run -p sim-db -- validate`. Add `--strict` to treat warnings as error
 | `sensor.range_order` | error | `0 ≤ min_range < max_range` |
 | `sensor.reference_range` | error | Radar reference range and RCS must be given together, both positive, with reference range ≤ max range |
 | `sensor.radar_fields` | error | `clutter_db_per_sea_state` (≥ 0) and `beamwidth_deg` (0 < b ≤ 360) only on radars |
+| `sensor.sonar_fields` | error | Sonar figures only on sonars (hull, towed, dipping, sonobuoy), within frequency 0.01–100 kHz, DI 0–40 dB, DT −10–30 dB, source level 150–250 dB, self-noise 20–120 dB |
 | `sensor.radar_defaults` | warning | A radar without `clutter_db_per_sea_state` or `beamwidth_deg`; the radar model's defaults (1.5 dB, 2°) apply |
 | `sensor.radar_reference` | error | A radar without a reference range and RCS (needed by the Phase 2 detection model) |
 | `weapon.range_order` | error | `0 ≤ min_range < max_range` |

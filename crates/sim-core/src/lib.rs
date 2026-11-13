@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod acoustics;
 mod adjudication;
 mod ai;
 mod c2;
@@ -38,6 +39,10 @@ mod sonar;
 mod time;
 mod weapon_tracks;
 
+pub use acoustics::{
+    buoy_views, sensor_depth_m, source_depth_m, Acoustics, Sonobuoy, SonobuoyView, TowedState,
+    TowedView, BUOY_LIFE_S, BUOY_LOAD, TOW_MAX_SPEED_MPS, TOW_TRANSITION_S,
+};
 pub use adjudication::{
     Adjudication, AdjudicationLog, AdjudicationRecord, ADJUDICATION_VIEW_LIMIT,
 };
@@ -101,7 +106,9 @@ pub use sim_events::{
     validate_events, Area, Audience, Cmp, Condition, DoctrineTarget, EventAction, EventRuntime,
     Inject, ScenarioEvent, Trigger,
 };
-pub use sim_events::{weather_at, LocalWeather, WeatherZone};
+pub use sim_events::{weather_at, LocalWeather, SoundProfile, WeatherZone};
+pub use sim_sensors::acoustics::{AcousticPath, SvpPoint};
+pub use sim_sensors::SonarFigures;
 pub use sim_sensors::{
     BearingLine, Carrier, Classification, Cov2, Environment, ErrorEllipse, JammerSpec,
 };

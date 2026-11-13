@@ -83,6 +83,9 @@ pub struct SensorSpec {
     /// Sonar: capable of active transmission (database `is_active`).
     #[serde(default)]
     pub active: bool,
+    /// Sonar: its own acoustic figures from the database (`None`: generic figures by kind).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sonar: Option<sim_sensors::SonarFigures>,
 }
 
 impl SensorSpec {
@@ -116,6 +119,17 @@ impl SensorSpec {
                 "sensor {} has an invalid radar reference",
                 self.sensor_id
             ));
+        }
+        if let Some(f) = &self.sonar {
+            let finite = [f.di_db, f.dt_db, f.source_level_db, f.self_noise_db]
+                .into_iter()
+                .all(|v| v.is_none_or(f64::is_finite));
+            if !finite || !positive(f.frequency_khz) {
+                return Err(format!(
+                    "sensor {} has invalid sonar figures",
+                    self.sensor_id
+                ));
+            }
         }
         Ok(())
     }
@@ -499,6 +513,7 @@ pub(crate) fn detection_system(
     library: Res<EmitterLibrary>,
     terrain: Res<crate::sim::TerrainRes>,
     weather: Res<Weather>,
+    acoustics: Res<crate::acoustics::Acoustics>,
     units: Query<(
         &Unit,
         &Position,
@@ -785,6 +800,7 @@ pub(crate) fn detection_system(
         &mut bearings,
         &mut fresh,
         zones,
+        (&acoustics, terrain),
     );
     optical_pass(
         &all,

@@ -28,6 +28,14 @@
   import { lanesFromGeoJson, navigableWidthM, type Lane } from "./lib/lanes";
   import { weatherAt, weatherLayers, weatherText, type WeatherZone } from "./lib/weather";
   import {
+    buoyLayers,
+    profileText,
+    svpFromCsv,
+    svpProblem,
+    towedText,
+    type SoundProfile,
+  } from "./lib/acoustics";
+  import {
     imageryCredit,
     imageryStatus,
     installImagery,
@@ -213,6 +221,59 @@
           cloud_base_m: null,
         });
       });
+    });
+  }
+
+  // Acoustics (slice 8): sound profiles for the white cell; towed arrays and sonobuoys for any
+  // seat with the gear.
+  let profileInput = $state<HTMLInputElement>();
+  let profileNotes = $state<string[]>([]);
+  let buoyDrops = $state<GeoPoint[] | null>(null);
+  let buoysDeep = $state(false);
+
+  function editProfiles(change: (p: SoundProfile[]) => void) {
+    const profiles = structuredClone($state.snapshot(sim.soundProfiles)) as SoundProfile[];
+    change(profiles);
+    void commands.orderSoundProfiles(profiles).then((r) => {
+      if (r.status === "error") sim.error = r.error;
+    });
+  }
+
+  async function importProfile(file: File | undefined) {
+    if (!file) return;
+    const { points, notes } = svpFromCsv(await file.text());
+    const problem = svpProblem(points);
+    profileNotes = problem ? [...notes, `${file.name} was not added: ${problem}`] : notes;
+    if (problem) return;
+    editProfiles((ps) => {
+      const id = Math.max(0, ...ps.map((p) => p.id)) + 1;
+      ps.push({ id, name: file.name.replace(/\.[^.]*$/, ""), area: null, months: [], points });
+    });
+  }
+
+  function orderTowed(unit: number, streamed: boolean) {
+    void commands.orderTowed(unit, streamed).then((r) => {
+      if (r.status === "error") sim.error = r.error;
+    });
+  }
+
+  /** Picks sonobuoy drop points one by one; "Lay" sends the unit through them. */
+  function pickBuoyPoint() {
+    const pts = buoyDrops;
+    if (!pts) return;
+    sim.pick(`Sonobuoys: click drop point ${pts.length + 1}, then Lay`, (p) => {
+      buoyDrops = [...pts, p];
+      pickBuoyPoint();
+    });
+  }
+
+  function layBuoys(unit: number) {
+    const pts = buoyDrops ?? [];
+    buoyDrops = null;
+    sim.picking = null;
+    if (!pts.length) return;
+    void commands.orderSonobuoys(unit, pts, buoysDeep).then((r) => {
+      if (r.status === "error") sim.error = r.error;
     });
   }
 
@@ -656,6 +717,7 @@
           symbolStyle,
         }),
         ...weatherLayers(sim.weatherZones),
+        ...buoyLayers(sim.sonobuoys),
         ...laneLayers(sim.session?.lanes ?? [], hiddenLabels),
         ...referenceLayers(sim.session?.reference_points ?? [], undefined, hiddenLabels),
         ...outcomeLayers(sim.outcomes, n(clock?.game_time_s ?? 0)),
@@ -1174,6 +1236,50 @@
                     {w.zone
                       ? `${w.zone.name}: ${weatherText(w.zone)}`
                       : `sea state ${w.sea_state} (outside the weather zones)`}
+                  </dd>
+                {/if}
+                {#if u.towed}
+                  <dt>Towed array</dt>
+                  <dd>
+                    {towedText(u.towed)}
+                    <button
+                      type="button"
+                      class="inline-action"
+                      onclick={() => orderTowed(u.id, !u.towed?.streamed)}
+                      >{u.towed.streamed ? "Recover" : "Stream"}</button
+                    >
+                  </dd>
+                {/if}
+                {#if u.sonobuoys_left != null}
+                  <dt>Sonobuoys</dt>
+                  <dd>
+                    {u.sonobuoys_left} left
+                    {#if buoyDrops}
+                      <span class="dim">{buoyDrops.length} points</span>
+                      <label class="inline"
+                        ><input type="checkbox" bind:checked={buoysDeep} /> deep (300 m)</label
+                      >
+                      <button type="button" class="inline-action" onclick={() => layBuoys(u.id)}
+                        >Lay</button
+                      >
+                      <button
+                        type="button"
+                        class="inline-action"
+                        onclick={() => {
+                          buoyDrops = null;
+                          sim.picking = null;
+                        }}>Cancel</button
+                      >
+                    {:else if (u.sonobuoys_left ?? 0) > 0}
+                      <button
+                        type="button"
+                        class="inline-action"
+                        onclick={() => {
+                          buoyDrops = [];
+                          pickBuoyPoint();
+                        }}>Lay on the map</button
+                      >
+                    {/if}
                   </dd>
                 {/if}
                 {#if water && (u.domain === "surface" || u.domain === "subsurface")}
@@ -1761,6 +1867,55 @@
               >
               <button type="button" onclick={addWeatherOnMap}>Add on the map</button>
             </div>
+          </section>
+          <section>
+            <h3>Sound profiles</h3>
+            <ul class="zones" aria-label="Sound profiles">
+              {#each sim.soundProfiles as p, i (p.id)}
+                <li class="stacked">
+                  <span>
+                    <input
+                      class="lane-name"
+                      value={p.name}
+                      aria-label="Sound profile name"
+                      onchange={(e) => {
+                        const name = e.currentTarget.value.trim();
+                        if (name) editProfiles((ps) => void (ps[i] && (ps[i].name = name)));
+                      }}
+                    />
+                    <span class="dim">{profileText(p)}</span>
+                  </span>
+                  <span class="row tight">
+                    <button
+                      type="button"
+                      onclick={() => editProfiles((ps) => void ps.splice(i, 1))}
+                      aria-label={`Remove ${p.name}`}>Remove</button
+                    >
+                  </span>
+                </li>
+              {:else}
+                <li class="empty">
+                  No sound profiles: sound spreads by the simple law everywhere.
+                </li>
+              {/each}
+            </ul>
+            {#each profileNotes as note, i (i)}
+              <p class="dim">{note}</p>
+            {/each}
+            <div class="row tight">
+              <button type="button" onclick={() => profileInput?.click()}>Import CSV…</button>
+            </div>
+            <input
+              bind:this={profileInput}
+              class="visually-hidden"
+              type="file"
+              accept=".csv,.txt,text/csv,text/plain"
+              aria-label="Sound-velocity profile (CSV of depth and speed)"
+              onchange={(e) => {
+                void importProfile(e.currentTarget.files?.[0]);
+                e.currentTarget.value = "";
+              }}
+            />
           </section>
           <section>
             <h3>Shipping lanes</h3>
@@ -2680,6 +2835,11 @@
   }
   .weather-fields {
     flex-wrap: wrap;
+  }
+  .inline-action {
+    margin-left: 6px;
+    padding: 0 8px;
+    font-size: 0.85em;
   }
   .choke {
     margin: 6px 0;
