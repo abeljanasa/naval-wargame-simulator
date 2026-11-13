@@ -500,7 +500,12 @@ export class TerrainLayers {
           id,
           type: "raster",
           source: id,
-          paint: { "raster-fade-duration": 0, "raster-resampling": "linear" },
+          paint: {
+            "raster-fade-duration": 0,
+            "raster-resampling": "linear",
+            // Dimmed over the imagery base layer, so the imagery shows through.
+            "raster-opacity": id === "terrain-depth" && m.getLayer("imagery") ? 0.45 : 1,
+          },
         },
         before,
       );

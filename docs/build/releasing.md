@@ -22,7 +22,7 @@ Then, on Windows and macOS (the application's platforms, ADR-0006), it:
 5. Writes **SBOMs** in CycloneDX JSON: one per Rust crate (`cargo cyclonedx`) and one for the desktop front end (`npm sbom`).
 6. Uploads the installers, scenarios, sums and SBOMs as artefacts.
 
-The app needs no data files. The open platform database and the Phase 1 demo scenario are compiled into the binary, and the offline map and the world terrain layer are bundled. The installed app makes no network calls: there is no updater and no tile server. Regional terrain packs (the Philippine area at 15″) are installed separately with *File › Install terrain pack…*.
+The app needs no data files. The open platform database and the Phase 1 demo scenario are compiled into the binary, and the offline map and the world terrain layer are bundled. The installed app makes no network calls: there is no updater and no tile server. Regional terrain packs (the Philippine area at 15″) are installed separately with *File › Install terrain pack…*, and the client's licensed imagery with *File › Install imagery pack…* ([imagery](../models/imagery.md)); neither is in the installers or the repository.
 
 ## Signing secrets
 

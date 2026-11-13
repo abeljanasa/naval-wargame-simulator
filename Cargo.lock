@@ -2852,6 +2852,8 @@ dependencies = [
 name = "nws-desktop"
 version = "0.1.0"
 dependencies = [
+ "flate2",
+ "rusqlite",
  "serde",
  "serde_json",
  "sim-aar",

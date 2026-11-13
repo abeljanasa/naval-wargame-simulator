@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 6: offline imagery layer)
+
+- **Imagery base layer** from the client's licensed tile pack: MBTiles or PMTiles v3, raster (PNG, JPEG, WebP).
+  - The app serves the tiles itself through its own `nwstiles` scheme; the content security policy allows only that scheme, so nothing is fetched from a network.
+  - The pack's attribution is shown with the map; a pack that gives none is flagged.
+- **Menus:** **File › Install imagery pack…** (up to 1 GB; larger packs are copied into the imagery folder), **View › Imagery** and **View › Imagery packs…**.
+- **Drawing order:** the land fill hides and the depth shading dims while imagery shows; the coastline and the picture stay on top.
+- **Checked with a generated test pattern**, since the client's pack has not arrived yet. No new crates.
+
 ### Added (Phase 4, slice 5: choke points, depths and lanes)
 
 - **Shipping lanes** in the planning layer and in scenarios (`lanes`): a centreline, a width, a choke point, and traffic in ships per day.

@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 mod host;
+mod imagery;
 mod terrain;
 
 use host::{AarView, ClockStatus, Host, SnapshotUpdate, TimeCompression, MAIN_WINDOW};
@@ -1144,6 +1145,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             route_depths,
             facility_depths,
             choke_depths,
+            imagery_status,
+            rescan_imagery,
         ])
         .events(collect_events![FrameEvent])
 }
@@ -1202,6 +1205,101 @@ fn spawn_runner(app: tauri::AppHandle, host: SharedHost) {
         })
         .map(|_| ())
         .unwrap_or_else(|e| eprintln!("failed to start simulation thread: {e}"));
+}
+
+type SharedImagery = Arc<Mutex<imagery::Imagery>>;
+
+/// The imagery packs on this machine (`imagery.rs`).
+#[tauri::command]
+#[specta::specta]
+fn imagery_status(imagery: State<'_, SharedImagery>) -> imagery::ImageryStatus {
+    lock(&imagery).status()
+}
+
+/// Reads the imagery folder again (after packs were copied into it by hand).
+#[tauri::command]
+#[specta::specta]
+fn rescan_imagery(imagery: State<'_, SharedImagery>) -> imagery::ImageryStatus {
+    let mut im = lock(&imagery);
+    im.rescan();
+    im.status()
+}
+
+/// Installs an imagery pack the user picked. Raw IPC (outside the typed bindings): the body is
+/// the pack, the `x-file-name` header its file name.
+#[tauri::command]
+fn install_imagery(
+    window: WebviewWindow,
+    request: tauri::ipc::Request<'_>,
+    host: State<'_, SharedHost>,
+    imagery: State<'_, SharedImagery>,
+) -> Result<imagery::ImageryStatus, String> {
+    if !lock(&host).controls_time(window.label()) {
+        return Err("only the white cell installs imagery".into());
+    }
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("send the pack as raw bytes".into());
+    };
+    let name = request
+        .headers()
+        .get("x-file-name")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let mut im = lock(&imagery);
+    let folder = im
+        .folder
+        .clone()
+        .ok_or("the imagery folder is not set up")?;
+    imagery::install(&folder, &name, bytes)?;
+    im.rescan();
+    Ok(im.status())
+}
+
+/// Serves `nwstiles://localhost/<file>/<z>/<x>/<y>` from the installed packs: the map's imagery
+/// layer, from this machine only.
+fn tile_response(imagery: &SharedImagery, path: &str) -> tauri::http::Response<Vec<u8>> {
+    let parts: Vec<&str> = path.trim_start_matches('/').split('/').collect();
+    let found = match parts.as_slice() {
+        [file, z, x, y] => {
+            let file = percent_decode(file);
+            let y = y.split('.').next().unwrap_or_default();
+            match (z.parse::<u8>(), x.parse::<u32>(), y.parse::<u32>()) {
+                (Ok(z), Ok(x), Ok(y)) if z <= 30 => lock(imagery).tile(&file, z, x, y),
+                _ => None,
+            }
+        }
+        _ => None,
+    };
+    let builder = tauri::http::Response::builder().header("Access-Control-Allow-Origin", "*");
+    let response = match found {
+        Some((bytes, mime)) => builder
+            .header(tauri::http::header::CONTENT_TYPE, mime)
+            .body(bytes),
+        None => builder
+            .status(tauri::http::StatusCode::NOT_FOUND)
+            .body(Vec::new()),
+    };
+    response.unwrap_or_default()
+}
+
+/// Undoes the `%XX` escapes of a URL path segment.
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Finds the terrain folders and reads the packs on a thread of their own (a regional pack takes
@@ -1273,17 +1371,27 @@ pub fn run() {
     };
 
     let shared_terrain: SharedTerrain = Arc::new(Mutex::new(TerrainState::default()));
+    let shared_imagery: SharedImagery = Arc::new(Mutex::new(imagery::Imagery::default()));
     // The typed commands, plus the two raw-bytes terrain commands that have no typed binding.
     let typed = builder.invoke_handler();
     let raw: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
-        Box::new(tauri::generate_handler![install_terrain_pack, terrain_grid]);
+        Box::new(tauri::generate_handler![
+            install_terrain_pack,
+            terrain_grid,
+            install_imagery
+        ]);
     let result = tauri::Builder::default()
         .invoke_handler(move |invoke| match invoke.message.command() {
-            "install_terrain_pack" | "terrain_grid" => raw(invoke),
+            "install_terrain_pack" | "terrain_grid" | "install_imagery" => raw(invoke),
             _ => typed(invoke),
         })
         .manage(host.clone())
         .manage(shared_terrain.clone())
+        .manage(shared_imagery.clone())
+        .register_uri_scheme_protocol("nwstiles", {
+            let imagery = shared_imagery.clone();
+            move |_ctx, request| tile_response(&imagery, request.uri().path())
+        })
         .manage(DbSources(Mutex::new(sim_db::embedded::source_set())))
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -1293,6 +1401,11 @@ pub fn run() {
         .setup(move |app| {
             builder.mount_events(app);
             start_terrain(app, &shared_terrain, &host);
+            if let Ok(data) = app.path().app_data_dir() {
+                let mut im = lock(&shared_imagery);
+                im.folder = Some(data.join("imagery"));
+                im.rescan();
+            }
             spawn_runner(
                 app.handle().clone(),
                 app.state::<SharedHost>().inner().clone(),

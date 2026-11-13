@@ -26,6 +26,14 @@
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import { commands } from "./lib/bindings";
   import { lanesFromGeoJson, navigableWidthM, type Lane } from "./lib/lanes";
+  import {
+    imageryCredit,
+    imageryStatus,
+    installImagery,
+    rescanImagery,
+    setImagery,
+    type ImageryStatus,
+  } from "./lib/imagery";
   import type {
     Audience,
     ChokeDepths_Serialize as ChokeDepths,
@@ -132,6 +140,50 @@
       }
     });
   });
+
+  // Imagery base layer (slice 6): the chosen pack, remembered per viewer like the theme.
+  let imagery = $state<ImageryStatus | null>(null);
+  let imageryFile = $state<string>(readImageryFile());
+  let showImagery = $state(false);
+  let imageryError = $state("");
+  let imageryInput = $state<HTMLInputElement>();
+
+  function readImageryFile(): string {
+    try {
+      return localStorage.getItem("nws-imagery") ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  function chooseImagery(file: string) {
+    imageryFile = file;
+    try {
+      localStorage.setItem("nws-imagery", file);
+    } catch {
+      // Storage unavailable: the choice lasts for this session only.
+    }
+  }
+
+  const activeImagery = $derived(imagery?.packs.find((p) => p.file === imageryFile) ?? null);
+
+  $effect(() => {
+    const pack = activeImagery;
+    if (map) setImagery(map, pack ? $state.snapshot(pack) : null);
+  });
+
+  async function installImageryFile(file: File | undefined) {
+    if (!file) return;
+    imageryError = "";
+    showImagery = true;
+    try {
+      imagery = await installImagery(file);
+      const added = imagery.packs.find((p) => p.file.endsWith(file.name) || p.name === file.name);
+      if (added) chooseImagery(added.file);
+    } catch (e) {
+      imageryError = `${file.name} was not installed: ${String(e)}`;
+    }
+  }
 
   // Shipping lanes and choke points (slice 5), for the white cell's Planning tab.
   let laneInput = $state<HTMLInputElement>();
@@ -449,6 +501,9 @@
       });
     });
     void refreshTerrain();
+    void imageryStatus()
+      .then((s) => (imagery = s))
+      .catch(() => {});
     sim.start().catch((e: unknown) => {
       startError = `Cannot connect to the simulation engine: ${String(e)}`;
     });
@@ -682,6 +737,11 @@
           onselect: () => editInput.click(),
         },
         {
+          label: "Install imagery pack…",
+          disabled: !sim.controlsTime,
+          onselect: () => imageryInput?.click(),
+        },
+        {
           label: "Install terrain pack…",
           disabled: !sim.controlsTime,
           separatorBefore: true,
@@ -720,6 +780,14 @@
           onselect: () => toggleTerrain("relief"),
         },
         { label: "Terrain packs…", onselect: () => (showTerrain = true) },
+        {
+          label: "Imagery",
+          separatorBefore: true,
+          checked: activeImagery !== null,
+          disabled: (imagery?.packs.length ?? 0) === 0,
+          onselect: () => chooseImagery(activeImagery ? "" : (imagery?.packs[0]?.file ?? "")),
+        },
+        { label: "Imagery packs…", onselect: () => (showImagery = true) },
         { label: "Picture", separatorBefore: true, onselect: () => (leftTab = "picture") },
         { label: "Messages", onselect: () => (leftTab = "messages") },
         {
@@ -1842,6 +1910,93 @@
     </div>
   {/if}
 
+  <input
+    bind:this={imageryInput}
+    class="visually-hidden"
+    type="file"
+    accept=".mbtiles,.pmtiles"
+    aria-label="Imagery tile pack"
+    onchange={(e) => {
+      void installImageryFile(e.currentTarget.files?.[0]);
+      e.currentTarget.value = "";
+    }}
+  />
+
+  {#if showImagery}
+    <div class="dialog-backdrop" role="presentation" onclick={() => (showImagery = false)}>
+      <div
+        class="dialog"
+        role="dialog"
+        aria-label="Imagery packs"
+        aria-modal="true"
+        tabindex="-1"
+        onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => {
+          if (e.key === "Escape") showImagery = false;
+        }}
+      >
+        <h2>Imagery packs</h2>
+        {#if imageryError}
+          <p class="error" role="alert">{imageryError}</p>
+        {/if}
+        {#if (imagery?.packs.length ?? 0) === 0}
+          <p>
+            No imagery is installed. The map uses its own coastline and depth shading. To add the
+            licensed imagery, choose File › Install imagery pack… (an <code>.mbtiles</code> or
+            <code>.pmtiles</code> file up to 1 GB), or copy larger packs into the folder below and press
+            Read the folder again.
+          </p>
+        {:else}
+          <fieldset class="imagery-packs">
+            <legend>Show on the map</legend>
+            <label class="inline">
+              <input
+                type="radio"
+                name="imagery"
+                checked={activeImagery === null}
+                onchange={() => chooseImagery("")}
+              />
+              None
+            </label>
+            {#each imagery?.packs ?? [] as p (p.file)}
+              <label class="inline">
+                <input
+                  type="radio"
+                  name="imagery"
+                  checked={activeImagery?.file === p.file}
+                  onchange={() => chooseImagery(p.file)}
+                />
+                <span>
+                  {p.name}
+                  <span class="dim">
+                    · {p.format.toUpperCase()}, zoom {p.min_zoom}–{p.max_zoom} · {imageryCredit(p)}
+                  </span>
+                </span>
+              </label>
+            {/each}
+          </fieldset>
+          <p class="dim">Nothing is fetched from a network: tiles come from these files only.</p>
+        {/if}
+        {#each imagery?.problems ?? [] as problem (problem)}
+          <p class="error">Not used: {problem}</p>
+        {/each}
+        {#if imagery?.folder}
+          <p class="dim">Imagery packs are kept in {imagery.folder}</p>
+        {/if}
+        <div class="row tight">
+          <button
+            type="button"
+            onclick={() =>
+              void rescanImagery().then((s) => {
+                imagery = s;
+              })}>Read the folder again</button
+          >
+          <button onclick={() => (showImagery = false)}>Close</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   {#if showTerrain}
     <div class="dialog-backdrop" role="presentation" onclick={() => (showTerrain = false)}>
       <div
@@ -2338,6 +2493,13 @@
   }
   .choke {
     margin: 6px 0;
+  }
+  .imagery-packs {
+    display: grid;
+    gap: 6px;
+    border: none;
+    padding: 0;
+    margin: 8px 0;
   }
   .statusbar .terrain-readout {
     margin-left: auto;

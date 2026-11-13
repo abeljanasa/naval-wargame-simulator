@@ -116,6 +116,10 @@ export const commands = {
 	facilityDepths: () => typedError<FacilityDepth_Serialize[], string>(__TAURI_INVOKE("facility_depths")),
 	/**  The water of every choke point, for the white cell's planning tab. */
 	chokeDepths: () => typedError<ChokeDepths_Serialize[], string>(__TAURI_INVOKE("choke_depths")),
+	/**  The imagery packs on this machine (`imagery.rs`). */
+	imageryStatus: () => __TAURI_INVOKE<ImageryStatus_Serialize>("imagery_status"),
+	/**  Reads the imagery folder again (after packs were copied into it by hand). */
+	rescanImagery: () => __TAURI_INVOKE<ImageryStatus_Serialize>("rescan_imagery"),
 };
 
 /** Events */
@@ -1065,6 +1069,62 @@ export type GroupStation = {
 	/**  Relative to the leader's heading, degrees. */
 	bearing_deg: number | null,
 	range_m: number | null,
+};
+
+/**  One installed pack, as the UI sees it. */
+export type ImageryInfo = ImageryInfo_Serialize | ImageryInfo_Deserialize;
+
+/**  One installed pack, as the UI sees it. */
+export type ImageryInfo_Deserialize = {
+	/**  File name in the imagery folder; also the pack's key in tile URLs. */
+	file: string,
+	name: string,
+	/**  `png`, `jpg` or `webp`. */
+	format: string,
+	min_zoom: number,
+	max_zoom: number,
+	/**  West, south, east, north, degrees (whole world if the pack does not say). */
+	bounds: [(number | null), (number | null), (number | null), (number | null)],
+	/**  The credit the imagery's licence asks for (`None`: the pack does not give one). */
+	attribution?: string | null,
+	/**  Tile size in pixels (256 unless the pack says otherwise). */
+	tile_size: number,
+};
+
+/**  One installed pack, as the UI sees it. */
+export type ImageryInfo_Serialize = {
+	/**  File name in the imagery folder; also the pack's key in tile URLs. */
+	file: string,
+	name: string,
+	/**  `png`, `jpg` or `webp`. */
+	format: string,
+	min_zoom: number,
+	max_zoom: number,
+	/**  West, south, east, north, degrees (whole world if the pack does not say). */
+	bounds: [(number | null), (number | null), (number | null), (number | null)],
+	/**  The credit the imagery's licence asks for (`None`: the pack does not give one). */
+	attribution: string | null,
+	/**  Tile size in pixels (256 unless the pack says otherwise). */
+	tile_size: number,
+};
+
+/**  The imagery packs on this machine. */
+export type ImageryStatus = ImageryStatus_Serialize | ImageryStatus_Deserialize;
+
+/**  The imagery packs on this machine. */
+export type ImageryStatus_Deserialize = {
+	packs: ImageryInfo_Deserialize[],
+	/**  Files in the folder that could not be read, and why. */
+	problems: string[],
+	folder: string,
+};
+
+/**  The imagery packs on this machine. */
+export type ImageryStatus_Serialize = {
+	packs: ImageryInfo_Serialize[],
+	/**  Files in the folder that could not be read, and why. */
+	problems: string[],
+	folder: string,
 };
 
 /**  A prepared message in the scenario's inject library, sent by an event or by the white cell. */

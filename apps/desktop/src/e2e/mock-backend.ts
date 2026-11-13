@@ -328,6 +328,9 @@ mockIPC(
         return "time,tick,kind,side,text\n";
       case "choke_depths":
         return [];
+      case "imagery_status":
+      case "rescan_imagery":
+        return { packs: [], problems: [], folder: "" };
       case "terrain_status":
         return { loading: false, packs: [], in_use: null, problems: [], folder: "" };
       case "terrain_grid":
