@@ -22,9 +22,14 @@ pub const PLATFORM_FILES: &[(&str, &str)] = &[
     open_file!("platforms/auxiliaries-and-merchants.json"),
     open_file!("platforms/historical.json"),
     open_file!("platforms/land-facilities.json"),
+    open_file!("platforms/regional-au.json"),
     open_file!("platforms/regional-cn.json"),
+    open_file!("platforms/regional-id.json"),
     open_file!("platforms/regional-jp.json"),
+    open_file!("platforms/regional-kr.json"),
+    open_file!("platforms/regional-my.json"),
     open_file!("platforms/regional-ph.json"),
+    open_file!("platforms/regional-tw.json"),
     open_file!("platforms/regional-us.json"),
     open_file!("platforms/regional-vn.json"),
     open_file!("platforms/submarines.json"),
@@ -84,9 +89,9 @@ mod tests {
     #[test]
     fn embedded_database_opens_clean() {
         let db = open_platform_db().unwrap();
-        // 50 generic classes, 30 regional (slice 13: PH and CN, then VN, US and JP) and 8
-        // historical (Gate 4).
-        assert_eq!(db.platforms().unwrap().len(), 88);
+        // 50 generic classes, 55 regional (slice 13: PH and CN; VN, US and JP; MY, ID, AU, KR
+        // and TW) and 8 historical (Gate 4).
+        assert_eq!(db.platforms().unwrap().len(), 113);
         assert!(db
             .issues()
             .unwrap()
@@ -95,6 +100,7 @@ mod tests {
         // Regional records come through with their ECM.
         assert_eq!(db.jammer_of("CHN-DDG-052D").unwrap(), Some(55.0));
         assert_eq!(db.jammer_of("JPN-FFM-MOGAMI").unwrap(), Some(50.0));
+        assert_eq!(db.jammer_of("KOR-DDG-SEJONG").unwrap(), Some(50.0));
         assert_eq!(db.jammer_of("GEN-FFG").unwrap(), None);
     }
 

@@ -110,10 +110,15 @@ Specific classes, for the Philippine Area of Responsibility ([ADR-0007](../adr/0
 | `platforms/regional-cn.json` | PLAN: `CHN-FFG-054A`, `CHN-DDG-052D`, `CHN-FS-056A`, `CHN-SSK-039A`. China Coast Guard: `CHN-CG-ZHAOTOU`, `CHN-CG-056` |
 | `platforms/regional-vn.json` | Vietnam People's Navy: `VNM-FF-GEPARD`, `VNM-SSK-KILO`, `VNM-PGG-MOLNIYA`, `VNM-PG-TT400`. Vietnam Coast Guard: `VNM-CG-HAMILTON` (ex-USCGC *Morgenthau*, CSB 8020) |
 | `platforms/regional-us.json` | US Navy: `USA-DDG-BURKE2A`, `USA-LCS-INDEP`, `USA-SSN-VIRGINIA`, `USA-P8A`, `USA-FA18EF` (with loadouts). US Coast Guard: `USA-WMSL-LEGEND` |
+| `platforms/regional-my.json` | Royal Malaysian Navy: `MYS-FF-LEKIU`, `MYS-PS-KEDAH`, `MYS-PS-KERIS`, `MYS-SSK-SCORPENE`. Malaysian Maritime Enforcement Agency: `MYS-MM-TUNFATIMAH` |
+| `platforms/regional-id.json` | Indonesian Navy: `IDN-FF-MARTADINATA`, `IDN-FS-BUNGTOMO`, `IDN-SSK-NAGAPASA`, `IDN-PGG-SAMPARI`. Bakamla: `IDN-BK-TANJUNGDATU` |
+| `platforms/regional-au.json` | Royal Australian Navy: `AUS-DDG-HOBART`, `AUS-FFH-ANZAC`, `AUS-SSK-COLLINS`, `AUS-PS-ARAFURA` |
+| `platforms/regional-kr.json` | Republic of Korea Navy: `KOR-DDG-SEJONG`, `KOR-FFG-DAEGU`, `KOR-SSK-SONWONIL`, `KOR-SSK-DOSAN`, `KOR-PGG-YOONYOUNGHA` |
+| `platforms/regional-tw.json` | Republic of China Navy: `TWN-FFG-KANGDING`, `TWN-FFG-CHENGKUNG`, `TWN-PGG-TUOCHIANG`, `TWN-SSK-HAILUNG`, `TWN-PGG-KUANGHUA6`. Coast Guard Administration: `TWN-CG-CHIAYI` |
 | `platforms/regional-jp.json` | JMSDF: `JPN-DDG-MAYA`, `JPN-DD-AKIZUKI`, `JPN-FFM-MOGAMI`, `JPN-SSK-TAIGEI`, `JPN-DDH-IZUMO`, `JPN-P1` (with loadouts). Japan Coast Guard: `JPN-CG-SHIKISHIMA` |
 | `platforms/historical.json` | Gate 4: `PAK-SSK-HANGOR`, `IND-FF-KHUKRI`, `IRN-FF-SAAM`, `IRN-PTG-KAMAN`, `USA-CG-BELKNAP`, `USA-FFG-OHP`, `USA-FF-KNOX`, `USA-A6E` |
-| `weapons.json` | Named weapons, added where the records need them. First tranche: C-802A, YJ-83, YJ-18, HHQ-16, HHQ-9, Mistral, VL MICA, Spike NLOS, Harpoon 1, SM-1MR, Skipper, Sea Killer 2, Limbo. Second: Kh-35 Uran-E, 3M-54E Klub-S, SM-2MR, SM-6, ESSM, NSM, Mk 48, Mk 54, RAM, Type 90, Type 17, Type 89, Harpoon Block II, Hellfire, Igla |
-| `reference.json` | Nations and services (PHL, CHN, USA, IRN, PAK, IND, VNM, JPN; navies and coast guards), and ECM records (generic ship and aircraft jammers; the Type 054A's, 052D's, Gepard's and Mogami's) |
+| `weapons.json` | Named weapons, added where the records need them. First tranche: C-802A, YJ-83, YJ-18, HHQ-16, HHQ-9, Mistral, VL MICA, Spike NLOS, Harpoon 1, SM-1MR, Skipper, Sea Killer 2, Limbo. Second: Kh-35 Uran-E, 3M-54E Klub-S, SM-2MR, SM-6, ESSM, NSM, Mk 48, Mk 54, RAM, Type 90, Type 17, Type 89, Harpoon Block II, Hellfire, Igla. Third: Exocet MM40 Block 2 and 3, SM39 Exocet, VL Seawolf, Black Shark, Hsiung Feng II and III, TC-2N, K-SAAM, K745 Blue Shark, Red Shark, MU90, A244/S |
+| `reference.json` | Nations and services (PHL, CHN, USA, IRN, PAK, IND, VNM, JPN, MYS, IDN, AUS, KOR, TWN; navies and coast guards), and ECM records (generic ship and aircraft jammers; named fits: Type 054A, 052D, Gepard, Mogami, Lekiu, Martadinata and the Korean Sonata suite) |
 
 How the values were set:
 

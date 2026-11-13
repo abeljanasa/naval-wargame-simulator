@@ -1,0 +1,690 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, Indonesia (Phase 4 slice 13, tranche 3): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "IDN-FF-MARTADINATA",
+   "name": "Raden Eddy Martadinata-class frigate (SIGMA 10514)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "IDN-TNIAL",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 105.11,
+   "displacement_t": 2946,
+   "draft_m": 3.75,
+   "max_speed_kn": 28,
+   "cruise_speed_kn": 14,
+   "accel_mps2": 0.05,
+   "endurance_nm": 5000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 17
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "VL MICA-M (12 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-VLMICA"
+     ]
+    },
+    {
+     "name": "Exocet MM40 Block III launchers (2x4)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-EXOCET-B3"
+     ]
+    },
+    {
+     "name": "Oto Melara 76 mm Super Rapid gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Millennium 35 mm CIWS",
+     "height_m": 12,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Vektor 20 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "B515 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-A244"
+     ]
+    },
+    {
+     "name": "SKWS decoy launchers",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "VL MICA-M (12 cells)",
+     "capacity": 12,
+     "contents": {
+      "WPN-VLMICA": 12
+     }
+    },
+    {
+     "name": "Exocet MM40 Block III launchers (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-EXOCET-B3": 8
+     }
+    },
+    {
+     "name": "Oto Melara 76 mm Super Rapid gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Millennium 35 mm CIWS",
+     "capacity": 40,
+     "contents": {
+      "WPN-CIWS": 40
+     }
+    },
+    {
+     "name": "Vektor 20 mm guns (2)",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "B515 triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-A244": 6
+     }
+    },
+    {
+     "name": "SKWS decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Martadinata-class frigate\", https://en.wikipedia.org/wiki/Martadinata-class_frigate (accessed 2026-11-13): 2,946 t full load, 105.11 m, 3.75 m draft, 28 kn, 5,000 nmi at 14 kn, complement 122; SMART-S Mk2 3D, STIR 1.2 EO Mk2, UMS 4132 Kingklip sonar, Vigile 100S ESM, Scorpion 2L ECM, SKWS decoys; Oto Melara 76 mm SR, Millennium 35 mm CIWS, 2 Vektor 20 mm, 12 VL MICA-M, 8 Exocet MM40 Block III, 2 triple B515 tubes (A244-S Mod 3). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-IDN-SCORPION2L"
+   ]
+  },
+  {
+   "id": "IDN-FS-BUNGTOMO",
+   "name": "Bung Tomo-class corvette",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "IDN-TNIAL",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 95,
+   "displacement_t": 1940,
+   "draft_m": 3.6,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 12,
+   "accel_mps2": 0.07,
+   "endurance_nm": 5000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 2000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 152,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 21
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 17
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 11
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Exocet MM40 launchers (2x4)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-EXOCET-B2"
+     ]
+    },
+    {
+     "name": "Oto Melara 76 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "DS30B 30 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Triple 324 mm torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-A244"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Exocet MM40 launchers (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-EXOCET-B2": 8
+     }
+    },
+    {
+     "name": "Oto Melara 76 mm gun",
+     "capacity": 300,
+     "contents": {
+      "WPN-GUN-76": 300
+     }
+    },
+    {
+     "name": "DS30B 30 mm guns (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    },
+    {
+     "name": "Triple 324 mm torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-A244": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Bung Tomo-class corvette\", https://en.wikipedia.org/wiki/Bung_Tomo-class_corvette (accessed 2026-11-13): 1,940 t, 95 m overall, 3.6 m draught, 30 kn, 5,000 nmi at 12 kn, complement 79; AWS-9 3D, 1802SW trackers, Type 1007 navigation, Scout surface search, Series 2500 EO director, TMS 4130C1 sonar, Cutlass 242; Oto Melara 76 mm, 2 DS30B 30 mm, 2x4 Exocet MM40 Block II/III (Block II used), 2 triple 324 mm tubes (A244S Mod 3). Seawolf out of service since 2018 (not modelled). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "IDN-SSK-NAGAPASA",
+   "name": "Nagapasa-class submarine (Type 209/1400 Chang Bogo improved)",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "IDN-TNIAL",
+   "propulsion": "PROP-DE-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 61.3,
+   "displacement_t": 1400,
+   "draft_m": 5.5,
+   "max_speed_kn": 21.5,
+   "cruise_speed_kn": 10,
+   "accel_mps2": 0.05,
+   "endurance_nm": 8000,
+   "max_depth_m": 500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 200,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 105,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 118,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "533 mm torpedo tubes (8)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-BLACKSHARK"
+     ]
+    },
+    {
+     "name": "ZOKA countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "533 mm torpedo tubes (8)",
+     "capacity": 14,
+     "contents": {
+      "WPN-BLACKSHARK": 14
+     }
+    },
+    {
+     "name": "ZOKA countermeasures",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Nagapasa-class submarine\", https://en.wikipedia.org/wiki/Nagapasa-class_submarine (accessed 2026-11-13): 1,400 t surfaced, 61.3 m, 5.5 m draft, 21.5 kn submerged, 8,000 nmi at 10 kn snorkelling, test depth 500 m (as given), complement over 40; CSU-90 sonar, KaleidoScope suite, flank arrays, Pegasso RESM, Aries radar, SERO 400 and OMS 100 periscopes, ZOKA countermeasures; 8 x 533 mm tubes, 14 Black Shark torpedoes. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "IDN-PGG-SAMPARI",
+   "name": "Sampari-class fast attack craft (KCR-60M, Exocet-armed ships)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "IDN-TNIAL",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-SMALL-CRAFT",
+   "length_m": 60.3,
+   "displacement_t": 500,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.15,
+   "endurance_nm": 2400,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 10
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Exocet MM40 Block III launchers (4)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-EXOCET-B3"
+     ]
+    },
+    {
+     "name": "Bofors 57 mm Mk 3 gun",
+     "height_m": 6,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "M71/08 20 mm guns (2)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "C-Guard decoy launchers (2)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Exocet MM40 Block III launchers (4)",
+     "capacity": 4,
+     "contents": {
+      "WPN-EXOCET-B3": 4
+     }
+    },
+    {
+     "name": "Bofors 57 mm Mk 3 gun",
+     "capacity": 250,
+     "contents": {
+      "WPN-GUN-76": 250
+     }
+    },
+    {
+     "name": "M71/08 20 mm guns (2)",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "C-Guard decoy launchers (2)",
+     "capacity": 12,
+     "contents": {
+      "WPN-DECOY-CHAFF": 12
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Sampari-class fast attack craft\", https://en.wikipedia.org/wiki/Sampari-class_fast_attack_craft (accessed 2026-11-13): 460-500 t (500 used), 60.3 m, 30 kn, 2,400 nmi, 8 days, complement 55; the ships after hulls 628 and 629: Terma SCANTER 4603, C-Fire EO fire control, PHOBOS RESM, C-Guard decoys; Bofors 57 mm Mk 3, 2 M71/08 20 mm, 4 Exocet MM40 Block III. Draught not given; cruise speed not given (15 kn assumed). The 57 mm is modelled by the generic 76 mm gun. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "IDN-BK-TANJUNGDATU",
+   "name": "Tanjung Datu-class patrol vessel (Indonesian Maritime Security Agency)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "IDN-BAKAMLA",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 110,
+   "displacement_t": 2400,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 2500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 1500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    }
+   ],
+   "launchers": [
+    {
+     "name": "SMASH 30 mm RCWS",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "SMASH 30 mm RCWS",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Tanjung Datu-class patrol vessel\", https://en.wikipedia.org/wiki/Tanjung_Datu-class_patrol_vessel (accessed 2026-11-13): 2,400 t, 110 m, 20 kn maximum, 15 kn cruise, 4,630 km (2,500 nmi) at 12 kn, 14 days, crew 76; SMASH 30 mm RCWS, 12.7 mm HMG and water cannon (not modelled); helipad and hangar. Draught and sensors not given (navigation radar assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  }
+ ]
+}

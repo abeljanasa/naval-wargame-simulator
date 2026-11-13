@@ -1,0 +1,615 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, Malaysia (Phase 4 slice 13, tranche 3): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "MYS-FF-LEKIU",
+   "name": "Lekiu-class frigate",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "MYS-RMN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 106,
+   "displacement_t": 2300,
+   "draft_m": 3.08,
+   "max_speed_kn": 28,
+   "cruise_speed_kn": 16,
+   "accel_mps2": 0.05,
+   "endurance_nm": 5000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Exocet MM40 Block 2 launchers (2x4)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-EXOCET-B2"
+     ]
+    },
+    {
+     "name": "VL Sea Wolf (16 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-SEAWOLF-VL"
+     ]
+    },
+    {
+     "name": "Bofors 57 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "DS30B 30 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "B515 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-A244"
+     ]
+    },
+    {
+     "name": "Super Barricade decoy launchers (2)",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Exocet MM40 Block 2 launchers (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-EXOCET-B2": 8
+     }
+    },
+    {
+     "name": "VL Sea Wolf (16 cells)",
+     "capacity": 16,
+     "contents": {
+      "WPN-SEAWOLF-VL": 16
+     }
+    },
+    {
+     "name": "Bofors 57 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "DS30B 30 mm guns (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    },
+    {
+     "name": "B515 triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-A244": 6
+     }
+    },
+    {
+     "name": "Super Barricade decoy launchers (2)",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Lekiu-class frigate\", https://en.wikipedia.org/wiki/Lekiu-class_frigate (accessed 2026-11-13): 2,300 t full load, 106 m, 3.08 m draught, 28 kn, 5,000 nmi, complement 146; Sea Giraffe 150, DA-08 air search, 2 Marconi 1802SW fire control, Radamec 2000 optronic director, Spherion TSM 2633 sonar, Mentor-A ESM, Scimitar ECM, 2 Super Barricade, Sea Siren torpedo decoy; Bofors 57 mm, 2 DS30B 30 mm, 16 VL Sea Wolf, 8 Exocet MM40 Block 2, 2 triple B515 tubes (A244-S). The 57 mm is modelled by the generic 76 mm gun; cruise speed not given (generic). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-MYS-SCIMITAR"
+   ]
+  },
+  {
+   "id": "MYS-PS-KEDAH",
+   "name": "Kedah-class offshore patrol vessel",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "MYS-RMN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 91.1,
+   "displacement_t": 1850,
+   "draft_m": 3.4,
+   "max_speed_kn": 24,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 6050,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 1500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 17
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 11
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Oto Melara 76 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Breda-Mauser 30 mm gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "ALEX/SRBOC decoy launchers",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Oto Melara 76 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Breda-Mauser 30 mm gun",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "ALEX/SRBOC decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Kedah-class offshore patrol vessel\", https://en.wikipedia.org/wiki/Kedah-class_offshore_patrol_vessel (accessed 2026-11-13): 1,850 t full load, 91.1 m, 3.4 m draught, 24 kn, 6,050 nmi, 21 days, complement 78; TRS-3D 16ES, Oerlikon TMX/EO fire control, Rheinmetall TMEO, Sceptre-X ESM, ALEX/SRBOC decoys; Oto Melara 76 mm, Breda-Mauser 30 mm. Cruise speed not given (15 kn assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "MYS-PS-KERIS",
+   "name": "Keris-class littoral mission ship",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "MYS-RMN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 69,
+   "displacement_t": 700,
+   "draft_m": 2.8,
+   "max_speed_kn": 24,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 2000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 1500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 9
+    }
+   ],
+   "launchers": [
+    {
+     "name": "H/PJ-17 30 mm gun",
+     "height_m": 7,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "H/PJ-17 30 mm gun",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Keris-class littoral mission ship\", https://en.wikipedia.org/wiki/Keris-class_littoral_mission_ship (accessed 2026-11-13): 700 t, 69 m, 2.8 m draught, 24 kn, 2,000 nmi at 15 kn, 15 days, complement 45; SR-47AG search radar, HEOS-100 and HEOS-300 fire control; one H/PJ-17 30 mm, 2 12.7 mm (not modelled). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "MYS-SSK-SCORPENE",
+   "name": "Scorpène-class submarine (Malaysia, Perdana Menteri)",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "MYS-RMN",
+   "propulsion": "PROP-DE-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 61.7,
+   "displacement_t": 1565,
+   "draft_m": 5.8,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 8,
+   "accel_mps2": 0.05,
+   "endurance_nm": 6500,
+   "max_depth_m": 350,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 200,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 105,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 118,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "533 mm torpedo tubes (6)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-BLACKSHARK",
+      "WPN-EXOCET-SM39"
+     ]
+    },
+    {
+     "name": "Countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "533 mm torpedo tubes (6)",
+     "capacity": 18,
+     "contents": {
+      "WPN-BLACKSHARK": 14,
+      "WPN-EXOCET-SM39": 4
+     }
+    },
+    {
+     "name": "Countermeasures",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Scorpène-class submarine\", https://en.wikipedia.org/wiki/Scorpène-class_submarine (accessed 2026-11-13): two Malaysian boats (Tunku Abdul Rahman, Tun Abdul Razak) commissioned 2009, TSM 2233 Mk 2 sonar; conventional CM-2000 figures used (the Malaysian variant is not stated): 1,565 t, 61.7 m, 5.8 m draft, 20 kn submerged, 6,500 nmi at 8 kn surfaced, test depth >350 m (350 used), complement 31; 6 x 533 mm tubes for 18 Black Shark torpedoes and SM39 Exocet (14 and 4 assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "MYS-MM-TUNFATIMAH",
+   "name": "Tun Fatimah-class offshore patrol vessel (Malaysian Maritime Enforcement Agency)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "MYS-MMEA",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 83,
+   "displacement_t": 1890,
+   "draft_m": 3.75,
+   "max_speed_kn": 22,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "endurance_nm": 6000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 1500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 11
+    }
+   ],
+   "launchers": [
+    {
+     "name": "SMASH 30 mm RCWS",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "SMASH 30 mm RCWS",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Tun Fatimah-class patrol vessel\", https://en.wikipedia.org/wiki/Tun_Fatimah-class_patrol_vessel (accessed 2026-11-13): 1,890 t, 83 m, 3.75 m draught, 22 kn, complement 46; Aselsan SMASH 30 mm RCWS, 2-4 12.7 mm (not modelled); helipad. Sensors and range not given (navigation radar assumed; generic OPV range); cruise speed 15 kn assumed. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  }
+ ]
+}

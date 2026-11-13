@@ -24,10 +24,17 @@
   - VLS splits and tube loads are not published; each record states the assumed split.
   - Jammers only where the source names a jammer or electronic attack (Gepard's Bell Squat, Mogami's NOLQ-3E), with generic strength (D).
   - The golden replays changed again for the same reason as the first tranche (the emitter library), checked the same way, and were re-blessed.
+- **Third tranche (2026-11-13): Malaysia, Indonesia, Australia, South Korea and Taiwan.** 25 classes and 13 weapons, by the same rules. Choices:
+  - Coast guards where an article gives a class's figures: the MMEA's Tun Fatimah, Bakamla's Tanjung Datu, Taiwan's Chiayi. The Korea Coast Guard article names no classes, and the Australian Border Force was not covered.
+  - The Haeseong (SSM-700K) reuses the first tranche's C-Star record.
+  - Weapons with no article fetched are modelled by generic records and say so: Taiwan's SUT and Korea's Tiger Shark torpedoes, KM-SAM (left out).
+  - Where an article gives several variants, the record says which it uses: the Malaysian Scorpène's figures are the conventional CM-2000's, Tuo Chiang is Flight I, Kang Ding is after its combat-system upgrade, Anzac is the RAN anti-ship missile defence fit.
+  - Jammers where the source names ECM: the Lekiu's Scimitar, the Martadinata's Scorpion 2L and the Korean SLQ-200(V)K Sonata suite.
+  - Golden replays re-blessed again, after the same check.
 
 ## Open
 
-- Other navies operating in the PAR (for example Malaysia, Indonesia, Australia, South Korea, Taiwan), as the client prioritises.
+- Further navies and agencies as the client's scenarios need them (for example Singapore, Thailand, Brunei, the Korea Coast Guard, the Australian Border Force).
 - The Vietnam Coast Guard's DN-2000 and the Ticonderoga class, if open figures are found.
 - Named sensor records as open figures are found.
 - Reference-data editing in the app, if the data team needs it.

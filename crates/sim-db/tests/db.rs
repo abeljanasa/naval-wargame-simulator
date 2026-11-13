@@ -293,7 +293,7 @@ fn open_source_loads_and_answers_queries() {
     assert_eq!(ffg.domain, "surface");
     assert!(db.platform("NOPE").unwrap().is_none());
     let all = db.platforms().unwrap();
-    assert_eq!(all.len(), 88, "50 generic, 30 regional, 8 historical");
+    assert_eq!(all.len(), 113, "50 generic, 55 regional, 8 historical");
     assert!(all.windows(2).all(|w| w[0].id < w[1].id), "sorted by id");
 }
 

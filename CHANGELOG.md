@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 13: regional database, third tranche)
+
+- **Malaysia:** Lekiu frigate, Kedah OPV, Keris littoral mission ship, Scorpène submarine; the MMEA's Tun Fatimah OPV.
+- **Indonesia:** Martadinata frigate, Bung Tomo corvette, Nagapasa submarine, Sampari attack craft; Bakamla's Tanjung Datu.
+- **Australia:** Hobart destroyer, Anzac frigate, Collins submarine, Arafura OPV.
+- **South Korea:** Sejong the Great destroyer, Daegu frigate, Son Won-il and Dosan Ahn Changho submarines, Yoon Youngha patrol vessel.
+- **Taiwan:** Kang Ding and Cheng Kung frigates, Tuo Chiang corvette, Hai Lung submarine, Kuang Hua VI missile boat; the Coast Guard Administration's Chiayi.
+- **Named weapons:** Exocet MM40 Block 2 and 3, SM39 Exocet, VL Seawolf, Black Shark, Hsiung Feng II and III, TC-2N, K-SAAM, K745 Blue Shark, Red Shark, MU90, A244/S.
+- **ECM:** the Lekiu's Scimitar, the Martadinata's Scorpion 2L and the Korean Sonata suite.
+- 113 platforms in all. Golden replays re-blessed: the emitter library grows with the database (DL-0048).
+
 ### Added (Phase 4, slice 13: regional database, second tranche)
 
 - **Vietnam People's Navy and Coast Guard:** Gepard 3.9 frigate, Kilo (Project 636.1) submarine, Molniya corvette, TT-400TP gunboat, and the ex-US Hamilton-class cutter CSB 8020.

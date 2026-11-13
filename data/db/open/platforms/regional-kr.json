@@ -1,0 +1,819 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, South Korea (Phase 4 slice 13, tranche 3): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "KOR-DDG-SEJONG",
+   "name": "Sejong the Great-class destroyer (KDX-III Batch I)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "KOR-ROKN",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-DESTROYER",
+   "length_m": 166,
+   "displacement_t": 10000,
+   "draft_m": 6.25,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.06,
+   "endurance_nm": 5500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 10000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MFR",
+     "height_m": 32
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-IRST",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -6
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -100
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 41 VLS (80 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-SM2MR"
+     ]
+    },
+    {
+     "name": "K-VLS (48 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-LACM",
+      "WPN-REDSHARK"
+     ]
+    },
+    {
+     "name": "SSM-700K Haeseong launchers (4x4)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-CSTAR"
+     ]
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Goalkeeper CIWS",
+     "height_m": 15,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "RAM Mk 49 launcher (21)",
+     "height_m": 14,
+     "weapons": [
+      "WPN-RAM"
+     ]
+    },
+    {
+     "name": "Triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-K745"
+     ]
+    },
+    {
+     "name": "Decoy launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 41 VLS (80 cells)",
+     "capacity": 80,
+     "contents": {
+      "WPN-SM2MR": 80
+     }
+    },
+    {
+     "name": "K-VLS (48 cells)",
+     "capacity": 48,
+     "contents": {
+      "WPN-REDSHARK": 16,
+      "WPN-LACM": 32
+     }
+    },
+    {
+     "name": "SSM-700K Haeseong launchers (4x4)",
+     "capacity": 16,
+     "contents": {
+      "WPN-CSTAR": 16
+     }
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Goalkeeper CIWS",
+     "capacity": 60,
+     "contents": {
+      "WPN-CIWS": 60
+     }
+    },
+    {
+     "name": "RAM Mk 49 launcher (21)",
+     "capacity": 21,
+     "contents": {
+      "WPN-RAM": 21
+     }
+    },
+    {
+     "name": "Triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-K745": 6
+     }
+    },
+    {
+     "name": "Decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Sejong the Great-class destroyer\", https://en.wikipedia.org/wiki/Sejong_the_Great-class_destroyer (accessed 2026-11-13): Batch I 10,000 t full load, 166 m, 6.25 m draft, exceeds 30 kn, 5,500 nmi, complement 300; AN/SPY-1D(V), AN/SPG-62, DSQS-21BZ-M hull sonar, SQR-220K towed array, IRST, SLQ-200K Sonata EW; Mk 45 Mod 4, Goalkeeper, RAM Block 1, 16 SSM-700K Haeseong, 2 triple tubes (K745), 80 Mk 41 cells (SM-2), 48 K-VLS (Red Shark, Hyunmoo III, K-SAAM, KM-SAM; split not given: 16 Red Shark and 32 land-attack assumed; KM-SAM not modelled). Goalkeeper modelled by the generic CIWS; the RAM launcher stores 21 (Wikipedia, \"RIM-116 Rolling Airframe Missile\", https://en.wikipedia.org/wiki/RIM-116_Rolling_Airframe_Missile (accessed 2026-11-13)). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-KOR-SONATA"
+   ]
+  },
+  {
+   "id": "KOR-FFG-DAEGU",
+   "name": "Daegu-class frigate (FFX Batch II)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "KOR-ROKN",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 122,
+   "displacement_t": 3600,
+   "draft_m": 4,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 135,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 145,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 165,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-IRST",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -5
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -80
+    }
+   ],
+   "launchers": [
+    {
+     "name": "K-VLS (16 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-KSAAM",
+      "WPN-LACM",
+      "WPN-REDSHARK"
+     ]
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 14,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-K745"
+     ]
+    },
+    {
+     "name": "MASS decoy launchers",
+     "height_m": 11,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "K-VLS (16 cells)",
+     "capacity": 40,
+     "contents": {
+      "WPN-KSAAM": 32,
+      "WPN-REDSHARK": 4,
+      "WPN-LACM": 4
+     }
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 40,
+     "contents": {
+      "WPN-CIWS": 40
+     }
+    },
+    {
+     "name": "Triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-K745": 6
+     }
+    },
+    {
+     "name": "MASS decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Daegu-class frigate\", https://en.wikipedia.org/wiki/Daegu-class_frigate (accessed 2026-11-13): 3,600 t full load, 122 m, 4 m draft, 30 kn maximum, 18 kn cruising, 4,500 nmi, complement 140, MT30 gas turbine (hybrid electric drive modelled as CODOG); SPS-550K 3D, SPG-540K fire control, SQS-240K hull sonar, SQR-250K towed array, SAQ-540K EOTS, SAQ-600K IRST, SLQ-200(V)K Sonata, SLQ-261K torpedo countermeasures, MASS decoys; Mk 45 Mod 4, Phalanx, 6 K745 in triple tubes, 16-cell K-VLS (K-SAAM quad-packed, Haeryong, Red Shark; split not given: 32 K-SAAM in 8 cells, 4 Red Shark, 4 Haeryong assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-KOR-SONATA"
+   ]
+  },
+  {
+   "id": "KOR-SSK-SONWONIL",
+   "name": "Son Won-il-class submarine (Type 214, KSS-II)",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "KOR-ROKN",
+   "propulsion": "PROP-AIP-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 65,
+   "displacement_t": 1860,
+   "draft_m": 6,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 6,
+   "accel_mps2": 0.05,
+   "endurance_nm": 12000,
+   "max_depth_m": 400,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 180,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 100,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 112,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 138,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-SON-SUB-TAS",
+     "height_m": -150
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "533 mm torpedo tubes (8)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-HARPOON-1",
+      "WPN-TORP-HW"
+     ]
+    },
+    {
+     "name": "Countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "533 mm torpedo tubes (8)",
+     "capacity": 16,
+     "contents": {
+      "WPN-TORP-HW": 12,
+      "WPN-HARPOON-1": 4
+     }
+    },
+    {
+     "name": "Countermeasures",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Type 214 submarine\", https://en.wikipedia.org/wiki/Type_214_submarine (accessed 2026-11-13): 1,860 t submerged, 65 m, 6 m draught, 20 kn submerged, 12,000 nmi surfaced, 84 days, test depth nearly 400 m (400 used), complement 27, fuel-cell AIP; 8 x 533 mm tubes, 4 Sub-Harpoon capable. Torpedo type and load not given (generic heavyweight, 12 assumed); Sub-Harpoon modelled by Harpoon Block 1. Sensors not given (generic AIP submarine). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "KOR-SSK-DOSAN",
+   "name": "Dosan Ahn Changho-class submarine (KSS-III Batch I)",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "KOR-ROKN",
+   "propulsion": "PROP-AIP-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 83.5,
+   "displacement_t": 3750,
+   "draft_m": 7.62,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 6,
+   "accel_mps2": 0.05,
+   "endurance_nm": 10000,
+   "max_depth_m": 300,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 180,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 100,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 112,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 138,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-SON-SUB-TAS",
+     "height_m": -150
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "533 mm torpedo tubes (6)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-TORP-HW"
+     ]
+    },
+    {
+     "name": "Countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "533 mm torpedo tubes (6)",
+     "capacity": 16,
+     "contents": {
+      "WPN-TORP-HW": 16
+     }
+    },
+    {
+     "name": "Countermeasures",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Dosan Ahn Changho-class submarine\", https://en.wikipedia.org/wiki/Dosan_Ahn_Changho-class_submarine (accessed 2026-11-13): Batch I 3,750 t submerged, 83.5 m, 7.62 m draught, 20 kn submerged, 10,000 nmi, AIP, complement 50; LIG Nex1 sonar suite, Indra RESM, Series 30 optronic mast; 6 x 533 mm tubes (K761 Tiger Shark heavyweight torpedoes), 6 K-VLS cells for submarine-launched ballistic missiles (not modelled). Tiger Shark modelled by the generic heavyweight torpedo; load (16) and test depth not given (generic). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "KOR-PGG-YOONYOUNGHA",
+   "name": "Yoon Youngha-class patrol vessel (PKG)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "KOR-ROKN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-SMALL-CRAFT",
+   "length_m": 63,
+   "displacement_t": 570,
+   "draft_m": 3,
+   "max_speed_kn": 44,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.15,
+   "endurance_nm": 1998,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 13
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 11
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "SSM-700K Haeseong launchers (4)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-CSTAR"
+     ]
+    },
+    {
+     "name": "76 mm gun",
+     "height_m": 6,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Nobong twin 40 mm gun",
+     "height_m": 7,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "K-RBOC decoy launchers (2)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "SSM-700K Haeseong launchers (4)",
+     "capacity": 4,
+     "contents": {
+      "WPN-CSTAR": 4
+     }
+    },
+    {
+     "name": "76 mm gun",
+     "capacity": 250,
+     "contents": {
+      "WPN-GUN-76": 250
+     }
+    },
+    {
+     "name": "Nobong twin 40 mm gun",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "K-RBOC decoy launchers (2)",
+     "capacity": 12,
+     "contents": {
+      "WPN-DECOY-CHAFF": 12
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Yoon Youngha-class patrol vessel\", https://en.wikipedia.org/wiki/Yoon_Youngha-class_patrol_vessel (accessed 2026-11-13): PKG 570 t, 63 m, 3 m draft, 44 kn, 1,998 nmi at 15 kn, complement 40, waterjets; SPS-100K surface search, SPS-540K 3D, CEROS 200 fire control, EOTS, SLQ-200(V)K Sonata ECM, 2 K-RBOC; 76 mm, Nobong twin 40 mm, 4 SSM-700K Haeseong. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts, VLS splits and tube loads are generic class estimates or stated assumptions unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-KOR-SONATA"
+   ]
+  }
+ ]
+}

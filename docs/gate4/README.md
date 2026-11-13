@@ -46,7 +46,7 @@ Recommended: a range per target domain on weapons (database and model), then re-
 | Two historical engagements, chosen with the SMEs, run as scenarios | The table above | **Drafts.** The client's SMEs confirm or correct the scenarios, records and assumptions |
 | Each with its outcome distribution compared with the record | The reports | Done for the drafts |
 | Every difference explained | Each report's "Differences to explain" | **Open.** The findings above are the development team's first reading; the SMEs explain each difference as a model limitation, data gap or historical uncertainty |
-| Regional database covering the replays' and the PAR's order of battle, with citations and confidence | [Data dictionary](../db/data-dictionary.md#regional-database-phase-4-slice-13), [DL-0048](../design-log/DL-0048-regional-database.md) | **Two tranches:** Philippine Navy and Coast Guard, PLAN (Southern Theater) and China Coast Guard, and the historical platforms; then the Vietnam People's Navy and Coast Guard, US Navy and Coast Guard, and JMSDF and Japan Coast Guard (88 platforms in all). Other navies next, as the client prioritises |
+| Regional database covering the replays' and the PAR's order of battle, with citations and confidence | [Data dictionary](../db/data-dictionary.md#regional-database-phase-4-slice-13), [DL-0048](../design-log/DL-0048-regional-database.md) | **Three tranches:** Philippine Navy and Coast Guard, PLAN (Southern Theater) and China Coast Guard, and the historical platforms; the Vietnam People's Navy and Coast Guard, US Navy and Coast Guard, and JMSDF and Japan Coast Guard; the navies of Malaysia, Indonesia, Australia, South Korea and Taiwan with the Malaysian, Indonesian and Taiwanese coast guards (113 platforms in all) |
 | Terrain, bathymetry and imagery data offline | Slices 2–6 | Done; imagery waits on the client's tile pack |
 | Duel tests extended to the new models | [Duel-test index](../gate2/duel-tests.md#phase-4-models) | Done |
 | All CI checks green with the data packs loaded | PR #4 checks | At the gate |
@@ -56,4 +56,4 @@ Recommended: a range per target domain on weapons (database and model), then re-
 1. **The SMEs review the two drafts:** the positions, timings, forces, simplifications and the recorded numbers (each report lists its assumptions and sources).
 2. **Whether to fix the two limitations before the gate** (single-platform TMA, ranges per target domain), or to record them as known limitations.
 3. **The measures of effectiveness** (decision 5): the engagement outcomes used here are provisional.
-4. **The next database tranche** (after Vietnam, the United States and Japan): which other navies the PAR scenarios need.
+4. **Any further database tranche:** which other navies or agencies the PAR scenarios need (for example Singapore, Thailand, Brunei).
