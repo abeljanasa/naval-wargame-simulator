@@ -1137,6 +1137,22 @@ fn refusals(sim: &Simulation, st: &mut Station, units: &[UnitView]) -> Vec<Strin
                     out.push(format!("{n} stopped: land ahead"));
                 }
             }
+            // Collisions (docs/models/collisions.md). The other hull is named only if it is
+            // the seat's own; otherwise it is "another vessel". Giving way is routine seamanship,
+            // not a warning: it stays in the event log, and the new course shows on the map.
+            SimEventKind::Collision {
+                a, b, closing_mps, ..
+            } => {
+                for (me, other) in [(a, b), (b, a)] {
+                    if let Some(n) = name(me) {
+                        let them = name(other).unwrap_or_else(|| "another vessel".into());
+                        let kn = closing_mps * 3600.0 / 1852.0;
+                        out.push(format!(
+                            "{n} collided with {them} at {kn:.0} kn and stopped; see its damage"
+                        ));
+                    }
+                }
+            }
             SimEventKind::CommandApplied { seq } => {
                 st.pending.remove(seq);
             }

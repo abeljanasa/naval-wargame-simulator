@@ -77,6 +77,24 @@ pub enum SimEventKind {
         unit: UnitId,
         reason: String,
     },
+    /// Two hulls collided (`docs/models/collisions.md`); both stop. Each one's damage roll, if
+    /// it takes one, follows as `DamageTaken`.
+    Collision {
+        a: UnitId,
+        b: UnitId,
+        closing_mps: f64,
+        /// Share of each hull's damage points the collision costs it.
+        damage_fraction_a: f64,
+        damage_fraction_b: f64,
+    },
+    /// A ship or submarine began to give way to `other`: `turn_deg` to starboard of its course,
+    /// and slowed if turning alone did not clear.
+    CollisionAvoidance {
+        unit: UnitId,
+        other: UnitId,
+        turn_deg: f64,
+        slowed: bool,
+    },
     /// A ship or submarine stopped rather than run onto land.
     LandAhead {
         unit: UnitId,

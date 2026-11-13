@@ -127,6 +127,7 @@ fn unit(
             mission: None,
             fuel: None,
             draft_m: None,
+            displacement_t: None,
         }),
     )
 }

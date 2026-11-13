@@ -9,6 +9,7 @@ mod acoustics;
 mod adjudication;
 mod ai;
 mod c2;
+mod collision;
 mod combat;
 mod command;
 mod comms;
@@ -48,6 +49,7 @@ pub use adjudication::{
 };
 pub use ai::MissionState;
 pub use c2::C2State;
+pub use collision::{damage_fraction, default_mass_t, AvoidState, Avoidance};
 pub use combat::{
     default_damage_profile, Health, Magazine, WeaponCatalog, WeaponInFlight, WeaponsInFlight,
     DAMAGE_CONTROL_PERIOD_TICKS, FUEL_RANGE_FACTOR,

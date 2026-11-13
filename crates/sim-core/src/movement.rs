@@ -14,7 +14,11 @@
 //! `docs/models/shallow-water.md`).
 //! Fuel (`docs/models/fuel.md`): a unit with a fuel model burns fuel by speed after it moves; out
 //! of fuel, its ordered speed counts as zero and it coasts to a stop.
-//! Not yet modelled (see `docs/backlog.md`): sea-state penalties.
+//! Heavy seas (`docs/models/weather.md`) cut a surface hull's top speed near its weather limit.
+//! Collisions (`docs/models/collisions.md`): before stepping, each ship or submarine gives way to
+//! the hulls the rules of the road make it give way to, turning to starboard (or slowing), then
+//! comes back to its route or ordered heading; after stepping, hulls that came into contact are
+//! handed to the collision system for damage.
 
 use crate::components::{Domain, Kinematics, Position, Route, Unit};
 use crate::events::{EventLog, SimEventKind};
@@ -38,6 +42,7 @@ type MovingUnit = (
     Option<&'static crate::detection::Signature>,
 );
 
+#[allow(clippy::too_many_arguments)] // a Bevy system: each resource is a parameter
 pub(crate) fn movement_system(
     clock: Res<SimClock>,
     land: Res<LandMaskRes>,
@@ -45,11 +50,24 @@ pub(crate) fn movement_system(
     env: Res<crate::detection::EnvState>,
     weather: Res<crate::detection::Weather>,
     mut log: ResMut<EventLog>,
+    mut avoidance: ResMut<crate::collision::Avoidance>,
+    mut pending: ResMut<crate::collision::PendingCollisions>,
     mut units: Query<MovingUnit>,
 ) {
     let tick = clock.tick;
     let mut order: Vec<_> = units.iter().map(|(e, u, ..)| (u.id, e)).collect();
     order.sort_unstable();
+    // Hulls as the tick starts (`docs/models/collisions.md`): what each one avoids, and where
+    // each one was, to find hulls that come into contact during it.
+    let hulls = |units: &Query<MovingUnit>| {
+        let mut v: Vec<crate::collision::Hull> = units
+            .iter()
+            .filter_map(|(_, u, p, k, _, _, s)| crate::collision::hull(u, p, k, s))
+            .collect();
+        v.sort_by_key(|h| h.id);
+        v
+    };
+    let start = hulls(&units);
 
     for (_, entity) in order {
         let Ok((_, unit, mut pos, mut kin, mut route, mut fuel, sig)) = units.get_mut(entity)
@@ -75,7 +93,65 @@ pub(crate) fn movement_system(
             kin.max_speed_mps = top
                 * sim_events::weather::speed_factor(sea, crate::planning::weather_limit(length));
         }
-        step_unit(&mut pos, &mut kin, &mut route, |idx, done| {
+        // Collision avoidance: give way by the rules of the road, then come back to the route,
+        // or to the heading the unit was ordered to hold.
+        let held = avoidance.0.get(&unit.id).copied();
+        let routed = route.is_active();
+        let goal = match route.current() {
+            Some(wp) => inverse(pos.point, wp).azimuth1_deg,
+            None => held.and_then(|h| h.resume_deg).unwrap_or(kin.heading_deg),
+        };
+        let steer = start
+            .iter()
+            .find(|h| h.id == unit.id)
+            .and_then(|me| crate::collision::avoid(me, goal, &start, held.and_then(|h| h.other)));
+        let mut heading = steer.map(|s| s.heading_deg);
+        match steer {
+            Some(s) => {
+                let was = held.and_then(|h| h.other);
+                avoidance.0.insert(
+                    unit.id,
+                    crate::collision::AvoidState {
+                        other: Some(s.other),
+                        resume_deg: (!routed).then_some(goal),
+                    },
+                );
+                if was != Some(s.other) {
+                    log.push(
+                        tick,
+                        SimEventKind::CollisionAvoidance {
+                            unit: unit.id,
+                            other: s.other,
+                            turn_deg: s.turn_deg,
+                            slowed: s.slow,
+                        },
+                    );
+                }
+                if s.slow {
+                    kin.max_speed_mps = kin.max_speed_mps.min(top * crate::collision::SLOW_FACTOR);
+                }
+            }
+            None => match held.and_then(|h| h.resume_deg) {
+                Some(r)
+                    if !routed
+                        && crate::collision::heading_gap(kin.heading_deg, r).abs()
+                            > crate::collision::RESUMED_DEG =>
+                {
+                    avoidance.0.insert(
+                        unit.id,
+                        crate::collision::AvoidState {
+                            other: None,
+                            resume_deg: Some(r),
+                        },
+                    );
+                    heading = Some(r);
+                }
+                _ => {
+                    avoidance.0.remove(&unit.id);
+                }
+            },
+        }
+        step_unit(&mut pos, &mut kin, &mut route, heading, |idx, done| {
             finished |= done;
             #[allow(clippy::cast_possible_truncation)] // routes are far shorter than u32::MAX
             log.push(
@@ -140,13 +216,24 @@ pub(crate) fn movement_system(
             }
         }
     }
+    // Hulls gone (destroyed, removed) stop avoiding; contacts go to the collision system.
+    let end = hulls(&units);
+    avoidance.0.retain(|u, _| end.iter().any(|h| h.id == *u));
+    for s in avoidance.0.values_mut() {
+        if s.other.is_some_and(|o| !end.iter().any(|h| h.id == o)) {
+            s.other = None;
+        }
+    }
+    pending.0 = crate::collision::new_contacts(&start, &end);
 }
 
 /// Advances one unit by one tick. `on_waypoint(index, route_finished)` is called for each arrival.
+/// `steer`: a heading to make good instead of the route this tick (collision avoidance).
 pub(crate) fn step_unit(
     pos: &mut Position,
     kin: &mut Kinematics,
     route: &mut Route,
+    steer: Option<f64>,
     mut on_waypoint: impl FnMut(usize, bool),
 ) {
     let dt = TICK_SECONDS;
@@ -161,7 +248,22 @@ pub(crate) fn step_unit(
     }
 
     if let Some(max_rate_dps) = kin.max_turn_rate_dps {
-        step_turn_limited(pos, kin, route, max_rate_dps, remaining, &mut on_waypoint);
+        step_turn_limited(
+            pos,
+            kin,
+            route,
+            max_rate_dps,
+            remaining,
+            steer,
+            &mut on_waypoint,
+        );
+        return;
+    }
+
+    if let Some(h) = steer {
+        let d = direct(pos.point, h, remaining);
+        pos.point = d.point;
+        kin.heading_deg = d.azimuth2_deg;
         return;
     }
 
@@ -238,6 +340,7 @@ fn step_turn_limited(
     route: &mut Route,
     max_rate_dps: f64,
     distance_m: f64,
+    steer: Option<f64>,
     on_waypoint: &mut impl FnMut(usize, bool),
 ) {
     let arrival_m = kin
@@ -259,8 +362,12 @@ fn step_turn_limited(
             return;
         }
     }
-    if let Some(wp) = route.current() {
-        let desired = inverse(pos.point, wp).azimuth1_deg;
+    let desired = steer.or_else(|| {
+        route
+            .current()
+            .map(|wp| inverse(pos.point, wp).azimuth1_deg)
+    });
+    if let Some(desired) = desired {
         let max_turn =
             turn_rate_dps(max_rate_dps, kin.min_turn_radius_m, kin.speed_mps) * TICK_SECONDS;
         let delta = heading_delta(kin.heading_deg, desired).clamp(-max_turn, max_turn);
@@ -321,7 +428,7 @@ mod tests {
             next: 0,
             charted: false,
         };
-        step_unit(&mut p, &mut k, &mut r, |_, _| {});
+        step_unit(&mut p, &mut k, &mut r, None, |_, _| {});
         // One second at 1.4324°/s: it cannot reverse course instantly.
         assert!(
             k.heading_deg < 2.0 || k.heading_deg > 358.0,
@@ -331,7 +438,7 @@ mod tests {
         // A 180° turn at 1.4324°/s takes about 126 s, then ~5 km to run: arrives well within 1,000 s.
         let mut arrived = None;
         for t in 1..1_000 {
-            step_unit(&mut p, &mut k, &mut r, |_, done| {
+            step_unit(&mut p, &mut k, &mut r, None, |_, done| {
                 if done {
                     arrived = Some(t);
                 }
@@ -354,7 +461,7 @@ mod tests {
         };
         let mut k = kin(10.0);
         let mut r = Route::default();
-        step_unit(&mut p, &mut k, &mut r, |_, _| {});
+        step_unit(&mut p, &mut k, &mut r, None, |_, _| {});
         let moved = inverse(GeoPoint::new(0.0, 0.0), p.point).distance_m;
         assert!((moved - 10.0).abs() < 1e-6, "moved {moved}");
         assert!(p.point.lon_deg.abs() < 1e-12);
@@ -369,11 +476,11 @@ mod tests {
         let mut k = kin(0.0);
         k.ordered_speed_mps = 10.0;
         let mut r = Route::default();
-        step_unit(&mut p, &mut k, &mut r, |_, _| {});
+        step_unit(&mut p, &mut k, &mut r, None, |_, _| {});
         assert!((k.speed_mps - 0.1).abs() < 1e-12);
         // 0.1 m/s² from rest → 10 m/s after 100 ticks.
         for _ in 0..99 {
-            step_unit(&mut p, &mut k, &mut r, |_, _| {});
+            step_unit(&mut p, &mut k, &mut r, None, |_, _| {});
         }
         assert!((k.speed_mps - 10.0).abs() < 1e-9);
     }
@@ -386,7 +493,7 @@ mod tests {
         };
         let mut k = kin(15.0);
         k.ordered_speed_mps = 40.0;
-        step_unit(&mut p, &mut k, &mut Route::default(), |_, _| {});
+        step_unit(&mut p, &mut k, &mut Route::default(), None, |_, _| {});
         assert!((k.speed_mps - 15.0).abs() < 1e-12);
     }
 
@@ -407,11 +514,11 @@ mod tests {
             charted: false,
         };
         let mut arrivals = vec![];
-        step_unit(&mut p, &mut k, &mut r, |i, d| arrivals.push((i, d)));
+        step_unit(&mut p, &mut k, &mut r, None, |i, d| arrivals.push((i, d)));
         assert_eq!(arrivals, vec![(0, false)]);
         let travelled = inverse(start, p.point).distance_m;
         assert!((travelled - 10.0).abs() < 1e-6, "travelled {travelled}");
-        step_unit(&mut p, &mut k, &mut r, |i, d| arrivals.push((i, d)));
+        step_unit(&mut p, &mut k, &mut r, None, |i, d| arrivals.push((i, d)));
         assert_eq!(arrivals, vec![(0, false), (1, true)]);
         assert_eq!(p.point, w2);
         assert_eq!(k.speed_mps, 0.0);
@@ -435,7 +542,7 @@ mod tests {
         };
         let mut ticks = 0;
         while r.is_active() {
-            step_unit(&mut p, &mut k, &mut r, |_, _| {});
+            step_unit(&mut p, &mut k, &mut r, None, |_, _| {});
             ticks += 1;
             assert!(ticks <= 1001);
         }

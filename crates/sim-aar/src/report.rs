@@ -179,6 +179,9 @@ struct Builder<'a> {
     last_hit: BTreeMap<UnitId, Credit>,
     /// White-cell overrides that can destroy a unit, with their tick and reason.
     adjudicated: BTreeMap<UnitId, (Tick, String)>,
+    /// Hulls in a collision, with its tick and the other hull (a loss that tick is the
+    /// collision's, not the last weapon's).
+    collided: BTreeMap<UnitId, (Tick, UnitId)>,
     intercepted: BTreeSet<u64>,
     losses: Vec<LossRow>,
     open_contacts: BTreeMap<(SideId, u32), usize>,
@@ -200,6 +203,7 @@ impl<'a> Builder<'a> {
             pending_hit: None,
             last_hit: BTreeMap::new(),
             adjudicated: BTreeMap::new(),
+            collided: BTreeMap::new(),
             intercepted: BTreeSet::new(),
             losses: Vec::new(),
             open_contacts: BTreeMap::new(),
@@ -469,6 +473,11 @@ impl<'a> Builder<'a> {
         if let Some((at, reason)) = self.adjudicated.remove(&unit) {
             if at == tick {
                 return (format!("white cell: {reason}"), None);
+            }
+        }
+        if let Some((at, other)) = self.collided.remove(&unit) {
+            if at == tick {
+                return (format!("collision with {}", self.unit_name(other)), None);
             }
         }
         match self.last_hit.get(&unit).cloned() {
@@ -793,6 +802,26 @@ impl<'a> Builder<'a> {
             SimEventKind::UnitDestroyed { unit } => {
                 let (cause, by) = self.credit_kill(t, *unit);
                 self.loss(t, *unit, false, cause, by);
+            }
+            SimEventKind::Collision {
+                a,
+                b,
+                closing_mps,
+                damage_fraction_a,
+                damage_fraction_b,
+            } => {
+                // Collision damage follows; it is nobody's weapon hit.
+                self.pending_hit = None;
+                self.collided.insert(*a, (t, *b));
+                self.collided.insert(*b, (t, *a));
+                let (na, nb) = (self.unit_name(*a), self.unit_name(*b));
+                let kn = closing_mps * 3600.0 / 1852.0;
+                let text = format!(
+                    "{na} and {nb} collided at {kn:.0} kn closing ({:.0} % and {:.0} % of their damage points)",
+                    damage_fraction_a * 100.0,
+                    damage_fraction_b * 100.0
+                );
+                self.note(t, TimelineKind::Damage, self.unit_side(*a), text);
             }
             SimEventKind::MineEncounter {
                 unit,

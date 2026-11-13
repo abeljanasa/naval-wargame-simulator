@@ -350,8 +350,9 @@ fn hit_and_miss_feedback_follows_fog_of_war() {
     let (s, _) = load("phase3-pilot.json");
     let db = sim_db::embedded::open_platform_db().unwrap();
     let mut sim = s.build(None, &db).unwrap();
-    // Cinder is sunk by Bastion's missile at 01:52:49 (6769 s) in the reference run.
-    sim.run_until(sim_core::Tick(6775));
+    // Cinder is sunk at 02:06:30 (7590 s) in the reference run (since collision avoidance,
+    // docs/models/collisions.md: Blue's ships give way to each other on the way in).
+    sim.run_until(sim_core::Tick(7596));
     let wc = sim.snapshot(sim_core::Viewer::WhiteCell).outcomes;
     let sunk = wc
         .iter()

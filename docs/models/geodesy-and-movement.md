@@ -35,6 +35,7 @@ All trigonometry goes through the pure-Rust `libm` crate, so results are bit-ide
    - If d ≥ the leg length (within 1 mm), snap to the waypoint, log `WaypointReached`, and carry the leftover distance onto the next leg.
    - After the final waypoint, log `RouteCompleted` and come to **all-stop** (v = v_ordered = 0).
 4. **Without a route:** dead-reckon along the current heading. Heading is updated to the geodesic's forward azimuth at the new point, so the unit follows a great circle, not a rhumb line.
+5. **Ships and submarines keep clear of each other**, and are damaged when they do not: see [collisions.md](collisions.md). A hull giving way steers its avoidance heading instead of its route for that tick, then comes back to the route or to its ordered heading.
 
 ### Worked example (hand calculation, matched by `hand_calculated_transit_time`)
 

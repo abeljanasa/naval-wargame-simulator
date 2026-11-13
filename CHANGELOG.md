@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added: ship collisions and collision avoidance
+
+- **Collisions:** ships and submarines whose depths overlap collide within half their combined lengths.
+  - Both stop. Each takes the weapon hit's damage roll for a share of its damage points: (other's mass / total)² × (closing speed / 14 m/s)², calibrated on USS *Fitzgerald*.
+  - A hard collision holes the hull and floods as a torpedo does.
+  - Logged, on the AAR timeline, and a loss to it is "collision with …".
+- **Collision avoidance** by the rules of the road, own side included:
+  - the give-way ship (overtaking, crossing with the other to starboard, head-on, or meeting a stopped ship) turns to starboard just enough to pass at a safe distance, or slows;
+  - at close quarters everyone acts;
+  - it then comes back to its route or ordered heading.
+
+  Ships do not see another side's submerged submarine.
+- **Golden replays re-blessed:** in four shipped scenarios Blue's ships now give way to each other; none has a collision. With avoidance off, the old hashes are reproduced exactly.
+- Platform displacement now reaches the engine (for mass). Saves stay format 27.
+
 ### Added (Phase 4, slice 8: acoustics)
 
 - **Sound-velocity profiles** by area and month, from the scenario (`sound_profiles`) or the white cell (Planning tab, CSV import). Without one, the Phase 2 sonar law holds unchanged.

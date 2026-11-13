@@ -904,7 +904,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
         stores,
         damage,
         fuel_basis,
-        draft_m,
+        (draft_m, displacement_t),
     ) = match &u.platform {
         Some(pid) => {
             let p = db
@@ -985,7 +985,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
                     }
                     _ => None,
                 },
-                p.draft_m,
+                (p.draft_m, p.displacement_t),
             )
         }
         // `validate` guarantees these are present when there is no platform.
@@ -1005,7 +1005,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
             BTreeMap::new(),
             None,
             None,
-            None,
+            (None, None),
         ),
     };
     Ok(UnitSpawn {
@@ -1035,6 +1035,7 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
         damage_profile: damage,
         mission: u.mission.clone(),
         draft_m,
+        displacement_t,
         fuel: fuel_basis
             .filter(|_| fuel)
             .map(|(capacity_t, endurance_m, cruise_mps)| FuelSpec {

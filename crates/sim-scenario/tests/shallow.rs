@@ -75,6 +75,7 @@ fn ship(at: GeoPoint, heading: f64, speed: f64, draft_m: f64, route: Vec<GeoPoin
             mission: None,
             fuel: None,
             draft_m: Some(draft_m),
+            displacement_t: None,
         }),
     }
 }

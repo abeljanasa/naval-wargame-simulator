@@ -426,6 +426,14 @@ pub(crate) fn apply_hit(
     torpedo: bool,
     tick: Tick,
 ) {
+    apply_damage(world, target, hit_damage_dp(warhead_kg), torpedo, tick);
+}
+
+/// Applies `dp` damage points to `target`, then four `Damage` draws in fixed order (critical?,
+/// which system, fire?, flooding?; `torpedo` floods as an underwater hit or a holed hull does).
+/// Destroys the unit if its damage reaches its damage points. Weapon hits and collisions both
+/// come here.
+pub(crate) fn apply_damage(world: &mut World, target: UnitId, dp: f64, torpedo: bool, tick: Tick) {
     let Some(e) = entity_of(world, target) else {
         return;
     };
@@ -438,7 +446,6 @@ pub(crate) fn apply_hit(
             rng.uniform(StreamId::Damage),
         ]
     };
-    let dp = hit_damage_dp(warhead_kg);
     let Some(mut h) = world.get_mut::<Health>(e) else {
         return;
     };

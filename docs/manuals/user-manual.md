@@ -43,6 +43,8 @@ Your workstation needs:
 
 **Imagery.** When the client's licensed imagery is installed, **View › Imagery** shows it under the picture (the land fill hides and the depth shading dims so it reads), and **View › Imagery packs…** lists the packs and lets you choose one. The imagery's credit is shown with the map. Nothing is downloaded: the imagery comes from files on this machine. The white cell installs a pack with **File › Install imagery pack…** (`.mbtiles` or `.pmtiles`, up to 1 GB); larger packs are copied into the folder the dialog shows.
 
+**Ships keep clear of each other.** Ships and submarines give way by the rules of the road, to their own side as well as to others. A ship giving way turns to starboard, or slows if turning will not do, then comes back to its route or heading on its own; you see it on the map. The event log records each time. A ship cannot see another side's submerged submarine and can run it down. A collision stops both and damages each by the closing speed and the other's size: a small craft hit by a large ship comes off far worse. Order the ships on again when you are ready.
+
 **Shallow water.** With terrain packs, ships and submarines are routed round water shallower than their draft plus 1 m. Harbour approaches, the first and last few kilometres of a leg, are left to your waypoints.
 - **No deep-enough route:** the order still goes through, routed round land only, and the status bar warns you: "*X*: no route deep enough for its draft…".
 - **Off its planned route:** a ship off its planned route (none, finished, or not planned for its draft) stops rather than steam into water shallower than its draft. The status bar says so ("*X* stopped: 5 m of water ahead…"); the white cell decides any damage.

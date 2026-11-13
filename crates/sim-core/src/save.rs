@@ -131,6 +131,9 @@ pub struct SaveGame {
     /// Sound profiles, towed arrays and sonobuoys (format 27). Older saves load with none.
     #[serde(default)]
     pub acoustics: crate::acoustics::Acoustics,
+    /// Who is giving way to whom (format 27). Older saves load with none.
+    #[serde(default)]
+    pub avoidance: crate::collision::Avoidance,
     #[serde(default)]
     pub bearings: BearingTable,
     #[serde(default)]

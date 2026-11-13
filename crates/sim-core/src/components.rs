@@ -48,6 +48,10 @@ pub struct Unit {
     /// Draft, metres, for facility depth limits. From the spawn command, so not hashed.
     #[serde(default)]
     pub draft_m: Option<f64>,
+    /// Full-load displacement, t, for collisions (`docs/models/collisions.md`). From the spawn
+    /// command, so not hashed; `None` uses a generic mass from the length.
+    #[serde(default)]
+    pub displacement_t: Option<f64>,
 }
 
 /// Geodetic position. `altitude_m` is height above MSL; negative values are depth.

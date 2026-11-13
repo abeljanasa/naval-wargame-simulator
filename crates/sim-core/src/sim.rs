@@ -165,6 +165,8 @@ impl Simulation {
         world.insert_resource(EnvState::default());
         world.insert_resource(crate::detection::Weather::default());
         world.insert_resource(crate::acoustics::Acoustics::default());
+        world.insert_resource(crate::collision::Avoidance::default());
+        world.insert_resource(crate::collision::PendingCollisions::default());
         world.insert_resource(BearingTable::default());
         world.insert_resource(WeaponCatalog::default());
         world.insert_resource(WeaponsInFlight::default());
@@ -892,6 +894,17 @@ impl Simulation {
                 }
             }
         }
+        // Avoidance state only when some hull is giving way, so runs without it keep their hashes.
+        let av = &self.world.resource::<crate::collision::Avoidance>().0;
+        if !av.is_empty() {
+            h.str("avoidance");
+            h.u64(av.len() as u64);
+            for (u, s) in av {
+                h.u64(u.0);
+                h.u64(s.other.map_or(0, |o| o.0 + 1));
+                h.opt_f64(s.resume_deg);
+            }
+        }
         let zones = &self.world.resource::<crate::detection::Weather>().0;
         if !zones.is_empty() {
             h.str("weather");
@@ -986,6 +999,7 @@ impl Simulation {
             environment: self.world.resource::<EnvState>().0,
             weather: self.world.resource::<crate::detection::Weather>().0.clone(),
             acoustics: self.world.resource::<crate::acoustics::Acoustics>().clone(),
+            avoidance: self.world.resource::<crate::collision::Avoidance>().clone(),
             bearings: self.world.resource::<BearingTable>().clone(),
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
@@ -1035,6 +1049,7 @@ impl Simulation {
         sim.world
             .insert_resource(crate::detection::Weather(save.weather.clone()));
         sim.world.insert_resource(save.acoustics.clone());
+        sim.world.insert_resource(save.avoidance.clone());
         sim.world.insert_resource(save.bearings);
         sim.world.insert_resource(save.emitter_library);
         sim.world.insert_resource(save.weapon_catalog);
@@ -1186,6 +1201,7 @@ fn build_schedule() -> Schedule {
         (
             apply_commands_system,
             movement_system,
+            crate::collision::collision_system,
             crate::acoustics::sonobuoy_system,
             crate::weapon_tracks::weapon_tracks_system,
             point_defence_system,
@@ -1584,6 +1600,7 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
                 group: s.group.clone(),
                 doctrine: s.doctrine,
                 draft_m: s.draft_m,
+                displacement_t: s.displacement_t,
             },
             Position {
                 point: s.position,
