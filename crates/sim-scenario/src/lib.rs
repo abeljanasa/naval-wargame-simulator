@@ -198,6 +198,9 @@ pub struct Scenario {
     /// Surface action groups: members keep station on the leader (format 5).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub action_groups: Vec<ActionGroup>,
+    /// Planning layer: shipping lanes, e.g. through choke points (Phase 4 slice 5).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lanes: Vec<sim_core::Lane>,
     /// The fuel model for ships and submarines (format 6; `docs/models/fuel.md`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fuel: bool,
@@ -767,11 +770,16 @@ impl Scenario {
                 weapon: m.weapon.clone(),
             });
         }
-        if !self.facilities.is_empty() || !self.zones.is_empty() || !self.action_groups.is_empty() {
+        if !self.facilities.is_empty()
+            || !self.zones.is_empty()
+            || !self.action_groups.is_empty()
+            || !self.lanes.is_empty()
+        {
             c2.push(CommandPayload::SetPlanning {
                 facilities: self.facilities.clone(),
                 zones: self.zones.clone(),
                 action_groups: (!self.action_groups.is_empty()).then(|| self.action_groups.clone()),
+                lanes: (!self.lanes.is_empty()).then(|| self.lanes.clone()),
             });
         }
         if !self.seats.is_empty() {

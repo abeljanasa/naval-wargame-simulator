@@ -14,15 +14,17 @@ pub enum AarTable {
     Losses,
     Weapons,
     Detections,
+    Transits,
     Timeline,
 }
 
 impl AarTable {
-    pub const ALL: [AarTable; 5] = [
+    pub const ALL: [AarTable; 6] = [
         AarTable::Sides,
         AarTable::Losses,
         AarTable::Weapons,
         AarTable::Detections,
+        AarTable::Transits,
         AarTable::Timeline,
     ];
 
@@ -34,6 +36,7 @@ impl AarTable {
             AarTable::Losses => "losses",
             AarTable::Weapons => "weapons",
             AarTable::Detections => "detections",
+            AarTable::Transits => "transits",
             AarTable::Timeline => "timeline",
         }
     }
@@ -224,6 +227,48 @@ impl AarReport {
                             clock(d.gained),
                             d.lost.map(clock).unwrap_or_default(),
                             format!("{:.0}", d.held_s),
+                        ],
+                    );
+                }
+            }
+            AarTable::Transits => {
+                line(
+                    &mut out,
+                    &h(&[
+                        "time",
+                        "choke_point",
+                        "unit",
+                        "unit_name",
+                        "side",
+                        "lane",
+                        "traffic_per_day",
+                        "depth_m",
+                        "draft_m",
+                        "risk",
+                    ]),
+                );
+                for r in &self.transits {
+                    let num = |v: Option<f64>, p: usize| {
+                        v.map_or_else(String::new, |v| format!("{v:.p$}"))
+                    };
+                    line(
+                        &mut out,
+                        &[
+                            clock(r.tick),
+                            r.choke_point.clone(),
+                            r.unit.0.to_string(),
+                            r.unit_name.clone(),
+                            side(r.side),
+                            r.lane.clone().unwrap_or_default(),
+                            format!("{:.1}", r.traffic_per_day),
+                            num(r.depth_m, 1),
+                            num(r.draft_m, 1),
+                            match r.risk {
+                                sim_core::TransitRisk::Low => "low",
+                                sim_core::TransitRisk::Moderate => "moderate",
+                                sim_core::TransitRisk::High => "high",
+                            }
+                            .to_owned(),
                         ],
                     );
                 }

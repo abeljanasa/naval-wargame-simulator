@@ -141,6 +141,7 @@ const session = (): SessionInfo => ({
   facilities: [],
   zones: viewer.kind === "white_cell" ? zones : [],
   action_groups: [],
+  lanes: [],
 });
 
 const platforms = [
@@ -325,6 +326,8 @@ mockIPC(
         return { report: aarReport(), replaying: replay !== null };
       case "aar_csv":
         return "time,tick,kind,side,text\n";
+      case "choke_depths":
+        return [];
       case "terrain_status":
         return { loading: false, packs: [], in_use: null, problems: [], folder: "" };
       case "terrain_grid":

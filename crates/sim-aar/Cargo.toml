@@ -19,6 +19,7 @@ thiserror.workspace = true
 specta = { workspace = true, optional = true }
 
 [dev-dependencies]
+serde_json.workspace = true
 sim-scenario.workspace = true
 sim-db.workspace = true
 

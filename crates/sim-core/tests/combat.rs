@@ -1146,6 +1146,7 @@ fn planning(facilities: Vec<Facility>, zones: Vec<Zone>) -> Command {
         Issuer::Scenario,
         None,
         CommandPayload::SetPlanning {
+            lanes: None,
             facilities,
             zones,
             action_groups: None,
@@ -1436,6 +1437,7 @@ fn only_privileged_issuers_set_the_planning_layer_and_bad_layers_are_refused() {
         Issuer::Player { seat: 1 },
         Some(1),
         CommandPayload::SetPlanning {
+            lanes: None,
             facilities: vec![],
             zones: vec![zone(
                 1,
@@ -2298,6 +2300,7 @@ fn denial_patrols_inside_the_choke_point_and_engages_only_inside_it() {
             Issuer::Scenario,
             None,
             CommandPayload::SetPlanning {
+                lanes: None,
                 facilities: vec![],
                 zones: vec![z],
                 action_groups: None,
@@ -2758,6 +2761,7 @@ fn set_groups(tick: u64, groups: Vec<ActionGroup>) -> Command {
         Issuer::Scenario,
         None,
         CommandPayload::SetPlanning {
+            lanes: None,
             facilities: vec![],
             zones: vec![],
             action_groups: Some(groups),

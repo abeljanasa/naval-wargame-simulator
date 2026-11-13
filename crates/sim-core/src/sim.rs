@@ -217,6 +217,27 @@ impl Simulation {
         self.terrain().map(|t| t.id().to_owned())
     }
 
+    /// The water of every choke point the planning layer names, by name (display only).
+    #[must_use]
+    pub fn choke_depths(&self) -> Vec<crate::lanes::ChokeDepths> {
+        let layer = self.world.resource::<PlanningLayer>();
+        let names: std::collections::BTreeSet<&str> = layer
+            .zones
+            .iter()
+            .filter_map(|z| z.choke_point.as_deref())
+            .collect();
+        names
+            .into_iter()
+            .filter_map(|n| crate::lanes::choke_depths(layer, self.terrain().map(|t| &**t), n))
+            .collect()
+    }
+
+    /// The shipping lanes in play.
+    #[must_use]
+    pub fn lanes(&self) -> Vec<crate::lanes::Lane> {
+        self.world.resource::<PlanningLayer>().lanes.clone()
+    }
+
     /// The terrain in use, if any.
     #[must_use]
     pub fn terrain(&self) -> Option<&Arc<Terrain>> {
@@ -1262,14 +1283,23 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             facilities,
             zones,
             action_groups,
+            lanes,
         } => {
             if !cmd.issuer.is_privileged() {
                 return Err("only the scenario or white cell may set the planning layer".into());
+            }
+            if let Some(lanes) = lanes {
+                crate::lanes::validate_lanes(lanes)?;
             }
             let mut layer = world.resource_mut::<PlanningLayer>();
             layer.set(facilities.clone(), zones.clone());
             if let Some(groups) = action_groups {
                 layer.action_groups.clone_from(groups);
+            }
+            if let Some(lanes) = lanes {
+                let mut lanes = lanes.clone();
+                lanes.sort_by_key(|l| l.id);
+                layer.lanes = lanes;
             }
             Ok(())
         }

@@ -21,6 +21,7 @@ mod events;
 mod fuel;
 mod hash;
 mod ids;
+mod lanes;
 mod mines;
 mod movement;
 mod optical;
@@ -69,6 +70,10 @@ pub use fuel::{
 };
 pub use hash::StateHash;
 pub use ids::{SideId, UnitId};
+pub use lanes::{
+    distance_to_lane_m, transit_risk, validate_lanes, ChokeDepths, Lane, TransitRisk,
+    DEFAULT_LANE_WIDTH_M,
+};
 pub use mines::{Minefield, Minefields, MINE_CHECK_PERIOD_TICKS};
 pub use optical::default_length_m;
 pub use outcomes::{Outcome, OutcomeFeed, OutcomeKind};

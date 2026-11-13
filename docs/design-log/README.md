@@ -33,6 +33,7 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
 | [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
 | [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0041](DL-0041-choke-points-and-lanes.md) | Choke points: depth sections, shipping lanes with sourced traffic, transit risk in the AAR | Project spec §7 + ADR-0007 + original design |
 | [DL-0040](DL-0040-terrain-masking.md) | Terrain masking of radar, ESM, optical, comms and coverage; land clutter for low aircraft over land | Project spec §6 + 4/3-earth path profiling + original design |
 | [DL-0039](DL-0039-shallow-water.md) | Shallow water: routing by draft, shoal guard off the charted route, chart depths of facilities, depth along the route | Project spec §6 + seamanship + original design |
 | [DL-0038](DL-0038-terrain-packs.md) | Terrain and bathymetry packs: format, sampling, install, map layers | Project spec §6, §14 + GEBCO 2020 + netCDF classic spec + original design |

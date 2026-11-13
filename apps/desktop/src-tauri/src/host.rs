@@ -189,6 +189,8 @@ pub struct Host {
     /// The planning layer in force: the scenario's, with the white cell's changes.
     pub zones: Vec<sim_core::Zone>,
     pub facilities: Vec<sim_core::Facility>,
+    /// Shipping lanes in play (public: every seat sees them).
+    pub lanes: Vec<sim_core::Lane>,
     /// Terrain and bathymetry packs for new exercises and replays (`None`: none installed).
     terrain: Option<Arc<Terrain>>,
 }
@@ -242,6 +244,7 @@ impl Host {
     ) -> Result<Self, sim_scenario::ScenarioError> {
         let (sim, seats, first) = start(&scenario, &platforms, None)?;
         let zones = scenario.zones.clone();
+        let lanes = scenario.lanes.clone();
         let facilities = scenario.facilities.clone();
         Ok(Self {
             scenario,
@@ -257,6 +260,7 @@ impl Host {
             replay: None,
             zones,
             facilities,
+            lanes,
             terrain: None,
         })
     }
@@ -316,6 +320,17 @@ impl Host {
             .collect())
     }
 
+    /// The water of every choke point (white cell only): depths and a section across each.
+    pub fn choke_depths(&mut self, label: &str) -> Result<Vec<sim_core::ChokeDepths>, String> {
+        if !matches!(self.seat_of(label)?.role, SeatRole::WhiteCell) {
+            return Err("only the white cell sees the planning layer".into());
+        }
+        Ok(match &mut self.replay {
+            Some(r) => r.sim_mut().choke_depths(),
+            None => self.sim.choke_depths(),
+        })
+    }
+
     /// The terrain id the live exercise (or the replay under review) runs with.
     #[must_use]
     pub fn terrain_in_use(&self) -> Option<String> {
@@ -336,6 +351,7 @@ impl Host {
         self.seats = seats;
         self.replay = None;
         self.zones = self.scenario.zones.clone();
+        self.lanes = self.scenario.lanes.clone();
         self.facilities = self.scenario.facilities.clone();
         let closing: Vec<String> = self
             .stations
@@ -940,6 +956,7 @@ impl Host {
         let seq = self.order(
             label,
             CommandPayload::SetPlanning {
+                lanes: None,
                 facilities: self.facilities.clone(),
                 zones: zones.clone(),
                 action_groups: None,
@@ -956,21 +973,29 @@ impl Host {
         label: &str,
         facilities: Vec<sim_core::Facility>,
         zones: Vec<sim_core::Zone>,
+        lanes: Option<Vec<sim_core::Lane>>,
     ) -> Result<u64, String> {
         if self.seat_of(label)?.role != SeatRole::WhiteCell {
             return Err("only the white cell changes the planning layer".into());
         }
         sim_core::validate_planning(&facilities, &zones)?;
+        if let Some(l) = &lanes {
+            sim_core::validate_lanes(l)?;
+        }
         let seq = self.order(
             label,
             CommandPayload::SetPlanning {
                 facilities: facilities.clone(),
                 zones: zones.clone(),
                 action_groups: None,
+                lanes: lanes.clone(),
             },
         )?;
         self.facilities = facilities;
         self.zones = zones;
+        if let Some(l) = lanes {
+            self.lanes = l;
+        }
         Ok(seq)
     }
 
@@ -1568,12 +1593,12 @@ mod tests {
         let removed = facilities.remove(free).id;
         let zones = h.zones.clone();
         assert!(
-            h.order_planning(M, facilities.clone(), zones.clone())
+            h.order_planning(M, facilities.clone(), zones.clone(), None)
                 .is_err(),
             "a side's seat may not"
         );
         h.set_seat(M, seat_named(&h, "White cell")).unwrap();
-        h.order_planning(M, facilities.clone(), zones.clone())
+        h.order_planning(M, facilities.clone(), zones.clone(), None)
             .unwrap();
         h.step(M, 1).unwrap();
         assert!(h.update(M).unwrap().refusals.is_empty());

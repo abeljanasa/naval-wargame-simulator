@@ -6,6 +6,7 @@
     createMap,
     declutter,
     labelCandidates,
+    laneLayers,
     outcomeLayers,
     outcomeText,
     buildLayers,
@@ -24,8 +25,11 @@
   import { sim, COMPRESSIONS } from "./lib/sim.svelte";
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import { commands } from "./lib/bindings";
+  import { lanesFromGeoJson, navigableWidthM, type Lane } from "./lib/lanes";
   import type {
     Audience,
+    ChokeDepths_Serialize as ChokeDepths,
+    GeoPoint,
     CommsView,
     Emcon,
     Facility,
@@ -128,6 +132,85 @@
       }
     });
   });
+
+  // Shipping lanes and choke points (slice 5), for the white cell's Planning tab.
+  let laneInput = $state<HTMLInputElement>();
+  let laneNotes = $state<string[]>([]);
+  let drawingLane = $state<GeoPoint[] | null>(null);
+  let chokes = $state<ChokeDepths[]>([]);
+  let chokeDraft = $state(10);
+  $effect(() => {
+    const key = `${(sim.session?.zones ?? []).length}|${(sim.session?.lanes ?? []).length}|${terrain?.packs.length ?? 0}`;
+    void key;
+    if (rightTab !== "planning") return;
+    void commands.chokeDepths().then((r) => {
+      if (r.status === "ok") chokes = r.data;
+    });
+  });
+
+  function editLanes(change: (l: Lane[]) => void) {
+    const lanes = structuredClone($state.snapshot(sim.session?.lanes ?? [])) as Lane[];
+    change(lanes);
+    void sim.setPlanning(
+      structuredClone($state.snapshot(sim.session?.facilities ?? [])),
+      structuredClone($state.snapshot(sim.session?.zones ?? [])),
+      lanes,
+    );
+  }
+
+  function nextLaneId(): number {
+    return Math.max(0, ...(sim.session?.lanes ?? []).map((l) => l.id)) + 1;
+  }
+
+  /** Draws a lane point by point on the map; "Finish lane" adds it. */
+  function drawLanePoint() {
+    const pts = drawingLane;
+    if (!pts) return;
+    sim.pick(`Lane: click point ${pts.length + 1} on the map, then Finish lane`, (p) => {
+      drawingLane = [...pts, p];
+      drawLanePoint();
+    });
+  }
+
+  function finishLane() {
+    const pts = drawingLane ?? [];
+    drawingLane = null;
+    sim.picking = null;
+    if (pts.length < 2) return;
+    const id = nextLaneId();
+    editLanes((ls) =>
+      ls.push({
+        id,
+        name: `Lane ${id}`,
+        points: pts,
+        width_m: 2000,
+        ships_per_day: null,
+        source: null,
+        choke_point: null,
+      }),
+    );
+  }
+
+  async function importLanes(file: File | undefined) {
+    if (!file) return;
+    const { lanes, notes } = lanesFromGeoJson(await file.text(), nextLaneId(), file.name);
+    laneNotes = notes;
+    if (lanes.length) editLanes((ls) => ls.push(...lanes));
+  }
+
+  const chokeSection = (c: ChokeDepths) =>
+    profilePaths(
+      {
+        draft_m: chokeDraft,
+        here_m: null,
+        least_m: null,
+        least_at_m: null,
+        charted: true,
+        profile: c.section,
+      },
+      240,
+      48,
+    );
 
   function editPlanning(change: (f: Facility[], z: Zone[]) => void) {
     const facilities = structuredClone($state.snapshot(sim.session?.facilities ?? []));
@@ -482,6 +565,7 @@
           hiddenLabels,
           symbolStyle,
         }),
+        ...laneLayers(sim.session?.lanes ?? [], hiddenLabels),
         ...referenceLayers(sim.session?.reference_points ?? [], undefined, hiddenLabels),
         ...outcomeLayers(sim.outcomes, n(clock?.game_time_s ?? 0)),
       ],
@@ -1424,6 +1508,154 @@
             </ul>
           </section>
           <section>
+            <h3>Shipping lanes</h3>
+            <ul class="zones" aria-label="Shipping lanes">
+              {#each sim.session?.lanes ?? [] as l, i (l.id)}
+                <li class="stacked">
+                  <span>
+                    <input
+                      class="lane-name"
+                      value={l.name}
+                      aria-label="Lane name"
+                      onchange={(e) => {
+                        const v = e.currentTarget.value.trim();
+                        editLanes((ls) => {
+                          const x = ls[i];
+                          if (x && v) x.name = v;
+                        });
+                      }}
+                    />
+                    <span class="dim">{l.source ?? "drawn here"}</span>
+                  </span>
+                  <span class="row tight">
+                    <label class="inline"
+                      >Width (km)
+                      <input
+                        class="depth"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={(n(l.width_m) / 1000).toFixed(1)}
+                        onchange={(e) => {
+                          const v = Number(e.currentTarget.value);
+                          editLanes((ls) => {
+                            const x = ls[i];
+                            if (x && v > 0) x.width_m = v * 1000;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Ships/day
+                      <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        value={l.ships_per_day ?? ""}
+                        placeholder="—"
+                        onchange={(e) => {
+                          const v = e.currentTarget.value.trim();
+                          editLanes((ls) => {
+                            const x = ls[i];
+                            if (!x) return;
+                            x.ships_per_day = v === "" ? null : Math.max(0, Number(v));
+                            if (x.ships_per_day !== null && !x.source)
+                              x.source = "planner's estimate";
+                          });
+                        }}
+                      /></label
+                    >
+                    <button
+                      type="button"
+                      onclick={() => editLanes((ls) => void ls.splice(i, 1))}
+                      aria-label={`Remove ${l.name}`}>Remove</button
+                    >
+                  </span>
+                </li>
+              {:else}
+                <li class="empty">No lanes.</li>
+              {/each}
+            </ul>
+            {#each laneNotes as note (note)}
+              <p class="dim">{note}</p>
+            {/each}
+            <div class="row tight">
+              {#if drawingLane}
+                <span class="dim">{drawingLane.length} points</span>
+                <button type="button" onclick={finishLane}>Finish lane</button>
+              {:else}
+                <button
+                  type="button"
+                  onclick={() => {
+                    drawingLane = [];
+                    drawLanePoint();
+                  }}>Draw on the map</button
+                >
+                <button type="button" onclick={() => laneInput?.click()}>Import GeoJSON…</button>
+              {/if}
+            </div>
+            <input
+              bind:this={laneInput}
+              class="visually-hidden"
+              type="file"
+              accept=".geojson,.json,application/geo+json,application/json"
+              aria-label="Shipping lanes (GeoJSON)"
+              onchange={(e) => {
+                void importLanes(e.currentTarget.files?.[0]);
+                e.currentTarget.value = "";
+              }}
+            />
+          </section>
+          {#if chokes.length > 0}
+            <section>
+              <h3>Choke points</h3>
+              <label class="inline"
+                >Draft (m)
+                <input
+                  class="depth"
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  bind:value={chokeDraft}
+                /></label
+              >
+              {#each chokes as c (c.choke_point)}
+                {@const sec = chokeSection(c)}
+                <div class="choke">
+                  <strong>{c.choke_point}</strong>
+                  <span class="dim">
+                    {#if c.least_m == null}
+                      no chart here
+                    {:else}
+                      least {Math.round(n(c.least_m))} m · typical {Math.round(n(c.median_m))} m · deepest
+                      {Math.round(n(c.deepest_m))} m · {(
+                        navigableWidthM(c.section, chokeDraft + 1) / 1000
+                      ).toFixed(1)} km wide for a {chokeDraft} m draft
+                    {/if}
+                    {#if c.lanes.length}
+                      · {c.lanes.length} lane{c.lanes.length > 1 ? "s" : ""}, {Math.round(
+                        n(c.traffic_per_day),
+                      )} ships a day
+                    {/if}
+                  </span>
+                  {#if c.least_m != null && sec.bed}
+                    <svg
+                      class="water-profile"
+                      viewBox="0 0 240 48"
+                      role="img"
+                      aria-label={`Depth across ${c.choke_point}`}
+                    >
+                      <path class="bed" d={sec.bed} />
+                      {#if sec.draftY !== null}
+                        <line class="draft" x1="0" x2="240" y1={sec.draftY} y2={sec.draftY} />
+                      {/if}
+                    </svg>
+                  {/if}
+                </div>
+              {/each}
+            </section>
+          {/if}
+          <section>
             <h3>Zones</h3>
             <ul class="zones" aria-label="Zone rules">
               {#each sim.session?.zones ?? [] as z (z.id)}
@@ -2100,6 +2332,12 @@
   }
   input.depth {
     width: 6em;
+  }
+  input.lane-name {
+    width: 12em;
+  }
+  .choke {
+    margin: 6px 0;
   }
   .statusbar .terrain-readout {
     margin-left: auto;

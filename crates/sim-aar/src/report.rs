@@ -83,6 +83,25 @@ pub struct DetectionRow {
     pub held_s: f64,
 }
 
+/// One choke-point transit, assessed (`docs/models/choke-points.md`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct TransitRow {
+    pub tick: Tick,
+    pub choke_point: String,
+    pub unit: UnitId,
+    pub unit_name: String,
+    pub side: Option<SideId>,
+    /// The lane the unit was in, if any.
+    pub lane: Option<String>,
+    /// The choke point's lanes' traffic, ships per day.
+    pub traffic_per_day: f64,
+    /// Water under the unit as it entered (terrain packs), and its draft.
+    pub depth_m: Option<f64>,
+    pub draft_m: Option<f64>,
+    pub risk: sim_core::TransitRisk,
+}
+
 /// What a timeline entry is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -125,6 +144,9 @@ pub struct AarReport {
     pub losses: Vec<LossRow>,
     pub weapons: Vec<WeaponRow>,
     pub detections: Vec<DetectionRow>,
+    /// Choke-point transits with lanes or terrain packs (older reports: none).
+    #[serde(default)]
+    pub transits: Vec<TransitRow>,
     pub timeline: Vec<TimelineEntry>,
 }
 
@@ -161,6 +183,7 @@ struct Builder<'a> {
     losses: Vec<LossRow>,
     open_contacts: BTreeMap<(SideId, u32), usize>,
     detections: Vec<DetectionRow>,
+    transits: Vec<TransitRow>,
     timeline: Vec<TimelineEntry>,
 }
 
@@ -181,6 +204,7 @@ impl<'a> Builder<'a> {
             losses: Vec::new(),
             open_contacts: BTreeMap::new(),
             detections: Vec::new(),
+            transits: Vec::new(),
             timeline: Vec::new(),
         };
         // Every unit that could appear, and the seat names, from the log (by sequence number).
@@ -985,6 +1009,51 @@ impl<'a> Builder<'a> {
                     format!("{name} engaged C{contact} with {weapon} in engage zone {zone}"),
                 );
             }
+            SimEventKind::TransitAssessed {
+                choke_point,
+                unit,
+                lane,
+                traffic_per_day,
+                depth_m,
+                draft_m,
+                risk,
+            } => {
+                let name = self.unit_name(*unit);
+                let risk_word = match risk {
+                    sim_core::TransitRisk::Low => "low",
+                    sim_core::TransitRisk::Moderate => "moderate",
+                    sim_core::TransitRisk::High => "high",
+                };
+                let lane_text = lane
+                    .as_ref()
+                    .map_or_else(String::new, |l| format!(" in lane {l}"));
+                let water = match (depth_m, draft_m) {
+                    (Some(d), Some(k)) => format!(", {d:.0} m of water for a {k:.1} m draft"),
+                    (Some(d), None) => format!(", {d:.0} m of water"),
+                    _ => String::new(),
+                };
+                self.note(
+                    t,
+                    TimelineKind::Event,
+                    self.unit_side(*unit),
+                    format!(
+                        "{name}: transit of {choke_point}{lane_text}, {traffic_per_day:.0} ships a \
+                         day{water}: {risk_word} risk"
+                    ),
+                );
+                self.transits.push(TransitRow {
+                    tick: t,
+                    choke_point: choke_point.clone(),
+                    unit: *unit,
+                    unit_name: name,
+                    side: self.unit_side(*unit),
+                    lane: lane.clone(),
+                    traffic_per_day: *traffic_per_day,
+                    depth_m: *depth_m,
+                    draft_m: *draft_m,
+                    risk: *risk,
+                });
+            }
             SimEventKind::ChokePointTransit { choke_point, unit } => {
                 let name = self.unit_name(*unit);
                 self.note(
@@ -1067,6 +1136,7 @@ impl<'a> Builder<'a> {
             losses: self.losses,
             weapons: self.weapons.into_values().collect(),
             detections: self.detections,
+            transits: self.transits,
             timeline: self.timeline,
         }
     }

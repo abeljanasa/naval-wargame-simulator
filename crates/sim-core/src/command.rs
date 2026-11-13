@@ -248,6 +248,9 @@ pub enum CommandPayload {
         /// Surface action groups (omitted: the groups in play are kept).
         #[serde(default)]
         action_groups: Option<Vec<crate::planning::ActionGroup>>,
+        /// Shipping lanes (omitted: the lanes in play are kept).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        lanes: Option<Vec<crate::lanes::Lane>>,
     },
     /// Gives an action group its one mission, run by its leader (`None` clears it).
     AssignGroupMission {
@@ -406,8 +409,12 @@ impl CommandPayload {
                 facilities,
                 zones,
                 action_groups,
+                lanes,
             } => {
                 crate::planning::validate_planning(facilities, zones)?;
+                if let Some(lanes) = lanes {
+                    crate::lanes::validate_lanes(lanes)?;
+                }
                 action_groups
                     .as_deref()
                     .map_or(Ok(()), crate::planning::validate_groups)

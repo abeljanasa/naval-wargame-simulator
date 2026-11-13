@@ -41,7 +41,7 @@ Choose the **White cell** seat (toolbar, **Seat**) to see ground truth: every si
 - **Unit**: the selected unit, with **Override** (Repair, Destroy, Remove) and weapons in flight (Hit, Miss);
 - **Injects**: the inject library and free messages;
 - **Events**;
-- **Planning**: command posts, facilities and zones in play;
+- **Planning**: command posts, facilities and zones in play; shipping lanes (draw them on the map, or import GeoJSON; traffic figures need a source); each choke point's water (least, typical and deepest depth, a section across it, and how wide the water is for a draft you enter);
 - **Seats**;
 - **Log**: the override log;
 - **Review**: replay and AAR.
@@ -123,7 +123,7 @@ On the **Review** tab (or **Exercise › Review and AAR**), for the control stat
 | **Back to live** | Returns every window to the live exercise, still paused. |
 | **Save record** | Saves the exercise (`.nwsrec`): the scenario and every order, override and inject. Keep it with the exercise papers. |
 | Open a record | Opens a saved record for review on any machine with this build. |
-| **AAR tables** | Summary by side, losses with cause, weapons expended against effective, detections, and the timeline. Click a row to jump the replay there. **Save CSV** exports the open table. |
+| **AAR tables** | Summary by side, losses with cause, weapons expended against effective, detections, choke-point **transits** (lane, traffic, water, draft and a low/moderate/high risk; with lanes or terrain packs), and the timeline. Click a row to jump the replay there. **Save CSV** exports the open table. |
 
 **"Replay: matches the recorded run"** confirms the replay is exactly what happened. A red warning means the record was altered, or was made by a different build; treat that replay's details with care.
 

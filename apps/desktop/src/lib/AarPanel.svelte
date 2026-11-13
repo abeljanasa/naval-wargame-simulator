@@ -22,6 +22,7 @@
     { key: "losses", label: "Losses" },
     { key: "weapons", label: "Weapons" },
     { key: "detections", label: "Detections" },
+    { key: "transits", label: "Transits" },
     { key: "timeline", label: "Timeline" },
   ];
 
@@ -192,6 +193,35 @@
             {/each}
           </tbody>
         </table>
+      {:else if tab === "transits"}
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th><th>Choke point</th><th>Unit</th><th>Lane</th><th>Traffic/day</th><th
+                >Water</th
+              ><th>Draft</th><th>Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each view.report.transits ?? [] as r, i (i)}
+              <tr class:link={sim.replaying} onclick={() => seekTo(n(r.tick))}>
+                <td class="mono">{gameTime(n(r.tick))}</td><td>{r.choke_point}</td><td
+                  >{r.unit_name}</td
+                ><td>{r.lane ?? "—"}</td><td class="mono">{Math.round(n(r.traffic_per_day))}</td>
+                <td class="mono">{r.depth_m == null ? "—" : `${Math.round(n(r.depth_m))} m`}</td>
+                <td class="mono">{r.draft_m == null ? "—" : `${n(r.draft_m).toFixed(1)} m`}</td>
+                <td class="risk {r.risk}">{r.risk}</td>
+              </tr>
+            {:else}
+              <tr
+                ><td colspan="8" class="dim"
+                  >No assessed transits. Choke points are assessed when they have shipping lanes or
+                  terrain packs are installed.</td
+                ></tr
+              >
+            {/each}
+          </tbody>
+        </table>
       {:else if tab === "detections"}
         <table>
           <thead>
@@ -348,5 +378,12 @@
     align-items: center;
     gap: 8px;
     margin: 4px 0 8px;
+  }
+  .risk.high {
+    color: var(--danger, #e05a4f);
+    font-weight: 600;
+  }
+  .risk.moderate {
+    color: var(--warn);
   }
 </style>

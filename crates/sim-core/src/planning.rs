@@ -581,6 +581,10 @@ pub struct PlanningLayer {
     /// Surface action groups, in order.
     #[serde(default)]
     pub action_groups: Vec<ActionGroup>,
+    /// Shipping lanes (`lanes.rs`), sorted by id. Last, and left out when empty, so layers
+    /// without lanes serialise (and hash) as before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lanes: Vec<crate::lanes::Lane>,
 }
 
 /// Checks a planning layer before it is set.
@@ -1271,15 +1275,15 @@ fn choke_transits(world: &mut World, tick: Tick) {
     if chokes.is_empty() {
         return;
     }
-    let mut units: Vec<(UnitId, SideId, GeoPoint)> = world
+    let mut units: Vec<(UnitId, SideId, GeoPoint, Option<f64>)> = world
         .query::<(&Unit, &Position)>()
         .iter(world)
-        .map(|(u, p)| (u.id, u.side, p.point))
+        .map(|(u, p)| (u.id, u.side, p.point, u.draft_m))
         .collect();
     units.sort_by_key(|u| u.0);
     let mut now_inside = BTreeSet::new();
     for (name, (owner, areas)) in &chokes {
-        for &(id, side, at) in &units {
+        for &(id, side, at, _) in &units {
             if side != *owner && areas.iter().any(|a| a.contains(at)) {
                 now_inside.insert((name.clone(), id));
             }
@@ -1291,9 +1295,44 @@ fn choke_transits(world: &mut World, tick: Tick) {
     };
     world.resource_mut::<PlanningLayer>().inside = now_inside;
     for (choke_point, unit) in entered {
-        world
-            .resource_mut::<EventLog>()
-            .push(tick, SimEventKind::ChokePointTransit { choke_point, unit });
+        // The transit's traffic, lane and under-keel margin (lanes or terrain packs only).
+        let assessment = units
+            .iter()
+            .find(|u| u.0 == unit)
+            .and_then(|&(_, _, at, draft)| {
+                let areas = &chokes.get(&choke_point)?.1;
+                crate::lanes::assess(
+                    world.resource::<PlanningLayer>(),
+                    world.resource::<crate::sim::TerrainRes>().0.as_deref(),
+                    &choke_point,
+                    areas,
+                    at,
+                    draft,
+                )
+                .map(|a| (a, draft))
+            });
+        let mut log = world.resource_mut::<EventLog>();
+        log.push(
+            tick,
+            SimEventKind::ChokePointTransit {
+                choke_point: choke_point.clone(),
+                unit,
+            },
+        );
+        if let Some((a, draft_m)) = assessment {
+            log.push(
+                tick,
+                SimEventKind::TransitAssessed {
+                    choke_point,
+                    unit,
+                    lane: a.lane,
+                    traffic_per_day: a.traffic_per_day,
+                    depth_m: a.depth_m,
+                    draft_m,
+                    risk: a.risk,
+                },
+            );
+        }
     }
 }
 

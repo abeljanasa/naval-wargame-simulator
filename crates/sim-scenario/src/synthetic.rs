@@ -79,6 +79,7 @@ pub fn synthetic_scenario(units: usize, platform: &str, seed: u64) -> Scenario {
         facilities: vec![],
         zones: vec![],
         action_groups: vec![],
+        lanes: vec![],
         fuel: false,
     }
 }

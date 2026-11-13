@@ -2,6 +2,7 @@
 // (selection, draft route). Every change to the simulation goes through `commands`.
 
 import {
+  type Lane_Deserialize as Lane,
   type Outcome,
   type ActionGroup,
   type AarTable,
@@ -354,8 +355,9 @@ class SimSession {
   }
 
   /** White cell: replaces the planning layer's facilities and zones in play. */
-  async setPlanning(facilities: Facility[], zones: Zone[]) {
-    const res = await commands.orderPlanning(facilities, zones);
+  /** Sets the planning layer; `lanes` null keeps the lanes in play. */
+  async setPlanning(facilities: Facility[], zones: Zone[], lanes: Lane[] | null = null) {
+    const res = await commands.orderPlanning(facilities, zones, lanes);
     if (res.status === "error") this.error = res.error;
     else {
       this.session = res.data;

@@ -456,6 +456,18 @@ pub enum SimEventKind {
         choke_point: String,
         unit: UnitId,
     },
+    /// The transit just logged, assessed (`docs/models/choke-points.md`): the choke point's
+    /// lane traffic, the lane the unit is in, the water under it and its draft. Only with lanes
+    /// or terrain packs.
+    TransitAssessed {
+        choke_point: String,
+        unit: UnitId,
+        lane: Option<String>,
+        traffic_per_day: f64,
+        depth_m: Option<f64>,
+        draft_m: Option<f64>,
+        risk: crate::lanes::TransitRisk,
+    },
     /// A mission-killed unit was sent to a port for repair.
     DivertedToPort {
         unit: UnitId,

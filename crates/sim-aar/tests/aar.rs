@@ -242,6 +242,7 @@ fn report_accounts_for_every_shot_and_loss() {
         (AarTable::Losses, r.losses.len()),
         (AarTable::Weapons, r.weapons.len()),
         (AarTable::Detections, r.detections.len()),
+        (AarTable::Transits, r.transits.len()),
         (AarTable::Timeline, r.timeline.len()),
     ];
     for (table, n) in rows {

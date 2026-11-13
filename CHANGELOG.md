@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 5: choke points, depths and lanes)
+
+- **Shipping lanes** in the planning layer and in scenarios (`lanes`): a centreline, a width, a choke point, and traffic in ships per day.
+  - A traffic figure must name its source (a licensed data set, a chart, or "planner's estimate"), or it is refused.
+  - The white cell draws lanes on the map or imports them from GeoJSON; an imported traffic figure without a source is dropped.
+  - Lanes show on the map for every seat.
+- **Choke points' water:** least, typical and deepest depth, a section across the choke point (square to its lane), and the navigable width for a draft. All are in the white cell's Planning tab.
+- **Transit risk:** each transit of a choke point with lanes or terrain packs is assessed (`TransitAssessed`): lane, traffic, water under the keel, draft, and low, moderate or high risk.
+  - The AAR has a new *Transits* table and `transits.csv`.
+- **Unchanged:** without lanes, the planning layer hashes as before, and the golden replays are unchanged.
+
 ### Added (Phase 4, slice 4: terrain masking)
 
 - **Terrain masking** (terrain packs): land between the two ends of a line of sight blocks radar, ESM and optical detection, line-of-sight radio links, and sense coverage.

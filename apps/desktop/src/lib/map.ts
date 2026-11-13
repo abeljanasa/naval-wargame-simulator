@@ -21,6 +21,7 @@ import type {
   BearingView,
   ContactView,
   GeoPoint,
+  Lane_Deserialize as Lane,
   Minefield,
   Outcome,
   UnitView,
@@ -793,6 +794,44 @@ export interface MapPoint {
 }
 
 const POINT_COLOUR: RGBA = [120, 220, 160, 255];
+
+/** Shipping lanes (slice 5): a translucent band of the lane's width, and its name and traffic
+ * at the middle of its centreline. */
+export function laneLayers(lanes: Lane[], hidden?: Set<string>): Layer[] {
+  const mid = (l: Lane): LonLat => {
+    const k = Math.floor((l.points.length - 1) / 2);
+    const p = l.points[k] ?? { lat_deg: 0, lon_deg: 0 };
+    const q = l.points[k + 1] ?? p;
+    return [(n(p.lon_deg) + n(q.lon_deg)) / 2, (n(p.lat_deg) + n(q.lat_deg)) / 2];
+  };
+  return [
+    new PathLayer<Lane>({
+      id: "lanes",
+      data: lanes,
+      getPath: (l) => l.points.map(pt),
+      getWidth: (l) => n(l.width_m),
+      widthUnits: "meters",
+      widthMinPixels: 2,
+      getColor: [214, 178, 92, 70],
+      capRounded: true,
+      jointRounded: true,
+    }),
+    new TextLayer<Lane>({
+      id: "lane-labels",
+      data: lanes.filter((l) => !hidden?.has(`lane:${l.id}`)),
+      getPosition: mid,
+      getText: (l) =>
+        l.ships_per_day == null ? l.name : `${l.name} · ${Math.round(l.ships_per_day)}/day`,
+      getSize: 11,
+      getColor: [226, 196, 120, 230],
+      fontFamily: "system-ui, sans-serif",
+      outlineWidth: 2,
+      outlineColor: [11, 27, 43, 255],
+      fontSettings: { sdf: true },
+      characterSet: LABEL_CHARSET,
+    }),
+  ];
+}
 
 /** Reference points: a small ring and the name. */
 export function referenceLayers(

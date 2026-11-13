@@ -55,6 +55,16 @@ fn terrain_status_of(t: &TerrainState, h: &Host) -> terrain::TerrainStatus {
     }
 }
 
+/// The water of every choke point, for the white cell's planning tab.
+#[tauri::command]
+#[specta::specta]
+fn choke_depths(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+) -> Result<Vec<sim_core::ChokeDepths>, String> {
+    lock(&host).choke_depths(window.label())
+}
+
 /// The water under a unit and along the rest of its route (`None` without terrain packs).
 #[tauri::command]
 #[specta::specta]
@@ -192,6 +202,8 @@ pub struct SessionInfo {
     pub zones: Vec<sim_core::Zone>,
     /// Surface action groups this window's seat may see.
     pub action_groups: Vec<sim_scenario::ActionGroup>,
+    /// Shipping lanes (public: every seat sees them).
+    pub lanes: Vec<sim_core::Lane>,
 }
 
 #[tauri::command]
@@ -608,6 +620,7 @@ fn session_info(h: &Host, label: &str) -> Result<SessionInfo, String> {
             .filter(|g| sees(h.viewer(label), g.side))
             .cloned()
             .collect(),
+        lanes: h.lanes.clone(),
     })
 }
 
@@ -994,9 +1007,10 @@ fn order_planning(
     host: State<'_, SharedHost>,
     facilities: Vec<sim_core::Facility>,
     zones: Vec<sim_core::Zone>,
+    lanes: Option<Vec<sim_core::Lane>>,
 ) -> Result<SessionInfo, String> {
     let mut h = lock(&host);
-    h.order_planning(window.label(), facilities, zones)?;
+    h.order_planning(window.label(), facilities, zones, lanes)?;
     session_info(&h, window.label())
 }
 
@@ -1129,6 +1143,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             terrain_status,
             route_depths,
             facility_depths,
+            choke_depths,
         ])
         .events(collect_events![FrameEvent])
 }

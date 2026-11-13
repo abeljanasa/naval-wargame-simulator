@@ -77,7 +77,7 @@ export const commands = {
 	/**  Gives an action group its mission (run by its leader); `None` clears it. */
 	orderGroupMission: (group: string, mission: Mission_Deserialize | null) => typedError<null, string>(__TAURI_INVOKE("order_group_mission", { group, mission })),
 	/**  White cell: replaces the planning layer's facilities and zones in play. */
-	orderPlanning: (facilities: Facility_Deserialize[], zones: Zone_Deserialize[]) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_planning", { facilities, zones })),
+	orderPlanning: (facilities: Facility_Deserialize[], zones: Zone_Deserialize[], lanes: Lane_Deserialize[] | null) => typedError<SessionInfo_Serialize, string>(__TAURI_INVOKE("order_planning", { facilities, zones, lanes })),
 	/**  Takes a unit out of its action group. */
 	orderDetach: (unit: UnitId) => typedError<null, string>(__TAURI_INVOKE("order_detach", { unit })),
 	/**  Puts a unit into an action group at a station on its leader. */
@@ -114,6 +114,8 @@ export const commands = {
 	routeDepths: (unit: UnitId) => typedError<RouteDepths_Serialize | null, string>(__TAURI_INVOKE("route_depths", { unit })),
 	/**  Each facility's charted depth, for the white cell's planning tab. */
 	facilityDepths: () => typedError<FacilityDepth_Serialize[], string>(__TAURI_INVOKE("facility_depths")),
+	/**  The water of every choke point, for the white cell's planning tab. */
+	chokeDepths: () => typedError<ChokeDepths_Serialize[], string>(__TAURI_INVOKE("choke_depths")),
 };
 
 /** Events */
@@ -133,6 +135,8 @@ export type AarReport_Deserialize = {
 	losses: LossRow_Deserialize[],
 	weapons: WeaponRow[],
 	detections: DetectionRow_Deserialize[],
+	/**  Choke-point transits with lanes or terrain packs (older reports: none). */
+	transits?: TransitRow_Deserialize[],
 	timeline: TimelineEntry_Deserialize[],
 };
 
@@ -144,11 +148,13 @@ export type AarReport_Serialize = {
 	losses: LossRow_Serialize[],
 	weapons: WeaponRow[],
 	detections: DetectionRow_Serialize[],
+	/**  Choke-point transits with lanes or terrain packs (older reports: none). */
+	transits: TransitRow_Serialize[],
 	timeline: TimelineEntry_Serialize[],
 };
 
 /**  The tables of an [`AarReport`]. */
-export type AarTable = "sides" | "losses" | "weapons" | "detections" | "timeline";
+export type AarTable = "sides" | "losses" | "weapons" | "detections" | "transits" | "timeline";
 
 /**
  *  The after-action review for one window: the whole report, with the timeline cut to what the
@@ -316,6 +322,54 @@ export type BearingView = {
 	age_s: number | null,
 	/**  Intercepted emitter type. */
 	emitter: string,
+};
+
+/**
+ *  A choke point's water: depth statistics over its zones, a depth section across it, and its
+ *  lanes' traffic.
+ */
+export type ChokeDepths = ChokeDepths_Serialize | ChokeDepths_Deserialize;
+
+/**
+ *  A choke point's water: depth statistics over its zones, a depth section across it, and its
+ *  lanes' traffic.
+ */
+export type ChokeDepths_Deserialize = {
+	choke_point: string,
+	/**  Over a 24 × 24 grid of the zones' area (`None` without terrain packs there). */
+	least_m?: number | null,
+	median_m?: number | null,
+	deepest_m?: number | null,
+	/**
+	 *  Across the choke point: square to its lane where it has one, else across its narrower
+	 *  way. Samples outside its zones have no depth.
+	 */
+	section_from: GeoPoint,
+	section_to: GeoPoint,
+	section: DepthSample_Deserialize[],
+	lanes: number[],
+	traffic_per_day: number | null,
+};
+
+/**
+ *  A choke point's water: depth statistics over its zones, a depth section across it, and its
+ *  lanes' traffic.
+ */
+export type ChokeDepths_Serialize = {
+	choke_point: string,
+	/**  Over a 24 × 24 grid of the zones' area (`None` without terrain packs there). */
+	least_m: number | null,
+	median_m: number | null,
+	deepest_m: number | null,
+	/**
+	 *  Across the choke point: square to its lane where it has one, else across its narrower
+	 *  way. Samples outside its zones have no depth.
+	 */
+	section_from: GeoPoint,
+	section_to: GeoPoint,
+	section: DepthSample_Serialize[],
+	lanes: number[],
+	traffic_per_day: number | null,
 };
 
 /**  How much a side knows about a track. Ordered: a track only ever climbs the ladder. */
@@ -1069,6 +1123,45 @@ export type JammerSpec = {
 	jn_db_at_1km: number | null,
 };
 
+/**  A shipping lane. */
+export type Lane = Lane_Serialize | Lane_Deserialize;
+
+/**  A shipping lane. */
+export type Lane_Deserialize = {
+	id: number,
+	name: string,
+	/**  The lane's centreline, at least two points. */
+	points: GeoPoint[],
+	width_m?: number | null,
+	/**  Traffic using the lane, ships per day. Only with a `source`. */
+	ships_per_day?: number | null,
+	/**
+	 *  Where the lane and its traffic figure come from: a licensed traffic data set, a chart,
+	 *  or "planner's estimate".
+	 */
+	source?: string | null,
+	/**  The choke point the lane runs through (as zones name it). */
+	choke_point?: string | null,
+};
+
+/**  A shipping lane. */
+export type Lane_Serialize = {
+	id: number,
+	name: string,
+	/**  The lane's centreline, at least two points. */
+	points: GeoPoint[],
+	width_m: number | null,
+	/**  Traffic using the lane, ships per day. Only with a `source`. */
+	ships_per_day: number | null,
+	/**
+	 *  Where the lane and its traffic figure come from: a licensed traffic data set, a chart,
+	 *  or "planner's estimate".
+	 */
+	source: string | null,
+	/**  The choke point the lane runs through (as zones name it). */
+	choke_point: string | null,
+};
+
 /**  The state of a unit's link to its command post, or of a hop. */
 export type LinkStatus = "up" | "out_of_range" | "beyond_horizon" | "jammed" | 
 /**  Too deep to receive. */
@@ -1553,6 +1646,8 @@ export type Scenario_Deserialize = {
 	zones?: Zone_Deserialize[],
 	/**  Surface action groups: members keep station on the leader (format 5). */
 	action_groups?: ActionGroup_Deserialize[],
+	/**  Planning layer: shipping lanes, e.g. through choke points (Phase 4 slice 5). */
+	lanes?: Lane_Deserialize[],
 	/**  The fuel model for ships and submarines (format 6; `docs/models/fuel.md`). */
 	fuel?: boolean,
 };
@@ -1590,6 +1685,8 @@ export type Scenario_Serialize = {
 	zones?: Zone_Serialize[],
 	/**  Surface action groups: members keep station on the leader (format 5). */
 	action_groups?: ActionGroup_Serialize[],
+	/**  Planning layer: shipping lanes, e.g. through choke points (Phase 4 slice 5). */
+	lanes?: Lane_Serialize[],
 	/**  The fuel model for ships and submarines (format 6; `docs/models/fuel.md`). */
 	fuel?: boolean,
 };
@@ -1657,6 +1754,8 @@ export type SessionInfo_Deserialize = {
 	zones: Zone_Deserialize[],
 	/**  Surface action groups this window's seat may see. */
 	action_groups: ActionGroup_Deserialize[],
+	/**  Shipping lanes (public: every seat sees them). */
+	lanes: Lane_Deserialize[],
 };
 
 export type SessionInfo_Serialize = {
@@ -1680,6 +1779,8 @@ export type SessionInfo_Serialize = {
 	zones: Zone_Serialize[],
 	/**  Surface action groups this window's seat may see. */
 	action_groups: ActionGroup_Serialize[],
+	/**  Shipping lanes (public: every seat sees them). */
+	lanes: Lane_Serialize[],
 };
 
 /**  How serious a scenario problem is. */
@@ -1924,6 +2025,46 @@ export type TimelineEntry_Serialize = {
 
 /**  What a timeline entry is about. */
 export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | "override" | "facilitation" | "event" | "script_error";
+
+/**  A transit's risk. */
+export type TransitRisk = "low" | "moderate" | "high";
+
+/**  One choke-point transit, assessed (`docs/models/choke-points.md`). */
+export type TransitRow = TransitRow_Serialize | TransitRow_Deserialize;
+
+/**  One choke-point transit, assessed (`docs/models/choke-points.md`). */
+export type TransitRow_Deserialize = {
+	tick: Tick,
+	choke_point: string,
+	unit: UnitId,
+	unit_name: string,
+	side?: SideId | null,
+	/**  The lane the unit was in, if any. */
+	lane?: string | null,
+	/**  The choke point's lanes' traffic, ships per day. */
+	traffic_per_day: number | null,
+	/**  Water under the unit as it entered (terrain packs), and its draft. */
+	depth_m?: number | null,
+	draft_m?: number | null,
+	risk: TransitRisk,
+};
+
+/**  One choke-point transit, assessed (`docs/models/choke-points.md`). */
+export type TransitRow_Serialize = {
+	tick: Tick,
+	choke_point: string,
+	unit: UnitId,
+	unit_name: string,
+	side: SideId | null,
+	/**  The lane the unit was in, if any. */
+	lane: string | null,
+	/**  The choke point's lanes' traffic, ships per day. */
+	traffic_per_day: number | null,
+	/**  Water under the unit as it entered (terrain packs), and its draft. */
+	depth_m: number | null,
+	draft_m: number | null,
+	risk: TransitRisk,
+};
 
 /**  What makes an event check its conditions. */
 export type Trigger = Trigger_Serialize | Trigger_Deserialize;
