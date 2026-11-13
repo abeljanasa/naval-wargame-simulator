@@ -514,6 +514,8 @@ impl Simulation {
                 last_seen_s: c.last_seen.seconds(),
                 detected_by: c.detected_by,
                 sensor_id: c.sensor_id.clone(),
+                course_deg: c.course.map(|k| k.course_deg),
+                speed_mps: c.course.map(|k| k.speed_mps),
             })
             .collect();
         Snapshot {
@@ -1033,6 +1035,20 @@ impl Simulation {
             h.opt_str(c.platform.as_deref());
             h.u64(c.detected_by.0);
             h.str(&c.sensor_id);
+            // The course estimate only when present (older states have none).
+            if !c.history.is_empty() {
+                h.str("history");
+                for (t, p) in &c.history {
+                    h.u64(t.0);
+                    h.f64(p.lat_deg);
+                    h.f64(p.lon_deg);
+                }
+            }
+            if let Some(k) = c.course {
+                h.str("course");
+                h.f64(k.course_deg);
+                h.f64(k.speed_mps);
+            }
         }
         h.finish()
     }

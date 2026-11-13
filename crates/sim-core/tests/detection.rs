@@ -410,6 +410,8 @@ fn track_error_grows_with_time_since_update() {
         platform: None,
         detected_by: UnitId(1),
         sensor_id: "TEST-RADAR".into(),
+        history: Vec::new(),
+        course: None,
     };
     let e = c.error_at(Tick(100));
     assert!((e.semi_major_m - 1802.776).abs() < 1e-3, "{e:?}");

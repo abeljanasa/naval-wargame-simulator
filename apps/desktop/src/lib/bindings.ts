@@ -635,6 +635,13 @@ export type ContactView_Deserialize = {
 	/**  Own unit whose sensor last detected it. */
 	detected_by: UnitId,
 	sensor_id: string,
+	/**
+	 *  Estimated course, degrees, from the track's own movement; absent until it has moved
+	 *  clearly beyond its position error (`docs/models/tracks.md`).
+	 */
+	course_deg?: number | null,
+	/**  Estimated speed, m/s, with the course. */
+	speed_mps?: number | null,
 };
 
 /**
@@ -664,6 +671,13 @@ export type ContactView_Serialize = {
 	/**  Own unit whose sensor last detected it. */
 	detected_by: UnitId,
 	sensor_id: string,
+	/**
+	 *  Estimated course, degrees, from the track's own movement; absent until it has moved
+	 *  clearly beyond its position error (`docs/models/tracks.md`).
+	 */
+	course_deg: number | null,
+	/**  Estimated speed, m/s, with the course. */
+	speed_mps: number | null,
 };
 
 /**  One sampled cell. */

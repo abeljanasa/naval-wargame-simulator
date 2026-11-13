@@ -74,7 +74,10 @@ pub use detection::{
     sensor_height_m, target_height_m, Contact, ContactRecord, EnvState, Jammer, SensorKind,
     SensorSpec, SensorSuite, Signature, CONTACT_TIMEOUT_TICKS, SENSOR_PERIOD_TICKS,
 };
-pub use detection::{local_env, Weather};
+pub use detection::{
+    fit_velocity, local_env, TrackCourse, Weather, COURSE_MIN_SAMPLES, COURSE_MIN_SIGNIFICANCE,
+    COURSE_MIN_SPAN_TICKS, COURSE_MIN_SPEED_MPS, COURSE_SAMPLE_TICKS, COURSE_WINDOW_TICKS,
+};
 pub use error::SimError;
 pub use esm::{
     BearingRecord, BearingTable, BearingView, EmitterLibrary, BEARING_MAX_AGE_TICKS, JAMMER_EMITTER,

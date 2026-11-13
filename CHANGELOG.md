@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added (contacts on the map)
+
+- **Contacts are drawn like own units once their course is known.** Each track estimates its course and speed from its own movement: a least-squares line through its positions over the last 6 minutes, accepted when the speed is significant ([DL-0052](docs/design-log/DL-0052-contact-course.md)).
+  - A classified contact with a course lies flat on the map, turned to it, and keeps it when the view is rotated or tilted.
+  - A newly acquired, stopped or unclassified contact faces the screen.
+  - Classified contacts carry the affiliation badge beside their label.
+- `ContactView` gains `course_deg` and `speed_mps`. Track histories are saved and hashed; golden replays re-blessed, with engagement outcomes unchanged.
+
 ### Fixed (map)
 
 - **Unit figures keep their heading when the map is rotated or tilted.** Ship, submarine, aircraft and weapon figures were drawn facing the screen, so after a right-drag they still pointed up the screen, not along their heading. They now lie flat on the map, turned to the heading.

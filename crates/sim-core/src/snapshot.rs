@@ -140,6 +140,11 @@ pub struct ContactView {
     /// Own unit whose sensor last detected it.
     pub detected_by: UnitId,
     pub sensor_id: String,
+    /// Estimated course, degrees, from the track's own movement; absent until it has moved
+    /// clearly beyond its position error (`docs/models/tracks.md`).
+    pub course_deg: Option<f64>,
+    /// Estimated speed, m/s, with the course.
+    pub speed_mps: Option<f64>,
 }
 
 /// A full state snapshot for one viewer. Units are sorted by `id`.

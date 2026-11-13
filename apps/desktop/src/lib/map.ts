@@ -511,6 +511,11 @@ function clip(a: GeoPoint, b: GeoPoint, max_m: number): LonLat {
 export function buildLayers(s: SceneInput): Layer[] {
   const figures = (s.symbolStyle ?? "figures") === "figures";
   const unitKind = (u: UnitView) => (figures ? figureKind(u.platform, null, u.domain) : null);
+  /** A classified contact with a plan-view figure and an estimated course. */
+  const flatContact = (c: ContactView) => {
+    const kind = figureKind(c.platform, c.category, c.domain);
+    return kind !== null && figureShape(kind) === "topdown" && c.course_deg != null;
+  };
   /** A plan-view figure, drawn flat on the map and turned to the heading. */
   const flatFigure = (u: UnitView) => {
     const kind = unitKind(u);
@@ -772,9 +777,31 @@ export function buildLayers(s: SceneInput): Layer[] {
       widthUnits: "pixels",
       updateTriggers: { getPath: [s.gameTimeS] },
     }),
+    // A classified contact whose course the side has estimated lies flat on the map, turned to
+    // that course, like own units; it keeps it however the view is rotated or tilted.
+    new IconLayer<ContactView>({
+      id: "contact-figures",
+      data: figures ? s.contacts.filter(flatContact) : [],
+      billboard: false,
+      getPosition: (c) => pt(c.position),
+      getIcon: (c) => {
+        const kind = figureKind(c.platform, c.category, c.domain);
+        return figureIcon(kind ?? "ship", contactAffiliation(c), false);
+      },
+      getSize: (c) => {
+        const kind = figureKind(c.platform, c.category, c.domain);
+        return kind ? figureSize(kind, false) * 0.9 : 30;
+      },
+      getAngle: (c) => -n(c.course_deg ?? 0),
+      sizeUnits: "meters",
+      sizeMinPixels: FIGURE_MIN_PX - 2,
+      sizeMaxPixels: FIGURE_MAX_PX - 8,
+    }),
+    // Contacts with no course yet (newly acquired, stopped), unclassified ones and APP-6 frames
+    // face the screen: the side does not know which way they point.
     new IconLayer<ContactView>({
       id: "contacts",
-      data: s.contacts,
+      data: figures ? s.contacts.filter((c) => !flatContact(c)) : s.contacts,
       getPosition: (c) => pt(c.position),
       getIcon: (c) => {
         const domain = c.domain ?? "surface";

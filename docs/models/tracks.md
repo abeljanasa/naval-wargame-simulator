@@ -48,10 +48,22 @@ Every sensor of the side updates the same track (the side's picture is fused). A
 
 unknown → domain → category → class → identified. A track only climbs. A radar detection supports **domain** (height and position separate surface, air and land returns). Category and above need ESM, visual or IR/EO identification, which arrive in later slices.
 
+## Course estimate
+
+A side does not know a contact's heading; it estimates the course from how its own track moves ([DL-0052](../design-log/DL-0052-contact-course.md)).
+
+- **History:** each track keeps its position estimate every 15 s over the last 6 minutes.
+- **Fit:** a straight line fitted through them by least squares (east and north against time) gives the velocity, and the standard error of the speed from the residuals.
+- **When a course is given:** at least 6 positions over at least 75 s, and a fitted speed of at least 1 m/s and at least 3 standard errors.
+- **Otherwise, no course:** a newly acquired contact, a stopped one, or one too slow to tell from the measurement jitter.
+
+The estimate uses only the side's own track. At 20 km, a 1° radar bearing error moves the track about 350 m sideways from scan to scan; the line fit averages that out over the window. A simpler first try, the move between two track estimates, mistook that jitter for movement and gave a stopped target a course.
+
 ## What the player sees
 
 - The estimated position and the **95 % containment ellipse**: the one-sigma ellipse scaled by √χ²₂(0.95) = 2.4477, grown to the snapshot time.
 - The domain once known, which sets the symbol frame. Affiliation stays "unknown" until postures exist (slice 2).
+- The estimated course and speed, once known. A classified contact with a course is drawn flat on the map, turned to that course, like own units; without one it faces the screen.
 
 ## Worked example
 
@@ -95,10 +107,15 @@ Only radar is used in this slice; the other rows take effect with their detectio
 | `repeated_detections_shrink_the_track_error` | engine: 31 scans give a smaller error than one |
 | `track_error_grows_with_time_since_update` | √(100² + 1800²) = 1802.8 m after 100 s |
 | `measurement_errors_are_logged_only_for_detections` | draws are logged with their inputs |
+| `fit_velocity_by_hand` | (0, 0, 0), (10, 10, 20), (20, 20, 40): 1 m/s east, 2 m/s north, zero error |
+| `a_track_gets_its_course_from_a_line_through_its_positions` | exact track east at 8 m/s: 090°, 8 m/s; ±300 m jitter on 225°: within 5°; under 75 s or stopped: none |
+| `a_new_contact_has_no_course_then_gets_the_targets_course` | engine: radar track of a corvette at 8 m/s on 000°, 135° and 270°: no course at 10 s, within 15° and 2.5 m/s at 10 minutes |
+| `a_stopped_target_has_no_course` | engine: no course after 15 minutes |
 
 ## Limitations
 
-- No velocity estimate: the estimate stays at the last fix while the error grows to cover the target's possible movement.
+- The position estimate does not use the course: it stays at the last fix while the error grows to cover the target's possible movement. The course is for display.
+- The course fit assumes a straight track over 6 minutes; after a turn it takes a few minutes to settle.
 - Perfect association (keyed by the true target); no false tracks or track swaps.
 - One fused picture per side with instant sharing; data links and their delays come with C2.
 - The growth bound is the worst case for the domain, so error ellipses on slow targets are pessimistic.

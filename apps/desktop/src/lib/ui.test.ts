@@ -307,6 +307,49 @@ describe("map layers", () => {
     expect(keys).toEqual(["u:1:1000", "f:Port:300", "p:RV:100"]);
   });
 
+  it("lays a contact flat on its estimated course; a new contact faces the screen", () => {
+    const contact = (number: number, course_deg: number | null) =>
+      ({
+        side: 1,
+        number,
+        position: { lat_deg: 0, lon_deg: 0 },
+        error: { semi_major_m: 100, semi_minor_m: 100, orientation_deg: 0 },
+        classification: "class",
+        domain: "surface",
+        affiliation: "hostile",
+        category: "surface_combatant",
+        platform: "GEN-FFG",
+        first_seen_s: 0,
+        last_seen_s: 0,
+        detected_by: 1,
+        sensor_id: "R",
+        course_deg,
+        speed_mps: course_deg === null ? null : 8,
+      }) as ContactView;
+    const layers = buildLayers({
+      units: [],
+      contacts: [contact(1, 270), contact(2, null)],
+      gameTimeS: 0,
+      viewer: { kind: "side", side: 1 },
+      selected: null,
+      draft: null,
+      onPickUnit: () => {},
+    });
+    const props = (id: string) =>
+      (
+        layers.find((l) => l.id === id) as unknown as {
+          props: { data: ContactView[]; billboard: boolean };
+        }
+      ).props;
+    // C1 has an estimated course: flat on the map, turned to it.
+    expect(props("contact-figures").data.map((c) => c.number)).toEqual([1]);
+    expect(props("contact-figures").billboard).toBe(false);
+    // C2 is newly acquired (no course yet): it faces the screen.
+    expect(props("contacts").data.map((c) => c.number)).toEqual([2]);
+    // Both carry the affiliation badge beside the label.
+    expect(props("contact-badges").data).toHaveLength(2);
+  });
+
   it("lays figures flat so they keep their heading in a rotated view; the badge is separate", () => {
     const flat = (layers: ReturnType<typeof scene>) =>
       (layers.find((l) => l.id === "units") as unknown as { props: { billboard: boolean } }).props
