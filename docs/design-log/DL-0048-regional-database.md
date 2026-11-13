@@ -18,9 +18,16 @@
 - **Historical platforms in their own file** (`historical.json`), for the Gate 4 engagements, so they are not mistaken for current forces.
 - **The emitter library grows with the database.** The ESM library lists every database class that carries a radar. The new classes reuse generic radars, so an intercept has more candidate classes. This changed every golden replay, including Phase 1; checked: with the library limited to generic classes, every old hash reproduces. The goldens were re-blessed. A real system's radar gets its own record when an open source gives its figures.
 - **No Type 818 or other records without an open source.**
+- **Second tranche (2026-11-13, at the client's request): Vietnam, the United States and Japan.** 18 classes and 15 weapons, by the same rules. Choices:
+  - US forces are those that operate in the PAR: Flight IIA destroyers, Independence-class LCS, Virginia-class submarines, the Legend-class cutter, P-8A and F/A-18E/F. The Ticonderoga class was left out (its article gives its figures only in sub-templates, and the class is retiring).
+  - The Vietnam Coast Guard's open-sourced class is the ex-US Hamilton-class cutter (CSB 8020); no open figures were found for its DN-2000 OPV.
+  - VLS splits and tube loads are not published; each record states the assumed split.
+  - Jammers only where the source names a jammer or electronic attack (Gepard's Bell Squat, Mogami's NOLQ-3E), with generic strength (D).
+  - The golden replays changed again for the same reason as the first tranche (the emitter library), checked the same way, and were re-blessed.
 
 ## Open
 
-- Vietnam, the United States, Japan and other navies operating in the PAR, as the client prioritises.
+- Other navies operating in the PAR (for example Malaysia, Indonesia, Australia, South Korea, Taiwan), as the client prioritises.
+- The Vietnam Coast Guard's DN-2000 and the Ticonderoga class, if open figures are found.
 - Named sensor records as open figures are found.
 - Reference-data editing in the app, if the data team needs it.

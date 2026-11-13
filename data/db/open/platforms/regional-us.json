@@ -1,0 +1,856 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, United States (Phase 4 slice 13, tranche 2): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "USA-DDG-BURKE2A",
+   "name": "Arleigh Burke-class destroyer, Flight IIA",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "USA-USN",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-DESTROYER",
+   "length_m": 155.3,
+   "displacement_t": 9650,
+   "draft_m": 9.4,
+   "max_speed_kn": 31,
+   "cruise_speed_kn": 20,
+   "accel_mps2": 0.06,
+   "endurance_nm": 4400,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 10000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MFR",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 25
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 28
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-SON-HULL-LF",
+     "height_m": -8
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -100
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 41 VLS (96 cells)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-ASW-ROCKET",
+      "WPN-ESSM",
+      "WPN-LACM",
+      "WPN-SM2MR",
+      "WPN-SM6"
+     ]
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 15,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Mk 38 25 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-MK54"
+     ]
+    },
+    {
+     "name": "Mk 36 SRBOC and Mk 53 Nulka launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 41 VLS (96 cells)",
+     "capacity": 112,
+     "contents": {
+      "WPN-SM2MR": 32,
+      "WPN-SM6": 8,
+      "WPN-ESSM": 24,
+      "WPN-ASW-ROCKET": 8,
+      "WPN-LACM": 40
+     }
+    },
+    {
+     "name": "5 in/62 Mk 45 Mod 4 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 60,
+     "contents": {
+      "WPN-CIWS": 60
+     }
+    },
+    {
+     "name": "Mk 38 25 mm guns (2)",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-MK54": 6
+     }
+    },
+    {
+     "name": "Mk 36 SRBOC and Mk 53 Nulka launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Arleigh Burke-class destroyer\", https://en.wikipedia.org/wiki/Arleigh_Burke-class_destroyer (accessed 2026-11-13) and its sensor and EW templates: Flight IIA 9,500 LT (9,650 t) full load, 509.5 ft (155.3 m), 31 ft (9.4 m) draft, in excess of 31 kn, 4,400 nmi at 20 kn; AN/SPY-1D, AN/SPS-67, AN/SPS-73, 3 AN/SPG-62, Mk 46 optical sight, AN/SQS-53C, AN/SQR-19 towed array, AN/SLQ-32, Mk 36 SRBOC and Nulka; 96 Mk 41 cells (mix of Tomahawk, SM-2MR, SM-6, ESSM quad-packed, VL-ASROC; split not given: 32 SM-2MR, 8 SM-6, 24 ESSM in 6 cells, 8 VL-ASROC, 40 Tomahawk assumed), 5 in/62 Mk 45 Mod 4, one Phalanx (DDG-85 onward), 2 Mk 38 25 mm, 2 Mk 32 triple tubes (Mk 54). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "USA-LCS-INDEP",
+   "name": "Independence-class littoral combat ship (surface warfare)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "USA-USN",
+   "propulsion": "PROP-CODAG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 127.4,
+   "displacement_t": 3104,
+   "draft_m": 4.3,
+   "max_speed_kn": 44,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4300,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 14
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Naval Strike Missile launchers (8)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-NSM"
+     ]
+    },
+    {
+     "name": "Mk 110 57 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "SeaRAM (11 cells)",
+     "height_m": 14,
+     "weapons": [
+      "WPN-RAM"
+     ]
+    },
+    {
+     "name": "Mk 44 30 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Hellfire vertical launch module",
+     "height_m": 6,
+     "weapons": [
+      "WPN-HELLFIRE"
+     ]
+    },
+    {
+     "name": "SRBOC and Nulka launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Naval Strike Missile launchers (8)",
+     "capacity": 8,
+     "contents": {
+      "WPN-NSM": 8
+     }
+    },
+    {
+     "name": "Mk 110 57 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "SeaRAM (11 cells)",
+     "capacity": 11,
+     "contents": {
+      "WPN-RAM": 11
+     }
+    },
+    {
+     "name": "Mk 44 30 mm guns (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    },
+    {
+     "name": "Hellfire vertical launch module",
+     "capacity": 24,
+     "contents": {
+      "WPN-HELLFIRE": 24
+     }
+    },
+    {
+     "name": "SRBOC and Nulka launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Independence-class littoral combat ship\", https://en.wikipedia.org/wiki/Independence-class_littoral_combat_ship (accessed 2026-11-13): 3,104 t full, 418 ft (127.4 m), 14 ft (4.3 m) draft, 44 kn, 4,300 nmi at 18 kn; AN/SPS-77 Sea Giraffe 3D, BridgeMaster E, AN/KAX-2 EO/IR, ES-3601 ESM, 4 SRBOC and Nulka; Mk 110 57 mm, SeaRAM, 2 Mk 44 30 mm and 24 Hellfire (surface warfare module), 8 Naval Strike Missiles. The 57 mm is modelled by the generic 76 mm gun; SeaRAM load 11 (Wikipedia, \"RIM-116 Rolling Airframe Missile\", https://en.wikipedia.org/wiki/RIM-116_Rolling_Airframe_Missile (accessed 2026-11-13)). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "USA-SSN-VIRGINIA",
+   "name": "Virginia-class submarine (Block III-IV)",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "USA-USN",
+   "propulsion": "PROP-NUC-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 114.9,
+   "displacement_t": 7900,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.05,
+   "max_depth_m": 244,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 300,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 110,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 120,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SUB-BOW",
+     "height_m": -10
+    },
+    {
+     "sensor": "SEN-SON-SUB-TAS",
+     "height_m": -200
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 1.5
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 6
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 6
+    }
+   ],
+   "launchers": [
+    {
+     "name": "21 in torpedo tubes (4)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-HARPOON-2",
+      "WPN-MK48"
+     ]
+    },
+    {
+     "name": "Virginia payload tubes (2x6)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-LACM"
+     ]
+    },
+    {
+     "name": "Countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "21 in torpedo tubes (4)",
+     "capacity": 25,
+     "contents": {
+      "WPN-MK48": 21,
+      "WPN-HARPOON-2": 4
+     }
+    },
+    {
+     "name": "Virginia payload tubes (2x6)",
+     "capacity": 12,
+     "contents": {
+      "WPN-LACM": 12
+     }
+    },
+    {
+     "name": "Countermeasures",
+     "capacity": 8,
+     "contents": {
+      "WPN-DECOY-TORP": 8
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Virginia-class submarine\", https://en.wikipedia.org/wiki/Virginia-class_submarine (accessed 2026-11-13): Blocks I-IV 7,900 t submerged, 377 ft (114.9 m), 25 kn or over, unlimited range, test depth over 800 ft (244 m used), complement 135; 4 x 21 in tubes with 25 weapons (Mk 48 or UGM-84 Harpoon; 21 and 4 assumed), 2 Virginia payload tubes with 12 Tomahawks. Draft and sensors not given in the infobox (generic SSN sensors). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "USA-WMSL-LEGEND",
+   "name": "Legend-class national security cutter (US Coast Guard)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "USA-USCG",
+   "propulsion": "PROP-CODAG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 127.4,
+   "displacement_t": 4674,
+   "draft_m": 6.9,
+   "max_speed_kn": 28,
+   "cruise_speed_kn": 12,
+   "accel_mps2": 0.05,
+   "endurance_nm": 12000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 25
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 14
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 110 57 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 14,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "SRBOC and Nulka launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 110 57 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 40,
+     "contents": {
+      "WPN-CIWS": 40
+     }
+    },
+    {
+     "name": "SRBOC and Nulka launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Legend-class cutter\", https://en.wikipedia.org/wiki/Legend-class_cutter (accessed 2026-11-13): 4,600 LT (4,674 t), 418 ft (127.4 m), 22.5 ft (6.9 m) draft, over 28 kn, 12,000 nmi, 60-90-day patrols; TRS-16 AN/SPS-75 3D air search, SPQ-9B fire control, AN/SPS-79 surface search, Furuno X and S-band, Mk 20 EO sight, AN/SLQ-32B(V)2, 2 SRBOC and 2 Nulka; Mk 110 57 mm, Phalanx Block 1B. Cruise speed not given (12 kn assumed). The 57 mm is modelled by the generic 76 mm gun. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "USA-P8A",
+   "name": "P-8A Poseidon maritime patrol aircraft",
+   "category": "mpa",
+   "domain": "air",
+   "service": "USA-USN",
+   "propulsion": "PROP-TURBOFAN",
+   "damage_profile": "DMG-AIRCRAFT-LARGE",
+   "displacement_t": 85.8,
+   "max_speed_kn": 490,
+   "cruise_speed_kn": 440,
+   "accel_mps2": 2,
+   "endurance_nm": 4500,
+   "max_altitude_m": 12500,
+   "hardpoints": 11,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 50,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "ir",
+     "value": 6,
+     "unit": "kw_sr",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MAR-AIR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-ESM-AIR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-EO-AIR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-SONOBUOY",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 0
+    }
+   ],
+   "launchers": [],
+   "magazines": [],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Boeing P-8 Poseidon\", https://en.wikipedia.org/wiki/Boeing_P-8_Poseidon (accessed 2026-11-13): max take-off 85,820 kg, 490 kn, cruise 440 kn, ferry range 4,500 nmi (used for the fuel model), combat radius 1,200 nmi with 4 h on station, ceiling 41,000 ft (12,500 m), 11 hardpoints (5 internal, 6 external); AN/APS-154, AN/ALQ-240 ESM; Harpoon, Mk 54 and others. Loadout counts are assumptions within the hardpoints. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "loadouts": [
+    {
+     "id": "USA-P8A/ASW",
+     "name": "Anti-submarine: Mk 54 torpedoes",
+     "role": "asw",
+     "items": {
+      "WPN-MK54": 5
+     }
+    },
+    {
+     "id": "USA-P8A/ASUW",
+     "name": "Anti-surface: Harpoon Block II",
+     "role": "asuw",
+     "items": {
+      "WPN-HARPOON-2": 4,
+      "WPN-MK54": 2
+     }
+    }
+   ]
+  },
+  {
+   "id": "USA-FA18EF",
+   "name": "F/A-18E/F Super Hornet",
+   "category": "fighter",
+   "domain": "air",
+   "service": "USA-USN",
+   "propulsion": "PROP-TURBOFAN",
+   "damage_profile": "DMG-AIRCRAFT-SMALL",
+   "displacement_t": 29.9,
+   "max_speed_kn": 1030,
+   "cruise_speed_kn": 482,
+   "accel_mps2": 7,
+   "endurance_nm": 1275,
+   "max_altitude_m": 15940,
+   "hardpoints": 11,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 3,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "ir",
+     "value": 6,
+     "unit": "kw_sr",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-FTR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-EO-AIR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 0
+    }
+   ],
+   "launchers": [],
+   "magazines": [],
+   "comms": [
+    "COM-UHF",
+    "COM-VHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Boeing F/A-18E/F Super Hornet\", https://en.wikipedia.org/wiki/Boeing_F/A-18E/F_Super_Hornet (accessed 2026-11-13): max take-off 29,937 kg, Mach 1.8 (1,030 kn clean at 40,000 ft), cruise 482 kn, range 1,275 nmi with two AIM-9 (used for the fuel model), combat radius 558 nmi hi-lo-hi, ceiling 15,940 m, 11 hardpoints; fighter escort 7 AIM-120 and 2 AIM-9; hi-lo-hi strike 2 GBU-10, 1 AIM-120, 2 AIM-9; Harpoon among air-to-surface missiles (4 assumed). AIM-120 and AIM-9 are modelled by the generic beyond-visual-range and short-range air-to-air missiles. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts and VLS splits are generic class estimates unless the source gives them",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "loadouts": [
+    {
+     "id": "USA-FA18EF/CAP",
+     "name": "Fighter escort: 7 AIM-120, 2 AIM-9",
+     "role": "air_superiority",
+     "items": {
+      "WPN-AAM-BVR": 7,
+      "WPN-AAM-SR": 2
+     }
+    },
+    {
+     "id": "USA-FA18EF/ASUW",
+     "name": "Maritime strike: Harpoon Block II",
+     "role": "asuw",
+     "items": {
+      "WPN-HARPOON-2": 4,
+      "WPN-AAM-BVR": 2,
+      "WPN-AAM-SR": 2
+     }
+    },
+    {
+     "id": "USA-FA18EF/STRIKE",
+     "name": "Hi-lo-hi strike: 2 GBU-10",
+     "role": "strike",
+     "items": {
+      "WPN-BOMB-GUIDED": 2,
+      "WPN-AAM-BVR": 1,
+      "WPN-AAM-SR": 2
+     }
+    }
+   ]
+  }
+ ]
+}

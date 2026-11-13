@@ -108,9 +108,12 @@ Specific classes, for the Philippine Area of Responsibility ([ADR-0007](../adr/0
 |---|---|
 | `platforms/regional-ph.json` | Philippine Navy: `PHL-FF-RIZAL`, `PHL-FFG-MALVAR`, `PHL-PS-DELPILAR`, `PHL-PG-ACERO`. Philippine Coast Guard: `PHL-CG-MAGBANUA`, `PHL-CG-PAROLA` |
 | `platforms/regional-cn.json` | PLAN: `CHN-FFG-054A`, `CHN-DDG-052D`, `CHN-FS-056A`, `CHN-SSK-039A`. China Coast Guard: `CHN-CG-ZHAOTOU`, `CHN-CG-056` |
+| `platforms/regional-vn.json` | Vietnam People's Navy: `VNM-FF-GEPARD`, `VNM-SSK-KILO`, `VNM-PGG-MOLNIYA`, `VNM-PG-TT400`. Vietnam Coast Guard: `VNM-CG-HAMILTON` (ex-USCGC *Morgenthau*, CSB 8020) |
+| `platforms/regional-us.json` | US Navy: `USA-DDG-BURKE2A`, `USA-LCS-INDEP`, `USA-SSN-VIRGINIA`, `USA-P8A`, `USA-FA18EF` (with loadouts). US Coast Guard: `USA-WMSL-LEGEND` |
+| `platforms/regional-jp.json` | JMSDF: `JPN-DDG-MAYA`, `JPN-DD-AKIZUKI`, `JPN-FFM-MOGAMI`, `JPN-SSK-TAIGEI`, `JPN-DDH-IZUMO`, `JPN-P1` (with loadouts). Japan Coast Guard: `JPN-CG-SHIKISHIMA` |
 | `platforms/historical.json` | Gate 4: `PAK-SSK-HANGOR`, `IND-FF-KHUKRI`, `IRN-FF-SAAM`, `IRN-PTG-KAMAN`, `USA-CG-BELKNAP`, `USA-FFG-OHP`, `USA-FF-KNOX`, `USA-A6E` |
-| `weapons.json` | Named weapons, added where the records need them: C-802A, YJ-83, YJ-18, HHQ-16, HHQ-9, Mistral, VL MICA, Spike NLOS, Harpoon 1, SM-1MR, Skipper, Sea Killer 2, Limbo |
-| `reference.json` | Nations and services (PHL, CHN, USA, IRN, PAK, IND), and ECM records (generic ship and aircraft jammers; the Type 054A's and 052D's) |
+| `weapons.json` | Named weapons, added where the records need them. First tranche: C-802A, YJ-83, YJ-18, HHQ-16, HHQ-9, Mistral, VL MICA, Spike NLOS, Harpoon 1, SM-1MR, Skipper, Sea Killer 2, Limbo. Second: Kh-35 Uran-E, 3M-54E Klub-S, SM-2MR, SM-6, ESSM, NSM, Mk 48, Mk 54, RAM, Type 90, Type 17, Type 89, Harpoon Block II, Hellfire, Igla |
+| `reference.json` | Nations and services (PHL, CHN, USA, IRN, PAK, IND, VNM, JPN; navies and coast guards), and ECM records (generic ship and aircraft jammers; the Type 054A's, 052D's, Gepard's and Mogami's) |
 
 How the values were set:
 
@@ -118,7 +121,8 @@ How the values were set:
 - **Signatures** are not published. They are copied from the matching generic class and carry their own provenance, confidence D.
 - **Sensors:** a named radar or sonar uses the generic record of its kind; the record's citation names the real system.
 - **Weapon Ph** is the generic class's, confidence D. Jammer strengths are estimates, D.
-- **Each record cites its source and the date accessed.** Records without an open source (for example the Type 818 cutter) were left out.
+- **VLS splits, tube loads and loadout counts** are rarely published; where the source gives only a mix, the split is an assumption stated in the citation.
+- **Each record cites its source and the date accessed.** Records without an open source (for example the Type 818 cutter) were left out. The second tranche's figures were read from each article's infobox through the Wikipedia API.
 
 ## Terrain and bathymetry sources (Phase 4 slice 2, ADR-0007)
 

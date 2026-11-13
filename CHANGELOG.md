@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 13: regional database, second tranche)
+
+- **Vietnam People's Navy and Coast Guard:** Gepard 3.9 frigate, Kilo (Project 636.1) submarine, Molniya corvette, TT-400TP gunboat, and the ex-US Hamilton-class cutter CSB 8020.
+- **US Navy and Coast Guard:** Arleigh Burke Flight IIA, Independence-class LCS, Virginia-class submarine, Legend-class cutter, P-8A and F/A-18E/F with loadouts.
+- **JMSDF and Japan Coast Guard:** Maya, Akizuki (2010), Mogami, Taigei, Izumo, Shikishima and the P-1 with loadouts.
+- **Named weapons:** Kh-35 Uran-E, 3M-54E Klub-S, SM-2MR, SM-6, ESSM, NSM, Mk 48, Mk 54, RAM, Type 90, Type 17, Type 89, Harpoon Block II, Hellfire, Igla.
+- **ECM:** the Gepard's Bell Squat jammers and the Mogami's NOLQ-3E.
+- Each record cites its open source; assumed VLS splits and loads are stated in the citation. 88 platforms in all.
+- Golden replays re-blessed: the emitter library grows with the database (DL-0048).
+
 ### Added (Phase 4, slice 14: model validation and the Gate 4 drafts)
 
 - **`nws-batch validate`:** runs a historical engagement's scenario many times and compares the outcomes with the record. Writes `report.md`, `validation.json` and `runs.csv`.
