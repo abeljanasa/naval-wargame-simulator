@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added (Gate 4 fixes)
+
+- **Single-observer target motion analysis** ([DL-0050](docs/design-log/DL-0050-single-observer-tma.md), [tma.md](docs/models/tma.md)): a submarine, or any unit with passive sonar, now ranges a target from its own bearings over time once it has manoeuvred.
+  - The estimate is a maximum-likelihood bearings-only fit of a constant-velocity target, from up to 15 minutes of bearings.
+  - It enters the track with its covariance; a `TmaSolution` event goes on the AAR timeline.
+  - An observer that has not manoeuvred is refused (the range is unobservable).
+- **Weapon ranges by target domain** ([DL-0051](docs/design-log/DL-0051-weapon-target-ranges.md)): new table `weapon_target_ranges` (migration 0005) and rule `weapon.target_ranges`.
+  - Engagements and point defence use the range against the target's domain.
+  - Generic guns reach aircraft at 12 km (127 mm-class) and 8 km (76 mm-class), against 24 and 16 km for ships.
+
+### Changed
+
+- **Gate 4 reports regenerated (200 runs each).**
+  - Hangor–Khukri: Khukri sunk in 77 % of runs (0 % before).
+  - Praying Mantis: Sahand sunk 29 % (3 %), Sabalan disabled 60 % (8 %), US losses mean 1.2 (2.9).
+  - The remaining differences are listed in `docs/gate4/README.md`.
+- **Golden replays re-blessed:** gun air ranges join the weapon catalogue hash, and TMA histories the state hash where passive sonar hears a target.
+
 ### Fixed
 
 - **The unit inspector's Water row no longer blinks at high time compression.** Its depth reading reloaded on every snapshot and was blanked while it loaded. It now reloads only when the unit or its route changes, and every 5 s, keeping the last reading on screen meanwhile. Measured at Max: 65 blinks in 15 s before, none after; the app also runs faster, since it no longer refetches every frame.

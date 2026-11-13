@@ -42,6 +42,7 @@ fn asm() -> WeaponSpec {
         warhead_kg: 220.0,
         base_ph: 0.8,
         target_domains: vec!["surface".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -57,6 +58,7 @@ fn gun() -> WeaponSpec {
         warhead_kg: 6.0,
         base_ph: 0.3,
         target_domains: vec!["surface".into(), "air".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -72,6 +74,7 @@ fn sam() -> WeaponSpec {
         warhead_kg: 40.0,
         base_ph: 0.75,
         target_domains: vec!["air".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -463,6 +466,7 @@ fn chaff() -> WeaponSpec {
         warhead_kg: 0.0,
         base_ph: 0.3,
         target_domains: vec!["air".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -769,6 +773,7 @@ fn mine() -> WeaponSpec {
         warhead_kg: 600.0,
         base_ph: 0.5,
         target_domains: vec!["surface".into(), "subsurface".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -2609,6 +2614,7 @@ fn torpedo() -> WeaponSpec {
         warhead_kg: 250.0,
         base_ph: 0.7,
         target_domains: vec!["surface".into()],
+        max_range_by_target: std::collections::BTreeMap::new(),
     }
 }
 
@@ -3005,4 +3011,64 @@ fn a_group_shares_its_air_picture_and_fires_one_sam_per_threat_at_a_time() {
         UnitId(1),
         "the silent ship fires on its mate's track: {fired:?}"
     );
+}
+
+/// The test gun, with a 5 km range against aircraft (its surface range stays 15 km). Given a
+/// seeker's track tolerance so the order is judged on range alone: an aircraft track grows at
+/// the air speed bound between scans, past a gun's 300 m limit.
+fn gun_with_air_range() -> WeaponSpec {
+    let mut g = gun();
+    g.guidance = Guidance::ActiveRadar;
+    g.max_range_by_target.insert("air".into(), 5_000.0);
+    g
+}
+
+/// Blue with that gun at the origin; a red aircraft at 1,000 m, `range_m` east.
+fn air_scene(range_m: f64) -> Simulation {
+    let mut sim = Simulation::new(3);
+    sim.submit(cmd(
+        0,
+        Issuer::Scenario,
+        None,
+        CommandPayload::SetWeaponCatalog {
+            weapons: vec![gun_with_air_range()],
+        },
+    ))
+    .unwrap();
+    sim.submit(unit(1, 1, ORIGIN, vec![radar()], &[("T-GUN", 100)], None))
+        .unwrap();
+    let mut red = unit(2, 2, direct(ORIGIN, 90.0, range_m).point, vec![], &[], None);
+    if let CommandPayload::SpawnUnit(s) = &mut red.payload {
+        s.domain = Domain::Air;
+        s.altitude_m = 1000.0;
+    }
+    sim.submit(red).unwrap();
+    sim.run_ticks(1);
+    sim
+}
+
+#[test]
+fn a_gun_reaches_aircraft_only_within_its_anti_air_range() {
+    // 10 km: inside the gun's 15 km surface range, beyond its 5 km range against aircraft.
+    let mut sim = air_scene(10_000.0);
+    sim.submit(engage_as(1, umpire(), None, "T-GUN", 1))
+        .unwrap();
+    sim.step();
+    let r = rejected(&sim);
+    assert!(
+        r.iter()
+            .any(|x| x.contains("0.0–5.0 km against air targets")),
+        "{r:?}"
+    );
+    assert!(!any_hit(&sim));
+    // 4 km: inside it, so the round is fired and rolled.
+    let mut sim = air_scene(4_000.0);
+    sim.submit(engage_as(1, umpire(), None, "T-GUN", 1))
+        .unwrap();
+    sim.step();
+    assert!(rejected(&sim).is_empty(), "{:?}", rejected(&sim));
+    assert!(sim
+        .events()
+        .iter()
+        .any(|e| matches!(e.kind, SimEventKind::HitRoll { .. })));
 }

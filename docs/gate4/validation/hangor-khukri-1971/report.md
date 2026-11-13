@@ -12,24 +12,21 @@ The first sinking of a warship by a submarine since 1945. Hangor, submerged west
 
 | Measure | Record | Model | Verdict |
 |---|---|---|---|
-| Khukri sunk | yes | P(record) 0 % (95 % CI 0–2 %) | inconsistent |
-| Kirpan survives | yes | P(record) 100 % (95 % CI 98–100 %) | consistent |
+| Khukri sunk | yes | P(record) 77 % (95 % CI 71–82 %) | consistent |
+| Kirpan survives | yes | P(record) 21 % (95 % CI 16–27 %) | consistent |
 | Hangor survives | yes | P(record) 100 % (95 % CI 98–100 %) | consistent |
-| Torpedoes fired by Hangor | 3 | mean 0.0 (5–95 %: 0–0; n 200) | outside the model's 90 % range |
-| Indian ships lost | 1 | mean 0.0 (5–95 %: 0–0; n 200) | outside the model's 90 % range |
-| Hits by Pakistan | 1 | mean 0.0 (5–95 %: 0–0; n 200) | outside the model's 90 % range |
-| Time to Hangor's first hit (s) | 600 | did not occur (n 0) | never happened in the model |
+| Torpedoes fired by Hangor | 3 | mean 7.1 (5–95 %: 5–10; n 200) | outside the model's 90 % range |
+| Indian ships lost | 1 | mean 1.6 (5–95 %: 0–2; n 200) | consistent |
+| Hits by Pakistan | 1 | mean 3.4 (5–95 %: 1–4; n 200) | consistent |
+| Time to Hangor's first hit (s) | 600 | mean 1238.3 (5–95 %: 621–1986; n 199) | outside the model's 90 % range |
 
 ## Differences to explain
 
 Each difference is for the SMEs to explain as a **model limitation**, a **data gap** or **historical uncertainty**.
 
-- **Khukri sunk** (inconsistent): _to explain._
 - **Torpedoes fired by Hangor** (outside the model's 90 % range): _to explain._
   - Note: Three by most accounts; the first is reported to have run deep or failed to detonate.
-- **Indian ships lost** (outside the model's 90 % range): _to explain._
-- **Hits by Pakistan** (outside the model's 90 % range): _to explain._
-- **Time to Hangor's first hit (s)** (never happened in the model): _to explain._
+- **Time to Hangor's first hit (s)** (outside the model's 90 % range): _to explain._
   - Note: Not in the record to the minute: about ten minutes after the attack began is an estimate for the SMEs to confirm or replace.
 
 ## What the scenario assumes

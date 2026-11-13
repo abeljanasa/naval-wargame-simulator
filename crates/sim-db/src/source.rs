@@ -225,6 +225,18 @@ struct Weapon {
     warhead_kg: f64,
     base_ph: f64,
     targets: Vec<String>,
+    /// Ranges against particular target domains (migration 0005), where they differ.
+    #[serde(default)]
+    target_ranges: Vec<TargetRange>,
+    provenance: Option<ProvenanceSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TargetRange {
+    target: String,
+    max_range_km: f64,
+    /// Overrides the weapon's provenance (a range estimate is often less certain).
     provenance: Option<ProvenanceSpec>,
 }
 
@@ -576,6 +588,21 @@ fn insert_weapons(tx: &Transaction<'_>, f: &WeaponsFile) -> Result<usize, DbErro
                 c, conf, cl, g, by, at
             ],
         )?;
+        for r in &w.target_ranges {
+            let rp = match &r.provenance {
+                Some(o) => Provenance::resolve(
+                    &f.defaults,
+                    Some(o),
+                    &format!("weapon {} range against {}", w.id, r.target),
+                )?,
+                None => p.clone(),
+            };
+            let (c, conf, cl, g, by, at) = prov_params!(rp);
+            tx.execute(
+                &format!("INSERT INTO weapon_target_ranges (weapon_id, target, max_range_m, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)"),
+                params![w.id, r.target, r.max_range_km * M_PER_KM, c, conf, cl, g, by, at],
+            )?;
+        }
     }
     Ok(f.weapons.len())
 }

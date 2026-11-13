@@ -199,7 +199,8 @@ pub(crate) fn point_defence_system(world: &mut World) {
                 if tick.0 < first.0 + reaction_time_s(w.kind) {
                     continue;
                 }
-                if range < w.min_range_m || range > w.max_range_m {
+                // Incoming weapons are air targets: a gun's anti-air range applies.
+                if range < w.min_range_m || range > w.max_range_for("air") {
                     continue;
                 }
                 let left = world

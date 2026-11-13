@@ -2,7 +2,7 @@
 
 Gate 4 (master prompt §12, §13; [Phase 4 plan](../plan/phase-4.md) §1): **SME-built scenarios of historical engagements are run and compared against the recorded outcomes, and the differences are documented.**
 
-> **Status (2026-11-13): drafts for SME review.** The two engagements below were built by the development team from public accounts, as the client asked, so its SMEs can correct them. Nothing here is confirmed. The reports show the first findings: two model limitations that the SMEs and the client should decide on.
+> **Status (2026-11-13): drafts for SME review.** The two engagements below were built by the development team from public accounts, as the client asked, so its SMEs can correct them. Nothing here is confirmed. The first runs found two model limitations; both are now fixed and the reports are regenerated. The remaining differences are listed below for the SMEs to explain.
 
 ## The engagements
 
@@ -13,30 +13,46 @@ Gate 4 (master prompt §12, §13; [Phase 4 plan](../plan/phase-4.md) §1): **SME
 
 Method: [docs/models/validation.md](../models/validation.md). Rerun with `nws-batch validate <spec> --out <dir>`.
 
-## Findings so far
+## Findings
 
-### 1. A lone submarine cannot attack on passive sonar (model limitation)
+### Fixed: a lone submarine could not attack on passive sonar
 
-In every *Hangor* run the boat holds passive bearings on both frigates (signal excess near +96 dB, because the frigates are pinging) but never forms a track, so it never fires. A track from passive bearings needs bearings from **two observers in the same scan** (the ESM and sonar cross-fix, [esm.md](../models/esm.md)). The model has **no single-platform target motion analysis (TMA)**: one platform's bearings over time do not make a position. Submarines in the model therefore attack only on active sonar, radar or periscope, or with a second listener.
+In the first *Hangor* runs, the boat held passive bearings on both frigates but never formed a track, so it never fired. A track from bearings needed two observers in the same scan; one platform's bearings over time made no position.
 
-*Hangor* attacked on her own passive sonar plot, so the record (Khukri sunk, three torpedoes, one hit) is inconsistent with the model. Recommended: a bearings-only TMA for a single observer, then re-run.
+**Fixed (2026-11-13, [DL-0050](../design-log/DL-0050-single-observer-tma.md), [tma.md](../models/tma.md)):** single-observer target motion analysis. A maximum-likelihood fit of one observer's bearings over up to 15 minutes ranges the target once the observer has manoeuvred.
 
-### 2. Guns engage aircraft at their surface range (model and data limitation)
+| Measure (200 runs) | Record | Before | After |
+|---|---|---|---|
+| Khukri sunk | yes | 0 % | 77 % |
+| Indian ships lost | 1 | 0 | mean 1.6 |
+| Hits by Pakistan | 1 | 0 | mean 3.4 |
 
-In the Praying Mantis runs, *Sahand*'s gun (the generic 127 mm, `WPN-GUN-127`, 24 km, surface, land and air) shoots down the A-6Es at stand-off ranges. A weapon has **one maximum range for every target domain**, and a medium-calibre gun's anti-aircraft reach is far shorter than its surface range. As a result:
+### Fixed: guns engaged aircraft at their surface range
 
-- US losses (record 0, model mean 2.9);
-- Iranian hits (record 0, model 3.1);
-- *Sahand* is rarely sunk (record yes, model 3 %) and *Sabalan* rarely disabled (record yes, model 8 %), because the A-6Es carrying the Harpoons, Skippers and bombs are lost first.
+In the first Praying Mantis runs, *Sahand*'s 127 mm gun (24 km) shot down the A-6Es at their stand-off stations: one maximum range served every target domain.
 
-Recommended: a range per target domain on weapons (database and model), then re-run.
+**Fixed (2026-11-13, [DL-0051](../design-log/DL-0051-weapon-target-ranges.md)):** a range per target domain. The generic 127 mm-class gun now reaches aircraft at 12 km, the 76 mm-class at 8 km. These are generic estimates for SME review.
 
-### Consistent so far
+| Measure (200 runs) | Record | Before | After |
+|---|---|---|---|
+| Sahand sunk | yes | 3 % | 29 % |
+| Sabalan disabled | yes | 8 % | 60 % |
+| US losses to Iranian fire | 0 | mean 2.9 | mean 1.2 |
+| Hits by Iran | 0 | mean 3.1 | mean 1.5 |
 
-- *Joshan* is sunk by SAG Charlie in every run.
-- US missile expenditure is close to the record (mean 12.8 against 12).
-- *Sabalan* is almost never sunk (record: crippled, not sunk).
-- *Kirpan* and *Hangor* survive.
+The A-6Es still lost are lost later in the action, when they close inside the frigates' short-range weapons to drop bombs.
+
+### Differences still to explain
+
+- **Hangor fires more torpedoes than the record:** mean 7.1 against 3. The model keeps firing at a track until it is lost, and the scenario models no torpedo failures; the first torpedo of the record is reported to have failed.
+- **Hangor's first hit comes later than the estimate:** mean 1,238 s against an estimated 600 s. The model needs several minutes of bearings across a turn before it ranges. The record's time is itself an estimate for the SMEs.
+- **Kirpan survives less often than the record:** 21 %. In the model, Hangor keeps attacking the second frigate; historically Kirpan withdrew. Consistent at the 10 % threshold, but worth the SMEs' view.
+- **Iran fires more missiles than the record:** 3.9 against 2. Every Iranian launcher with a target in range fires.
+
+### Consistent
+
+- **Praying Mantis:** *Joshan* is sunk by SAG Charlie in every run, and US missile expenditure is close to the record (mean 14.2 against 12). Sabalan disabled, Sabalan not sunk, US losses and Iranian hits are consistent.
+- **Hangor–Khukri:** Khukri is sunk, *Hangor* survives every run, and Indian losses and Pakistani hits are consistent.
 
 ## Definition of done (Gate 4)
 
@@ -54,6 +70,6 @@ Recommended: a range per target domain on weapons (database and model), then re-
 ## What the client decides
 
 1. **The SMEs review the two drafts:** the positions, timings, forces, simplifications and the recorded numbers (each report lists its assumptions and sources).
-2. **Whether to fix the two limitations before the gate** (single-platform TMA, ranges per target domain), or to record them as known limitations.
+2. **The two fixes:** whether their assumptions stand. These are the TMA thresholds and the generic gun anti-air ranges, 12 km and 8 km.
 3. **The measures of effectiveness** (decision 5): the engagement outcomes used here are provisional.
 4. **Any further database tranche:** which other navies or agencies the PAR scenarios need (for example Singapore, Thailand, Brunei).

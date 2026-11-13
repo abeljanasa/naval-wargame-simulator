@@ -13,22 +13,18 @@ In reprisal for the mining of USS Samuel B. Roberts, US forces struck two Irania
 | Measure | Record | Model | Verdict |
 |---|---|---|---|
 | Joshan sunk | yes | P(record) 100 % (95 % CI 98–100 %) | consistent |
-| Sahand sunk | yes | P(record) 3 % (95 % CI 1–6 %) | unlikely |
-| Sabalan disabled | yes | P(record) 8 % (95 % CI 5–13 %) | unlikely |
-| Sabalan sunk | no | P(record) 98 % (95 % CI 94–99 %) | consistent |
-| US ships and aircraft lost to Iranian fire | 0 | mean 2.9 (5–95 %: 2–3; n 200) | outside the model's 90 % range |
-| Hits by Iran | 0 | mean 3.1 (5–95 %: 2–4; n 200) | outside the model's 90 % range |
-| US missiles fired at ships | 12 | mean 12.8 (5–95 %: 8–17; n 200) | consistent |
+| Sahand sunk | yes | P(record) 29 % (95 % CI 23–36 %) | consistent |
+| Sabalan disabled | yes | P(record) 60 % (95 % CI 54–67 %) | consistent |
+| Sabalan sunk | no | P(record) 57 % (95 % CI 51–64 %) | consistent |
+| US ships and aircraft lost to Iranian fire | 0 | mean 1.2 (5–95 %: 0–3; n 200) | consistent |
+| Hits by Iran | 0 | mean 1.5 (5–95 %: 0–3; n 200) | consistent |
+| US missiles fired at ships | 12 | mean 14.2 (5–95 %: 10–18; n 200) | consistent |
 | Iranian missiles fired | 2 | mean 3.9 (5–95 %: 4–4; n 200) | outside the model's 90 % range |
 
 ## Differences to explain
 
 Each difference is for the SMEs to explain as a **model limitation**, a **data gap** or **historical uncertainty**.
 
-- **Sahand sunk** (unlikely): _to explain._
-- **Sabalan disabled** (unlikely): _to explain._
-- **US ships and aircraft lost to Iranian fire** (outside the model's 90 % range): _to explain._
-- **Hits by Iran** (outside the model's 90 % range): _to explain._
 - **Iranian missiles fired** (outside the model's 90 % range): _to explain._
   - Note: Joshan's Harpoon at Wainwright, and a surface-to-air missile from Sahand at the A-6Es (accounts vary).
 

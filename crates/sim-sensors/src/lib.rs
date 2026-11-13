@@ -14,6 +14,7 @@ mod measurement;
 mod optical;
 mod radar;
 mod sonar;
+mod tma;
 mod track;
 
 pub use classify::{radar_classification, Classification};
@@ -40,5 +41,9 @@ pub use sonar::{
     sonar_params, sonar_params_with, thorp_absorption_db_per_km, transmission_loss_db,
     SonarFigures, SonarParams, DIPPING_MAX_ALTITUDE_M, DIPPING_MAX_SPEED_MPS, SE_SIGMA_DB,
     SPREADING_TRANSITION_M,
+};
+pub use tma::{
+    tma_solve, TmaBearing, TmaSolution, TMA_MAX_ERROR_FRACTION, TMA_MAX_SPEED_MPS,
+    TMA_MIN_BEARINGS, TMA_MIN_SPAN_S,
 };
 pub use track::{measured_point, Cov2, ErrorEllipse, TrackEstimate};

@@ -57,6 +57,7 @@ Phase 1 ships only generic classes (`GEN-*`), all with confidence D. Each value 
 | `platform_comms` | (platform, comms) | Fitted comms |
 | `ecm_systems` | `id` | ECM equipment (migration 0004): kind (`noise_jammer`, `deception_jammer`) and strength as J/N in a victim receiver 1 km away (dB). A unit jams with its platform's strongest ECM unless its scenario gives it a jammer |
 | `platform_ecm` | (platform, ecm) | Fitted ECM |
+| `weapon_target_ranges` | (weapon, target) | A weapon's maximum range against one target domain where it is shorter than its maximum range, m (migration 0005): a gun against aircraft. The engine uses it for engagements and point defence ([DL-0051](../design-log/DL-0051-weapon-target-ranges.md)) |
 
 ## Validation rules
 
@@ -79,6 +80,7 @@ Run `cargo run -p sim-db -- validate`. Add `--strict` to treat warnings as error
 | `sensor.radar_defaults` | warning | A radar without `clutter_db_per_sea_state` or `beamwidth_deg`; the radar model's defaults (1.5 dB, 2°) apply |
 | `sensor.radar_reference` | error | A radar without a reference range and RCS (needed by the Phase 2 detection model) |
 | `weapon.range_order` | error | `0 ≤ min_range < max_range` |
+| `weapon.target_ranges` | error | A range against a domain the weapon does not target, at or below its minimum range, or above its maximum range |
 | `weapon.base_ph` | error | Base Ph outside [0, 1] |
 | `weapon.values` | error | Negative speed or warhead |
 | `weapon.target_domains` | error | Unknown or empty target domains |

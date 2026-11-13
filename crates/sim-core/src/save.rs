@@ -142,6 +142,9 @@ pub struct SaveGame {
     /// none.
     #[serde(default)]
     pub tasking: crate::tasking::Tasking,
+    /// Single-observer TMA bearing histories (format 27). Older saves load with none.
+    #[serde(default)]
+    pub tma: crate::tma::Tma,
     #[serde(default)]
     pub bearings: BearingTable,
     #[serde(default)]

@@ -23,12 +23,12 @@
       "note": "",
       "p5_p95": null,
       "p_ci95": [
-        0.013820125830748327,
-        0.06389511973247333
+        0.2315392689125782,
+        0.3563760535731166
       ],
-      "p_record": 0.03,
+      "p_record": 0.29,
       "record": true,
-      "verdict": "unlikely"
+      "verdict": "consistent"
     },
     {
       "id": "sabalan_disabled",
@@ -38,12 +38,12 @@
       "note": "",
       "p5_p95": null,
       "p_ci95": [
-        0.05374529946985246,
-        0.13189688544235392
+        0.5358822087449843,
+        0.6701601300121683
       ],
-      "p_record": 0.085,
+      "p_record": 0.605,
       "record": true,
-      "verdict": "unlikely"
+      "verdict": "consistent"
     },
     {
       "id": "sabalan_sunk",
@@ -53,52 +53,52 @@
       "note": "",
       "p5_p95": null,
       "p_ci95": [
-        0.9428208558483829,
-        0.9892754385292123
+        0.5057080512046821,
+        0.6414650479075696
       ],
-      "p_record": 0.975,
+      "p_record": 0.575,
       "record": false,
       "verdict": "consistent"
     },
     {
       "id": "us_losses",
-      "mean": 2.91,
+      "mean": 1.195,
       "n": 200,
       "name": "US ships and aircraft lost to Iranian fire",
       "note": "",
       "p5_p95": [
-        2.0,
+        0.0,
         3.0
       ],
       "p_ci95": null,
       "p_record": null,
       "record": 0.0,
-      "verdict": "outside"
+      "verdict": "consistent"
     },
     {
       "id": "iran_hits",
-      "mean": 3.085,
+      "mean": 1.455,
       "n": 200,
       "name": "Hits by Iran",
       "note": "",
       "p5_p95": [
-        2.0,
-        4.0
+        0.0,
+        3.0
       ],
       "p_ci95": null,
       "p_record": null,
       "record": 0.0,
-      "verdict": "outside"
+      "verdict": "consistent"
     },
     {
       "id": "us_missiles",
-      "mean": 12.79,
+      "mean": 14.22,
       "n": 200,
       "name": "US missiles fired at ships",
       "note": "By the public accounts: SAG Charlie fired five SM-1 and one Harpoon at Joshan; the A-6Es fired two Harpoons and four Skippers at Sahand (counts differ between accounts; the SMEs should confirm).",
       "p5_p95": [
-        8.0,
-        17.0
+        10.0,
+        18.0
       ],
       "p_ci95": null,
       "p_record": null,

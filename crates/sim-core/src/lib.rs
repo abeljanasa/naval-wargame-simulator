@@ -40,6 +40,7 @@ mod snapshot;
 mod sonar;
 mod tasking;
 mod time;
+mod tma;
 mod weapon_tracks;
 
 pub use acoustics::{
@@ -131,6 +132,7 @@ pub use sonar::{
 };
 pub use tasking::{next_review, TaskingView, TASKING_PERIOD_TICKS};
 pub use time::{SimClock, Tick, TICK_SECONDS};
+pub use tma::{Tma, TmaTrack, TMA_GAP_TICKS, TMA_SAMPLE_TICKS, TMA_WINDOW_TICKS};
 pub use weapon_tracks::{
     WeaponTrack, WeaponTrackView, WeaponTracks, MISSILE_LENGTH_M, TORPEDO_NOISE_DB,
     WEAPON_TRACK_TIMEOUT_TICKS,

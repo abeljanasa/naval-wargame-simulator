@@ -45,6 +45,8 @@ Hand-value and behaviour tests for the models added in Phase 4. They run in CI w
 | Collisions ([collisions.md](../models/collisions.md)) | `damage_shares_follow_mass_and_speed`, `rules_of_the_road`, `contact_is_counted_once_when_hulls_meet`; `sim-scenario/tests/collisions.rs` | Damage (m_o/(m_s+m_o))²·(v/14)²; head-on both to starboard |
 | Air operations ([air-operations.md](../models/air-operations.md)) | `readiness_delays`, `bingo_is_the_fuel_home_plus_the_reserve`, `turnaround_grows_with_the_weapons_loaded`; `sim-scenario/tests/air.rs` | Bingo C·(d/E + 0.1); tanking 1 t/min a hose |
 | Sense-zone tasking ([sensor-tasking.md](../models/sensor-tasking.md)) | `the_widest_reach_goes_where_it_covers_most`, `reviews_every_five_minutes`; `sim-scenario/tests/tasking.rs` | The greedy choice, by hand |
+| Single-observer TMA ([tma.md](../models/tma.md)) | `a_manoeuvring_observer_ranges_a_moving_target`, `a_straight_leg_does_not_range_a_moving_target`, `solve4_inverts_by_hand`; `sim-scenario/tests/tma.rs` | Exact bearings: position within 30 m, velocity within 0.1 m/s; straight leg unobservable |
+| Weapon ranges by target domain ([weapons-damage.md](../models/weapons-damage.md)) | `a_gun_reaches_aircraft_only_within_its_anti_air_range` | Gun 15 km surface, 5 km air: aircraft at 10 km refused, at 4 km engaged |
 | Validation ([validation.md](../models/validation.md)) | `wilson_interval_by_hand`, `yes_no_verdicts_by_the_probability_of_the_record`, `counts_compare_with_the_five_to_ninety_five_range` | Wilson 8/10: 0.4902–0.9433 |
 
 ## Historical engagements (Gate 4)

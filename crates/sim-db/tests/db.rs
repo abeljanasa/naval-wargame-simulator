@@ -139,6 +139,7 @@ const FAULTS: &[(&str, &str, &str)] = &[
     ("ECM out of range", "UPDATE ecm_systems SET jn_db_at_1km = 500 WHERE id = 'ECM-GEN-SHIP'", "ecm.values"),
     ("radar without clutter figure", "UPDATE sensors SET clutter_db_per_sea_state = NULL WHERE id = 'SEN-RDR-NAV'", "sensor.radar_defaults"),
     ("radar without reference","UPDATE sensors SET ref_target_rcs_m2 = NULL, ref_detect_range_m = NULL WHERE id = 'SEN-RDR-NAV'", "sensor.radar_reference"),
+    ("weapon range against a domain beyond its maximum", "UPDATE weapon_target_ranges SET max_range_m = 999999 WHERE weapon_id = 'WPN-GUN-127'", "weapon.target_ranges"),
     ("weapon range order", "UPDATE weapons SET min_range_m = max_range_m WHERE id = 'WPN-SAM-MR'", "weapon.range_order"),
     ("Ph above one", "UPDATE weapons SET base_ph = 1.5 WHERE id = 'WPN-SAM-MR'", "weapon.base_ph"),
     ("bad target domain", "UPDATE weapons SET target_domains = 'air,space' WHERE id = 'WPN-SAM-MR'", "weapon.target_domains"),

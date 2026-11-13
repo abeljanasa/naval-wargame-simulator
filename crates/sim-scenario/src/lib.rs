@@ -1244,6 +1244,8 @@ fn weapon_catalog<'a>(
         let kind = WeaponKind::from_db(&kind).ok_or_else(|| {
             ScenarioError::Invalid(format!("weapon {id} has unknown kind {kind}"))
         })?;
+        // Ranges against particular domains (a gun against aircraft), migration 0005.
+        let max_range_by_target = db.weapon_target_ranges(&id)?;
         out.push(WeaponSpec {
             id,
             name,
@@ -1255,6 +1257,7 @@ fn weapon_catalog<'a>(
             warhead_kg: warhead,
             base_ph: ph,
             target_domains: domains.split(',').map(|d| d.trim().to_owned()).collect(),
+            max_range_by_target,
         });
     }
     Ok(out)

@@ -165,6 +165,7 @@ impl Simulation {
         world.insert_resource(EnvState::default());
         world.insert_resource(crate::detection::Weather::default());
         world.insert_resource(crate::acoustics::Acoustics::default());
+        world.insert_resource(crate::tma::Tma::default());
         world.insert_resource(crate::collision::Avoidance::default());
         world.insert_resource(crate::air::Air::default());
         world.insert_resource(crate::tasking::Tasking::default());
@@ -783,6 +784,14 @@ impl Simulation {
             h.f64(w.speed_mps);
             h.f64(w.warhead_kg);
             h.f64(w.base_ph);
+            // Per-domain ranges only when given, so catalogues without them keep their hashes.
+            if !w.max_range_by_target.is_empty() {
+                h.str("ranges");
+                for (d, r) in &w.max_range_by_target {
+                    h.str(d);
+                    h.f64(*r);
+                }
+            }
         }
         let wif = self.world.resource::<WeaponsInFlight>();
         h.u64(wif.next_id);
@@ -936,6 +945,18 @@ impl Simulation {
             }
         }
         // Sensor tasking only when used, so runs without coverage goals keep their hashes.
+        // TMA histories only when there are any, so runs without passive acoustic bearings keep
+        // their hashes.
+        let tma = self.world.resource::<crate::tma::Tma>();
+        if !tma.is_empty() {
+            h.str("tma");
+            if let Ok(bytes) = rmp_serde::to_vec(tma) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
         let tasking = self.world.resource::<crate::tasking::Tasking>();
         if !tasking.is_empty() {
             h.str("tasking");
@@ -1054,6 +1075,7 @@ impl Simulation {
             avoidance: self.world.resource::<crate::collision::Avoidance>().clone(),
             air: self.world.resource::<crate::air::Air>().clone(),
             tasking: self.world.resource::<crate::tasking::Tasking>().clone(),
+            tma: self.world.resource::<crate::tma::Tma>().clone(),
             bearings: self.world.resource::<BearingTable>().clone(),
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
@@ -1103,6 +1125,7 @@ impl Simulation {
         sim.world
             .insert_resource(crate::detection::Weather(save.weather.clone()));
         sim.world.insert_resource(save.acoustics.clone());
+        sim.world.insert_resource(save.tma.clone());
         sim.world.insert_resource(save.avoidance.clone());
         sim.world.insert_resource(save.air.clone());
         sim.world.insert_resource(save.tasking.clone());

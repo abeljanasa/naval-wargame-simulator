@@ -514,6 +514,7 @@ pub(crate) fn detection_system(
     terrain: Res<crate::sim::TerrainRes>,
     weather: Res<Weather>,
     acoustics: Res<crate::acoustics::Acoustics>,
+    mut tma: ResMut<crate::tma::Tma>,
     units: Query<(
         &Unit,
         &Position,
@@ -815,7 +816,15 @@ pub(crate) fn detection_system(
         terrain,
         zones,
     );
-    resolve_bearings(fresh, &all, tick, &mut contacts, &mut log, &mut bearings);
+    resolve_bearings(
+        fresh,
+        &all,
+        tick,
+        &mut contacts,
+        &mut log,
+        &mut bearings,
+        &mut tma,
+    );
     for (side, number, target) in contacts.expire(tick) {
         log.push(
             tick,

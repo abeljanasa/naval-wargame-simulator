@@ -431,6 +431,17 @@ pub enum SimEventKind {
         target: UnitId,
         bearings: u32,
     },
+    /// One observer's passive acoustic bearings, taken over minutes while it manoeuvred, ranged
+    /// a target (single-platform TMA, `docs/models/tma.md`). Sent once per bearing history.
+    TmaSolution {
+        side: SideId,
+        target: UnitId,
+        observer: UnitId,
+        bearings: u32,
+        range_m: f64,
+        /// One-sigma position error (semi-major axis), m.
+        error_m: f64,
+    },
     ContactLost {
         side: SideId,
         number: u32,

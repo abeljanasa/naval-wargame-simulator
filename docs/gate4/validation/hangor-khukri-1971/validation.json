@@ -8,12 +8,12 @@
       "note": "",
       "p5_p95": null,
       "p_ci95": [
-        0.0,
-        0.018846005918320894
+        0.7069157192180299,
+        0.8229074375860769
       ],
-      "p_record": 0.0,
+      "p_record": 0.77,
       "record": true,
-      "verdict": "inconsistent"
+      "verdict": "consistent"
     },
     {
       "id": "kirpan_survives",
@@ -23,10 +23,10 @@
       "note": "",
       "p5_p95": null,
       "p_ci95": [
-        0.9811539940816791,
-        1.0
+        0.15928329527863416,
+        0.271647388153992
       ],
-      "p_record": 1.0,
+      "p_record": 0.21,
       "record": true,
       "verdict": "consistent"
     },
@@ -47,13 +47,13 @@
     },
     {
       "id": "hangor_torpedoes",
-      "mean": 0.0,
+      "mean": 7.075,
       "n": 200,
       "name": "Torpedoes fired by Hangor",
       "note": "Three by most accounts; the first is reported to have run deep or failed to detonate.",
       "p5_p95": [
-        0.0,
-        0.0
+        5.0,
+        10.0
       ],
       "p_ci95": null,
       "p_record": null,
@@ -62,45 +62,48 @@
     },
     {
       "id": "india_losses",
-      "mean": 0.0,
+      "mean": 1.56,
       "n": 200,
       "name": "Indian ships lost",
       "note": "",
       "p5_p95": [
         0.0,
-        0.0
+        2.0
       ],
       "p_ci95": null,
       "p_record": null,
       "record": 1.0,
-      "verdict": "outside"
+      "verdict": "consistent"
     },
     {
       "id": "pakistan_hits",
-      "mean": 0.0,
+      "mean": 3.395,
       "n": 200,
       "name": "Hits by Pakistan",
       "note": "",
       "p5_p95": [
-        0.0,
-        0.0
+        1.0,
+        4.0
       ],
       "p_ci95": null,
       "p_record": null,
       "record": 1.0,
-      "verdict": "outside"
+      "verdict": "consistent"
     },
     {
       "id": "pakistan_first_hit_s",
-      "mean": null,
-      "n": 0,
+      "mean": 1238.2964824120604,
+      "n": 199,
       "name": "Time to Hangor's first hit (s)",
       "note": "Not in the record to the minute: about ten minutes after the attack began is an estimate for the SMEs to confirm or replace.",
-      "p5_p95": null,
+      "p5_p95": [
+        621.0,
+        1986.0
+      ],
       "p_ci95": null,
       "p_record": null,
       "record": 600.0,
-      "verdict": "never_in_model"
+      "verdict": "outside"
     }
   ],
   "name": "Hangor and Khukri, 9 December 1971",

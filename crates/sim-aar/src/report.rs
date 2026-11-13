@@ -687,6 +687,23 @@ impl<'a> Builder<'a> {
                     format!("{} gained C{number} ({target_name})", self.side_name(*side)),
                 );
             }
+            SimEventKind::TmaSolution {
+                side,
+                target,
+                observer,
+                bearings,
+                range_m,
+                error_m,
+            } => {
+                let text = format!(
+                    "{} ranged {} by TMA: {:.1} km ± {:.1} km from {bearings} bearings",
+                    self.unit_name(*observer),
+                    self.unit_name(*target),
+                    range_m / 1000.0,
+                    error_m / 1000.0
+                );
+                self.note(t, TimelineKind::Contact, Some(*side), text);
+            }
             SimEventKind::ContactLost {
                 side,
                 number,

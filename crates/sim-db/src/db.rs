@@ -237,6 +237,21 @@ impl PlatformDb {
         Ok(v)
     }
 
+    /// A weapon's ranges against particular target domains (migration 0005), m; empty where its
+    /// maximum range applies to every domain.
+    pub fn weapon_target_ranges(
+        &self,
+        weapon_id: &str,
+    ) -> Result<std::collections::BTreeMap<String, f64>, DbError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT target, max_range_m FROM weapon_target_ranges WHERE weapon_id = ?1 ORDER BY target",
+        )?;
+        let v = stmt
+            .query_map([weapon_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<Result<_, _>>()?;
+        Ok(v)
+    }
+
     /// The strongest jammer a platform carries (ECM equipment, migration 0004): its J/N at 1 km,
     /// dB. `None` for a platform with none.
     pub fn jammer_of(&self, platform_id: &str) -> Result<Option<f64>, DbError> {

@@ -232,12 +232,14 @@ pub(crate) fn engage(
         ));
     }
     let range = inverse(from.point, estimate.position).distance_m;
-    if range < spec.min_range_m || range > spec.max_range_m {
+    // The range against this domain: a gun reaches aircraft at less than its surface range.
+    let max_range = spec.max_range_for(domain_name);
+    if range < spec.min_range_m || range > max_range {
         return Err(format!(
-            "C{contact} at {:.1} km is outside {weapon}'s {:.1}–{:.1} km",
+            "C{contact} at {:.1} km is outside {weapon}'s {:.1}–{:.1} km against {domain_name} targets",
             range / 1000.0,
             spec.min_range_m / 1000.0,
-            spec.max_range_m / 1000.0
+            max_range / 1000.0
         ));
     }
     // Weapons control status and ROE. The white cell may override (adjudication).

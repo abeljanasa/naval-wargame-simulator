@@ -31,10 +31,15 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "0004_ecm",
         sql: include_str!("../migrations/0004_ecm.sql"),
     },
+    Migration {
+        version: 5,
+        name: "0005_weapon_target_ranges",
+        sql: include_str!("../migrations/0005_weapon_target_ranges.sql"),
+    },
 ];
 
 /// Schema version produced by applying every migration.
-pub const LATEST_VERSION: u32 = 4;
+pub const LATEST_VERSION: u32 = 5;
 
 pub fn schema_version(conn: &Connection) -> Result<u32, DbError> {
     Ok(conn.pragma_query_value(None, "user_version", |r| r.get(0))?)

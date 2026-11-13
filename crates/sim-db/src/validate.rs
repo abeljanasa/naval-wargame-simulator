@@ -97,6 +97,7 @@ fn key_column(table: &str) -> &'static str {
     match table {
         "platform_signatures" => "platform_id || ':' || kind || ':' || aspect || ':' || speed_band",
         "mounts" | "magazines" => "platform_id || '#' || name",
+        "weapon_target_ranges" => "weapon_id || ':' || target",
         _ => "id",
     }
 }
@@ -232,6 +233,8 @@ fn sensors(conn: &Connection, out: &mut Collector) -> Result<(), DbError> {
 fn weapons(conn: &Connection, out: &mut Collector) -> Result<(), DbError> {
     rows(conn, out, Severity::Error, "weapon.range_order",
         "SELECT 'weapons/' || id, 'min_range_m ' || min_range_m || ' must be >= 0 and < max_range_m ' || max_range_m FROM weapons WHERE min_range_m < 0 OR min_range_m >= max_range_m ORDER BY 1")?;
+    rows(conn, out, Severity::Error, "weapon.target_ranges",
+        "SELECT 'weapon_target_ranges/' || r.weapon_id || ':' || r.target, 'a range against ' || r.target || ' must be for a domain the weapon targets, above its minimum range and no more than its maximum range' FROM weapon_target_ranges r JOIN weapons w ON w.id = r.weapon_id WHERE (',' || w.target_domains || ',') NOT LIKE ('%,' || r.target || ',%') OR r.max_range_m <= w.min_range_m OR r.max_range_m > w.max_range_m ORDER BY 1")?;
     rows(conn, out, Severity::Error, "weapon.base_ph",
         "SELECT 'weapons/' || id, 'base_ph ' || base_ph || ' must be in [0, 1]' FROM weapons WHERE base_ph < 0 OR base_ph > 1 ORDER BY 1")?;
     rows(conn, out, Severity::Error, "weapon.values",
