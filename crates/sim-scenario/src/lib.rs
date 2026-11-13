@@ -149,6 +149,22 @@ pub struct ScenarioUnit {
     /// Fraction of fuel at the start, with the fuel model on (default full; format 6).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fuel_level: Option<f64>,
+    /// Aircraft: its airbase facility (Phase 4 slice 9, `docs/models/air-operations.md`). With a
+    /// base it starts parked there, unless `airborne`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<u32>,
+    /// Aircraft with a base: starts in the air instead of parked.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub airborne: bool,
+    /// Aircraft: readiness at the start (default ready).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub readiness: Option<sim_core::Readiness>,
+    /// Aircraft in maintenance: for how long, s (none: until changed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maintenance_s: Option<f64>,
+    /// Aircraft: the loadout carried at the start (default the platform's first).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loadout: Option<String>,
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -420,6 +436,19 @@ impl Scenario {
                             f.name
                         ));
                     }
+                }
+            }
+        }
+        for u in &self.units {
+            if let Some(b) = u.base {
+                let ok = self.facilities.iter().any(|f| {
+                    f.id == b && f.side == u.side && f.kind == sim_core::FacilityKind::Airbase
+                });
+                if !ok {
+                    out.push(format!(
+                        "unit {}: base {b} is not an airbase of its side",
+                        u.id
+                    ));
                 }
             }
         }
@@ -973,8 +1002,21 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
                         fire_susceptibility: fire,
                         flooding_susceptibility: flood,
                     }),
-                // (capacity t, endurance m, cruise m/s) for ships and submarines with figures.
+                // (capacity t, endurance m, cruise m/s) for ships, submarines and aircraft with
+                // figures; an aircraft's fuel is a share of its maximum take-off mass.
                 match (p.endurance_m, p.displacement_t) {
+                    (Some(e), Some(d))
+                        if db_domain == Domain::Air
+                            && e > 0.0
+                            && d > 0.0
+                            && p.cruise_speed_mps > 0.0 =>
+                    {
+                        Some((
+                            d * aircraft_fuel_fraction(&p.category),
+                            e,
+                            p.cruise_speed_mps,
+                        ))
+                    }
                     (Some(e), Some(d))
                         if matches!(db_domain, Domain::Surface | Domain::Subsurface)
                             && e > 0.0
@@ -1007,6 +1049,26 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
             None,
             (None, None),
         ),
+    };
+    let mut stores = stores;
+    let air = if domain == Domain::Air && (u.platform.is_some() || u.base.is_some()) {
+        let a = air_spec(u, db, category.as_deref(), cruise, max_speed)?;
+        // It carries the loadout it starts with.
+        if let Some(o) = a
+            .loadout
+            .as_deref()
+            .and_then(|l| a.loadouts.iter().find(|o| o.id == l))
+        {
+            stores = o.stores.clone();
+        }
+        Some(a)
+    } else {
+        if u.base.is_some() || u.readiness.is_some() || u.loadout.is_some() || u.airborne {
+            return Err(invalid(
+                "only aircraft have a base, readiness, loadout or airborne start".into(),
+            ));
+        }
+        None
     };
     Ok(UnitSpawn {
         id: u.id,
@@ -1044,7 +1106,97 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
                 cruise_mps,
                 level: u.fuel_level.unwrap_or(1.0),
                 bingo: None,
+                kind: if domain == Domain::Air {
+                    sim_core::FuelKind::Aviation
+                } else {
+                    sim_core::FuelKind::Marine
+                },
+                idle_fraction: (domain == Domain::Air).then_some(sim_core::AIRCRAFT_IDLE_FRACTION),
             }),
+        air,
+    })
+}
+
+/// Share of an aircraft's maximum take-off mass that is fuel, by category (generic).
+fn aircraft_fuel_fraction(category: &str) -> f64 {
+    match category {
+        "fighter" => 0.28,
+        "helicopter" => 0.15,
+        "mpa" => 0.35,
+        "aew" => 0.3,
+        "tanker" => 0.45,
+        "uav" => 0.35,
+        _ => 0.3,
+    }
+}
+
+/// Altitude an aircraft flies at once launched, by category, m (generic).
+fn cruise_altitude_m(category: &str) -> f64 {
+    match category {
+        "fighter" => 8_000.0,
+        "helicopter" => 150.0,
+        "mpa" => 3_000.0,
+        "aew" | "tanker" => 9_000.0,
+        _ => 5_000.0,
+    }
+}
+
+/// An aircraft's part in air operations (`docs/models/air-operations.md`): its loadouts from the
+/// database, the scenario's base, readiness and loadout, and what its category makes it.
+fn air_spec(
+    u: &ScenarioUnit,
+    db: &PlatformDb,
+    category: Option<&str>,
+    cruise_mps: f64,
+    max_speed_mps: f64,
+) -> Result<sim_core::AirSpec, ScenarioError> {
+    let invalid = |msg: String| ScenarioError::Invalid(format!("unit {}: {msg}", u.id));
+    let loadouts: Vec<sim_core::LoadoutOption> = match &u.platform {
+        Some(pid) => db
+            .loadouts_of(pid)?
+            .into_iter()
+            .map(|(id, name, role, stores)| sim_core::LoadoutOption {
+                id,
+                name,
+                role,
+                stores: stores.into_iter().collect(),
+            })
+            .collect(),
+        None => Vec::new(),
+    };
+    let loadout = match &u.loadout {
+        Some(l) if !loadouts.iter().any(|o| &o.id == l) => {
+            return Err(invalid(format!("unknown loadout {l:?}")));
+        }
+        Some(l) => Some(l.clone()),
+        None => loadouts.first().map(|o| o.id.clone()),
+    };
+    let category = category.unwrap_or("");
+    let cruise = if cruise_mps > 0.0 {
+        cruise_mps
+    } else {
+        0.6 * max_speed_mps
+    };
+    Ok(sim_core::AirSpec {
+        base: u.base,
+        parked: u.base.is_some() && !u.airborne,
+        readiness: u.readiness.unwrap_or_default(),
+        maintenance_s: u.maintenance_s,
+        loadouts,
+        loadout,
+        tanker: (category == "tanker").then_some(sim_core::TankerSpec {
+            hoses: sim_core::DEFAULT_HOSES,
+            transfer_t_per_min: sim_core::DEFAULT_TRANSFER_T_PER_MIN,
+        }),
+        cruise_altitude_m: if u.altitude_m > 0.0 {
+            u.altitude_m
+        } else {
+            cruise_altitude_m(category)
+        },
+        cruise_mps: cruise,
+        // Helicopters, and slow (rotary or tilt) UAVs, use any deck.
+        vtol: category == "helicopter" || (category == "uav" && max_speed_mps <= 150.0 * 0.514_444),
+        large: matches!(category, "mpa" | "aew" | "tanker"),
     })
 }
 
@@ -1056,7 +1208,14 @@ fn weapon_catalog<'a>(
 ) -> Result<Vec<WeaponSpec>, ScenarioError> {
     let ids: BTreeSet<&str> = spawns
         .iter()
-        .flat_map(|s| s.stores.keys())
+        .flat_map(|s| {
+            // Every loadout an aircraft can be given, not only the one it starts with.
+            s.stores.keys().chain(
+                s.air
+                    .iter()
+                    .flat_map(|a| a.loadouts.iter().flat_map(|o| o.stores.keys())),
+            )
+        })
         .map(String::as_str)
         .chain(mine_types)
         .collect();

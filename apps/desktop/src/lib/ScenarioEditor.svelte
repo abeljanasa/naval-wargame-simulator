@@ -38,6 +38,7 @@
     { key: "sheltering_port", label: "Sheltering port" },
     { key: "anchorage", label: "Anchorage" },
     { key: "refuelling_point", label: "Refuelling point" },
+    { key: "airbase", label: "Airbase" },
   ];
   const SERVICES = ["repair", "rearm", "refuel"] as const;
   let planSide = $state(1);

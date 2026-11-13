@@ -129,6 +129,9 @@ pub struct UnitSpawn {
     /// Full-load displacement, t (from the platform database), for collisions.
     #[serde(default)]
     pub displacement_t: Option<f64>,
+    /// Air operations (Phase 4 slices 9–11): base, readiness, loadouts, tanker.
+    #[serde(default)]
+    pub air: Option<crate::air::AirSpec>,
 }
 
 /// One emitter type and the platform classes known to carry it.
@@ -205,6 +208,28 @@ pub enum CommandPayload {
         points: Vec<GeoPoint>,
         #[serde(default)]
         deep: bool,
+    },
+    /// Launches a parked aircraft on a sortie (`docs/models/air-operations.md`); the loadout
+    /// defaults to the mission's.
+    LaunchSortie {
+        unit: UnitId,
+        mission: Mission,
+        #[serde(default)]
+        loadout: Option<String>,
+    },
+    /// Recalls an aircraft: cancels a launch not yet made, or brings it back to `base` (default:
+    /// its own, or the nearest that takes it).
+    RecallAircraft {
+        unit: UnitId,
+        #[serde(default)]
+        base: Option<u32>,
+    },
+    /// Sets a parked aircraft's readiness, with a maintenance period if given.
+    SetReadiness {
+        unit: UnitId,
+        readiness: crate::air::Readiness,
+        #[serde(default)]
+        maintenance_s: Option<f64>,
     },
     /// Replaces the ESM emitter library (built from the platform database). Scenario and white
     /// cell only.
@@ -311,6 +336,9 @@ impl CommandPayload {
             | CommandPayload::LayMines { unit, .. }
             | CommandPayload::StreamTowedArray { unit, .. }
             | CommandPayload::LaySonobuoys { unit, .. }
+            | CommandPayload::LaunchSortie { unit, .. }
+            | CommandPayload::RecallAircraft { unit, .. }
+            | CommandPayload::SetReadiness { unit, .. }
             | CommandPayload::DetachFromGroup { unit }
             | CommandPayload::JoinGroup { unit, .. } => Some(*unit),
             CommandPayload::SpawnUnit(_)
@@ -376,6 +404,12 @@ impl CommandPayload {
                 if s.draft_m.is_some_and(|d| !(d.is_finite() && d >= 0.0)) {
                     return Err("draft_m must be finite and >= 0".into());
                 }
+                if let Some(a) = &s.air {
+                    if s.domain != crate::components::Domain::Air {
+                        return Err("only aircraft take part in air operations".into());
+                    }
+                    a.validate()?;
+                }
                 if s.displacement_t
                     .is_some_and(|m| !(m.is_finite() && m > 0.0))
                 {
@@ -424,6 +458,7 @@ impl CommandPayload {
                 sim_events::validate_profiles(profiles)
             }
             CommandPayload::LaySonobuoys { points, .. } => check_points(points),
+            CommandPayload::LaunchSortie { mission, .. } => mission.validate(),
             CommandPayload::SetWeaponCatalog { weapons } => {
                 weapons.iter().try_for_each(WeaponSpec::validate)
             }
@@ -497,6 +532,7 @@ impl CommandPayload {
                 }
             }
             CommandPayload::StreamTowedArray { .. } => Ok(()),
+            CommandPayload::RecallAircraft { .. } | CommandPayload::SetReadiness { .. } => Ok(()),
             CommandPayload::LayMines {
                 mines, radius_m, ..
             } => {

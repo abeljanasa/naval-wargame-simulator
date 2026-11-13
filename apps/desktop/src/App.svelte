@@ -56,6 +56,8 @@
     Zone,
   } from "./lib/bindings";
   import AarPanel from "./lib/AarPanel.svelte";
+  import AirPanel from "./lib/AirPanel.svelte";
+  import { airborneText, bingoText } from "./lib/air";
   import ScenarioEditor from "./lib/ScenarioEditor.svelte";
   import { editor } from "./lib/editor.svelte";
   import DbBrowser from "./lib/DbBrowser.svelte";
@@ -762,7 +764,7 @@
   // ---- Layout: menus, panel tabs, dialogs ----
 
   type LeftTab = "picture" | "messages" | "coverage";
-  type RightTab = "unit" | "injects" | "events" | "planning" | "seats" | "log" | "review";
+  type RightTab = "unit" | "air" | "injects" | "events" | "planning" | "seats" | "log" | "review";
   let leftTab = $state<LeftTab>("picture");
   let rightTab = $state<RightTab>("unit");
   let showDb = $state(false);
@@ -775,6 +777,7 @@
   /** The right-hand tabs this seat has. */
   const rightTabs = $derived<{ key: RightTab; label: string }[]>([
     { key: "unit", label: "Unit" },
+    ...(sim.airBases.length > 0 ? ([{ key: "air", label: "Air" }] as const) : []),
     ...(isWhiteCell
       ? ([
           { key: "injects", label: "Injects" },
@@ -1250,6 +1253,22 @@
                     >
                   </dd>
                 {/if}
+                {#if u.air}
+                  <dt>Air</dt>
+                  <dd>
+                    {airborneText(u.air)}{bingoText(u.air) ? `, ${bingoText(u.air)}` : ""}
+                    {#if u.air.state !== "returning"}
+                      <button
+                        type="button"
+                        class="inline-action"
+                        onclick={() =>
+                          void commands.orderRecall(u.id, null).then((r) => {
+                            if (r.status === "error") sim.error = r.error;
+                          })}>Recall</button
+                      >
+                    {/if}
+                  </dd>
+                {/if}
                 {#if u.sonobuoys_left != null}
                   <dt>Sonobuoys</dt>
                   <dd>
@@ -1550,6 +1569,8 @@
               </ul>
             </section>
           {/if}
+        {:else if rightTab === "air"}
+          <AirPanel />
         {:else if rightTab === "injects"}
           <section>
             <h3>Inject library</h3>

@@ -15,16 +15,18 @@ pub enum AarTable {
     Weapons,
     Detections,
     Transits,
+    Sorties,
     Timeline,
 }
 
 impl AarTable {
-    pub const ALL: [AarTable; 6] = [
+    pub const ALL: [AarTable; 7] = [
         AarTable::Sides,
         AarTable::Losses,
         AarTable::Weapons,
         AarTable::Detections,
         AarTable::Transits,
+        AarTable::Sorties,
         AarTable::Timeline,
     ];
 
@@ -37,6 +39,7 @@ impl AarTable {
             AarTable::Weapons => "weapons",
             AarTable::Detections => "detections",
             AarTable::Transits => "transits",
+            AarTable::Sorties => "sorties",
             AarTable::Timeline => "timeline",
         }
     }
@@ -85,6 +88,7 @@ fn kind(k: TimelineKind) -> &'static str {
         TimelineKind::Damage => "damage",
         TimelineKind::Loss => "loss",
         TimelineKind::Mine => "mine",
+        TimelineKind::Air => "air",
         TimelineKind::Override => "override",
         TimelineKind::Facilitation => "facilitation",
         TimelineKind::Event => "event",
@@ -227,6 +231,43 @@ impl AarReport {
                             clock(d.gained),
                             d.lost.map(clock).unwrap_or_default(),
                             format!("{:.0}", d.held_s),
+                        ],
+                    );
+                }
+            }
+            AarTable::Sorties => {
+                line(
+                    &mut out,
+                    &h(&[
+                        "launched",
+                        "unit",
+                        "unit_name",
+                        "side",
+                        "base",
+                        "mission",
+                        "loadout",
+                        "ended",
+                        "flight_min",
+                        "outcome",
+                        "tanker_fuel_t",
+                    ]),
+                );
+                for r in &self.sorties {
+                    let until = r.ended.unwrap_or(self.end_tick);
+                    line(
+                        &mut out,
+                        &[
+                            clock(r.launched),
+                            r.unit.0.to_string(),
+                            r.unit_name.clone(),
+                            side(r.side),
+                            r.base.clone(),
+                            r.mission.clone(),
+                            r.loadout.clone().unwrap_or_default(),
+                            r.ended.map(clock).unwrap_or_default(),
+                            format!("{:.0}", (until.seconds() - r.launched.seconds()) / 60.0),
+                            r.outcome.clone(),
+                            format!("{:.1}", r.tanker_fuel_t),
                         ],
                     );
                 }

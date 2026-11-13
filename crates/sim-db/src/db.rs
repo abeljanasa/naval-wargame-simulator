@@ -237,6 +237,34 @@ impl PlatformDb {
         Ok(v)
     }
 
+    /// An aircraft's loadouts, by id: (id, name, role, weapons by id with quantities). Empty for
+    /// platforms without loadouts (`docs/models/air-operations.md`).
+    #[allow(clippy::type_complexity)]
+    pub fn loadouts_of(
+        &self,
+        platform_id: &str,
+    ) -> Result<Vec<(String, String, String, Vec<(String, u32)>)>, DbError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, role FROM loadouts WHERE platform_id = ?1 ORDER BY id")?;
+        let heads = stmt
+            .query_map([platform_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<Result<Vec<(String, String, String)>, _>>()?;
+        let mut items = self.conn.prepare(
+            "SELECT weapon_id, quantity FROM loadout_items WHERE loadout_id = ?1
+              ORDER BY weapon_id",
+        )?;
+        heads
+            .into_iter()
+            .map(|(id, name, role)| {
+                let stores = items
+                    .query_map([&id], |r| Ok((r.get(0)?, r.get(1)?)))?
+                    .collect::<Result<Vec<(String, u32)>, _>>()?;
+                Ok((id, name, role, stores))
+            })
+            .collect()
+    }
+
     /// A weapon's figures: (id, name, kind, guidance, min range m, max range m, speed m/s,
     /// warhead kg, base Ph, comma-separated target domains).
     #[allow(clippy::type_complexity)]

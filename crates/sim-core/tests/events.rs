@@ -44,6 +44,7 @@ fn spawn(id: u64, side: u16, at: GeoPoint, speed_mps: f64, route: Vec<GeoPoint>)
         fuel: None,
         draft_m: None,
         displacement_t: None,
+        air: None,
     }
 }
 

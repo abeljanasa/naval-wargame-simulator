@@ -95,6 +95,62 @@ pub enum SimEventKind {
         turn_deg: f64,
         slowed: bool,
     },
+    /// A parked aircraft was tasked; it launches in `ready_in_s` once a runway is free
+    /// (`docs/models/air-operations.md`).
+    SortieOrdered {
+        unit: UnitId,
+        ready_in_s: f64,
+        loadout: Option<String>,
+    },
+    /// An aircraft took off from `base` on a sortie.
+    SortieLaunched {
+        unit: UnitId,
+        base: u32,
+        loadout: Option<String>,
+        mission: String,
+    },
+    /// An aircraft turned for `base`: mission complete, target gone, weapons expended, bingo
+    /// fuel, recalled.
+    AircraftReturning {
+        unit: UnitId,
+        base: u32,
+        reason: String,
+    },
+    /// An aircraft landed at `base`, took `fuel_t` of aviation fuel, and turns round.
+    AircraftRecovered {
+        unit: UnitId,
+        base: u32,
+        fuel_t: f64,
+        turnaround_s: f64,
+    },
+    /// An aircraft reached bingo fuel; it heads for a tanker, if one is nearer than a base.
+    BingoFuel {
+        unit: UnitId,
+        fuel_t: f64,
+        tanker: Option<UnitId>,
+    },
+    /// A receiver took a tanker's hose.
+    TankingStarted {
+        receiver: UnitId,
+        tanker: UnitId,
+    },
+    /// A receiver left the tanker with `fuel_t` aboard, having taken `taken_t`.
+    TankingComplete {
+        receiver: UnitId,
+        tanker: UnitId,
+        fuel_t: f64,
+        taken_t: f64,
+    },
+    /// An aircraft was lost other than to a weapon: out of fuel, or with its carrier.
+    AircraftLost {
+        unit: UnitId,
+        reason: String,
+    },
+    /// A parked aircraft's readiness changed.
+    ReadinessChanged {
+        unit: UnitId,
+        readiness: crate::air::Readiness,
+    },
     /// A ship or submarine stopped rather than run onto land.
     LandAhead {
         unit: UnitId,

@@ -78,6 +78,8 @@ pub struct SnapshotUpdate {
     pub sound_profiles: Vec<sim_core::SoundProfile>,
     /// The viewer's laid sonobuoys (sent whole).
     pub sonobuoys: Vec<sim_core::SonobuoyView>,
+    /// The viewer's airbases and the aircraft parked there (sent whole).
+    pub air_bases: Vec<sim_core::AirBaseView>,
     /// The viewer's recent ESM bearing lines (sent whole, like contacts).
     pub bearings: Vec<BearingView>,
     /// The viewer's weapons in flight (sent whole).
@@ -1057,6 +1059,52 @@ impl Host {
         self.order(label, CommandPayload::StreamTowedArray { unit, streamed })
     }
 
+    /// Launches a parked aircraft on a sortie (`docs/models/air-operations.md`).
+    pub fn order_sortie(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+        mission: Mission,
+        loadout: Option<String>,
+    ) -> Result<u64, String> {
+        self.order(
+            label,
+            CommandPayload::LaunchSortie {
+                unit,
+                mission,
+                loadout,
+            },
+        )
+    }
+
+    /// Recalls an aircraft (cancels a launch, or brings it home).
+    pub fn order_recall(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+        base: Option<u32>,
+    ) -> Result<u64, String> {
+        self.order(label, CommandPayload::RecallAircraft { unit, base })
+    }
+
+    /// Sets a parked aircraft's readiness.
+    pub fn order_readiness(
+        &mut self,
+        label: &str,
+        unit: UnitId,
+        readiness: sim_core::Readiness,
+        maintenance_s: Option<f64>,
+    ) -> Result<u64, String> {
+        self.order(
+            label,
+            CommandPayload::SetReadiness {
+                unit,
+                readiness,
+                maintenance_s,
+            },
+        )
+    }
+
     /// Sends a unit through `points`, laying a sonobuoy at each.
     pub fn order_sonobuoys(
         &mut self,
@@ -1220,6 +1268,7 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
         weather_zones: snap.weather_zones.clone(),
         sound_profiles: snap.sound_profiles.clone(),
         sonobuoys: snap.sonobuoys.clone(),
+        air_bases: snap.air_bases.clone(),
         bearings: snap.bearings.clone(),
         weapons: snap.weapons.clone(),
         refusals,

@@ -35,6 +35,7 @@ Each facility belongs to one side:
 |---|---|
 | `command_post` | Orders route through the post (below). Ashore when fixed, or carried by a `unit` (a flagship afloat, an aircraft airborne, a land unit). |
 | `sheltering_port`, `anchorage`, `refuelling_point` | Serve the side's units that are **alongside**: inside the facility's water and at ≤ 0.5 m/s, with the `services` the facility offers. |
+| `airbase` | An airfield, or a ship's flight deck (`unit`): runways or deck spots, parking and aviation fuel in its `air` block. Its aircraft park there, launch and recover ([air-operations.md](air-operations.md)). Ships never divert to one. |
 
 **Water, depth and holding limits** (slice 13, [DL-0032](../design-log/DL-0032-anchorages-weather.md)):
 - **`area`:** a polygon or circle that a fixed facility's water uses instead of `radius_m` round `position`. `position` stays the point units steer for, and the scenario check warns if it is outside the area. A facility carried by a unit (an oiler) always uses its radius.

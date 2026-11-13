@@ -134,6 +134,10 @@ pub struct SaveGame {
     /// Who is giving way to whom (format 27). Older saves load with none.
     #[serde(default)]
     pub avoidance: crate::collision::Avoidance,
+    /// Air operations: aircraft, hangars, runways, aviation fuel used (format 27). Older saves
+    /// load with none.
+    #[serde(default)]
+    pub air: crate::air::Air,
     #[serde(default)]
     pub bearings: BearingTable,
     #[serde(default)]

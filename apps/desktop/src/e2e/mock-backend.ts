@@ -464,6 +464,7 @@ const frame = (): FrameEvent => {
       weather_zones: [],
       sound_profiles: [],
       sonobuoys: [],
+      air_bases: [],
       bearings,
       weapons: [],
       minefields: [],

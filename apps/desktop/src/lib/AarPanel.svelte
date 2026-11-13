@@ -23,6 +23,7 @@
     { key: "weapons", label: "Weapons" },
     { key: "detections", label: "Detections" },
     { key: "transits", label: "Transits" },
+    { key: "sorties", label: "Sorties" },
     { key: "timeline", label: "Timeline" },
   ];
 
@@ -37,6 +38,7 @@
     "damage",
     "loss",
     "mine",
+    "air",
     "override",
     "facilitation",
     "event",
@@ -190,6 +192,34 @@
               </tr>
             {:else}
               <tr><td colspan="9" class="dim">No weapons fired.</td></tr>
+            {/each}
+          </tbody>
+        </table>
+      {:else if tab === "sorties"}
+        <table>
+          <thead>
+            <tr>
+              <th>Launched</th><th>Aircraft</th><th>Base</th><th>Mission</th><th>Loadout</th><th
+                >Flight</th
+              ><th>Outcome</th><th>From tankers</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each view.report.sorties ?? [] as r, i (i)}
+              <tr class:link={sim.replaying} onclick={() => seekTo(n(r.launched))}>
+                <td class="mono">{gameTime(n(r.launched))}</td><td>{r.unit_name}</td><td
+                  >{r.base}</td
+                ><td>{r.mission}</td><td>{r.loadout ?? "—"}</td>
+                <td class="mono"
+                  >{Math.round((n(r.ended ?? view.report.end_tick) - n(r.launched)) / 60)} min</td
+                >
+                <td>{r.outcome}</td>
+                <td class="mono"
+                  >{n(r.tanker_fuel_t) > 0 ? `${n(r.tanker_fuel_t).toFixed(1)} t` : "—"}</td
+                >
+              </tr>
+            {:else}
+              <tr><td colspan="8" class="dim">No sorties flown.</td></tr>
             {/each}
           </tbody>
         </table>

@@ -128,6 +128,7 @@ fn unit(
             fuel: None,
             draft_m: None,
             displacement_t: None,
+            air: None,
         }),
     )
 }
@@ -1139,6 +1140,7 @@ fn facility(
         depth_m: None,
         max_sea_state: None,
         staging: false,
+        air: None,
     }
 }
 
@@ -1908,6 +1910,8 @@ fn fuelled(mut c: Command, capacity_t: f64, endurance_m: f64, level: f64) -> Com
             cruise_mps: 10.0,
             level,
             bingo: None,
+            kind: Default::default(),
+            idle_fraction: None,
         });
     }
     c

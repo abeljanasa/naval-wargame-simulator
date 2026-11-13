@@ -126,6 +126,12 @@ export const commands = {
 	orderTowed: (unit: UnitId, streamed: boolean) => typedError<null, string>(__TAURI_INVOKE("order_towed", { unit, streamed })),
 	/**  Sends a unit through `points`, laying a sonobuoy at each (`deep`: hydrophones at 300 m). */
 	orderSonobuoys: (unit: UnitId, points: GeoPoint[], deep: boolean) => typedError<null, string>(__TAURI_INVOKE("order_sonobuoys", { unit, points, deep })),
+	/**  Launches a parked aircraft on a sortie; the loadout defaults to the mission's. */
+	orderSortie: (unit: UnitId, mission: Mission_Deserialize, loadout: string | null) => typedError<null, string>(__TAURI_INVOKE("order_sortie", { unit, mission, loadout })),
+	/**  Recalls an aircraft: cancels a launch, or brings it back to `base` (default its own). */
+	orderRecall: (unit: UnitId, base: number | null) => typedError<null, string>(__TAURI_INVOKE("order_recall", { unit, base })),
+	/**  Sets a parked aircraft's readiness (with a maintenance period, if given). */
+	orderReadiness: (unit: UnitId, readiness: Readiness, maintenanceS: number | null) => typedError<null, string>(__TAURI_INVOKE("order_readiness", { unit, readiness, maintenanceS })),
 	/**  Reads the imagery folder again (after packs were copied into it by hand). */
 	rescanImagery: () => __TAURI_INVOKE<ImageryStatus_Serialize>("rescan_imagery"),
 };
@@ -149,6 +155,8 @@ export type AarReport_Deserialize = {
 	detections: DetectionRow_Deserialize[],
 	/**  Choke-point transits with lanes or terrain packs (older reports: none). */
 	transits?: TransitRow_Deserialize[],
+	/**  Sorties flown (older reports: none). */
+	sorties?: SortieRow_Deserialize[],
 	timeline: TimelineEntry_Deserialize[],
 };
 
@@ -162,11 +170,13 @@ export type AarReport_Serialize = {
 	detections: DetectionRow_Serialize[],
 	/**  Choke-point transits with lanes or terrain packs (older reports: none). */
 	transits: TransitRow_Serialize[],
+	/**  Sorties flown (older reports: none). */
+	sorties: SortieRow_Serialize[],
 	timeline: TimelineEntry_Serialize[],
 };
 
 /**  The tables of an [`AarReport`]. */
-export type AarTable = "sides" | "losses" | "weapons" | "detections" | "transits" | "timeline";
+export type AarTable = "sides" | "losses" | "weapons" | "detections" | "transits" | "sorties" | "timeline";
 
 /**
  *  The after-action review for one window: the whole report, with the timeline cut to what the
@@ -296,6 +306,103 @@ export type Adjudication_Serialize =
 { kind: "move_unit"; unit: UnitId; position: GeoPoint; altitude_m: number | null } | 
 /**  Set the rounds of one weapon a unit carries (0 removes it). */
 { kind: "set_stores"; unit: UnitId; weapon: string; count: number };
+
+/**  An airbase and its aircraft on the ground, as a seat sees it. */
+export type AirBaseView = AirBaseView_Serialize | AirBaseView_Deserialize;
+
+/**  An airbase and its aircraft on the ground, as a seat sees it. */
+export type AirBaseView_Deserialize = {
+	facility: number,
+	name: string,
+	side: SideId,
+	position?: GeoPoint | null,
+	runways: number,
+	parking: number,
+	deck: boolean,
+	/**  Aviation fuel left, t (`None`: unlimited). */
+	aviation_fuel_t?: number | null,
+	aircraft: ParkedView_Deserialize[],
+};
+
+/**  An airbase and its aircraft on the ground, as a seat sees it. */
+export type AirBaseView_Serialize = {
+	facility: number,
+	name: string,
+	side: SideId,
+	position: GeoPoint | null,
+	runways: number,
+	parking: number,
+	deck: boolean,
+	/**  Aviation fuel left, t (`None`: unlimited). */
+	aviation_fuel_t: number | null,
+	aircraft: ParkedView_Serialize[],
+};
+
+/**  The runways (or deck) of an airbase facility. */
+export type AirField = AirField_Serialize | AirField_Deserialize;
+
+/**  The runways (or deck) of an airbase facility. */
+export type AirField_Deserialize = {
+	/**
+	 *  Runways (ashore) or launch and recovery spots (deck), each launching or recovering one
+	 *  aircraft per interval.
+	 */
+	runways?: number,
+	/**  Seconds between launches or recoveries on one runway (default 120 ashore, 60 on a deck). */
+	interval_s?: number | null,
+	/**  Aircraft it can park; 0 = no limit. */
+	parking?: number,
+	/**  A ship's flight deck. */
+	deck?: boolean,
+	/**  Fixed-wing aircraft can use it (default: yes ashore, no on a deck; a carrier sets it). */
+	fixed_wing?: boolean | null,
+	/**  Aviation fuel held at the start, t; `None` = unlimited. */
+	aviation_fuel_t?: number | null,
+};
+
+/**  The runways (or deck) of an airbase facility. */
+export type AirField_Serialize = {
+	/**
+	 *  Runways (ashore) or launch and recovery spots (deck), each launching or recovering one
+	 *  aircraft per interval.
+	 */
+	runways: number,
+	/**  Seconds between launches or recoveries on one runway (default 120 ashore, 60 on a deck). */
+	interval_s: number | null,
+	/**  Aircraft it can park; 0 = no limit. */
+	parking: number,
+	/**  A ship's flight deck. */
+	deck: boolean,
+	/**  Fixed-wing aircraft can use it (default: yes ashore, no on a deck; a carrier sets it). */
+	fixed_wing: boolean | null,
+	/**  Aviation fuel held at the start, t; `None` = unlimited. */
+	aviation_fuel_t: number | null,
+};
+
+/**  An aircraft in the air, as a seat sees it. */
+export type AirUnitView = AirUnitView_Serialize | AirUnitView_Deserialize;
+
+/**  An aircraft in the air, as a seat sees it. */
+export type AirUnitView_Deserialize = {
+	base?: number | null,
+	/**  `airborne`, `returning`, `to_tanker` or `tanking`. */
+	state: string,
+	loadout?: string | null,
+	/**  Fuel share at which it turns for home from here (`None`: no fuel model). */
+	bingo_fraction?: number | null,
+	tanker: boolean,
+};
+
+/**  An aircraft in the air, as a seat sees it. */
+export type AirUnitView_Serialize = {
+	base: number | null,
+	/**  `airborne`, `returning`, `to_tanker` or `tanking`. */
+	state: string,
+	loadout: string | null,
+	/**  Fuel share at which it turns for home from here (`None`: no fuel model). */
+	bingo_fraction: number | null,
+	tanker: boolean,
+};
 
 /**  A region of the sea. */
 export type Area = 
@@ -909,7 +1016,9 @@ export type FacilityDepth_Serialize = {
 };
 
 /**  What a facility is. */
-export type FacilityKind = "command_post" | "refuelling_point" | "sheltering_port" | "anchorage";
+export type FacilityKind = "command_post" | "refuelling_point" | "sheltering_port" | "anchorage" | 
+/**  An airfield, or a ship's flight deck (Phase 4 slice 9, `docs/models/air-operations.md`). */
+"airbase";
 
 /**  A planning-layer facility. */
 export type Facility_Deserialize = {
@@ -968,6 +1077,8 @@ export type Facility_Deserialize = {
 	max_sea_state?: number | null,
 	/**  Anchorages: AI-run units whose mission is complete hold here until tasked again. */
 	staging?: boolean,
+	/**  Airbases: runways or deck, parking and aviation fuel (Phase 4 slice 9). */
+	air?: AirField_Deserialize | null,
 };
 
 /**  A planning-layer facility. */
@@ -1027,6 +1138,8 @@ export type Facility_Serialize = {
 	max_sea_state: number | null,
 	/**  Anchorages: AI-run units whose mission is complete hold here until tasked again. */
 	staging: boolean,
+	/**  Airbases: runways or deck, parking and aviation fuel (Phase 4 slice 9). */
+	air?: AirField_Serialize,
 };
 
 /**  Streamed to the UI at ≤ 30 Hz. */
@@ -1249,6 +1362,15 @@ export type LinkStatus = "up" | "out_of_range" | "beyond_horizon" | "jammed" |
 /**  No command post commands the unit, or every one is down. */
 "no_post";
 
+/**  One loadout an aircraft can carry (from the platform database). */
+export type LoadoutOption = {
+	id: string,
+	name: string,
+	/**  `air_superiority`, `asuw`, `asw` or `strike`. */
+	role: string,
+	stores: { [key in string]: number },
+};
+
 /**  One unit lost. */
 export type LossRow = LossRow_Serialize | LossRow_Deserialize;
 
@@ -1454,6 +1576,43 @@ export type Outcome_Serialize = {
 	reason: string | null,
 };
 
+/**  A parked aircraft, as a seat sees it. */
+export type ParkedView = ParkedView_Serialize | ParkedView_Deserialize;
+
+/**  A parked aircraft, as a seat sees it. */
+export type ParkedView_Deserialize = {
+	unit: UnitId,
+	name: string,
+	platform?: string | null,
+	readiness: Readiness,
+	/**  Tasked and waiting to launch. */
+	launching: boolean,
+	/**  Seconds until it can launch (turnaround, maintenance, alert delay once tasked). */
+	ready_in_s: number | null,
+	loadout?: string | null,
+	loadouts: LoadoutOption[],
+	fuel_fraction?: number | null,
+	/**  Damaged: it cannot fly. */
+	damaged: boolean,
+};
+
+/**  A parked aircraft, as a seat sees it. */
+export type ParkedView_Serialize = {
+	unit: UnitId,
+	name: string,
+	platform: string | null,
+	readiness: Readiness,
+	/**  Tasked and waiting to launch. */
+	launching: boolean,
+	/**  Seconds until it can launch (turnaround, maintenance, alert delay once tasked). */
+	ready_in_s: number | null,
+	loadout: string | null,
+	loadouts: LoadoutOption[],
+	fuel_fraction: number | null,
+	/**  Damaged: it cannot fly. */
+	damaged: boolean,
+};
+
 /**  A command post's state. */
 export type PostView = PostView_Serialize | PostView_Deserialize;
 
@@ -1481,6 +1640,17 @@ export type PostView_Serialize = {
 export type Posture = "friendly" | 
 /**  The default between sides that have not set a posture. */
 "neutral" | "unfriendly" | "hostile";
+
+/**  How soon a parked aircraft can launch once tasked. */
+export type Readiness = 
+/**  Crewed and armed: launches when a runway is free. */
+"ready" | 
+/**  Launches 15 minutes after tasking. */
+"alert15" | 
+/**  Launches 60 minutes after tasking. */
+"alert60" | 
+/**  Not available until maintenance ends (or the readiness is changed). */
+"maintenance";
 
 /**
  *  A named point on the map (a rendezvous, a waypoint name, a briefing mark). It has no effect
@@ -1656,6 +1826,19 @@ export type ScenarioUnit_Deserialize = {
 	reserve?: boolean,
 	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
 	fuel_level?: number | null,
+	/**
+	 *  Aircraft: its airbase facility (Phase 4 slice 9, `docs/models/air-operations.md`). With a
+	 *  base it starts parked there, unless `airborne`.
+	 */
+	base?: number | null,
+	/**  Aircraft with a base: starts in the air instead of parked. */
+	airborne?: boolean,
+	/**  Aircraft: readiness at the start (default ready). */
+	readiness?: Readiness | null,
+	/**  Aircraft in maintenance: for how long, s (none: until changed). */
+	maintenance_s?: number | null,
+	/**  Aircraft: the loadout carried at the start (default the platform's first). */
+	loadout?: string | null,
 };
 
 /**  A unit as written in a scenario file. */
@@ -1689,6 +1872,19 @@ export type ScenarioUnit_Serialize = {
 	reserve?: boolean,
 	/**  Fraction of fuel at the start, with the fuel model on (default full; format 6). */
 	fuel_level?: number | null,
+	/**
+	 *  Aircraft: its airbase facility (Phase 4 slice 9, `docs/models/air-operations.md`). With a
+	 *  base it starts parked there, unless `airborne`.
+	 */
+	base?: number,
+	/**  Aircraft with a base: starts in the air instead of parked. */
+	airborne?: boolean,
+	/**  Aircraft: readiness at the start (default ready). */
+	readiness?: Readiness,
+	/**  Aircraft in maintenance: for how long, s (none: until changed). */
+	maintenance_s?: number | null,
+	/**  Aircraft: the loadout carried at the start (default the platform's first). */
+	loadout?: string,
 };
 
 export type Scenario_Deserialize = {
@@ -1954,6 +2150,8 @@ export type SnapshotUpdate_Deserialize = {
 	sound_profiles: SoundProfile_Deserialize[],
 	/**  The viewer's laid sonobuoys (sent whole). */
 	sonobuoys: SonobuoyView[],
+	/**  The viewer's airbases and the aircraft parked there (sent whole). */
+	air_bases: AirBaseView_Deserialize[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -2002,6 +2200,8 @@ export type SnapshotUpdate_Serialize = {
 	sound_profiles: SoundProfile_Serialize[],
 	/**  The viewer's laid sonobuoys (sent whole). */
 	sonobuoys: SonobuoyView[],
+	/**  The viewer's airbases and the aircraft parked there (sent whole). */
+	air_bases: AirBaseView_Serialize[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -2038,6 +2238,43 @@ export type SonobuoyView = {
 	depth_m: number | null,
 	/**  Seconds of life left. */
 	life_s: number | null,
+};
+
+/**  One sortie (`docs/models/air-operations.md`). */
+export type SortieRow = SortieRow_Serialize | SortieRow_Deserialize;
+
+/**  One sortie (`docs/models/air-operations.md`). */
+export type SortieRow_Deserialize = {
+	launched: Tick,
+	unit: UnitId,
+	unit_name: string,
+	side?: SideId | null,
+	base: string,
+	mission: string,
+	loadout?: string | null,
+	/**  When it landed or was lost (`None`: still flying at the end). */
+	ended?: Tick | null,
+	/**  Recovered, lost (and why), or airborne at the end. */
+	outcome: string,
+	/**  Fuel taken from tankers, t. */
+	tanker_fuel_t: number | null,
+};
+
+/**  One sortie (`docs/models/air-operations.md`). */
+export type SortieRow_Serialize = {
+	launched: Tick,
+	unit: UnitId,
+	unit_name: string,
+	side: SideId | null,
+	base: string,
+	mission: string,
+	loadout: string | null,
+	/**  When it landed or was lost (`None`: still flying at the end). */
+	ended: Tick | null,
+	/**  Recovered, lost (and why), or airborne at the end. */
+	outcome: string,
+	/**  Fuel taken from tankers, t. */
+	tanker_fuel_t: number | null,
 };
 
 /**  A sound-velocity profile for a region and season (`docs/models/acoustics.md`). */
@@ -2163,7 +2400,9 @@ export type TimelineEntry_Serialize = {
 };
 
 /**  What a timeline entry is about. */
-export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | "override" | "facilitation" | "event" | "script_error";
+export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | 
+/**  Air operations: sorties, recoveries, bingo, tanking. */
+"air" | "override" | "facilitation" | "event" | "script_error";
 
 /**  A towed array, as a seat sees it. */
 export type TowedView = {
@@ -2292,6 +2531,8 @@ export type UnitView_Deserialize = {
 	towed?: TowedView | null,
 	/**  Sonobuoys left, for units that carry them. */
 	sonobuoys_left?: number | null,
+	/**  An aircraft's air operations state: base, sortie, loadout, bingo. */
+	air?: AirUnitView_Deserialize | null,
 };
 
 export type UnitView_Serialize = {
@@ -2330,6 +2571,8 @@ export type UnitView_Serialize = {
 	towed?: TowedView,
 	/**  Sonobuoys left, for units that carry them. */
 	sonobuoys_left?: number,
+	/**  An aircraft's air operations state: base, sortie, loadout, bingo. */
+	air?: AirUnitView_Serialize,
 };
 
 /**  Whose picture a snapshot shows. */

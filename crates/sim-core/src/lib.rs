@@ -8,6 +8,7 @@
 mod acoustics;
 mod adjudication;
 mod ai;
+mod air;
 mod c2;
 mod collision;
 mod combat;
@@ -48,6 +49,10 @@ pub use adjudication::{
     Adjudication, AdjudicationLog, AdjudicationRecord, ADJUDICATION_VIEW_LIMIT,
 };
 pub use ai::MissionState;
+pub use air::{
+    fuel_needed_t, mission_name, readiness_text, AirBaseView, AirField, AirSpec, AirUnitView,
+    LoadoutOption, ParkedView, Readiness, TankerSpec, DEFAULT_HOSES, DEFAULT_TRANSFER_T_PER_MIN,
+};
 pub use c2::C2State;
 pub use collision::{damage_fraction, default_mass_t, AvoidState, Avoidance};
 pub use combat::{
@@ -74,7 +79,8 @@ pub use esm::{
 };
 pub use events::{SimEvent, SimEventKind};
 pub use fuel::{
-    burn_t_per_s, Fuel, FuelSpec, DEFAULT_BINGO, FUEL_FRACTION_OF_DISPLACEMENT, HOTEL_FRACTION,
+    burn_t_per_s, Fuel, FuelKind, FuelSpec, AIRCRAFT_IDLE_FRACTION, DEFAULT_BINGO,
+    FUEL_FRACTION_OF_DISPLACEMENT, HOTEL_FRACTION,
 };
 pub use hash::StateHash;
 pub use ids::{SideId, UnitId};

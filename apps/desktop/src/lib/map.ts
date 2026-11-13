@@ -991,6 +991,7 @@ const FACILITY_CODE: Record<string, string> = {
   refuelling_point: "RAS",
   sheltering_port: "PORT",
   anchorage: "ANCH",
+  airbase: "AIR",
 };
 
 /** One sense zone's coverage, as the engine samples it. */

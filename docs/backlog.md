@@ -37,7 +37,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
   - ~~depths for ports and anchorages from bathymetry~~ (Phase 4 slice 3, DL-0039);
   - choke points that inherit depth and shipping lanes;
   - ~~shallow-water routing~~ (Phase 4 slice 3, DL-0039).
-- [ ] Airbases and air operations: aircraft fuel and tanking, aircraft loadout choice, runways at facilities.
+- [x] Airbases and air operations: aircraft fuel and tanking, aircraft loadout choice, runways at facilities (Phase 4 slices 9–11, DL-0046).
 - [ ] Automatic sense-zone sensor placement and tasking (§7.1, analysis phase).
 
 ## Phase 2, deferred from slices
@@ -50,7 +50,8 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [ ] Sonobuoy laying and towed-array streaming states (missions, slice 10); active-sonar reverberation.
 - [x] Weapons in flight as detectable, engageable targets (Phase 3 slice 15); salvo deconfliction within an action group (slice 16).
 - [ ] Seeker re-attack, and salvo deconfliction across ships that are not in a group.
-- [ ] Aircraft loadout choice (air operations, Phase 4); damage location and compartments.
+- [x] Aircraft loadout choice (Phase 4 slice 10, DL-0046).
+- [ ] Damage location and compartments.
 
 ## Phase 1, still to do (Gate 1: "units move and detect")
 
@@ -59,7 +60,7 @@ The client chose to close the in-phase P1 gaps and move these to Phase 4, becaus
 - [x] In-app database browser: search, record detail with source citation, confidence and marking, and validation feedback (DL-0009).
 - [x] In-app database *editing* for platform records: record diff, citation entry, live validation while typing. It writes the JSON source (ADR-0004, DL-0037).
 - [x] Editing sensors and weapons in the app, in the same record editor (`sensors.json`, `weapons.json`).
-- [ ] Planning-layer facility attributes still to do: runways (air operations, Phase 4). Berths, repair, rearm, fuel and draft limits (planner-entered depth, DL-0032) are done.
+- [x] Planning-layer facility attributes: runways (airbases, Phase 4 slice 9), berths, repair, rearm, fuel and draft limits (planner-entered depth, DL-0032).
 - [x] Release scan (`sim-db scan`), run in the release workflow.
 - [x] Installers, signed when secrets are configured, plus SBOMs and a `cargo deny` licence audit (docs/build/releasing.md).
 - [x] Air-gapped vendored build, with the engine verified offline (docs/build/air-gapped.md).

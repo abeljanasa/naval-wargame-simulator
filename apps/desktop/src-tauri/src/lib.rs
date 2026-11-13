@@ -1152,6 +1152,50 @@ fn order_sonobuoys(
         .map(|_| ())
 }
 
+/// Launches a parked aircraft on a sortie; the loadout defaults to the mission's.
+#[tauri::command]
+#[specta::specta]
+fn order_sortie(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    mission: Mission,
+    loadout: Option<String>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_sortie(window.label(), unit, mission, loadout)
+        .map(|_| ())
+}
+
+/// Recalls an aircraft: cancels a launch, or brings it back to `base` (default its own).
+#[tauri::command]
+#[specta::specta]
+fn order_recall(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    base: Option<u32>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_recall(window.label(), unit, base)
+        .map(|_| ())
+}
+
+/// Sets a parked aircraft's readiness (with a maintenance period, if given).
+#[tauri::command]
+#[specta::specta]
+fn order_readiness(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    unit: UnitId,
+    readiness: sim_core::Readiness,
+    maintenance_s: Option<f64>,
+) -> Result<(), String> {
+    lock(&host)
+        .order_readiness(window.label(), unit, readiness, maintenance_s)
+        .map(|_| ())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -1203,6 +1247,9 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             order_sound_profiles,
             order_towed,
             order_sonobuoys,
+            order_sortie,
+            order_recall,
+            order_readiness,
             rescan_imagery,
         ])
         .events(collect_events![FrameEvent])

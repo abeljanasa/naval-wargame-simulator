@@ -20,7 +20,7 @@ With fuel on, every ship and submarine whose platform gives an **endurance** get
 - **Cruise speed:** from the database.
 - **Starting level:** full, or the unit's `fuel_level` (a fraction).
 
-Units with no endurance in the database have no fuel model; nuclear submarines are the usual case. Aircraft and land units have no fuel model either; aircraft fuel and tanking arrive with air operations in Phase 4.
+Units with no endurance in the database have no fuel model; nuclear submarines are the usual case. Land units have no fuel model either. Aircraft burn **aviation fuel** with an idle share of 0.6, and refuel at airbases and from tankers ([air-operations.md](air-operations.md)).
 
 ## Burn
 
@@ -83,6 +83,6 @@ Every 60 s, a unit **alongside** a refuelling point takes fuel.
 ## Limitations
 
 - **Generic capacity:** 10 % of displacement. The database has no fuel capacity yet.
-- **One fuel type:** marine fuel. Aviation fuel and fuel types arrive with air operations.
+- **Two fuel types:** marine fuel for ships and submarines, from refuelling points; aviation fuel for aircraft, from airbases and tankers ([air-operations.md](air-operations.md)). No facility converts one to the other, and oilers do not yet carry aviation fuel.
 - **No weather or sea-state effect** on the burn rate, and no damage effect on fuel.
 - **Oilers do not run dry themselves:** an oiler's own fuel is its unit's fuel model, and its cargo is `fuel_t`.

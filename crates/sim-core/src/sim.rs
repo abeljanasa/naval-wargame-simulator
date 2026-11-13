@@ -166,6 +166,7 @@ impl Simulation {
         world.insert_resource(crate::detection::Weather::default());
         world.insert_resource(crate::acoustics::Acoustics::default());
         world.insert_resource(crate::collision::Avoidance::default());
+        world.insert_resource(crate::air::Air::default());
         world.insert_resource(crate::collision::PendingCollisions::default());
         world.insert_resource(BearingTable::default());
         world.insert_resource(WeaponCatalog::default());
@@ -404,6 +405,13 @@ impl Simulation {
         let planning = self.world.resource::<PlanningLayer>().clone();
         let records = self.unit_records();
         let acoustics = self.world.resource::<crate::acoustics::Acoustics>().clone();
+        let air_units: BTreeMap<UnitId, crate::air::AirUnitView> = self
+            .world
+            .resource::<crate::air::Air>()
+            .aircraft
+            .keys()
+            .filter_map(|id| crate::air::unit_view(&self.world, *id).map(|v| (*id, v)))
+            .collect();
         let side_of: BTreeMap<UnitId, SideId> =
             records.iter().map(|r| (r.unit.id, r.unit.side)).collect();
         let units = records
@@ -454,6 +462,7 @@ impl Simulation {
                                 .copied()
                                 .unwrap_or(crate::acoustics::BUOY_LOAD)
                         }),
+                    air: air_units.get(&r.unit.id).cloned(),
                     stores: r
                         .magazine
                         .0
@@ -528,6 +537,14 @@ impl Simulation {
             environment: self.world.resource::<EnvState>().0,
             weather_zones: self.world.resource::<crate::detection::Weather>().0.clone(),
             sound_profiles: acoustics.profiles.clone(),
+            air_bases: crate::air::base_views(
+                &self.world,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+                tick,
+            ),
             sonobuoys: crate::acoustics::buoy_views(
                 &acoustics,
                 match viewer {
@@ -741,6 +758,11 @@ impl Simulation {
                 h.f64(f.cruise_mps);
                 h.f64(f.fuel_t);
                 h.f64(f.bingo);
+                // Aviation fuel only, so ships keep their hashes.
+                if f.kind == crate::fuel::FuelKind::Aviation {
+                    h.str("aviation");
+                    h.f64(f.idle_fraction);
+                }
             }
         }
         let catalog = self.world.resource::<WeaponCatalog>();
@@ -905,6 +927,17 @@ impl Simulation {
                 h.opt_f64(s.resume_deg);
             }
         }
+        // Air operations only when used, so runs without aircraft bases keep their hashes.
+        let air = self.world.resource::<crate::air::Air>();
+        if !air.is_empty() {
+            h.str("air");
+            if let Ok(bytes) = rmp_serde::to_vec(air) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
         let zones = &self.world.resource::<crate::detection::Weather>().0;
         if !zones.is_empty() {
             h.str("weather");
@@ -1000,6 +1033,7 @@ impl Simulation {
             weather: self.world.resource::<crate::detection::Weather>().0.clone(),
             acoustics: self.world.resource::<crate::acoustics::Acoustics>().clone(),
             avoidance: self.world.resource::<crate::collision::Avoidance>().clone(),
+            air: self.world.resource::<crate::air::Air>().clone(),
             bearings: self.world.resource::<BearingTable>().clone(),
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
@@ -1050,6 +1084,7 @@ impl Simulation {
             .insert_resource(crate::detection::Weather(save.weather.clone()));
         sim.world.insert_resource(save.acoustics.clone());
         sim.world.insert_resource(save.avoidance.clone());
+        sim.world.insert_resource(save.air.clone());
         sim.world.insert_resource(save.bearings);
         sim.world.insert_resource(save.emitter_library);
         sim.world.insert_resource(save.weapon_catalog);
@@ -1071,40 +1106,8 @@ impl Simulation {
         let mut index = BTreeMap::new();
         for r in save.units {
             let id = r.unit.id;
-            let signature = r.signature.unwrap_or(Signature {
-                rcs_m2: default_rcs_m2(r.unit.domain),
-                radiated_noise_db: None,
-                length_m: None,
-            });
-            let health = r
-                .health
-                .unwrap_or_else(|| Health::new(default_damage_profile(r.unit.domain)));
-            // Saves before format 17 have no loadout: take what the unit has now.
-            let loadout = r.loadout.unwrap_or_else(|| Loadout {
-                sensors: r.sensors.0.clone(),
-                max_speed_mps: r.kinematics.max_speed_mps,
-                stores: r.magazine.0.clone(),
-            });
-            let fuel = r.fuel;
-            let e = sim
-                .world
-                .spawn((
-                    r.unit,
-                    r.position,
-                    r.kinematics,
-                    r.route,
-                    r.sensors,
-                    signature,
-                    Jammer(r.jammer),
-                    health,
-                    r.magazine,
-                    r.mission,
-                    loadout,
-                ))
-                .id();
-            if let Some(f) = fuel {
-                sim.world.entity_mut(e).insert(f);
-            }
+            // Saves before format 17 have no loadout: `spawn_record` takes what the unit has now.
+            let e = spawn_record(&mut sim.world, r);
             if index.insert(id, e).is_some() {
                 return Err(SimError::CorruptSave(format!("duplicate unit {id}")));
             }
@@ -1112,6 +1115,83 @@ impl Simulation {
         sim.world.insert_resource(UnitIndex(index));
         Ok(sim)
     }
+}
+
+fn spawn_parts(
+    world: &mut World,
+    r: UnitRecord,
+    signature: Signature,
+    health: Health,
+    loadout: Loadout,
+) -> Entity {
+    let fuel = r.fuel;
+    let e = world
+        .spawn((
+            r.unit,
+            r.position,
+            r.kinematics,
+            r.route,
+            r.sensors,
+            signature,
+            Jammer(r.jammer),
+            health,
+            r.magazine,
+            r.mission,
+            loadout,
+        ))
+        .id();
+    if let Some(f) = fuel {
+        world.entity_mut(e).insert(f);
+    }
+    e
+}
+
+/// Puts a unit back in the world from its record (an aircraft launching from a hangar).
+pub(crate) fn spawn_record(world: &mut World, r: UnitRecord) -> Entity {
+    let id = r.unit.id;
+    let signature = r.signature.unwrap_or(Signature {
+        rcs_m2: default_rcs_m2(r.unit.domain),
+        radiated_noise_db: None,
+        length_m: None,
+    });
+    let health = r
+        .health
+        .clone()
+        .unwrap_or_else(|| Health::new(default_damage_profile(r.unit.domain)));
+    let loadout = r.loadout.clone().unwrap_or_else(|| Loadout {
+        sensors: r.sensors.0.clone(),
+        max_speed_mps: r.kinematics.max_speed_mps,
+        stores: r.magazine.0.clone(),
+    });
+    let e = spawn_parts(world, r, signature, health, loadout);
+    world.resource_mut::<UnitIndex>().0.insert(id, e);
+    e
+}
+
+/// Takes a unit out of the world as a record (an aircraft landing in a hangar).
+pub(crate) fn take_record(world: &mut World, e: Entity) -> Option<UnitRecord> {
+    let r = UnitRecord {
+        unit: world.get::<Unit>(e)?.clone(),
+        position: *world.get::<Position>(e)?,
+        kinematics: *world.get::<Kinematics>(e)?,
+        route: world.get::<Route>(e)?.clone(),
+        sensors: world.get::<SensorSuite>(e)?.clone(),
+        signature: world.get::<Signature>(e).copied(),
+        jammer: world.get::<Jammer>(e).and_then(|j| j.0),
+        magazine: world.get::<Magazine>(e)?.clone(),
+        health: world.get::<Health>(e).cloned(),
+        mission: world.get::<MissionState>(e).cloned().unwrap_or_default(),
+        loadout: world.get::<Loadout>(e).cloned(),
+        fuel: world.get::<crate::fuel::Fuel>(e).copied(),
+    };
+    world.despawn(e);
+    world.resource_mut::<UnitIndex>().0.remove(&r.unit.id);
+    Some(r)
+}
+
+/// The side an order acts for: `None` for the scenario, white cell and scripts.
+fn issuer_side(cmd: &Command) -> Option<SideId> {
+    (!cmd.issuer.is_privileged()).then(|| cmd.side.unwrap_or(SideId(0)))
 }
 
 fn hash_mission(h: &mut StateHash, m: &MissionState) {
@@ -1200,6 +1280,7 @@ fn build_schedule() -> Schedule {
     schedule.add_systems(
         (
             apply_commands_system,
+            crate::air::air_system,
             movement_system,
             crate::collision::collision_system,
             crate::acoustics::sonobuoy_system,
@@ -1484,6 +1565,21 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
             let entity = authorised_entity(world, cmd, *unit)?;
             crate::acoustics::order_towed(world, entity, *unit, *streamed)
         }
+        CommandPayload::LaunchSortie {
+            unit,
+            mission,
+            loadout,
+        } => crate::air::order_launch(world, issuer_side(cmd), *unit, mission, loadout.as_deref()),
+        CommandPayload::RecallAircraft { unit, base } => {
+            crate::air::order_recall(world, issuer_side(cmd), *unit, *base)
+        }
+        CommandPayload::SetReadiness {
+            unit,
+            readiness,
+            maintenance_s,
+        } => {
+            crate::air::order_readiness(world, issuer_side(cmd), *unit, *readiness, *maintenance_s)
+        }
         CommandPayload::LaySonobuoys { unit, points, deep } => {
             let entity = authorised_entity(world, cmd, *unit)?;
             crate::acoustics::order_buoys(world, entity, *unit, points, *deep)
@@ -1651,6 +1747,9 @@ fn spawn_unit(world: &mut World, s: &UnitSpawn) -> Result<(), String> {
             .insert(crate::fuel::Fuel::from_spec(f));
     }
     world.resource_mut::<UnitIndex>().0.insert(s.id, entity);
+    if let Some(a) = &s.air {
+        crate::air::register(world, s.id, a)?;
+    }
     world
         .resource_mut::<EventLog>()
         .push(tick, SimEventKind::UnitSpawned { unit: s.id });

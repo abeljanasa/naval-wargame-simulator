@@ -70,6 +70,7 @@ fn spawn(
             fuel: None,
             draft_m: None,
             displacement_t: None,
+            air: None,
         }),
     }
 }

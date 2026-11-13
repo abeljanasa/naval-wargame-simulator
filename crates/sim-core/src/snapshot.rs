@@ -77,6 +77,9 @@ pub struct UnitView {
     /// Sonobuoys left, for units that carry them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sonobuoys_left: Option<u32>,
+    /// An aircraft's air operations state: base, sortie, loadout, bingo.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub air: Option<crate::air::AirUnitView>,
 }
 
 /// Rounds of one weapon carried.
@@ -163,6 +166,9 @@ pub struct Snapshot {
     /// Sound-velocity profiles in force (every seat sees them, like the weather).
     #[serde(default)]
     pub sound_profiles: Vec<sim_events::SoundProfile>,
+    /// The viewer's airbases (every side's for the white cell) and the aircraft parked there.
+    #[serde(default)]
+    pub air_bases: Vec<crate::air::AirBaseView>,
     /// Side viewer: that side's recent ESM bearing lines. White cell: every side's.
     pub bearings: Vec<BearingView>,
     /// Side viewer: its own weapons in flight. White cell: every weapon in flight.

@@ -102,6 +102,25 @@ pub struct TransitRow {
     pub risk: sim_core::TransitRisk,
 }
 
+/// One sortie (`docs/models/air-operations.md`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct SortieRow {
+    pub launched: Tick,
+    pub unit: UnitId,
+    pub unit_name: String,
+    pub side: Option<SideId>,
+    pub base: String,
+    pub mission: String,
+    pub loadout: Option<String>,
+    /// When it landed or was lost (`None`: still flying at the end).
+    pub ended: Option<Tick>,
+    /// Recovered, lost (and why), or airborne at the end.
+    pub outcome: String,
+    /// Fuel taken from tankers, t.
+    pub tanker_fuel_t: f64,
+}
+
 /// What a timeline entry is about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -117,6 +136,8 @@ pub enum TimelineKind {
     Damage,
     Loss,
     Mine,
+    /// Air operations: sorties, recoveries, bingo, tanking.
+    Air,
     Override,
     Facilitation,
     Event,
@@ -147,6 +168,9 @@ pub struct AarReport {
     /// Choke-point transits with lanes or terrain packs (older reports: none).
     #[serde(default)]
     pub transits: Vec<TransitRow>,
+    /// Sorties flown (older reports: none).
+    #[serde(default)]
+    pub sorties: Vec<SortieRow>,
     pub timeline: Vec<TimelineEntry>,
 }
 
@@ -182,6 +206,13 @@ struct Builder<'a> {
     /// Hulls in a collision, with its tick and the other hull (a loss that tick is the
     /// collision's, not the last weapon's).
     collided: BTreeMap<UnitId, (Tick, UnitId)>,
+    /// Aircraft lost other than to a weapon (out of fuel, with their carrier), and why.
+    air_lost: BTreeMap<UnitId, (Tick, String)>,
+    /// Airbase names, from the planning layer in the log.
+    bases: BTreeMap<u32, String>,
+    sorties: Vec<SortieRow>,
+    /// The open sortie of each aircraft in the air, by index in `sorties`.
+    flying: BTreeMap<UnitId, usize>,
     intercepted: BTreeSet<u64>,
     losses: Vec<LossRow>,
     open_contacts: BTreeMap<(SideId, u32), usize>,
@@ -204,6 +235,10 @@ impl<'a> Builder<'a> {
             last_hit: BTreeMap::new(),
             adjudicated: BTreeMap::new(),
             collided: BTreeMap::new(),
+            air_lost: BTreeMap::new(),
+            bases: BTreeMap::new(),
+            sorties: Vec::new(),
+            flying: BTreeMap::new(),
             intercepted: BTreeSet::new(),
             losses: Vec::new(),
             open_contacts: BTreeMap::new(),
@@ -220,6 +255,11 @@ impl<'a> Builder<'a> {
                 CommandPayload::SetEvents { reserves, .. } => {
                     for s in reserves {
                         b.units.insert(s.id, info(s));
+                    }
+                }
+                CommandPayload::SetPlanning { facilities, .. } => {
+                    for f in facilities {
+                        b.bases.insert(f.id, f.name.clone());
                     }
                 }
                 CommandPayload::SetSeats { seats } => {
@@ -355,6 +395,27 @@ impl<'a> Builder<'a> {
                 self.unit_name(*unit),
                 if *streamed { "stream" } else { "recover" }
             ),
+            CommandPayload::LaunchSortie {
+                unit,
+                mission,
+                loadout,
+            } => format!(
+                "launched {} on a {} sortie{}",
+                n(unit),
+                sim_core::mission_name(mission),
+                loadout
+                    .as_deref()
+                    .map(|l| format!(" with {l}"))
+                    .unwrap_or_default()
+            ),
+            CommandPayload::RecallAircraft { unit, .. } => format!("recalled {}", n(unit)),
+            CommandPayload::SetReadiness {
+                unit, readiness, ..
+            } => format!(
+                "set {} to {}",
+                n(unit),
+                sim_core::readiness_text(*readiness)
+            ),
             CommandPayload::LaySonobuoys { unit, points, .. } => format!(
                 "{}: lay {} sonobuoy(s)",
                 self.unit_name(*unit),
@@ -473,6 +534,11 @@ impl<'a> Builder<'a> {
         if let Some((at, reason)) = self.adjudicated.remove(&unit) {
             if at == tick {
                 return (format!("white cell: {reason}"), None);
+            }
+        }
+        if let Some((at, why)) = self.air_lost.remove(&unit) {
+            if at == tick {
+                return (why, None);
             }
         }
         if let Some((at, other)) = self.collided.remove(&unit) {
@@ -801,6 +867,10 @@ impl<'a> Builder<'a> {
             }
             SimEventKind::UnitDestroyed { unit } => {
                 let (cause, by) = self.credit_kill(t, *unit);
+                if let Some(i) = self.flying.remove(unit) {
+                    self.sorties[i].ended = Some(t);
+                    self.sorties[i].outcome = format!("lost: {cause}");
+                }
                 self.loss(t, *unit, false, cause, by);
             }
             SimEventKind::Collision {
@@ -822,6 +892,87 @@ impl<'a> Builder<'a> {
                     damage_fraction_b * 100.0
                 );
                 self.note(t, TimelineKind::Damage, self.unit_side(*a), text);
+            }
+            SimEventKind::SortieLaunched {
+                unit,
+                base,
+                loadout,
+                mission,
+            } => {
+                let name = self.unit_name(*unit);
+                let base_name = self.base_name(*base);
+                self.flying.insert(*unit, self.sorties.len());
+                self.sorties.push(SortieRow {
+                    launched: t,
+                    unit: *unit,
+                    unit_name: name.clone(),
+                    side: self.unit_side(*unit),
+                    base: base_name.clone(),
+                    mission: mission.clone(),
+                    loadout: loadout.clone(),
+                    ended: None,
+                    outcome: String::new(),
+                    tanker_fuel_t: 0.0,
+                });
+                let with = loadout
+                    .as_deref()
+                    .map(|l| format!(" with {l}"))
+                    .unwrap_or_default();
+                self.note(
+                    t,
+                    TimelineKind::Air,
+                    self.unit_side(*unit),
+                    format!("{name} took off from {base_name} on a {mission} sortie{with}"),
+                );
+            }
+            SimEventKind::AircraftReturning { unit, base, reason } => {
+                let text = format!(
+                    "{} returning to {}: {reason}",
+                    self.unit_name(*unit),
+                    self.base_name(*base)
+                );
+                self.note(t, TimelineKind::Air, self.unit_side(*unit), text);
+            }
+            SimEventKind::AircraftRecovered {
+                unit, base, fuel_t, ..
+            } => {
+                let base_name = self.base_name(*base);
+                if let Some(i) = self.flying.remove(unit) {
+                    self.sorties[i].ended = Some(t);
+                    self.sorties[i].outcome = format!("recovered at {base_name}");
+                }
+                let text = format!(
+                    "{} landed at {base_name} and took {fuel_t:.1} t of fuel",
+                    self.unit_name(*unit)
+                );
+                self.note(t, TimelineKind::Air, self.unit_side(*unit), text);
+            }
+            SimEventKind::BingoFuel { unit, tanker, .. } => {
+                let to = tanker.map_or_else(
+                    || "for home".to_owned(),
+                    |k| format!("for the tanker {}", self.unit_name(k)),
+                );
+                let text = format!("{} at bingo fuel, heading {to}", self.unit_name(*unit));
+                self.note(t, TimelineKind::Air, self.unit_side(*unit), text);
+            }
+            SimEventKind::TankingComplete {
+                receiver,
+                tanker,
+                taken_t,
+                ..
+            } => {
+                if let Some(i) = self.flying.get(receiver) {
+                    self.sorties[*i].tanker_fuel_t += taken_t;
+                }
+                let text = format!(
+                    "{} took {taken_t:.1} t from {}",
+                    self.unit_name(*receiver),
+                    self.unit_name(*tanker)
+                );
+                self.note(t, TimelineKind::Air, self.unit_side(*receiver), text);
+            }
+            SimEventKind::AircraftLost { unit, reason } => {
+                self.air_lost.insert(*unit, (t, reason.clone()));
             }
             SimEventKind::MineEncounter {
                 unit,
@@ -1169,7 +1320,17 @@ impl<'a> Builder<'a> {
         }
     }
 
+    fn base_name(&self, id: u32) -> String {
+        self.bases
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| format!("airbase {id}"))
+    }
+
     fn finish(mut self, end: Tick) -> AarReport {
+        for i in std::mem::take(&mut self.flying).into_values() {
+            self.sorties[i].outcome = "airborne at the end".into();
+        }
         for row in &mut self.detections {
             let until = row.lost.unwrap_or(end);
             row.held_s = until.seconds() - row.gained.seconds();
@@ -1191,6 +1352,7 @@ impl<'a> Builder<'a> {
             weapons: self.weapons.into_values().collect(),
             detections: self.detections,
             transits: self.transits,
+            sorties: self.sorties,
             timeline: self.timeline,
         }
     }

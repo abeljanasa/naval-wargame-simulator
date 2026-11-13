@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slices 9–11: air operations)
+
+- **Airbases:** a facility kind `airbase`, ashore or carried by a ship (a carrier, or a frigate's helicopter deck), with runways or deck spots, a launch interval, parking and aviation fuel.
+  - Aircraft with a `base` start parked there at a readiness: ready, alert 15, alert 60 or maintenance.
+  - Parked aircraft are off the map; aircraft aboard a ship that is sunk are lost with it.
+- **Sorties:** launch orders give a mission and the loadout for it (by role, from the database) or a named one.
+  - A launch waits for readiness, rearming (2 min a weapon) and a runway slot; recoveries go first.
+  - Aircraft return when the mission is done, the weapons are spent, the target is gone, at bingo, or when recalled.
+  - They land, refuel from the base's stock, rearm, and turn round (20 or 40 min, plus 2 min a weapon).
+- **Aircraft fuel** (with the fuel model): aviation fuel from take-off mass and range; takeoff and climb allowance; cruise, loiter and dash by the fuel law with an idle share of 0.6.
+  - Bingo is the fuel to the nearest base plus a 10 % reserve; an aircraft out of fuel is lost.
+- **Tankers:** two hoses at 1 t/min, a queue, and the tanker's own bingo. Aircraft at bingo go to a tanker on station when it is nearer than a base, and resume their mission.
+- **Fuel types:** marine and aviation; ships and aircraft each refuel only where their fuel is.
+- **AAR:** a Sorties table (CSV too) and air events on the timeline. Saved (format 27) and hashed only with aircraft; golden replays unchanged.
+- **Desktop:** an Air tab (bases, aircraft, readiness, launch, cancel), an Air row with Recall in the unit inspector, airbases on the map (`AIR`) and in the scenario editor.
+
 ### Added: ship collisions and collision avoidance
 
 - **Collisions:** ships and submarines whose depths overlap collide within half their combined lengths.

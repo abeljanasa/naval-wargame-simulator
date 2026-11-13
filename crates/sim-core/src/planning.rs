@@ -62,6 +62,8 @@ pub enum FacilityKind {
     RefuellingPoint,
     ShelteringPort,
     Anchorage,
+    /// An airfield, or a ship's flight deck (Phase 4 slice 9, `docs/models/air-operations.md`).
+    Airbase,
 }
 
 /// What happens to a player's order issued while a command post is down and its alternate has
@@ -165,6 +167,9 @@ pub struct Facility {
     /// Anchorages: AI-run units whose mission is complete hold here until tasked again.
     #[serde(default)]
     pub staging: bool,
+    /// Airbases: runways or deck, parking and aviation fuel (Phase 4 slice 9).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub air: Option<crate::air::AirField>,
 }
 
 /// What a zone governs.
@@ -617,11 +622,11 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         if f.unit.is_some()
             && !matches!(
                 f.kind,
-                FacilityKind::CommandPost | FacilityKind::RefuellingPoint
+                FacilityKind::CommandPost | FacilityKind::RefuellingPoint | FacilityKind::Airbase
             )
         {
             return Err(format!(
-                "facility {:?}: only command posts and refuelling points are carried by a unit",
+                "facility {:?}: only command posts, refuelling points and airbases are carried by a unit",
                 f.name
             ));
         }
@@ -642,6 +647,15 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
                 "facility {:?} needs a depth > 0 and a holding limit of sea state 0-9",
                 f.name
             ));
+        }
+        if (f.kind == FacilityKind::Airbase) != f.air.is_some() {
+            return Err(format!(
+                "facility {:?}: an airbase needs its airfield, and only an airbase has one",
+                f.name
+            ));
+        }
+        if let Some(a) = &f.air {
+            a.validate(&f.name)?;
         }
         if f.staging && f.kind != FacilityKind::Anchorage {
             return Err(format!(
@@ -770,7 +784,7 @@ impl PlanningLayer {
             .map(|t| (t - self.issued.get(&f.id).copied().unwrap_or(0.0)).max(0.0))
     }
 
-    fn facility(&self, id: u32) -> Option<&Facility> {
+    pub(crate) fn facility(&self, id: u32) -> Option<&Facility> {
         self.facilities.iter().find(|f| f.id == id)
     }
 
@@ -800,7 +814,7 @@ fn position_of(world: &World, unit: UnitId) -> Option<GeoPoint> {
 }
 
 /// Where a command post is now (`None`: carried by a unit that has been lost).
-fn post_position(world: &World, f: &Facility) -> Option<GeoPoint> {
+pub(crate) fn post_position(world: &World, f: &Facility) -> Option<GeoPoint> {
     match f.unit {
         Some(u) => position_of(world, u),
         None => Some(f.position),
@@ -1567,7 +1581,10 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason, sea: u8) {
         layer
             .facilities
             .iter()
-            .filter(|f| f.kind != FacilityKind::CommandPost && !over_limit_at(world, f, sea))
+            .filter(|f| {
+                !matches!(f.kind, FacilityKind::CommandPost | FacilityKind::Airbase)
+                    && !over_limit_at(world, f, sea)
+            })
             .filter(|f| match reason {
                 DivertReason::Repair => f.services.repair,
                 DivertReason::Fuel => f.services.refuel && layer.fuel_left(f) != Some(0.0),
@@ -1590,8 +1607,10 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason, sea: u8) {
             Option<&crate::fuel::Fuel>,
         )>()
         .iter(world)
-        .filter(|(_, _, _, h, m, fuel)| {
-            m.mission.is_some()
+        .filter(|(_, u, _, h, m, fuel)| {
+            // Aircraft go to their airbases (air operations), not to these.
+            u.domain != crate::components::Domain::Air
+                && m.mission.is_some()
                 && match reason {
                     DivertReason::Repair => h.status == Status::MissionKilled,
                     DivertReason::Fuel => {
