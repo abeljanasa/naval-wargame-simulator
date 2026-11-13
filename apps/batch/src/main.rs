@@ -10,6 +10,7 @@
 mod bench;
 mod mc;
 mod terrain;
+mod validate;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
@@ -105,6 +106,28 @@ enum Cmd {
         /// shoal guard. Their id joins the state hash.
         #[arg(long)]
         terrain: Vec<PathBuf>,
+    },
+    /// Validate the model against a historical engagement: Monte Carlo runs of its scenario
+    /// compared with the record (`docs/models/validation.md`). Writes `validation.json`,
+    /// `report.md` and `runs.csv`.
+    Validate {
+        /// Validation spec (`data/validation/*/validation.json`).
+        spec: PathBuf,
+        /// Number of runs (default: the spec's).
+        #[arg(long)]
+        runs: Option<u64>,
+        /// First seed (default: the scenario's own).
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Worker threads (default: the machine's cores).
+        #[arg(long)]
+        threads: Option<usize>,
+        /// Output directory.
+        #[arg(long)]
+        out: PathBuf,
+        /// Open platform database file. Defaults to the embedded database.
+        #[arg(long)]
+        db: Option<PathBuf>,
     },
     /// Terrain and bathymetry packs: build one from a GEBCO download, describe one, or sample it.
     Terrain {
@@ -295,6 +318,44 @@ fn main() -> Result<()> {
             println!(
                 "{}",
                 serde_json::json!({ "scenario": s.name, "runs": results.len(), "threads": threads, "out": out })
+            );
+            Ok(())
+        }
+        Cmd::Validate {
+            spec,
+            runs,
+            seed,
+            threads,
+            out,
+            db,
+        } => {
+            let (v, s) = validate::load(&spec)?;
+            let first = seed.unwrap_or(s.seed);
+            let seeds: Vec<u64> = (0..runs.unwrap_or(v.runs))
+                .map(|i| first.wrapping_add(i))
+                .collect();
+            let threads = threads.unwrap_or_else(|| {
+                std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+            });
+            let open = || platforms(db.as_deref());
+            let values = mc::run_with(
+                &s,
+                &seeds,
+                s.duration_ticks(),
+                threads,
+                &open,
+                None,
+                &|sim, _| validate::measure(&v, &s, sim),
+            )?;
+            let rows = validate::compare(&v, &values);
+            validate::write(&out, &v, &s, &seeds, &values, &rows)?;
+            let open_items = rows
+                .iter()
+                .filter(|r| r.verdict != validate::Verdict::Consistent)
+                .count();
+            println!(
+                "{}",
+                serde_json::json!({ "validation": v.name, "runs": seeds.len(), "measures": rows.len(), "differences": open_items, "out": out })
             );
             Ok(())
         }

@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 14: model validation and the Gate 4 drafts)
+
+- **`nws-batch validate`:** runs a historical engagement's scenario many times and compares the outcomes with the record. Writes `report.md`, `validation.json` and `runs.csv`.
+  - Measures: unit lost, survives or disabled; losses, weapons fired, hits and time to first hit by side.
+  - Verdicts: P(record) with a 95 % Wilson interval for yes/no measures; the 5–95 % range for counts. Every difference is listed for the SMEs to explain.
+- **Two draft engagements** for SME review (`data/validation/`): *Hangor* and *Khukri* (1971) and Operation Praying Mantis (1988), with sources and assumptions.
+- **Gate 4 review pack** (`docs/gate4/`) with the 200-run reports. Two model limitations found:
+  - a lone submarine cannot attack on passive sonar (no single-platform TMA);
+  - guns engage aircraft at their surface range.
+- **Duel-test index** extended to the Phase 4 models.
+- The Monte Carlo runner takes any per-run measure (`run_with`).
+
+### Added (Phase 4, slice 13: regional database, first tranche)
+
+- **Philippine Navy and Coast Guard:** *Jose Rizal* and *Miguel Malvar* frigates, *Del Pilar* OPV, *Acero* attack craft, *Teresa Magbanua* and *Parola* response vessels.
+- **PLAN (Southern Theater) and China Coast Guard:** Type 054A, 052D, 056A, 039A/B, the *Zhaotou* cutter and the coast-guard Type 056.
+- **Historical platforms** for Gate 4: *Hangor*, *Khukri*, *Saam*, *Kaman*, *Belknap*, *Oliver Hazard Perry*, *Knox*, A-6E with loadouts.
+- **Named weapons:** C-802A, YJ-83, YJ-18, HHQ-16, HHQ-9, Mistral, VL MICA, Spike NLOS, Harpoon 1, SM-1MR, Skipper, Sea Killer 2, Limbo.
+- **Every specific record cites its open source** (a URL, DOI or ISBN), with confidence C, or D for estimates; signatures carry their own provenance.
+- **ECM equipment as records** (migration 0004): noise and deception jammers fitted to platforms. A unit jams with its platform's ECM unless the scenario gives it a jammer.
+
+### Changed
+
+- `provenance.not_generic` is now an error for a specific record without a citation, instead of a warning for every specific record. New rule: `ecm.values`.
+- Golden replays re-blessed: the ESM emitter library lists every database class carrying a radar, and the new classes reuse generic radars (DL-0048).
+
 ### Added (Phase 4, slice 12: automatic sense-zone tasking)
 
 - **Coverage goals:** a sense zone may carry a goal (a share of its area) and the units the engine may use for it.

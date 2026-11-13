@@ -1,0 +1,132 @@
+{
+  "measures": [
+    {
+      "id": "joshan_sunk",
+      "mean": null,
+      "n": 200,
+      "name": "Joshan sunk",
+      "note": "",
+      "p5_p95": null,
+      "p_ci95": [
+        0.9811539940816791,
+        1.0
+      ],
+      "p_record": 1.0,
+      "record": true,
+      "verdict": "consistent"
+    },
+    {
+      "id": "sahand_sunk",
+      "mean": null,
+      "n": 200,
+      "name": "Sahand sunk",
+      "note": "",
+      "p5_p95": null,
+      "p_ci95": [
+        0.013820125830748327,
+        0.06389511973247333
+      ],
+      "p_record": 0.03,
+      "record": true,
+      "verdict": "unlikely"
+    },
+    {
+      "id": "sabalan_disabled",
+      "mean": null,
+      "n": 200,
+      "name": "Sabalan disabled",
+      "note": "",
+      "p5_p95": null,
+      "p_ci95": [
+        0.05374529946985246,
+        0.13189688544235392
+      ],
+      "p_record": 0.085,
+      "record": true,
+      "verdict": "unlikely"
+    },
+    {
+      "id": "sabalan_sunk",
+      "mean": null,
+      "n": 200,
+      "name": "Sabalan sunk",
+      "note": "",
+      "p5_p95": null,
+      "p_ci95": [
+        0.9428208558483829,
+        0.9892754385292123
+      ],
+      "p_record": 0.975,
+      "record": false,
+      "verdict": "consistent"
+    },
+    {
+      "id": "us_losses",
+      "mean": 2.91,
+      "n": 200,
+      "name": "US ships and aircraft lost to Iranian fire",
+      "note": "",
+      "p5_p95": [
+        2.0,
+        3.0
+      ],
+      "p_ci95": null,
+      "p_record": null,
+      "record": 0.0,
+      "verdict": "outside"
+    },
+    {
+      "id": "iran_hits",
+      "mean": 3.085,
+      "n": 200,
+      "name": "Hits by Iran",
+      "note": "",
+      "p5_p95": [
+        2.0,
+        4.0
+      ],
+      "p_ci95": null,
+      "p_record": null,
+      "record": 0.0,
+      "verdict": "outside"
+    },
+    {
+      "id": "us_missiles",
+      "mean": 12.79,
+      "n": 200,
+      "name": "US missiles fired at ships",
+      "note": "By the public accounts: SAG Charlie fired five SM-1 and one Harpoon at Joshan; the A-6Es fired two Harpoons and four Skippers at Sahand (counts differ between accounts; the SMEs should confirm).",
+      "p5_p95": [
+        8.0,
+        17.0
+      ],
+      "p_ci95": null,
+      "p_record": null,
+      "record": 12.0,
+      "verdict": "consistent"
+    },
+    {
+      "id": "iran_missiles",
+      "mean": 3.9,
+      "n": 200,
+      "name": "Iranian missiles fired",
+      "note": "Joshan's Harpoon at Wainwright, and a surface-to-air missile from Sahand at the A-6Es (accounts vary).",
+      "p5_p95": [
+        4.0,
+        4.0
+      ],
+      "p_ci95": null,
+      "p_record": null,
+      "record": 2.0,
+      "verdict": "outside"
+    }
+  ],
+  "name": "Operation Praying Mantis, 18 April 1988 (ship actions)",
+  "runs": 200,
+  "scenario": "Validation draft — Operation Praying Mantis, 18 April 1988",
+  "seeds": [
+    19880418,
+    19880617
+  ],
+  "status": "DRAFT for SME review: built from public accounts, not yet confirmed"
+}

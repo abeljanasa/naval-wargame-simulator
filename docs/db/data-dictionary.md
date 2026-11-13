@@ -55,6 +55,8 @@ Phase 1 ships only generic classes (`GEN-*`), all with confidence D. Each value 
 | `magazines` / `magazine_contents` | `id` / (magazine, weapon) | Stowage capacity and default load |
 | `loadouts` / `loadout_items` | `id` / (loadout, weapon) | Aircraft weapon loads, limited by `platforms.hardpoints` |
 | `platform_comms` | (platform, comms) | Fitted comms |
+| `ecm_systems` | `id` | ECM equipment (migration 0004): kind (`noise_jammer`, `deception_jammer`) and strength as J/N in a victim receiver 1 km away (dB). A unit jams with its platform's strongest ECM unless its scenario gives it a jammer |
+| `platform_ecm` | (platform, ecm) | Fitted ECM |
 
 ## Validation rules
 
@@ -66,12 +68,13 @@ Run `cargo run -p sim-db -- validate`. Add `--strict` to treat warnings as error
 | `provenance.created_by_missing` | error | Empty `created_by` |
 | `provenance.updated_at_format` | error | `updated_at` is not `YYYY-MM-DD` |
 | `classification.open_build` | error | Any record not marked `UNCLASSIFIED` in the open build |
-| `provenance.not_generic` | warning | Non-generic record in the open build |
+| `provenance.not_generic` | error | A specific (non-generic) record whose citation has no URL, `doi:` or ISBN: a specific record must cite its open source |
 | `fk.dangling` | error | Any reference to a missing row |
 | `sensor.beyond_horizon` | error | A radar, ESM, IR, EO or visual sensor's max range exceeds the 4/3-earth radar horizon between its mount and a target at the sensor's highest covered altitude. Airborne mounts are assessed at the platform ceiling |
 | `sensor.range_order` | error | `0 ≤ min_range < max_range` |
 | `sensor.reference_range` | error | Radar reference range and RCS must be given together, both positive, with reference range ≤ max range |
 | `sensor.radar_fields` | error | `clutter_db_per_sea_state` (≥ 0) and `beamwidth_deg` (0 < b ≤ 360) only on radars |
+| `ecm.values` | error | ECM strength outside 0–100 dB J/N at 1 km |
 | `sensor.sonar_fields` | error | Sonar figures only on sonars (hull, towed, dipping, sonobuoy), within frequency 0.01–100 kHz, DI 0–40 dB, DT −10–30 dB, source level 150–250 dB, self-noise 20–120 dB |
 | `sensor.radar_defaults` | warning | A radar without `clutter_db_per_sea_state` or `beamwidth_deg`; the radar model's defaults (1.5 dB, 2°) apply |
 | `sensor.radar_reference` | error | A radar without a reference range and RCS (needed by the Phase 2 detection model) |
@@ -96,6 +99,26 @@ Run `cargo run -p sim-db -- validate`. Add `--strict` to treat warnings as error
 | `damage.fractions` | error | Damage points ≤ 0 or fractions outside [0, 1] |
 | `signature.value` | error | Negative signature value |
 | `platform.no_rcs` / `platform.no_acoustic` | warning | Missing signature; detection will fall back to a default |
+
+## Regional database (Phase 4 slice 13)
+
+Specific classes, for the Philippine Area of Responsibility ([ADR-0007](../adr/0007-phase-4-region-and-data.md)) and the Gate 4 engagements ([DL-0048](../design-log/DL-0048-regional-database.md)). Open sources only, UNCLASSIFIED.
+
+| File | Contents |
+|---|---|
+| `platforms/regional-ph.json` | Philippine Navy: `PHL-FF-RIZAL`, `PHL-FFG-MALVAR`, `PHL-PS-DELPILAR`, `PHL-PG-ACERO`. Philippine Coast Guard: `PHL-CG-MAGBANUA`, `PHL-CG-PAROLA` |
+| `platforms/regional-cn.json` | PLAN: `CHN-FFG-054A`, `CHN-DDG-052D`, `CHN-FS-056A`, `CHN-SSK-039A`. China Coast Guard: `CHN-CG-ZHAOTOU`, `CHN-CG-056` |
+| `platforms/historical.json` | Gate 4: `PAK-SSK-HANGOR`, `IND-FF-KHUKRI`, `IRN-FF-SAAM`, `IRN-PTG-KAMAN`, `USA-CG-BELKNAP`, `USA-FFG-OHP`, `USA-FF-KNOX`, `USA-A6E` |
+| `weapons.json` | Named weapons, added where the records need them: C-802A, YJ-83, YJ-18, HHQ-16, HHQ-9, Mistral, VL MICA, Spike NLOS, Harpoon 1, SM-1MR, Skipper, Sea Killer 2, Limbo |
+| `reference.json` | Nations and services (PHL, CHN, USA, IRN, PAK, IND), and ECM records (generic ship and aircraft jammers; the Type 054A's and 052D's) |
+
+How the values were set:
+
+- **Published figures** (dimensions, displacement, speeds, endurance, fits, weapon ranges) come from the cited source, confidence C.
+- **Signatures** are not published. They are copied from the matching generic class and carry their own provenance, confidence D.
+- **Sensors:** a named radar or sonar uses the generic record of its kind; the record's citation names the real system.
+- **Weapon Ph** is the generic class's, confidence D. Jammer strengths are estimates, D.
+- **Each record cites its source and the date accessed.** Records without an open source (for example the Type 818 cutter) were left out.
 
 ## Terrain and bathymetry sources (Phase 4 slice 2, ADR-0007)
 

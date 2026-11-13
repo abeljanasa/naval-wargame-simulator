@@ -1,0 +1,102 @@
+{
+  "format": "nws-scenario",
+  "format_version": 2,
+  "name": "Validation draft — Hangor and Khukri, 9 December 1971",
+  "description": "DRAFT for SME review (Gate 4). The Pakistan Navy submarine Hangor, submerged off Diu, attacks the Indian frigates Khukri and Kirpan, which are searching for her at slow speed. Built from public accounts; see data/validation/hangor-khukri-1971/validation.json for sources and assumptions.",
+  "seed": 19711209,
+  "duration_s": 3600,
+  "environment": {
+    "sea_state": 2,
+    "start_unix_s": 60458400
+  },
+  "sides": [
+    {
+      "id": 1,
+      "name": "India",
+      "postures": [
+        {
+          "toward": 2,
+          "posture": "hostile"
+        }
+      ],
+      "doctrine": {
+        "wcs": "free",
+        "emcon": "active"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Pakistan",
+      "postures": [
+        {
+          "toward": 1,
+          "posture": "hostile"
+        }
+      ],
+      "doctrine": {
+        "wcs": "free",
+        "emcon": "silent"
+      }
+    }
+  ],
+  "units": [
+    {
+      "id": 1,
+      "name": "INS Khukri (F149)",
+      "side": 1,
+      "platform": "IND-FF-KHUKRI",
+      "position": {
+        "lat_deg": 20.27,
+        "lon_deg": 70.99
+      },
+      "heading_deg": 270.0,
+      "speed_mps": 6.17,
+      "mission": {
+        "kind": "ferry",
+        "destination": {
+          "lat_deg": 20.27,
+          "lon_deg": 70.55
+        }
+      }
+    },
+    {
+      "id": 2,
+      "name": "INS Kirpan (F144)",
+      "side": 1,
+      "platform": "IND-FF-KHUKRI",
+      "position": {
+        "lat_deg": 20.3,
+        "lon_deg": 71.0
+      },
+      "heading_deg": 270.0,
+      "speed_mps": 6.17,
+      "mission": {
+        "kind": "escort",
+        "escorted": 1,
+        "bearing_deg": 30.0,
+        "range_m": 4000
+      }
+    },
+    {
+      "id": 3,
+      "name": "PNS Hangor (S131)",
+      "side": 2,
+      "platform": "PAK-SSK-HANGOR",
+      "position": {
+        "lat_deg": 20.24,
+        "lon_deg": 70.9
+      },
+      "altitude_m": -50.0,
+      "heading_deg": 0.0,
+      "speed_mps": 1.54,
+      "mission": {
+        "kind": "patrol",
+        "centre": {
+          "lat_deg": 20.24,
+          "lon_deg": 70.9
+        },
+        "radius_m": 1500
+      }
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "format": "nws-validation",
+  "name": "Hangor and Khukri, 9 December 1971",
+  "scenario": "scenario.json",
+  "runs": 200,
+  "status": "DRAFT for SME review: built from public accounts, not yet confirmed",
+  "summary": "The first sinking of a warship by a submarine since 1945. Hangor, submerged west of Diu Head, fired three torpedoes at the two Indian frigates hunting her: the first, at Kirpan, missed (or failed); a second hit Khukri, which sank within minutes with heavy loss of life; a third was fired at Kirpan, which withdrew. Hangor escaped despite a prolonged search.",
+  "sources": [
+    "Wikipedia, 'INS Khukri (1956)', https://en.wikipedia.org/wiki/INS_Khukri_(1956), accessed 2026-11-13",
+    "Wikipedia, 'PNS Hangor (S131)', https://en.wikipedia.org/wiki/PNS_Hangor_(S131), accessed 2026-11-13",
+    "Wikipedia, 'Sinking of INS Khukri', https://en.wikipedia.org/wiki/Sinking_of_INS_Khukri, accessed 2026-11-13"
+  ],
+  "assumptions": [
+    "Start about 14:00 UTC (19:30 local), after dark; Hangor already in contact and submerged at 50 m.",
+    "Khukri steers west at 12 kn; Kirpan keeps station 4 km on her starboard bow (the public accounts give the frigates as searching at slow speed; the formation is an assumption).",
+    "Positions are approximate (about 35 nm SSW of Diu); the accounts disagree by several miles.",
+    "The torpedoes are the database's generic heavyweight torpedo (WPN-TORP-HW), not the French E14/E15 the boat carried; their reliability and the 'first torpedo did not explode' account are not modelled.",
+    "The Indian frigates' sonar (Type 170/174) is the generic hull-mounted medium-frequency sonar.",
+    "The engagement window is one hour; the Indian search of the following days is not modelled."
+  ],
+  "measures": [
+    {
+      "id": "khukri_sunk",
+      "name": "Khukri sunk",
+      "kind": "unit_lost",
+      "unit": 1,
+      "record": true
+    },
+    {
+      "id": "kirpan_survives",
+      "name": "Kirpan survives",
+      "kind": "unit_survives",
+      "unit": 2,
+      "record": true
+    },
+    {
+      "id": "hangor_survives",
+      "name": "Hangor survives",
+      "kind": "unit_survives",
+      "unit": 3,
+      "record": true
+    },
+    {
+      "id": "hangor_torpedoes",
+      "name": "Torpedoes fired by Hangor",
+      "kind": "weapons_fired",
+      "side": 2,
+      "weapons": [
+        "WPN-TORP-HW"
+      ],
+      "record": 3,
+      "note": "Three by most accounts; the first is reported to have run deep or failed to detonate."
+    },
+    {
+      "id": "india_losses",
+      "name": "Indian ships lost",
+      "kind": "losses",
+      "side": 1,
+      "record": 1
+    },
+    {
+      "id": "pakistan_hits",
+      "name": "Hits by Pakistan",
+      "kind": "hits",
+      "side": 2,
+      "record": 1
+    },
+    {
+      "id": "pakistan_first_hit_s",
+      "name": "Time to Hangor's first hit (s)",
+      "kind": "first_hit_s",
+      "side": 2,
+      "record": 600,
+      "note": "Not in the record to the minute: about ten minutes after the attack began is an estimate for the SMEs to confirm or replace."
+    }
+  ]
+}

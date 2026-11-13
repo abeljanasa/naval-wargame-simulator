@@ -20,7 +20,10 @@ macro_rules! open_file {
 pub const PLATFORM_FILES: &[(&str, &str)] = &[
     open_file!("platforms/aircraft.json"),
     open_file!("platforms/auxiliaries-and-merchants.json"),
+    open_file!("platforms/historical.json"),
     open_file!("platforms/land-facilities.json"),
+    open_file!("platforms/regional-cn.json"),
+    open_file!("platforms/regional-ph.json"),
     open_file!("platforms/submarines.json"),
     open_file!("platforms/surface-combatants.json"),
 ];
@@ -78,7 +81,16 @@ mod tests {
     #[test]
     fn embedded_database_opens_clean() {
         let db = open_platform_db().unwrap();
-        assert_eq!(db.platforms().unwrap().len(), 50);
+        // 50 generic classes, 12 regional (slice 13) and 8 historical (Gate 4).
+        assert_eq!(db.platforms().unwrap().len(), 70);
+        assert!(db
+            .issues()
+            .unwrap()
+            .iter()
+            .all(|i| i.severity != crate::validate::Severity::Error));
+        // Regional records come through with their ECM.
+        assert_eq!(db.jammer_of("CHN-DDG-052D").unwrap(), Some(55.0));
+        assert_eq!(db.jammer_of("GEN-FFG").unwrap(), None);
     }
 
     #[test]

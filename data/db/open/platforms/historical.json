@@ -1,0 +1,1092 @@
+{
+ "defaults": {
+  "source_citation": "Gate 4 historical engagements (Phase 4 slice 14), drafts for SME review: each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "PAK-SSK-HANGOR",
+   "name": "Daphne-class submarine (Pakistan Hangor class, 1971)",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "PAK-PN",
+   "propulsion": "PROP-DE-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 57.75,
+   "displacement_t": 1038,
+   "draft_m": 5.25,
+   "max_speed_kn": 16,
+   "cruise_speed_kn": 7.5,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4300,
+   "max_depth_m": 300,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 200,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 105,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 118,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 7
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 7
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 7
+    }
+   ],
+   "launchers": [
+    {
+     "name": "550 mm torpedo tubes (12)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-TORP-HW"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "550 mm torpedo tubes (12)",
+     "capacity": 12,
+     "contents": {
+      "WPN-TORP-HW": 12
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Daphné-class submarine\", https://en.wikipedia.org/wiki/Daphn%C3%A9-class_submarine (accessed 2026-11-13): 1,038 t submerged, 57.75 m, 5.25 m draught, 16 kn submerged (13.5 surfaced), 4,300 nm at 7.5 kn snorkelling, test depth 300 m; DUUA 2B sonar, DSUV 2 passive, DRUA radar, ARUR detector; 12x 550 mm tubes, 12 torpedoes (type not named: generic heavyweight torpedo). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "IND-FF-KHUKRI",
+   "name": "Blackwood-class (Type 14) frigate, Indian Navy (1971)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "IND-IN",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 94.5,
+   "displacement_t": 1479,
+   "draft_m": 4.6,
+   "max_speed_kn": 27,
+   "cruise_speed_kn": 12,
+   "accel_mps2": 0.07,
+   "endurance_nm": 5200,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 2000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 152,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Limbo Mk 10 mortars (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-LIMBO"
+     ]
+    },
+    {
+     "name": "40 mm Bofors (3)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Limbo Mk 10 mortars (2)",
+     "capacity": 30,
+     "contents": {
+      "WPN-LIMBO": 30
+     }
+    },
+    {
+     "name": "40 mm Bofors (3)",
+     "capacity": 90,
+     "contents": {
+      "WPN-GUN-30": 90
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Blackwood-class frigate\", https://en.wikipedia.org/wiki/Blackwood-class_frigate (accessed 2026-11-13): 1,479 t full load, 94.5 m, 4.6 m draught, 27 kn, 5,200 nm at 12 kn, complement 112; Type 974 radar, Type 174/162/170 sonars; 2 Limbo Mk 10, 3x 40 mm Bofors. Steam turbine propulsion (no steam entry in the propulsion table: gas turbine used). Limbo load not given (30 rounds assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "IRN-FF-SAAM",
+   "name": "Vosper Mk 5 (Alvand/Saam-class) frigate, 1988 fit",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "IRN-IRIN",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 94.5,
+   "displacement_t": 1540,
+   "draft_m": 3.25,
+   "max_speed_kn": 39,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.07,
+   "endurance_nm": 5000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 2000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 152,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 17
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Sea Killer Mk 2 quintuple launcher",
+     "height_m": 7,
+     "weapons": [
+      "WPN-SEAKILLER2"
+     ]
+    },
+    {
+     "name": "Sea Cat triple launcher",
+     "height_m": 9,
+     "weapons": [
+      "WPN-SAM-PD"
+     ]
+    },
+    {
+     "name": "4.5 in Mk 8 gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Twin 35 mm Oerlikon",
+     "height_m": 10,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Limbo Mk 10 mortar",
+     "height_m": 4,
+     "weapons": [
+      "WPN-LIMBO"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Sea Killer Mk 2 quintuple launcher",
+     "capacity": 5,
+     "contents": {
+      "WPN-SEAKILLER2": 5
+     }
+    },
+    {
+     "name": "Sea Cat triple launcher",
+     "capacity": 3,
+     "contents": {
+      "WPN-SAM-PD": 3
+     }
+    },
+    {
+     "name": "4.5 in Mk 8 gun",
+     "capacity": 300,
+     "contents": {
+      "WPN-GUN-127": 300
+     }
+    },
+    {
+     "name": "Twin 35 mm Oerlikon",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    },
+    {
+     "name": "Limbo Mk 10 mortar",
+     "capacity": 15,
+     "contents": {
+      "WPN-LIMBO": 15
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Alvand-class frigate\", https://en.wikipedia.org/wiki/Alvand-class_frigate (accessed 2026-11-13): 1,540 t full, 94.5 m, 3.25 m draught, 39 kn (17 on diesels), 5,000 nm at 15 kn; Plessey AWS 1 radar, 2 Contraves Seahunter fire control, Decca RDL 1 passive DF; quintuple Sea Killer Mk 2, triple Sea Cat, 4.5 in Mk 8, twin 35 mm, Limbo Mk 10 (build fit, closest to 1988). No sonar named (a generic hull sonar is assumed for Limbo). Sea Cat modelled by the generic point-defence SAM, 4.5 in by the generic 127 mm gun. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "IRN-PTG-KAMAN",
+   "name": "Kaman-class (La Combattante II) fast attack craft, 1988",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "IRN-IRIN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-SMALL-CRAFT",
+   "length_m": 47,
+   "displacement_t": 234,
+   "max_speed_kn": 38,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.15,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 500,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 10
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 10
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Harpoon box launchers (4)",
+     "height_m": 5,
+     "weapons": [
+      "WPN-HARPOON-1"
+     ]
+    },
+    {
+     "name": "76 mm gun",
+     "height_m": 6,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "40 mm gun",
+     "height_m": 6,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Harpoon box launchers (4)",
+     "capacity": 4,
+     "contents": {
+      "WPN-HARPOON-1": 4
+     }
+    },
+    {
+     "name": "76 mm gun",
+     "capacity": 250,
+     "contents": {
+      "WPN-GUN-76": 250
+     }
+    },
+    {
+     "name": "40 mm gun",
+     "capacity": 60,
+     "contents": {
+      "WPN-GUN-30": 60
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"La Combattante II type fast attack craft\", https://en.wikipedia.org/wiki/Kaman-class_fast_attack_craft (accessed 2026-11-13): type typically 234 t, 47 m; 76 mm forward and 40 mm aft, four box launchers; Wikipedia, \"Operation Praying Mantis\", https://en.wikipedia.org/wiki/Operation_Praying_Mantis (accessed 2026-11-13): Joshan fired a Harpoon. Speed, draught and sensors not given (generic fast-attack-craft values); four Harpoons assumed. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "D",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "USA-CG-BELKNAP",
+   "name": "Belknap-class cruiser (USS Wainwright, 1988)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "USA-USN",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-CRUISER",
+   "length_m": 167,
+   "displacement_t": 8057,
+   "draft_m": 8.8,
+   "max_speed_kn": 32,
+   "cruise_speed_kn": 20,
+   "accel_mps2": 0.06,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 15000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 34
+    },
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 32
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 28
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-SON-HULL-LF",
+     "height_m": -7
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 10 twin-arm launcher",
+     "height_m": 6,
+     "weapons": [
+      "WPN-ASW-ROCKET",
+      "WPN-SM1MR"
+     ]
+    },
+    {
+     "name": "Harpoon quadruple launchers (2)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-HARPOON-1"
+     ]
+    },
+    {
+     "name": "5\"/54 Mk 42 gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS (2)",
+     "height_m": 16,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Mk 36 SRBOC decoy launchers",
+     "height_m": 14,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 10 twin-arm launcher",
+     "capacity": 60,
+     "contents": {
+      "WPN-SM1MR": 40,
+      "WPN-ASW-ROCKET": 20
+     }
+    },
+    {
+     "name": "Harpoon quadruple launchers (2)",
+     "capacity": 8,
+     "contents": {
+      "WPN-HARPOON-1": 8
+     }
+    },
+    {
+     "name": "5\"/54 Mk 42 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Phalanx CIWS (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-CIWS": 120
+     }
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "capacity": 12,
+     "contents": {
+      "WPN-TORP-LW": 12
+     }
+    },
+    {
+     "name": "Mk 36 SRBOC decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Belknap-class cruiser\", https://en.wikipedia.org/wiki/Belknap-class_cruiser (accessed 2026-11-13): 8,057 t, 167 m, 8.8 m draft, 32 kn, complement 477; SPS-10, SPS-48, SPS-49, 2 SPG-55, SQS-26 sonar; Mk 10 launcher (Standard ER and ASROC, 40 + 20), 2x4 Harpoon, 5\"/54 Mk 42, 2 Phalanx, 2x3 Mk 46 torpedo tubes. Range not given. Standard ER modelled by the SM-1MR record; steam turbines as gas turbine. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "USA-FFG-OHP",
+   "name": "Oliver Hazard Perry-class frigate (USS Simpson, 1988)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "USA-USN",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 136,
+   "displacement_t": 4200,
+   "draft_m": 6.7,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 20,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -5
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -100
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 13 single-arm launcher",
+     "height_m": 6,
+     "weapons": [
+      "WPN-HARPOON-1",
+      "WPN-SM1MR"
+     ]
+    },
+    {
+     "name": "76 mm/62 gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 15,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Mk 36 SRBOC decoy launchers",
+     "height_m": 13,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 13 single-arm launcher",
+     "capacity": 40,
+     "contents": {
+      "WPN-SM1MR": 36,
+      "WPN-HARPOON-1": 4
+     }
+    },
+    {
+     "name": "76 mm/62 gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 60,
+     "contents": {
+      "WPN-CIWS": 60
+     }
+    },
+    {
+     "name": "Mk 32 triple torpedo tubes (2)",
+     "capacity": 24,
+     "contents": {
+      "WPN-TORP-LW": 24
+     }
+    },
+    {
+     "name": "Mk 36 SRBOC decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Oliver Hazard Perry-class frigate\", https://en.wikipedia.org/wiki/Oliver_Hazard_Perry-class_frigate (accessed 2026-11-13): 4,200 t full, 136 m, 6.7 m draft, 30 kn, 4,500 nm at 20 kn, complement 176; SPS-49, SPS-55, Mk 92 fire control, SQS-56 sonar, SQR-19 towed array, SLQ-32, SRBOC; Mk 13 launcher with a 40-round magazine (SM-1MR and Harpoon; 36/4 assumed), 76 mm/62, Phalanx, 2x3 Mk 32 tubes (24 torpedoes). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "USA-FF-KNOX",
+   "name": "Knox-class frigate (USS Bagley, 1988)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "USA-USN",
+   "propulsion": "PROP-GT",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 134,
+   "displacement_t": 4130,
+   "draft_m": 7.54,
+   "max_speed_kn": 27,
+   "cruise_speed_kn": 20,
+   "accel_mps2": 0.05,
+   "endurance_nm": 4500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 28
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 24
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-SON-HULL-LF",
+     "height_m": -7
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -100
+    }
+   ],
+   "launchers": [
+    {
+     "name": "Mk 16 ASROC launcher (two cells Harpoon)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-ASW-ROCKET",
+      "WPN-HARPOON-1"
+     ]
+    },
+    {
+     "name": "5\"/54 Mk 42 gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "Phalanx CIWS",
+     "height_m": 14,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Mk 32 torpedo tubes",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Mk 36 SRBOC decoy launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "Mk 16 ASROC launcher (two cells Harpoon)",
+     "capacity": 16,
+     "contents": {
+      "WPN-ASW-ROCKET": 14,
+      "WPN-HARPOON-1": 2
+     }
+    },
+    {
+     "name": "5\"/54 Mk 42 gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "Phalanx CIWS",
+     "capacity": 60,
+     "contents": {
+      "WPN-CIWS": 60
+     }
+    },
+    {
+     "name": "Mk 32 torpedo tubes",
+     "capacity": 8,
+     "contents": {
+      "WPN-TORP-LW": 8
+     }
+    },
+    {
+     "name": "Mk 36 SRBOC decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Knox-class frigate\", https://en.wikipedia.org/wiki/Knox-class_frigate (accessed 2026-11-13): 4,130 t full, 134 m, 7.54 m draft, 27 kn, 4,500 nm at 20 kn; SPS-10, SPS-40, SPS-67, SQS-26 sonar, SQS-35 and SQR-18 towed sonars, SPG-53; 5\"/54 Mk 42, Mk 16 8-cell ASROC launcher with two cells converted to Harpoon, Phalanx, Mk 32 tubes. Load split assumed (14 ASROC, 2 Harpoon); steam turbine as gas turbine. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "USA-A6E",
+   "name": "A-6E Intruder (VA-95, 1988)",
+   "category": "fighter",
+   "domain": "air",
+   "service": "USA-USN",
+   "propulsion": "PROP-TURBOFAN",
+   "damage_profile": "DMG-AIRCRAFT-SMALL",
+   "displacement_t": 27.4,
+   "max_speed_kn": 560,
+   "cruise_speed_kn": 412,
+   "accel_mps2": 8,
+   "endurance_nm": 919,
+   "max_altitude_m": 12900,
+   "hardpoints": 5,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 3,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "ir",
+     "value": 5,
+     "unit": "kw_sr",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-FTR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-EO-AIR",
+     "height_m": 0
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 0
+    }
+   ],
+   "launchers": [],
+   "magazines": [],
+   "comms": [
+    "COM-UHF",
+    "COM-VHF",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Grumman A-6 Intruder\", https://en.wikipedia.org/wiki/Grumman_A-6_Intruder (accessed 2026-11-13): A-6E max take-off 27,397 kg, 412 kn cruise, 560 kn at sea level, ceiling 12,900 m, combat range 919 nm (hi-lo-hi), 5 hardpoints; AN/APQ-148/156 radar, TRAM FLIR and laser designator; Harpoon, AGM-123 Skipper, laser-guided bombs, Rockeye. Specifications read from the page's summary of its A-6E table. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "loadouts": [
+    {
+     "id": "USA-A6E/ASUW",
+     "name": "Anti-ship: Harpoon and Skipper",
+     "role": "asuw",
+     "items": {
+      "WPN-HARPOON-1": 1,
+      "WPN-SKIPPER": 2
+     }
+    },
+    {
+     "id": "USA-A6E/STRIKE",
+     "name": "Laser-guided bombs",
+     "role": "strike",
+     "items": {
+      "WPN-BOMB-GUIDED": 2
+     }
+    }
+   ]
+  }
+ ]
+}

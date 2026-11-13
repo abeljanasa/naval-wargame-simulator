@@ -113,6 +113,28 @@ pub fn run(
     open_db: &(dyn Fn() -> Result<sim_db::PlatformDb> + Sync),
     terrain: Option<&std::sync::Arc<sim_geo::terrain::Terrain>>,
 ) -> Result<Vec<RunMoes>> {
+    run_with(
+        scenario,
+        seeds,
+        end,
+        threads,
+        open_db,
+        terrain,
+        &|sim, seed| measure(scenario, sim, seed, end),
+    )
+}
+
+/// Runs `seeds` of `scenario` in parallel and measures each finished run with `measure`.
+/// Results come back in seed order.
+pub fn run_with<R: Send>(
+    scenario: &Scenario,
+    seeds: &[u64],
+    end: Tick,
+    threads: usize,
+    open_db: &(dyn Fn() -> Result<sim_db::PlatformDb> + Sync),
+    terrain: Option<&std::sync::Arc<sim_geo::terrain::Terrain>>,
+    measure: &(dyn Fn(&mut sim_core::Simulation, u64) -> R + Sync),
+) -> Result<Vec<R>> {
     let next = AtomicUsize::new(0);
     let results = Mutex::new(Vec::with_capacity(seeds.len()));
     let threads = threads.clamp(1, seeds.len().max(1));
@@ -129,11 +151,11 @@ pub fn run(
                         let mut sim = scenario.build(Some(seed), &db)?;
                         sim.set_terrain(terrain.cloned());
                         sim.run_until(end);
-                        let r = measure(scenario, &mut sim, seed, end);
+                        let r = measure(&mut sim, seed);
                         results
                             .lock()
                             .unwrap_or_else(std::sync::PoisonError::into_inner)
-                            .push(r);
+                            .push((seed, r));
                     }
                 })
             })
@@ -147,8 +169,8 @@ pub fn run(
     let mut out = results
         .into_inner()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    out.sort_by_key(|r| r.seed);
-    Ok(out)
+    out.sort_by_key(|(seed, _)| *seed);
+    Ok(out.into_iter().map(|(_, r)| r).collect())
 }
 
 /// Statistics of every measure over the runs.

@@ -93,6 +93,19 @@ struct ReferenceFile {
     propulsion: Vec<Propulsion>,
     damage_profiles: Vec<DamageProfile>,
     comms: Vec<Comms>,
+    /// ECM equipment (migration 0004).
+    #[serde(default)]
+    ecm: Vec<Ecm>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Ecm {
+    id: String,
+    name: String,
+    kind: String,
+    jn_db_at_1km: f64,
+    provenance: Option<ProvenanceSpec>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -256,6 +269,9 @@ struct Platform {
     loadouts: Vec<Loadout>,
     #[serde(default)]
     comms: Vec<String>,
+    /// ECM equipment fitted (migration 0004).
+    #[serde(default)]
+    ecm: Vec<String>,
     provenance: Option<ProvenanceSpec>,
 }
 
@@ -269,6 +285,8 @@ struct Signature {
     speed_band: String,
     value: f64,
     unit: String,
+    /// Overrides the platform's provenance (a real ship's signature is usually an estimate).
+    provenance: Option<ProvenanceSpec>,
 }
 
 fn all() -> String {
@@ -505,6 +523,14 @@ fn insert_reference(tx: &Transaction<'_>, f: &ReferenceFile) -> Result<(), DbErr
             params![m.id, m.name, m.kind, m.range_km * M_PER_KM, m.is_datalink, c, conf, cl, g, by, at],
         )?;
     }
+    for x in &f.ecm {
+        let p = Provenance::resolve(&f.defaults, x.provenance.as_ref(), &format!("ecm {}", x.id))?;
+        let (c, conf, cl, g, by, at) = prov_params!(p);
+        tx.execute(
+            &format!("INSERT INTO ecm_systems (id, name, kind, jn_db_at_1km, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)"),
+            params![x.id, x.name, x.kind, x.jn_db_at_1km, c, conf, cl, g, by, at],
+        )?;
+    }
     Ok(())
 }
 
@@ -576,9 +602,24 @@ fn insert_platform(
         ],
     )?;
     for s in &pl.signatures {
+        let sp = match &s.provenance {
+            Some(o) => Provenance::resolve(
+                defaults,
+                Some(o),
+                &format!("platform {} signature {}", pl.id, s.kind),
+            )?,
+            None => p.clone(),
+        };
+        let (c, conf, cl, g, by, at) = prov_params!(sp);
         tx.execute(
             &format!("INSERT INTO platform_signatures (platform_id, kind, aspect, speed_band, value, unit, {PROV_COLS}) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)"),
             params![pl.id, s.kind, s.aspect, s.speed_band, s.value, s.unit, c, conf, cl, g, by, at],
+        )?;
+    }
+    for e in &pl.ecm {
+        tx.execute(
+            "INSERT INTO platform_ecm (platform_id, ecm_id) VALUES (?1,?2)",
+            params![pl.id, e],
         )?;
     }
     for m in &pl.sensors {

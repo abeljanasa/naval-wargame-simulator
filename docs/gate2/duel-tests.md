@@ -32,6 +32,25 @@ Gate 2 ("duel tests pass", master prompt §13) asks for a duel test against hand
 | Mines | `simple_initial_threat_hand_values` | P 0.4710 crossing; 0.01579 per step |
 | Missions ([missions.md](../models/missions.md)) | `patrol_points_hand_values`, `escort_station_and_speed`, `automated_engagement_follows_the_release_rule` | 10 km due east; station on 135° |
 
+## Phase 4 models
+
+Hand-value and behaviour tests for the models added in Phase 4. They run in CI with the rest.
+
+| Model (doc) | Tests | Key hand values |
+|---|---|---|
+| Monte Carlo ([Phase 4 plan, slice 1](../plan/phase-4.md)) | `nws-batch` `mc` tests | Mean, SD and normal 95 % CI by hand; results independent of thread count |
+| Acoustics ([acoustics.md](../models/acoustics.md)) | `convergence_zone_matches_the_hand_calculation`, `transmission_loss_by_path_matches_the_hand_calculation`, `reverberation_falls_with_range_and_rises_in_shallow_water`; engine tests in `sim-scenario/tests/acoustics.rs` | CZ 54.4 km for a 60 m layer over a 1,000 m axis; turning depth 2,823.5 m |
+| Weather ([weather.md](../models/weather.md)) | `sim-scenario/tests/weather.rs` | Rain and sea state degrade radar inside the zone only; fog shortens optical range |
+| Terrain masking, shallow water ([terrain-masking.md](../models/terrain-masking.md), [shallow-water.md](../models/shallow-water.md)) | `sim-scenario/tests/masking.rs`, `shallow.rs` | An island cuts the line of sight; a deep-draft ship routes round a bank |
+| Collisions ([collisions.md](../models/collisions.md)) | `damage_shares_follow_mass_and_speed`, `rules_of_the_road`, `contact_is_counted_once_when_hulls_meet`; `sim-scenario/tests/collisions.rs` | Damage (m_o/(m_s+m_o))²·(v/14)²; head-on both to starboard |
+| Air operations ([air-operations.md](../models/air-operations.md)) | `readiness_delays`, `bingo_is_the_fuel_home_plus_the_reserve`, `turnaround_grows_with_the_weapons_loaded`; `sim-scenario/tests/air.rs` | Bingo C·(d/E + 0.1); tanking 1 t/min a hose |
+| Sense-zone tasking ([sensor-tasking.md](../models/sensor-tasking.md)) | `the_widest_reach_goes_where_it_covers_most`, `reviews_every_five_minutes`; `sim-scenario/tests/tasking.rs` | The greedy choice, by hand |
+| Validation ([validation.md](../models/validation.md)) | `wilson_interval_by_hand`, `yes_no_verdicts_by_the_probability_of_the_record`, `counts_compare_with_the_five_to_ninety_five_range` | Wilson 8/10: 0.4902–0.9433 |
+
+## Historical engagements (Gate 4)
+
+The Gate 4 drafts compare whole engagements with the record over 200 runs each. See the [Gate 4 review pack](../gate4/README.md).
+
 ## Whole-system checks
 
 | Check | What it shows |

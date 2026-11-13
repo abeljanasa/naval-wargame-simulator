@@ -1816,8 +1816,8 @@ export type ScenarioUnit_Deserialize = {
 	/**  Doctrine set on this unit; unset fields inherit from its group and side. */
 	doctrine?: Doctrine_Deserialize,
 	/**
-	 *  A noise jammer (radiates while the unit's EMCON is active). Until the database carries
-	 *  ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+	 *  A noise jammer (radiates while the unit's EMCON is active). Without one, the unit jams
+	 *  with its platform's strongest ECM equipment from the database, if it has any.
 	 */
 	jammer?: JammerSpec | null,
 	/**  Mission at start. */
@@ -1862,8 +1862,8 @@ export type ScenarioUnit_Serialize = {
 	/**  Doctrine set on this unit; unset fields inherit from its group and side. */
 	doctrine?: Doctrine_Serialize,
 	/**
-	 *  A noise jammer (radiates while the unit's EMCON is active). Until the database carries
-	 *  ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+	 *  A noise jammer (radiates while the unit's EMCON is active). Without one, the unit jams
+	 *  with its platform's strongest ECM equipment from the database, if it has any.
 	 */
 	jammer?: JammerSpec,
 	/**  Mission at start. */

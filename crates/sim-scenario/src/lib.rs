@@ -136,8 +136,8 @@ pub struct ScenarioUnit {
     /// Doctrine set on this unit; unset fields inherit from its group and side.
     #[serde(default, skip_serializing_if = "is_default")]
     pub doctrine: Doctrine,
-    /// A noise jammer (radiates while the unit's EMCON is active). Until the database carries
-    /// ECM equipment (Phase 2 slice 9), jammers are given per unit in the scenario.
+    /// A noise jammer (radiates while the unit's EMCON is active). Without one, the unit jams
+    /// with its platform's strongest ECM equipment from the database, if it has any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jammer: Option<JammerSpec>,
     /// Mission at start.
@@ -1097,7 +1097,14 @@ fn resolve_unit(u: &ScenarioUnit, db: &PlatformDb, fuel: bool) -> Result<UnitSpa
         min_turn_radius_m: turn.1,
         group: u.group.clone(),
         doctrine: u.doctrine,
-        jammer: u.jammer,
+        // A jammer from the scenario, else the platform's strongest ECM (migration 0004).
+        jammer: match (&u.jammer, &u.platform) {
+            (Some(j), _) => Some(*j),
+            (None, Some(pid)) => db
+                .jammer_of(pid)?
+                .map(|jn_db_at_1km| sim_core::JammerSpec { jn_db_at_1km }),
+            (None, None) => None,
+        },
         radiated_noise_db: noise,
         category,
         length_m: length,

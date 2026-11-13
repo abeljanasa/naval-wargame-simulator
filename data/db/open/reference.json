@@ -12,14 +12,28 @@
       "id": "GEN",
       "name": "Generic",
       "provenance": { "source_citation": "Original design: placeholder nation for generic classes", "confidence": "A" }
-    }
+    },
+    {"id": "PHL", "name": "Philippines", "provenance": {"source_citation": "Wikipedia, \"Philippines\", https://en.wikipedia.org/wiki/Philippines (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "CHN", "name": "China", "provenance": {"source_citation": "Wikipedia, \"China\", https://en.wikipedia.org/wiki/China (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "USA", "name": "United States", "provenance": {"source_citation": "Wikipedia, \"United States\", https://en.wikipedia.org/wiki/United_States (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IRN", "name": "Iran", "provenance": {"source_citation": "Wikipedia, \"Iran\", https://en.wikipedia.org/wiki/Iran (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "PAK", "name": "Pakistan", "provenance": {"source_citation": "Wikipedia, \"Pakistan\", https://en.wikipedia.org/wiki/Pakistan (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IND", "name": "India", "provenance": {"source_citation": "Wikipedia, \"India\", https://en.wikipedia.org/wiki/India (accessed 2026-11-13)", "confidence": "A", "is_generic": false}}
   ],
   "services": [
     { "id": "GEN-NAVY", "nation": "GEN", "name": "Generic navy", "branch": "navy" },
     { "id": "GEN-AIR", "nation": "GEN", "name": "Generic air force", "branch": "air_force" },
     { "id": "GEN-ARMY", "nation": "GEN", "name": "Generic army (coastal defence)", "branch": "army" },
     { "id": "GEN-CG", "nation": "GEN", "name": "Generic coast guard", "branch": "coast_guard" },
-    { "id": "GEN-CIVIL", "nation": "GEN", "name": "Generic civil / merchant", "branch": "civil" }
+    { "id": "GEN-CIVIL", "nation": "GEN", "name": "Generic civil / merchant", "branch": "civil" },
+    {"id": "PHL-PN", "nation": "PHL", "name": "Philippine Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Philippine Navy\", https://en.wikipedia.org/wiki/Philippine_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "PHL-PCG", "nation": "PHL", "name": "Philippine Coast Guard", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"Philippine Coast Guard\", https://en.wikipedia.org/wiki/Philippine_Coast_Guard (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "CHN-PLAN", "nation": "CHN", "name": "People's Liberation Army Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"People's Liberation Army Navy\", https://en.wikipedia.org/wiki/People%27s_Liberation_Army_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "CHN-CCG", "nation": "CHN", "name": "China Coast Guard", "branch": "coast_guard", "provenance": {"source_citation": "Wikipedia, \"China Coast Guard\", https://en.wikipedia.org/wiki/China_Coast_Guard (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "USA-USN", "nation": "USA", "name": "United States Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"United States Navy\", https://en.wikipedia.org/wiki/United_States_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IRN-IRIN", "nation": "IRN", "name": "Islamic Republic of Iran Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Islamic Republic of Iran Navy\", https://en.wikipedia.org/wiki/Islamic_Republic_of_Iran_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "PAK-PN", "nation": "PAK", "name": "Pakistan Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Pakistan Navy\", https://en.wikipedia.org/wiki/Pakistan_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}},
+    {"id": "IND-IN", "nation": "IND", "name": "Indian Navy", "branch": "navy", "provenance": {"source_citation": "Wikipedia, \"Indian Navy\", https://en.wikipedia.org/wiki/Indian_Navy (accessed 2026-11-13)", "confidence": "A", "is_generic": false}}
   ],
   "propulsion": [
     { "id": "PROP-NUC-SURFACE", "name": "Nuclear steam turbine (surface)", "kind": "nuclear", "fuel_type": "nuclear" },
@@ -63,5 +77,11 @@
     { "id": "COM-LINK", "name": "Generic tactical data link", "kind": "datalink", "range_km": 450, "is_datalink": true },
     { "id": "COM-UWT", "name": "Generic underwater telephone", "kind": "underwater_telephone", "range_km": 10, "is_datalink": false },
     { "id": "COM-VLF", "name": "Generic VLF broadcast receiver", "kind": "vlf", "range_km": 10000, "is_datalink": false }
+  ],
+  "ecm": [
+    {"id": "ECM-GEN-SHIP", "name": "Generic shipborne noise jammer", "kind": "noise_jammer", "jn_db_at_1km": 50},
+    {"id": "ECM-GEN-AIR", "name": "Generic airborne jamming pod", "kind": "noise_jammer", "jn_db_at_1km": 60},
+    {"id": "ECM-CHN-HZ100", "name": "HZ-100 ECM and ELINT system (Type 054A)", "kind": "noise_jammer", "jn_db_at_1km": 50, "provenance": {"source_citation": "Wikipedia, \"Type 054A frigate\", https://en.wikipedia.org/wiki/Type_054A_frigate (accessed 2026-11-13): system named; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}},
+    {"id": "ECM-CHN-NRJ6A", "name": "NRJ-6A electronic warfare system (Type 052D)", "kind": "noise_jammer", "jn_db_at_1km": 55, "provenance": {"source_citation": "Wikipedia, \"Type 052D destroyer\", https://en.wikipedia.org/wiki/Type_052D_destroyer (accessed 2026-11-13): system named; performance not published, generic shipborne jammer value", "confidence": "D", "is_generic": false}}
   ]
 }

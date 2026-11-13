@@ -237,6 +237,18 @@ impl PlatformDb {
         Ok(v)
     }
 
+    /// The strongest jammer a platform carries (ECM equipment, migration 0004): its J/N at 1 km,
+    /// dB. `None` for a platform with none.
+    pub fn jammer_of(&self, platform_id: &str) -> Result<Option<f64>, DbError> {
+        let v: Option<f64> = self.conn.query_row(
+            "SELECT MAX(e.jn_db_at_1km) FROM platform_ecm pe JOIN ecm_systems e ON e.id = pe.ecm_id
+              WHERE pe.platform_id = ?1",
+            [platform_id],
+            |r| r.get(0),
+        )?;
+        Ok(v)
+    }
+
     /// An aircraft's loadouts, by id: (id, name, role, weapons by id with quantities). Empty for
     /// platforms without loadouts (`docs/models/air-operations.md`).
     #[allow(clippy::type_complexity)]

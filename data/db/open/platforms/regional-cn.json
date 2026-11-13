@@ -1,0 +1,892 @@
+{
+ "defaults": {
+  "source_citation": "Regional database, China (Phase 4 slice 13): each record cites its open source (see the record's provenance)",
+  "confidence": "C",
+  "classification": "UNCLASSIFIED",
+  "is_generic": false,
+  "created_by": "nws-core-team",
+  "updated_at": "2026-11-13"
+ },
+ "platforms": [
+  {
+   "id": "CHN-FFG-054A",
+   "name": "Type 054A frigate (Jiangkai II)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "CHN-PLAN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-FRIGATE",
+   "length_m": 134,
+   "displacement_t": 3963,
+   "draft_m": 5,
+   "max_speed_kn": 27,
+   "cruise_speed_kn": 18,
+   "accel_mps2": 0.05,
+   "endurance_nm": 3800,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 5000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 150,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 168,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-3D-MR",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 26
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 14
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -5
+    }
+   ],
+   "launchers": [
+    {
+     "name": "32-cell H/AKJ-16 VLS",
+     "height_m": 5,
+     "weapons": [
+      "WPN-ASW-ROCKET",
+      "WPN-HHQ16"
+     ]
+    },
+    {
+     "name": "YJ-83 launchers (2x4)",
+     "height_m": 8,
+     "weapons": [
+      "WPN-YJ83"
+     ]
+    },
+    {
+     "name": "H/PJ-26 76 mm gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "Type 730 CIWS (2)",
+     "height_m": 14,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Yu-7 triple torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Type 726-4 decoy launchers (2)",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "32-cell H/AKJ-16 VLS",
+     "capacity": 32,
+     "contents": {
+      "WPN-HHQ16": 24,
+      "WPN-ASW-ROCKET": 8
+     }
+    },
+    {
+     "name": "YJ-83 launchers (2x4)",
+     "capacity": 8,
+     "contents": {
+      "WPN-YJ83": 8
+     }
+    },
+    {
+     "name": "H/PJ-26 76 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "Type 730 CIWS (2)",
+     "capacity": 80,
+     "contents": {
+      "WPN-CIWS": 80
+     }
+    },
+    {
+     "name": "Yu-7 triple torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    },
+    {
+     "name": "Type 726-4 decoy launchers (2)",
+     "capacity": 36,
+     "contents": {
+      "WPN-DECOY-CHAFF": 36
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Type 054A frigate\", https://en.wikipedia.org/wiki/Type_054A_frigate (accessed 2026-11-13): 3,963 t full, 134 m, 5 m draught, 27 kn, 3,800 nm at 18 kn; Type 382 radar, Type 344, 4x MR-90, MR-36A, Type 347G, RM-1290, MGK-335 sonar, Type 922-1 RWR, HZ-100 ECM; 32-cell VLS (HHQ-16, Yu-8), 2x4 YJ-83, H/PJ-26 76 mm, 2 Type 730/1130 CIWS, 2x3 Yu-7 torpedo tubes, 2x6 Type 87 ASW rockets, 2 Type 726-4 decoy launchers. VLS split between HHQ-16 and Yu-8 not given (24/8 assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-CHN-HZ100"
+   ]
+  },
+  {
+   "id": "CHN-DDG-052D",
+   "name": "Type 052D destroyer (Luyang III)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "CHN-PLAN",
+   "propulsion": "PROP-CODOG",
+   "damage_profile": "DMG-DESTROYER",
+   "length_m": 157,
+   "displacement_t": 7500,
+   "draft_m": 6,
+   "max_speed_kn": 30,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.06,
+   "endurance_nm": 4500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 10000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-MFR",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-RDR-LRAS",
+     "height_m": 32
+    },
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 25
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-RDR-CIWS",
+     "height_m": 15
+    },
+    {
+     "sensor": "SEN-ESM-SHIP",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -6
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -100
+    }
+   ],
+   "launchers": [
+    {
+     "name": "64-cell universal VLS",
+     "height_m": 5,
+     "weapons": [
+      "WPN-ASW-ROCKET",
+      "WPN-HHQ9",
+      "WPN-YJ18"
+     ]
+    },
+    {
+     "name": "H/PJ-45 130 mm gun",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-127"
+     ]
+    },
+    {
+     "name": "HHQ-10 24-cell launcher",
+     "height_m": 12,
+     "weapons": [
+      "WPN-SAM-PD"
+     ]
+    },
+    {
+     "name": "Type 730 CIWS",
+     "height_m": 15,
+     "weapons": [
+      "WPN-CIWS"
+     ]
+    },
+    {
+     "name": "Torpedo tubes (2 sets)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    },
+    {
+     "name": "Decoy launchers",
+     "height_m": 12,
+     "weapons": [
+      "WPN-DECOY-CHAFF"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "64-cell universal VLS",
+     "capacity": 64,
+     "contents": {
+      "WPN-HHQ9": 32,
+      "WPN-YJ18": 16,
+      "WPN-ASW-ROCKET": 16
+     }
+    },
+    {
+     "name": "H/PJ-45 130 mm gun",
+     "capacity": 500,
+     "contents": {
+      "WPN-GUN-127": 500
+     }
+    },
+    {
+     "name": "HHQ-10 24-cell launcher",
+     "capacity": 24,
+     "contents": {
+      "WPN-SAM-PD": 24
+     }
+    },
+    {
+     "name": "Type 730 CIWS",
+     "capacity": 60,
+     "contents": {
+      "WPN-CIWS": 60
+     }
+    },
+    {
+     "name": "Torpedo tubes (2 sets)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    },
+    {
+     "name": "Decoy launchers",
+     "capacity": 24,
+     "contents": {
+      "WPN-DECOY-CHAFF": 24
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Type 052D destroyer\", https://en.wikipedia.org/wiki/Type_052D_destroyer (accessed 2026-11-13): 7,500 t full, 157 m, 6 m draught, 30 kn, 4,500 nm at 15 kn, complement 280; Type 346A AESA, Type 518, Type 364, Type 344, Type 760, SJD-9 sonar, SJG-311 VDS, towed array, NRJ-6A EW; 64 VLS cells (HHQ-9, YJ-18, CY-5), H/PJ-45 130 mm, HHQ-10 (24-cell), Type 730/1130 CIWS, torpedo tubes. VLS split not given (32/16/16 assumed); 130 mm modelled by the generic 127 mm gun, HHQ-10 by the generic point-defence SAM. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   },
+   "ecm": [
+    "ECM-CHN-NRJ6A"
+   ]
+  },
+  {
+   "id": "CHN-FS-056A",
+   "name": "Type 056A corvette (Jiangdao, ASW)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "CHN-PLAN",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 90,
+   "displacement_t": 1500,
+   "draft_m": 4,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 16,
+   "accel_mps2": 0.07,
+   "endurance_nm": 3500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 2000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 152,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    },
+    {
+     "sensor": "SEN-SON-TAS",
+     "height_m": -80
+    }
+   ],
+   "launchers": [
+    {
+     "name": "YJ-83 launchers (2x2)",
+     "height_m": 7,
+     "weapons": [
+      "WPN-YJ83"
+     ]
+    },
+    {
+     "name": "HHQ-10 8-cell launcher",
+     "height_m": 10,
+     "weapons": [
+      "WPN-SAM-PD"
+     ]
+    },
+    {
+     "name": "H/PJ-26 76 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "H/PJ-17 30 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    },
+    {
+     "name": "Triple 324 mm torpedo tubes (2)",
+     "height_m": 4,
+     "weapons": [
+      "WPN-TORP-LW"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "YJ-83 launchers (2x2)",
+     "capacity": 4,
+     "contents": {
+      "WPN-YJ83": 4
+     }
+    },
+    {
+     "name": "HHQ-10 8-cell launcher",
+     "capacity": 8,
+     "contents": {
+      "WPN-SAM-PD": 8
+     }
+    },
+    {
+     "name": "H/PJ-26 76 mm gun",
+     "capacity": 300,
+     "contents": {
+      "WPN-GUN-76": 300
+     }
+    },
+    {
+     "name": "H/PJ-17 30 mm guns (2)",
+     "capacity": 100,
+     "contents": {
+      "WPN-GUN-30": 100
+     }
+    },
+    {
+     "name": "Triple 324 mm torpedo tubes (2)",
+     "capacity": 6,
+     "contents": {
+      "WPN-TORP-LW": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Type 056 corvette\", https://en.wikipedia.org/wiki/Type_056_corvette (accessed 2026-11-13): 1,500 t, 90 m, 4 m draught, 25 kn, 3,500 nm at 16 kn, complement 78; Type 360 radar, Type 347G, bow sonar, towed array and VDS (056A); 4 YJ-83, 8-cell HHQ-10, H/PJ-26 76 mm, 2 H/PJ-17 30 mm, 2x3 324 mm torpedo tubes (Yu-7); helipad. HHQ-10 modelled by the generic point-defence SAM. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "CHN-SSK-039A",
+   "name": "Type 039A/B submarine (Yuan)",
+   "category": "submarine",
+   "domain": "subsurface",
+   "service": "CHN-PLAN",
+   "propulsion": "PROP-AIP-SUB",
+   "damage_profile": "DMG-SUBMARINE",
+   "length_m": 77.6,
+   "displacement_t": 3600,
+   "draft_m": 6.7,
+   "max_speed_kn": 20,
+   "cruise_speed_kn": 8,
+   "accel_mps2": 0.05,
+   "max_depth_m": 250,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 200,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "slow",
+     "value": 105,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 118,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 140,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-SON-SSK-BOW",
+     "height_m": -2
+    },
+    {
+     "sensor": "SEN-PERISCOPE",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-RDR-SUB-MAST",
+     "height_m": 8
+    },
+    {
+     "sensor": "SEN-ESM-SUB",
+     "height_m": 8
+    }
+   ],
+   "launchers": [
+    {
+     "name": "533 mm torpedo tubes (6)",
+     "height_m": -3,
+     "weapons": [
+      "WPN-ASM-SUBLAUNCH",
+      "WPN-TORP-HW"
+     ]
+    },
+    {
+     "name": "Countermeasures",
+     "height_m": -3,
+     "weapons": [
+      "WPN-DECOY-TORP"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "533 mm torpedo tubes (6)",
+     "capacity": 18,
+     "contents": {
+      "WPN-TORP-HW": 14,
+      "WPN-ASM-SUBLAUNCH": 4
+     }
+    },
+    {
+     "name": "Countermeasures",
+     "capacity": 6,
+     "contents": {
+      "WPN-DECOY-TORP": 6
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-VLF",
+    "COM-UWT"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Type 039A/B/C submarine\", https://en.wikipedia.org/wiki/Type_039A_submarine (accessed 2026-11-13): 3,600 t submerged, 77.6 m, 6.7 m draught, 20 kn, test depth 250 m, complement 36, AIP; 6x 533 mm tubes (Yu-6/Yu-10 torpedoes, YJ-82/YJ-18 anti-ship missiles); sensors not confirmed by the source. Range not given; torpedo-room load a generic SSK estimate. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "CHN-CG-ZHAOTOU",
+   "name": "Zhaotou-class cutter (China Coast Guard, 12,000 t)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "CHN-CCG",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CRUISER",
+   "length_m": 165,
+   "displacement_t": 12000,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 15,
+   "accel_mps2": 0.06,
+   "endurance_nm": 15000,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 15000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 155,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "max",
+     "value": 170,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 30
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 28
+    },
+    {
+     "sensor": "SEN-EO-SHIP",
+     "height_m": 22
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 18
+    }
+   ],
+   "launchers": [
+    {
+     "name": "H/PJ-26 76 mm gun",
+     "height_m": 10,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "30 mm guns (2)",
+     "height_m": 11,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "H/PJ-26 76 mm gun",
+     "capacity": 400,
+     "contents": {
+      "WPN-GUN-76": 400
+     }
+    },
+    {
+     "name": "30 mm guns (2)",
+     "capacity": 120,
+     "contents": {
+      "WPN-GUN-30": 120
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Zhaotou-class cutter\", https://en.wikipedia.org/wiki/Zhaotou-class_patrol_cutter (accessed 2026-11-13): 12,000 t full, 165 m, beam over 20 m, 25 kn, 15,000 nm (estimated; speed not given: 15 kn assumed), draft not given; H/PJ-26 76 mm, 2x 30 mm, 2 AA machine guns; hangar for two Z-8. Sensors not given (navigation-class generic radars assumed). Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  },
+  {
+   "id": "CHN-CG-056",
+   "name": "Type 056 corvette in China Coast Guard service (disarmed of missiles and torpedoes)",
+   "category": "surface_combatant",
+   "domain": "surface",
+   "service": "CHN-CCG",
+   "propulsion": "PROP-DIESEL",
+   "damage_profile": "DMG-CORVETTE",
+   "length_m": 90,
+   "displacement_t": 1500,
+   "draft_m": 4,
+   "max_speed_kn": 25,
+   "cruise_speed_kn": 16,
+   "accel_mps2": 0.07,
+   "endurance_nm": 3500,
+   "signatures": [
+    {
+     "kind": "rcs",
+     "value": 2000,
+     "unit": "m2",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    },
+    {
+     "kind": "acoustic",
+     "speed_band": "cruise",
+     "value": 152,
+     "unit": "db_re_1upa",
+     "provenance": {
+      "source_citation": "Generic class estimate copied from the matching generic class; no open source gives this ship's signatures (docs/db/data-dictionary.md#generic-values)",
+      "confidence": "D",
+      "is_generic": true
+     }
+    }
+   ],
+   "sensors": [
+    {
+     "sensor": "SEN-RDR-SURF",
+     "height_m": 20
+    },
+    {
+     "sensor": "SEN-RDR-FC",
+     "height_m": 16
+    },
+    {
+     "sensor": "SEN-RDR-NAV",
+     "height_m": 18
+    },
+    {
+     "sensor": "SEN-VISUAL",
+     "height_m": 12
+    },
+    {
+     "sensor": "SEN-SON-HULL-MF",
+     "height_m": -4
+    }
+   ],
+   "launchers": [
+    {
+     "name": "H/PJ-26 76 mm gun",
+     "height_m": 8,
+     "weapons": [
+      "WPN-GUN-76"
+     ]
+    },
+    {
+     "name": "H/PJ-17 30 mm guns (2)",
+     "height_m": 9,
+     "weapons": [
+      "WPN-GUN-30"
+     ]
+    }
+   ],
+   "magazines": [
+    {
+     "name": "H/PJ-26 76 mm gun",
+     "capacity": 300,
+     "contents": {
+      "WPN-GUN-76": 300
+     }
+    },
+    {
+     "name": "H/PJ-17 30 mm guns (2)",
+     "capacity": 100,
+     "contents": {
+      "WPN-GUN-30": 100
+     }
+    }
+   ],
+   "comms": [
+    "COM-HF",
+    "COM-VHF",
+    "COM-UHF",
+    "COM-SATCOM",
+    "COM-LINK"
+   ],
+   "provenance": {
+    "source_citation": "Wikipedia, \"Type 056 corvette\", https://en.wikipedia.org/wiki/Type_056_corvette (accessed 2026-11-13): the 22 original Type 056 were transferred to the China Coast Guard (2021-2023) with missiles and torpedoes removed; 1,500 t, 90 m, 4 m draught, 25 kn, 3,500 nm at 16 kn; Type 360, Type 347G, bow sonar; H/PJ-26 76 mm, 2 H/PJ-17 30 mm. Sensors are modelled by generic class records (the systems named by the source are listed here); gun, CIWS and decoy ammunition counts are generic class estimates",
+    "confidence": "C",
+    "is_generic": false
+   }
+  }
+ ]
+}
