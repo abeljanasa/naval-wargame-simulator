@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **The unit inspector's Water row no longer blinks at high time compression.** Its depth reading reloaded on every snapshot and was blanked while it loaded. It now reloads only when the unit or its route changes, and every 5 s, keeping the last reading on screen meanwhile. Measured at Max: 65 blinks in 15 s before, none after; the app also runs faster, since it no longer refetches every frame.
+- **Named classes and weapons from the regional database are drawn properly on the map.**
+  - Classes like `PHL-FF-RIZAL` now get their own figure and function code, rather than a plain ship with no code.
+  - Named missiles and torpedoes in flight are drawn by their kind, rather than as gun shells.
+  - The lookup (`apps/desktop/src/lib/named-classes.ts`) is generated from the database; the symbol tests fail for any class or weapon missing from it.
+
 ### Added (Phase 4, slice 13: regional database, third tranche)
 
 - **Malaysia:** Lekiu frigate, Kedah OPV, Keris littoral mission ship, Scorpène submarine; the MMEA's Tun Fatimah OPV.

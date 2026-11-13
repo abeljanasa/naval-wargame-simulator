@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import type { Map as MapLibreMap } from "maplibre-gl";
   import type { MapboxOverlay } from "@deck.gl/mapbox";
   import {
@@ -115,28 +115,6 @@
   /** White cell: the kind and radius of a zone to add on the map. */
   let newZoneKind = $state<"sense" | "engage">("sense");
   let newZoneKm = $state(20);
-
-  // Depth under the selected unit and along its route (terrain packs), refreshed as it moves.
-  let water = $state<WaterView | null>(null);
-  $effect(() => {
-    const id = sim.selected;
-    const key = `${String(sim.selectedUnit?.route?.next)}|${String(sim.selectedUnit?.route?.waypoints.length)}`;
-    void key;
-    water = null;
-    if (id === null || (terrain?.packs.length ?? 0) === 0) return;
-    let live = true;
-    const load = async () => {
-      const r = await commands.routeDepths(id);
-      if (live && sim.selected === id) water = r.status === "ok" ? r.data : null;
-    };
-    void load();
-    const timer = setInterval(() => void load(), 5000);
-    return () => {
-      live = false;
-      clearInterval(timer);
-    };
-  });
-  const waterProfile = $derived(water ? profilePaths(water, 240, 48) : null);
 
   // Charted depths of the facilities, for the white cell's Planning tab.
   let chartDepths = $state<Map<number, number | null>>(new Map());
@@ -504,6 +482,40 @@
   // Terrain and bathymetry (lib/terrain.ts): which layers show, remembered like the theme.
   let terrainView = $state<TerrainView>(readTerrainView());
   let terrain = $state<TerrainStatus | null>(null);
+
+  // Depth under the selected unit and along its route (terrain packs), refreshed as it moves.
+  // The reload key is a derived string, so the effect re-runs only when the unit or its route
+  // changes, not on every snapshot. The last reading stays shown while a new one loads, so the
+  // Water row does not blink at fast time steps; it is cleared only for a different unit.
+  let water = $state<WaterView | null>(null);
+  let waterFor: number | null = null;
+  const waterKey = $derived(
+    `${String(sim.selected)}|${String(sim.selectedUnit?.route?.next)}|${String(sim.selectedUnit?.route?.waypoints.length)}|${String(terrain?.packs.length ?? 0)}`,
+  );
+  $effect(() => {
+    void waterKey;
+    const id = untrack(() => sim.selected);
+    if (id !== waterFor) {
+      water = null;
+      waterFor = id;
+    }
+    if (id === null || (untrack(() => terrain?.packs.length) ?? 0) === 0) {
+      water = null;
+      return;
+    }
+    let live = true;
+    const load = async () => {
+      const r = await commands.routeDepths(id);
+      if (live && sim.selected === id) water = r.status === "ok" ? r.data : null;
+    };
+    void load();
+    const timer = setInterval(() => void load(), 5000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  });
+  const waterProfile = $derived(water ? profilePaths(water, 240, 48) : null);
   let terrainLayers = $state<TerrainLayers | null>(null);
   let terrainReadout = $state("");
   let showTerrain = $state(false);

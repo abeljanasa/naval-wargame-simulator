@@ -6,6 +6,7 @@
 // copied from any product.
 
 import type { Domain } from "./bindings";
+import { NAMED_FIGURE, NAMED_MUNITION } from "./named-classes";
 import { AFFILIATION_COLOUR, frameSvg, type Affiliation } from "./symbols";
 
 /** Ship and submarine plan views (64 × 64 canvas, bow up). */
@@ -124,7 +125,7 @@ export function figureKind(
   domain?: Domain | null,
 ): FigureKind | null {
   return (
-    (platform ? CLASS_FIGURE[platform] : undefined) ??
+    (platform ? (CLASS_FIGURE[platform] ?? NAMED_FIGURE[platform]) : undefined) ??
     (category ? CATEGORY_FIGURE[category] : undefined) ??
     (domain ? DOMAIN_FIGURE[domain] : undefined) ??
     null
@@ -486,6 +487,9 @@ export type MunitionKind =
 
 /** The munition figure for a weapon id from the database. */
 export function munitionKind(weapon: string): MunitionKind {
+  // Named weapons (the regional database) by their database kind.
+  const named = NAMED_MUNITION[weapon];
+  if (named) return named;
   if (weapon.startsWith("WPN-ASM")) return "anti_ship_missile";
   if (weapon.startsWith("WPN-SAM")) return "sam";
   if (weapon.startsWith("WPN-LACM")) return "cruise_missile";
