@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 12: automatic sense-zone tasking)
+
+- **Coverage goals:** a sense zone may carry a goal (a share of its area) and the units the engine may use for it.
+- **Tasking every 5 minutes:** below the goal, the engine tasks the side's free units, greedily by the uncovered cells each would cover, until the projected coverage meets the goal.
+  - Free ships and submarines get a Support mission at the chosen station.
+  - Parked aircraft are launched on a patrol sortie round it.
+- **Release and relief:** a unit given another mission, recalled, home at bingo or lost is released, and the next pass sends a relief. Units with missions are never taken.
+- **Logged:** each tasking, shortfall and goal regained, on the AAR timeline (kind `tasking`). Saved (format 27) and hashed only with goals; golden replays unchanged.
+- **Desktop:** goals, tasked units and shortfalls on the Coverage tab; goals set in the Planning tab and the scenario editor.
+
 ### Added (Phase 4, slices 9–11: air operations)
 
 - **Airbases:** a facility kind `airbase`, ashore or carried by a ship (a carrier, or a frigate's helicopter deck), with runways or deck spots, a launch interval, parking and aviation fuel.

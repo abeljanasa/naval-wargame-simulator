@@ -89,6 +89,7 @@ fn kind(k: TimelineKind) -> &'static str {
         TimelineKind::Loss => "loss",
         TimelineKind::Mine => "mine",
         TimelineKind::Air => "air",
+        TimelineKind::Tasking => "tasking",
         TimelineKind::Override => "override",
         TimelineKind::Facilitation => "facilitation",
         TimelineKind::Event => "event",

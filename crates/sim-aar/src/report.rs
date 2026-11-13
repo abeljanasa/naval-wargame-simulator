@@ -138,6 +138,8 @@ pub enum TimelineKind {
     Mine,
     /// Air operations: sorties, recoveries, bingo, tanking.
     Air,
+    /// Automatic sense-zone tasking: sensors sent, goals short or met.
+    Tasking,
     Override,
     Facilitation,
     Event,
@@ -210,6 +212,8 @@ struct Builder<'a> {
     air_lost: BTreeMap<UnitId, (Tick, String)>,
     /// Airbase names, from the planning layer in the log.
     bases: BTreeMap<u32, String>,
+    /// Zone names and sides, from the planning layer in the log.
+    zones: BTreeMap<u32, (String, SideId)>,
     sorties: Vec<SortieRow>,
     /// The open sortie of each aircraft in the air, by index in `sorties`.
     flying: BTreeMap<UnitId, usize>,
@@ -237,6 +241,7 @@ impl<'a> Builder<'a> {
             collided: BTreeMap::new(),
             air_lost: BTreeMap::new(),
             bases: BTreeMap::new(),
+            zones: BTreeMap::new(),
             sorties: Vec::new(),
             flying: BTreeMap::new(),
             intercepted: BTreeSet::new(),
@@ -257,9 +262,14 @@ impl<'a> Builder<'a> {
                         b.units.insert(s.id, info(s));
                     }
                 }
-                CommandPayload::SetPlanning { facilities, .. } => {
+                CommandPayload::SetPlanning {
+                    facilities, zones, ..
+                } => {
                     for f in facilities {
                         b.bases.insert(f.id, f.name.clone());
+                    }
+                    for z in zones {
+                        b.zones.insert(z.id, (z.name.clone(), z.side));
                     }
                 }
                 CommandPayload::SetSeats { seats } => {
@@ -971,6 +981,43 @@ impl<'a> Builder<'a> {
                 );
                 self.note(t, TimelineKind::Air, self.unit_side(*receiver), text);
             }
+            SimEventKind::SensorTasked {
+                zone,
+                unit,
+                coverage,
+                projected,
+                ..
+            } => {
+                let (name, side) = self.zone_of(*zone);
+                let text = format!(
+                    "{} tasked to watch {name} (coverage {:.0} % → {:.0} %)",
+                    self.unit_name(*unit),
+                    coverage * 100.0,
+                    projected * 100.0
+                );
+                self.note(t, TimelineKind::Tasking, side, text);
+            }
+            SimEventKind::CoverageShortfall {
+                zone,
+                coverage,
+                goal,
+            } => {
+                let (name, side) = self.zone_of(*zone);
+                let text = format!(
+                    "{name} short of its coverage goal ({:.0} % of {:.0} %): no sensor left to send",
+                    coverage * 100.0,
+                    goal * 100.0
+                );
+                self.note(t, TimelineKind::Tasking, side, text);
+            }
+            SimEventKind::CoverageGoalMet { zone, coverage } => {
+                let (name, side) = self.zone_of(*zone);
+                let text = format!(
+                    "{name} back at its coverage goal ({:.0} %)",
+                    coverage * 100.0
+                );
+                self.note(t, TimelineKind::Tasking, side, text);
+            }
             SimEventKind::AircraftLost { unit, reason } => {
                 self.air_lost.insert(*unit, (t, reason.clone()));
             }
@@ -1318,6 +1365,13 @@ impl<'a> Builder<'a> {
             ),
             _ => {}
         }
+    }
+
+    fn zone_of(&self, id: u32) -> (String, Option<SideId>) {
+        self.zones.get(&id).map_or_else(
+            || (format!("zone {id}"), None),
+            |(n, s)| (n.clone(), Some(*s)),
+        )
     }
 
     fn base_name(&self, id: u32) -> String {

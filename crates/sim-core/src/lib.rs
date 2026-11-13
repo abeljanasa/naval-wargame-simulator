@@ -38,6 +38,7 @@ mod seats;
 mod sim;
 mod snapshot;
 mod sonar;
+mod tasking;
 mod time;
 mod weapon_tracks;
 
@@ -128,6 +129,7 @@ pub use sonar::{
     default_radiated_noise_db, sonar_usable, ACOUSTIC_LABEL, DEFAULT_SUBMARINE_NOISE_DB,
     DEFAULT_SURFACE_NOISE_DB, TARGET_STRENGTH_SUBMARINE_DB, TARGET_STRENGTH_SURFACE_DB,
 };
+pub use tasking::{next_review, TaskingView, TASKING_PERIOD_TICKS};
 pub use time::{SimClock, Tick, TICK_SECONDS};
 pub use weapon_tracks::{
     WeaponTrack, WeaponTrackView, WeaponTracks, MISSILE_LENGTH_M, TORPEDO_NOISE_DB,

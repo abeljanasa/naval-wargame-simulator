@@ -2152,6 +2152,8 @@ export type SnapshotUpdate_Deserialize = {
 	sonobuoys: SonobuoyView[],
 	/**  The viewer's airbases and the aircraft parked there (sent whole). */
 	air_bases: AirBaseView_Deserialize[],
+	/**  The viewer's sense zones with coverage goals and the units tasked to them. */
+	sensor_tasking: TaskingView[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -2202,6 +2204,8 @@ export type SnapshotUpdate_Serialize = {
 	sonobuoys: SonobuoyView[],
 	/**  The viewer's airbases and the aircraft parked there (sent whole). */
 	air_bases: AirBaseView_Serialize[],
+	/**  The viewer's sense zones with coverage goals and the units tasked to them. */
+	sensor_tasking: TaskingView[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -2327,6 +2331,16 @@ export type SvpPoint = {
 /**  Systems a critical hit can knock out. */
 export type System = "sensors" | "propulsion" | "weapons" | "flight_deck" | "comms";
 
+/**  A sense zone's tasking, as a seat sees it. */
+export type TaskingView = {
+	zone: number,
+	goal: number | null,
+	/**  Units tasked to it, in unit-id order. */
+	units: UnitId[],
+	/**  Short of its goal with nothing left to send. */
+	short: boolean,
+};
+
 /**  One pack found on this machine. */
 export type TerrainPackInfo = {
 	id: string,
@@ -2402,7 +2416,9 @@ export type TimelineEntry_Serialize = {
 /**  What a timeline entry is about. */
 export type TimelineKind = "order" | "refused" | "contact" | "launch" | "hit" | "miss" | "intercept" | "damage" | "loss" | "mine" | 
 /**  Air operations: sorties, recoveries, bingo, tanking. */
-"air" | "override" | "facilitation" | "event" | "script_error";
+"air" | 
+/**  Automatic sense-zone tasking: sensors sent, goals short or met. */
+"tasking" | "override" | "facilitation" | "event" | "script_error";
 
 /**  A towed array, as a seat sees it. */
 export type TowedView = {
@@ -2741,6 +2757,13 @@ export type Zone_Deserialize = {
 	layer?: ZoneLayer | null,
 	/**  Sense zones: the sensor types this layer is for; coverage counts only these (empty: all). */
 	sensors?: SensorKind[],
+	/**
+	 *  Sense zones: the share of the zone to keep covered; the engine tasks free sensors to keep
+	 *  it (Phase 4 slice 12, `docs/models/sensor-tasking.md`). `None`: players task them.
+	 */
+	coverage_goal?: number | null,
+	/**  Sense zones with a goal: the units the engine may task for it (empty: any free unit). */
+	assets?: UnitId[],
 };
 
 /**  A sense or engage zone of one side. */
@@ -2763,6 +2786,13 @@ export type Zone_Serialize = {
 	layer: ZoneLayer | null,
 	/**  Sense zones: the sensor types this layer is for; coverage counts only these (empty: all). */
 	sensors: SensorKind[],
+	/**
+	 *  Sense zones: the share of the zone to keep covered; the engine tasks free sensors to keep
+	 *  it (Phase 4 slice 12, `docs/models/sensor-tasking.md`). `None`: players task them.
+	 */
+	coverage_goal?: number | null,
+	/**  Sense zones with a goal: the units the engine may task for it (empty: any free unit). */
+	assets?: UnitId[],
 };
 
 /* Tauri Specta runtime */

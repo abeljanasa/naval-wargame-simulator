@@ -33,6 +33,7 @@ Never cite another product's binaries, databases, save files or internals.
 | [DL-0017](DL-0017-ph-damage.md) | Probability of hit and damage | Project spec §8 + platform database + original design |
 | [DL-0018](DL-0018-point-defence.md) | Point defence and soft kill | Project spec §8 + platform database + original design |
 | [DL-0019](DL-0019-missions.md) | Basic missions and automated tasking | Project spec §7, §8 + original design |
+| [DL-0047](DL-0047-sensor-tasking.md) | Automatic sense-zone tasking: coverage goals, greedy tasking of free ships, submarines and parked aircraft, release and relief | Project spec §7.1 + coverage model + original design |
 | [DL-0046](DL-0046-air-operations.md) | Air operations: airbases and decks, readiness, sorties and loadouts, runway slots, turnaround, aircraft fuel, bingo and tanking | Project spec §13 + public readiness and tanking practice + original design |
 | [DL-0045](DL-0045-collisions.md) | Ship collisions (damage by closing speed and mass) and collision avoidance by the rules of the road, own side included | COLREGS + public collision reports + original design |
 | [DL-0044](DL-0044-acoustics.md) | Ocean acoustics: sound-velocity profiles, layers, convergence zones, bottom bounce, reverberation; towed arrays and sonobuoys | Project spec §13 + public underwater-acoustics textbooks + original design |

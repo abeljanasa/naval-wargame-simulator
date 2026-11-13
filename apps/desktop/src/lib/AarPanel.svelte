@@ -43,6 +43,7 @@
     "facilitation",
     "event",
     "script_error",
+    "tasking",
   ];
 
   async function openTables() {

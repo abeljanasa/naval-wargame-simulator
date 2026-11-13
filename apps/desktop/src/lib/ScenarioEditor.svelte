@@ -1226,6 +1226,26 @@
           >
           {#if z.kind === "sense"}
             <div class="row" aria-label={`Sensor types for ${z.name}`}>
+              <label class="inline"
+                >Coverage goal
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="5"
+                  style="width: 4.5em"
+                  aria-label={`Coverage goal of ${z.name}, per cent`}
+                  value={z.coverage_goal == null ? "" : Math.round(z.coverage_goal * 100)}
+                  onchange={(e) => {
+                    const v = Number(e.currentTarget.value);
+                    z.coverage_goal =
+                      e.currentTarget.value === "" || !(v > 0) ? null : Math.min(100, v) / 100;
+                    if (z.coverage_goal == null) z.assets = [];
+                    changed();
+                  }}
+                />
+                % (the engine tasks free sensors to keep it)</label
+              >
               <span class="dim">Sensors (none ticked: all):</span>
               {#each SENSOR_KINDS as k (k.key)}
                 <label class="inline">

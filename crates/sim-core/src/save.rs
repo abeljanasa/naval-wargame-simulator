@@ -138,6 +138,10 @@ pub struct SaveGame {
     /// load with none.
     #[serde(default)]
     pub air: crate::air::Air,
+    /// Automatic sense-zone tasking: units tasked, zones short (format 27). Older saves load with
+    /// none.
+    #[serde(default)]
+    pub tasking: crate::tasking::Tasking,
     #[serde(default)]
     pub bearings: BearingTable,
     #[serde(default)]

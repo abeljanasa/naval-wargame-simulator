@@ -208,6 +208,13 @@ pub struct Zone {
     /// Sense zones: the sensor types this layer is for; coverage counts only these (empty: all).
     #[serde(default)]
     pub sensors: Vec<crate::detection::SensorKind>,
+    /// Sense zones: the share of the zone to keep covered; the engine tasks free sensors to keep
+    /// it (Phase 4 slice 12, `docs/models/sensor-tasking.md`). `None`: players task them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage_goal: Option<f64>,
+    /// Sense zones with a goal: the units the engine may task for it (empty: any free unit).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<UnitId>,
 }
 
 /// A zone's layer in a choke point's defence: sense far out, engage in the inner layers.
@@ -709,6 +716,20 @@ pub fn validate_planning(facilities: &[Facility], zones: &[Zone]) -> Result<(), 
         z.area
             .validate()
             .map_err(|e| format!("zone {:?}: {e}", z.name))?;
+        if let Some(g) = z.coverage_goal {
+            if z.kind != ZoneKind::Sense || !(g.is_finite() && g > 0.0 && g <= 1.0) {
+                return Err(format!(
+                    "zone {:?}: a coverage goal is for sense zones, a share above 0 and at most 1",
+                    z.name
+                ));
+            }
+        }
+        if !z.assets.is_empty() && z.coverage_goal.is_none() {
+            return Err(format!(
+                "zone {:?}: units to task need a coverage goal",
+                z.name
+            ));
+        }
         if z.kind == ZoneKind::Engage && !z.sensors.is_empty() {
             return Err(format!(
                 "zone {:?}: only sense zones list sensor types",

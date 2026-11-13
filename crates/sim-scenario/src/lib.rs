@@ -459,6 +459,14 @@ impl Scenario {
                     z.name, z.side
                 ));
             }
+            for u in &z.assets {
+                if side_of.get(u) != Some(&z.side) {
+                    out.push(format!(
+                        "zone {:?}: unit {u} to task is not a unit of its side",
+                        z.name
+                    ));
+                }
+            }
         }
         out.extend(self.action_group_issues());
         if self.duration_s == 0 {

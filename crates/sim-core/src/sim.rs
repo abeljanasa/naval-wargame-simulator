@@ -167,6 +167,7 @@ impl Simulation {
         world.insert_resource(crate::acoustics::Acoustics::default());
         world.insert_resource(crate::collision::Avoidance::default());
         world.insert_resource(crate::air::Air::default());
+        world.insert_resource(crate::tasking::Tasking::default());
         world.insert_resource(crate::collision::PendingCollisions::default());
         world.insert_resource(BearingTable::default());
         world.insert_resource(WeaponCatalog::default());
@@ -537,6 +538,13 @@ impl Simulation {
             environment: self.world.resource::<EnvState>().0,
             weather_zones: self.world.resource::<crate::detection::Weather>().0.clone(),
             sound_profiles: acoustics.profiles.clone(),
+            sensor_tasking: crate::tasking::views(
+                &self.world,
+                match viewer {
+                    Viewer::WhiteCell => None,
+                    Viewer::Side { side } => Some(side),
+                },
+            ),
             air_bases: crate::air::base_views(
                 &self.world,
                 match viewer {
@@ -927,6 +935,17 @@ impl Simulation {
                 h.opt_f64(s.resume_deg);
             }
         }
+        // Sensor tasking only when used, so runs without coverage goals keep their hashes.
+        let tasking = self.world.resource::<crate::tasking::Tasking>();
+        if !tasking.is_empty() {
+            h.str("tasking");
+            if let Ok(bytes) = rmp_serde::to_vec(tasking) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
         // Air operations only when used, so runs without aircraft bases keep their hashes.
         let air = self.world.resource::<crate::air::Air>();
         if !air.is_empty() {
@@ -1034,6 +1053,7 @@ impl Simulation {
             acoustics: self.world.resource::<crate::acoustics::Acoustics>().clone(),
             avoidance: self.world.resource::<crate::collision::Avoidance>().clone(),
             air: self.world.resource::<crate::air::Air>().clone(),
+            tasking: self.world.resource::<crate::tasking::Tasking>().clone(),
             bearings: self.world.resource::<BearingTable>().clone(),
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
@@ -1085,6 +1105,7 @@ impl Simulation {
         sim.world.insert_resource(save.acoustics.clone());
         sim.world.insert_resource(save.avoidance.clone());
         sim.world.insert_resource(save.air.clone());
+        sim.world.insert_resource(save.tasking.clone());
         sim.world.insert_resource(save.bearings);
         sim.world.insert_resource(save.emitter_library);
         sim.world.insert_resource(save.weapon_catalog);
@@ -1292,6 +1313,7 @@ fn build_schedule() -> Schedule {
             detection_system,
             ai_system,
             planning_system,
+            crate::tasking::tasking_system,
             scenario_events_system,
             advance_clock_system,
         )

@@ -203,6 +203,46 @@ fn bounds(area: &Area) -> (f64, f64, f64, f64) {
     }
 }
 
+/// The sensor types a sense zone counts: its list, or every type.
+pub(crate) fn zone_kinds(z: &Zone) -> Vec<SensorKind> {
+    if z.sensors.is_empty() {
+        ALL_KINDS.to_vec()
+    } else {
+        z.sensors.clone()
+    }
+}
+
+/// The longest nominal range of `suite`'s sensors of `kinds`, for a unit at `p` moving at
+/// `speed_mps` (automatic tasking, `docs/models/sensor-tasking.md`).
+pub(crate) fn unit_reach_m(
+    world: &World,
+    u: &Unit,
+    p: &Position,
+    speed_mps: f64,
+    suite: &[SensorSpec],
+    kinds: &[SensorKind],
+) -> f64 {
+    let env = world.resource::<EnvState>().0;
+    let local = crate::detection::local_env(
+        env,
+        &world.resource::<crate::detection::Weather>().0,
+        p.point,
+    );
+    let tick = world.resource::<SimClock>().tick;
+    #[allow(clippy::cast_precision_loss)]
+    let unix_s = env.start_unix_s as f64 + tick.seconds();
+    let emits = world
+        .resource::<PlanningLayer>()
+        .doctrine_for(world.resource::<C2State>(), u, p.point)
+        .emcon
+        == Emcon::Active;
+    suite
+        .iter()
+        .filter(|s| kinds.contains(&s.kind))
+        .map(|s| nominal_range_m(s, (u, p, speed_mps), emits, local, unix_s))
+        .fold(0.0, f64::max)
+}
+
 /// The coverage of sense zone `zone` (see the module docs). `None`: no such sense zone.
 #[allow(clippy::cast_precision_loss)]
 pub(crate) fn zone_coverage(world: &mut World, zone: u32) -> Option<ZoneCoverage> {
@@ -212,11 +252,7 @@ pub(crate) fn zone_coverage(world: &mut World, zone: u32) -> Option<ZoneCoverage
         .iter()
         .find(|z| z.id == zone && z.kind == ZoneKind::Sense)?
         .clone();
-    let kinds: Vec<SensorKind> = if z.sensors.is_empty() {
-        ALL_KINDS.to_vec()
-    } else {
-        z.sensors.clone()
-    };
+    let kinds = zone_kinds(&z);
     let env = world.resource::<EnvState>().0;
     let zones = world.resource::<crate::detection::Weather>().0.clone();
     let terrain = world.resource::<crate::sim::TerrainRes>().0.clone();

@@ -1105,6 +1105,8 @@ fn zone(id: u32, kind: ZoneKind, area: Area, doctrine: Doctrine) -> Zone {
         shooters: vec![],
         layer: None,
         sensors: vec![],
+        coverage_goal: None,
+        assets: vec![],
     }
 }
 

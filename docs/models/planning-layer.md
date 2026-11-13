@@ -93,7 +93,7 @@ A **choke point** is a sense zone round an engage zone, sharing a `choke_point` 
 
 ### Coverage
 
-For any sense zone, the side (or the white cell) can ask for its **coverage** now. This is a query: it changes nothing, draws nothing, and is not hashed. In this TTX release players task the sensors themselves; automatic sensor tasking is Phase 4.
+For any sense zone, the side (or the white cell) can ask for its **coverage** now. This is a query: it changes nothing, draws nothing, and is not hashed. Players task sensors themselves, unless the zone has a **coverage goal**: then the engine tasks the side's free sensors to keep it ([sensor-tasking.md](sensor-tasking.md), Phase 4 slice 12).
 - **Grid:** the zone's bounding box is cut into 24 × 24 cells, and the cells whose centre is inside the zone are kept.
 - **Covered:** a cell is covered when some unit of the zone's side has a working sensor of one of the zone's types (every type when it lists none) whose **nominal range** reaches the cell's centre. Otherwise the cell is a **gap**.
 

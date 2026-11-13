@@ -446,8 +446,13 @@
     return `${c.status.replaceAll("_", " ")}${post}: orders will not get through`;
   }
 
+  /** A unit's name, on the map or parked at an airbase. */
   function unitName(id: number): string {
-    return sim.units.find((u) => u.id === id)?.name ?? `unit ${id}`;
+    return (
+      sim.units.find((u) => u.id === id)?.name ??
+      sim.airBases.flatMap((b) => b.aircraft).find((a) => a.unit === id)?.name ??
+      `unit ${id}`
+    );
   }
 
   function seatRoleText(s: Seat): string {
@@ -1158,6 +1163,7 @@
           <ul class="zones" aria-label="Sense coverage">
             {#each senseZones as z (z.id)}
               {@const cov = sim.coverage.find((c) => c.zone === z.id)}
+              {@const task = sim.sensorTasking.find((t) => t.zone === z.id)}
               <li>
                 <label class="inline">
                   <input
@@ -1168,6 +1174,14 @@
                   {z.name}{z.layer ? ` (${z.layer})` : ""}
                 </label>
                 {#if cov}<span>{Math.round(n(cov.fraction) * 100)} % covered</span>{/if}
+                {#if task}
+                  <span class="dim"
+                    >goal {Math.round(n(task.goal) * 100)} %{task.units.length
+                      ? `; tasked: ${task.units.map(unitName).join(", ")}`
+                      : ""}</span
+                  >
+                  {#if task.short}<span class="hurt">short: no sensor left to send</span>{/if}
+                {/if}
               </li>
             {/each}
           </ul>
@@ -2092,6 +2106,33 @@
               {#each sim.session?.zones ?? [] as z (z.id)}
                 <li class="stacked">
                   <span>{z.name} <span class="dim">({z.kind})</span></span>
+                  {#if z.kind === "sense"}
+                    <label class="inline"
+                      >Coverage goal
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="5"
+                        style="width: 4.5em"
+                        aria-label={`Coverage goal of ${z.name}, per cent`}
+                        value={z.coverage_goal == null ? "" : Math.round(n(z.coverage_goal) * 100)}
+                        onchange={(e) => {
+                          const v = Number(e.currentTarget.value);
+                          editPlanning((_, zs) => {
+                            const k = zs.find((x) => x.id === z.id);
+                            if (!k) return;
+                            k.coverage_goal =
+                              e.currentTarget.value === "" || !(v > 0)
+                                ? null
+                                : Math.min(100, v) / 100;
+                            if (k.coverage_goal == null) k.assets = [];
+                          });
+                        }}
+                      />
+                      %</label
+                    >
+                  {/if}
                   <span class="row tight">
                     <select
                       aria-label={`Weapons control in ${z.name}`}

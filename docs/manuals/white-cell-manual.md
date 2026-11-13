@@ -111,7 +111,7 @@ Scenarios with a planning layer add decision points you can exploit:
 - **Fuel** (scenarios with the fuel model): AI units low on fuel head for the nearest refuelling point or oiler. Queues at a busy point show in the timeline (*waiting for a berth*). Closing a depot's refuel service is a strong logistics inject.
 - **Weather:** raising the sea state (an event, or the scenario) sends small ships to shelter. Ships at an anchorage whose holding limit is exceeded leave it.
 - **Action groups:** sinking a leader hands the group to its next ship, with the group's mission.
-- **Coverage:** the left panel's **Coverage** tab shows any side's sense-zone coverage and gaps, for planning a decision point.
+- **Coverage:** the left panel's **Coverage** tab shows any side's sense-zone coverage and gaps, for planning a decision point. Set a sense zone's **coverage goal** in the Planning tab (*Coverage goal %*, a logged order; empty to stop) and the engine tasks that side's free sensors to keep it; each decision is on the timeline.
 
 ## 5. Exercise review and AAR
 

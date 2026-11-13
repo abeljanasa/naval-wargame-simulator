@@ -151,6 +151,28 @@ pub enum SimEventKind {
         unit: UnitId,
         readiness: crate::air::Readiness,
     },
+    /// The engine tasked a sensor to a sense zone short of its coverage goal: `unit` goes to
+    /// `station` (`docs/models/sensor-tasking.md`).
+    SensorTasked {
+        zone: u32,
+        unit: UnitId,
+        station: sim_geo::GeoPoint,
+        reach_m: f64,
+        /// Coverage before this task, and projected with it.
+        coverage: f64,
+        projected: f64,
+    },
+    /// A sense zone is short of its coverage goal and the side has nothing left to send.
+    CoverageShortfall {
+        zone: u32,
+        coverage: f64,
+        goal: f64,
+    },
+    /// A sense zone that was short is back at its coverage goal.
+    CoverageGoalMet {
+        zone: u32,
+        coverage: f64,
+    },
     /// A ship or submarine stopped rather than run onto land.
     LandAhead {
         unit: UnitId,

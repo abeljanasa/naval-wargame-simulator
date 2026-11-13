@@ -169,6 +169,9 @@ pub struct Snapshot {
     /// The viewer's airbases (every side's for the white cell) and the aircraft parked there.
     #[serde(default)]
     pub air_bases: Vec<crate::air::AirBaseView>,
+    /// The viewer's sense zones with coverage goals, and the units tasked to them.
+    #[serde(default)]
+    pub sensor_tasking: Vec<crate::tasking::TaskingView>,
     /// Side viewer: that side's recent ESM bearing lines. White cell: every side's.
     pub bearings: Vec<BearingView>,
     /// Side viewer: its own weapons in flight. White cell: every weapon in flight.

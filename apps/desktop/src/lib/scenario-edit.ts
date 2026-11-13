@@ -132,6 +132,10 @@ export interface DraftZone {
   layer?: "outer" | "middle" | "inner" | null;
   /** Sense zones: the sensor types the layer is for (coverage counts these). */
   sensors?: string[];
+  /** Sense zones: the share to keep covered; the engine tasks free sensors (slice 12). */
+  coverage_goal?: number | null;
+  /** Sense zones with a goal: the units the engine may task (empty: any free unit). */
+  assets?: number[];
 }
 
 export interface DraftStation {

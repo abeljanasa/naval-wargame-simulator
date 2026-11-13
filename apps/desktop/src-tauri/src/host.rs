@@ -80,6 +80,8 @@ pub struct SnapshotUpdate {
     pub sonobuoys: Vec<sim_core::SonobuoyView>,
     /// The viewer's airbases and the aircraft parked there (sent whole).
     pub air_bases: Vec<sim_core::AirBaseView>,
+    /// The viewer's sense zones with coverage goals and the units tasked to them.
+    pub sensor_tasking: Vec<sim_core::TaskingView>,
     /// The viewer's recent ESM bearing lines (sent whole, like contacts).
     pub bearings: Vec<BearingView>,
     /// The viewer's weapons in flight (sent whole).
@@ -1269,6 +1271,7 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
         sound_profiles: snap.sound_profiles.clone(),
         sonobuoys: snap.sonobuoys.clone(),
         air_bases: snap.air_bases.clone(),
+        sensor_tasking: snap.sensor_tasking.clone(),
         bearings: snap.bearings.clone(),
         weapons: snap.weapons.clone(),
         refusals,
