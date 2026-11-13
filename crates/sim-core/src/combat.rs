@@ -336,7 +336,16 @@ pub(crate) fn apply_hit_roll(
         .get::<Signature>(e)
         .and_then(|s| s.length_m)
         .unwrap_or_else(|| crate::optical::default_length_m(domain));
-    let sea_state = world.resource::<EnvState>().0.sea_state;
+    // The sea where the target is (weather zones), else the scenario-wide sea state.
+    let sea_state = {
+        let env = world.resource::<EnvState>().0;
+        let zones = &world.resource::<crate::detection::Weather>().0;
+        world
+            .get::<crate::components::Position>(e)
+            .map_or(env.sea_state, |p| {
+                crate::detection::local_env(env, zones, p.point).sea_state
+            })
+    };
     let air = domain == Domain::Air;
     let size = ph_size_modifier(air, length);
     let manoeuvre = ph_speed_modifier(air, speed);

@@ -554,6 +554,9 @@ fn act(
         EventAction::SetEnvironment { environment } => CommandPayload::SetEnvironment {
             environment: *environment,
         },
+        EventAction::SetWeather { zones } => CommandPayload::SetWeather {
+            zones: zones.clone(),
+        },
         EventAction::SetSpeed { unit, speed_mps } => CommandPayload::SetSpeed {
             unit: UnitId(*unit),
             speed_mps: *speed_mps,

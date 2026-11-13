@@ -181,6 +181,10 @@ pub enum CommandPayload {
     SetEnvironment {
         environment: Environment,
     },
+    /// Replaces the weather zones (`docs/models/weather.md`). Scenario, events and white cell.
+    SetWeather {
+        zones: Vec<sim_events::WeatherZone>,
+    },
     /// Replaces the ESM emitter library (built from the platform database). Scenario and white
     /// cell only.
     SetEmitterLibrary {
@@ -289,6 +293,7 @@ impl CommandPayload {
             CommandPayload::SpawnUnit(_)
             | CommandPayload::SetPosture { .. }
             | CommandPayload::SetEnvironment { .. }
+            | CommandPayload::SetWeather { .. }
             | CommandPayload::SetEmitterLibrary { .. }
             | CommandPayload::SetWeaponCatalog { .. }
             | CommandPayload::CreateMinefield { .. }
@@ -385,6 +390,7 @@ impl CommandPayload {
             } if group.trim().is_empty() => Err("group name is empty".into()),
             CommandPayload::SetDoctrine { .. } => Ok(()),
             CommandPayload::SetEnvironment { environment } => environment.validate(),
+            CommandPayload::SetWeather { zones } => sim_events::validate_weather(zones),
             CommandPayload::SetWeaponCatalog { weapons } => {
                 weapons.iter().try_for_each(WeaponSpec::validate)
             }

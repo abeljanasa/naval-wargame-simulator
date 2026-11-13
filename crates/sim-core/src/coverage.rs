@@ -218,6 +218,7 @@ pub(crate) fn zone_coverage(world: &mut World, zone: u32) -> Option<ZoneCoverage
         z.sensors.clone()
     };
     let env = world.resource::<EnvState>().0;
+    let zones = world.resource::<crate::detection::Weather>().0.clone();
     let terrain = world.resource::<crate::sim::TerrainRes>().0.clone();
     let tick = world.resource::<SimClock>().tick;
     #[allow(clippy::cast_precision_loss)]
@@ -240,6 +241,7 @@ pub(crate) fn zone_coverage(world: &mut World, zone: u32) -> Option<ZoneCoverage
         }
         let emits = layer.doctrine_for(&c2, u, p.point).emcon == Emcon::Active;
         for s in suite.0.iter().filter(|s| kinds.contains(&s.kind)) {
+            let env = crate::detection::local_env(env, &zones, p.point);
             let range_m = nominal_range_m(s, (u, p, k.speed_mps), emits, env, unix_s);
             if range_m > 0.0 {
                 let reference = match s.kind {

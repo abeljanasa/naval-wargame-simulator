@@ -72,6 +72,8 @@ pub struct SnapshotUpdate {
     pub contacts: Vec<ContactView>,
     /// Sea state and weather (small; sent every frame).
     pub environment: Environment,
+    /// Weather zones (small; sent every frame).
+    pub weather_zones: Vec<sim_core::WeatherZone>,
     /// The viewer's recent ESM bearing lines (sent whole, like contacts).
     pub bearings: Vec<BearingView>,
     /// The viewer's weapons in flight (sent whole).
@@ -1014,6 +1016,21 @@ impl Host {
         }
     }
 
+    /// White cell: replaces the weather zones (`docs/models/weather.md`).
+    pub fn order_weather(
+        &mut self,
+        label: &str,
+        zones: Vec<sim_core::WeatherZone>,
+    ) -> Result<u64, String> {
+        if self.seat_of(label)?.role != SeatRole::WhiteCell {
+            return Err("only the white cell changes the weather".into());
+        }
+        for z in &zones {
+            z.validate()?;
+        }
+        self.order(label, CommandPayload::SetWeather { zones })
+    }
+
     pub fn order_facilitate(&mut self, label: &str, action: Facilitation) -> Result<u64, String> {
         self.order(label, CommandPayload::Facilitate { action })
     }
@@ -1147,6 +1164,7 @@ fn whole(snap: &Snapshot, refusals: Vec<String>) -> SnapshotUpdate {
         removed: vec![],
         contacts: snap.contacts.clone(),
         environment: snap.environment,
+        weather_zones: snap.weather_zones.clone(),
         bearings: snap.bearings.clone(),
         weapons: snap.weapons.clone(),
         refusals,

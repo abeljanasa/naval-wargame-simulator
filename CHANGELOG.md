@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Added (Phase 4, slice 7: weather zones)
+
+- **Weather zones:** areas with their own sea state, wind, visibility, rain and cloud base.
+  - The scenario-wide weather holds outside them; older scenarios are one global zone and unchanged.
+  - Zones are set in the scenario (`weather_zones`), by events (`set_weather`) and by the white cell (Planning tab).
+  - They are saved (format 27), hashed when present, and shown to every seat.
+- **Local effects:**
+  - sea clutter from the target's sea;
+  - two-way rain loss along radar paths (X-band power law);
+  - optical range from the least visibility along the path;
+  - low cloud hides aircraft from the eye and EO/IR;
+  - sonar noise from the listener's sea;
+  - weapon Ph from the target's sea;
+  - sheltering by the sea at the unit and the facility.
+- **Heavy seas slow surface hulls** near and above their weather limit: 85 % one step below, 60 % at or above.
+- **Desktop:** zones on the map, the selected unit's weather in the unit panel, and zone editing in the white cell's Planning tab.
+
 ### Added (Phase 4, slice 6: offline imagery layer)
 
 - **Imagery base layer** from the client's licensed tile pack: MBTiles or PMTiles v3, raster (PNG, JPEG, WebP).

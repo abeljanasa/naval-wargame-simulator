@@ -16,9 +16,11 @@
 mod eval;
 pub mod lua;
 mod model;
+pub mod weather;
 
 pub use eval::{EventRuntime, EventWorld, TickFacts, UnitFact};
 pub use model::{
     validate_events, Area, Audience, Cmp, Condition, DoctrineTarget, EventAction, Inject,
     ScenarioEvent, Trigger,
 };
+pub use weather::{validate_weather, weather_at, LocalWeather, WeatherZone};

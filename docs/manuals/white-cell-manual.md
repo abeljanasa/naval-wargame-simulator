@@ -41,7 +41,7 @@ Choose the **White cell** seat (toolbar, **Seat**) to see ground truth: every si
 - **Unit**: the selected unit, with **Override** (Repair, Destroy, Remove) and weapons in flight (Hit, Miss);
 - **Injects**: the inject library and free messages;
 - **Events**;
-- **Planning**: command posts, facilities and zones in play; shipping lanes (draw them on the map, or import GeoJSON; traffic figures need a source); each choke point's water (least, typical and deepest depth, a section across it, and how wide the water is for a draft you enter);
+- **Planning**: weather zones (add one on the map with a radius, then set its sea state, wind, visibility, rain and cloud base; each change is a logged order); command posts, facilities and zones in play; shipping lanes (draw them on the map, or import GeoJSON; traffic figures need a source); each choke point's water (least, typical and deepest depth, a section across it, and how wide the water is for a draft you enter);
 - **Seats**;
 - **Log**: the override log;
 - **Review**: replay and AAR.

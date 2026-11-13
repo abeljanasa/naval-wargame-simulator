@@ -175,6 +175,9 @@ pub struct Scenario {
     /// Sea state and weather loss for the whole scenario (default: calm, clear).
     #[serde(default, skip_serializing_if = "is_default")]
     pub environment: Environment,
+    /// Weather zones over the scenario-wide weather (Phase 4 slice 7, `docs/models/weather.md`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub weather_zones: Vec<sim_core::WeatherZone>,
     pub units: Vec<ScenarioUnit>,
     /// Scenario events, checked every tick (`docs/models/events.md`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -734,6 +737,11 @@ impl Scenario {
         if self.environment != Environment::default() {
             c2.push(CommandPayload::SetEnvironment {
                 environment: self.environment,
+            });
+        }
+        if !self.weather_zones.is_empty() {
+            c2.push(CommandPayload::SetWeather {
+                zones: self.weather_zones.clone(),
             });
         }
         for s in &self.sides {

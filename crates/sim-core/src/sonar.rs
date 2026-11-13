@@ -93,6 +93,7 @@ pub(crate) fn sonar_pass(
     log: &mut EventLog,
     bearings: &mut BearingTable,
     fresh: &mut FreshBearings,
+    zones: &[sim_events::WeatherZone],
 ) {
     // The loudest active sonar each unit is transmitting with, if any.
     let pinging: Vec<Option<f64>> = all
@@ -125,9 +126,11 @@ pub(crate) fn sonar_pass(
         return;
     }
     by_lat.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-    let ambient = ambient_noise_db(env.sea_state);
     let mut candidates: Vec<usize> = Vec::new();
     for (oi, obs) in all.iter().enumerate() {
+        // Ambient noise from the sea state where the listener is.
+        let ambient =
+            ambient_noise_db(crate::detection::local_env(env, zones, obs.position.point).sea_state);
         for s in obs.sensors.0.iter().filter(|s| is_sonar(s.kind)) {
             if !sonar_usable(s.kind, obs.domain, obs.position.altitude_m, obs.speed_mps) {
                 continue;

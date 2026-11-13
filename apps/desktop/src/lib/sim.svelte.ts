@@ -2,6 +2,7 @@
 // (selection, draft route). Every change to the simulation goes through `commands`.
 
 import {
+  type WeatherZone_Serialize as WeatherZone,
   type Lane_Deserialize as Lane,
   type Outcome,
   type ActionGroup,
@@ -56,6 +57,8 @@ class SimSession {
   session = $state<SessionInfo | null>(null);
   /** Sea state and weather, from the latest frame. */
   environment = $state<Environment | null>(null);
+  /** Weather zones over the scenario-wide weather (every seat sees them). */
+  weatherZones = $state<WeatherZone[]>([]);
   /** The seat's recent ESM bearing lines. */
   bearings = $state<BearingView[]>([]);
   /** The seat's missiles and torpedoes in flight. */
@@ -161,6 +164,7 @@ class SimSession {
     }
     this.allContacts = u.contacts;
     this.environment = u.environment;
+    this.weatherZones = (u.weather_zones ?? []) as WeatherZone[];
     this.bearings = u.bearings;
     this.weapons = u.weapons;
     this.minefields = u.minefields;

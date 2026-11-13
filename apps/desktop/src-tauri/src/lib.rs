@@ -1099,6 +1099,17 @@ fn order_facilitate(
         .map_err(|e| e.to_string())
 }
 
+/// Replaces the weather zones (white cell only).
+#[tauri::command]
+#[specta::specta]
+fn order_weather(
+    window: WebviewWindow,
+    host: State<'_, SharedHost>,
+    zones: Vec<sim_core::WeatherZone>,
+) -> Result<(), String> {
+    lock(&host).order_weather(window.label(), zones).map(|_| ())
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(collect_commands![
@@ -1146,6 +1157,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             facility_depths,
             choke_depths,
             imagery_status,
+            order_weather,
             rescan_imagery,
         ])
         .events(collect_events![FrameEvent])

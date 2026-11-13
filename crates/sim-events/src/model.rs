@@ -234,6 +234,11 @@ pub enum EventAction {
     SetEnvironment {
         environment: Environment,
     },
+    /// Replaces the weather zones (`docs/models/weather.md`); an empty list leaves only the
+    /// scenario-wide weather.
+    SetWeather {
+        zones: Vec<crate::weather::WeatherZone>,
+    },
     SetSpeed {
         #[cfg_attr(feature = "specta", specta(type = u32))]
         unit: u64,
@@ -303,6 +308,7 @@ impl EventAction {
                 ..
             } if group.trim().is_empty() => Err("group name is empty".into()),
             EventAction::SetEnvironment { environment } => environment.validate(),
+            EventAction::SetWeather { zones } => crate::weather::validate_weather(zones),
             EventAction::SetSpeed { speed_mps, .. }
                 if !(speed_mps.is_finite() && *speed_mps >= 0.0) =>
             {

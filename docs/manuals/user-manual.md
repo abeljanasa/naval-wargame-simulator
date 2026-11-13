@@ -37,6 +37,8 @@ Your workstation needs:
 - **When a pack takes effect:** an exercise that has not started takes the pack at once; otherwise the next scenario you open does. A running exercise keeps the terrain it started with, so its record still replays.
 - **Records and terrain:** a record made with terrain packs replays only on a machine with the same packs installed. The app names the packs it needs.
 
+**Weather.** Weather zones show on the map as pale outlines, named with their sea state. Inside one, its weather applies: rough seas slow small ships and raise sea clutter, rain weakens radar, fog shortens the range of lookouts and cameras, and low cloud hides aircraft above it from the eye and from EO/IR (not from radar). Outside every zone, the scenario's weather (the sea state in the toolbar) holds. The unit panel's *Weather* row says what a selected unit is in.
+
 **Imagery.** When the client's licensed imagery is installed, **View › Imagery** shows it under the picture (the land fill hides and the depth shading dims so it reads), and **View › Imagery packs…** lists the packs and lets you choose one. The imagery's credit is shown with the map. Nothing is downloaded: the imagery comes from files on this machine. The white cell installs a pack with **File › Install imagery pack…** (`.mbtiles` or `.pmtiles`, up to 1 GB); larger packs are copied into the folder the dialog shows.
 
 **Shallow water.** With terrain packs, ships and submarines are routed round water shallower than their draft plus 1 m. Harbour approaches, the first and last few kilometres of a leg, are left to your waypoints.

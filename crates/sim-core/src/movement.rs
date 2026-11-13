@@ -35,12 +35,15 @@ type MovingUnit = (
     &'static mut Kinematics,
     &'static mut Route,
     Option<&'static mut Fuel>,
+    Option<&'static crate::detection::Signature>,
 );
 
 pub(crate) fn movement_system(
     clock: Res<SimClock>,
     land: Res<LandMaskRes>,
     terrain: Res<TerrainRes>,
+    env: Res<crate::detection::EnvState>,
+    weather: Res<crate::detection::Weather>,
     mut log: ResMut<EventLog>,
     mut units: Query<MovingUnit>,
 ) {
@@ -49,7 +52,8 @@ pub(crate) fn movement_system(
     order.sort_unstable();
 
     for (_, entity) in order {
-        let Ok((_, unit, mut pos, mut kin, mut route, mut fuel)) = units.get_mut(entity) else {
+        let Ok((_, unit, mut pos, mut kin, mut route, mut fuel, sig)) = units.get_mut(entity)
+        else {
             continue;
         };
         let before = (*pos, kin.heading_deg);
@@ -60,6 +64,17 @@ pub(crate) fn movement_system(
             kin.ordered_speed_mps = 0.0;
         }
         let mut finished = false;
+        // Heavy seas (`docs/models/weather.md`): a surface hull makes only part of its top speed
+        // near and above its weather limit, in the sea where it is.
+        let top = kin.max_speed_mps;
+        if unit.domain == Domain::Surface {
+            let sea = crate::detection::local_env(env.0, &weather.0, pos.point).sea_state;
+            let length = sig
+                .and_then(|s| s.length_m)
+                .unwrap_or_else(|| crate::optical::default_length_m(unit.domain));
+            kin.max_speed_mps = top
+                * sim_events::weather::speed_factor(sea, crate::planning::weather_limit(length));
+        }
         step_unit(&mut pos, &mut kin, &mut route, |idx, done| {
             finished |= done;
             #[allow(clippy::cast_possible_truncation)] // routes are far shorter than u32::MAX
@@ -112,6 +127,7 @@ pub(crate) fn movement_system(
                 }
             }
         }
+        kin.max_speed_mps = top;
         if dry && !finished {
             kin.ordered_speed_mps = ordered;
         }

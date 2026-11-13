@@ -60,6 +60,7 @@ pub use detection::{
     sensor_height_m, target_height_m, Contact, ContactRecord, EnvState, Jammer, SensorKind,
     SensorSpec, SensorSuite, Signature, CONTACT_TIMEOUT_TICKS, SENSOR_PERIOD_TICKS,
 };
+pub use detection::{local_env, Weather};
 pub use error::SimError;
 pub use esm::{
     BearingRecord, BearingTable, BearingView, EmitterLibrary, BEARING_MAX_AGE_TICKS, JAMMER_EMITTER,
@@ -100,6 +101,7 @@ pub use sim_events::{
     validate_events, Area, Audience, Cmp, Condition, DoctrineTarget, EventAction, EventRuntime,
     Inject, ScenarioEvent, Trigger,
 };
+pub use sim_events::{weather_at, LocalWeather, WeatherZone};
 pub use sim_sensors::{
     BearingLine, Carrier, Classification, Cov2, Environment, ErrorEllipse, JammerSpec,
 };

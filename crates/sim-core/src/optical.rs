@@ -96,6 +96,7 @@ pub(crate) fn optical_pass(
     bearings: &mut BearingTable,
     fresh: &mut FreshBearings,
     terrain: Option<&sim_geo::terrain::Terrain>,
+    zones: &[sim_events::WeatherZone],
 ) {
     let mut by_lat: Vec<(f64, usize)> = all
         .iter()
@@ -105,7 +106,6 @@ pub(crate) fn optical_pass(
     by_lat.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
     #[allow(clippy::cast_precision_loss)]
     let unix_s = env.start_unix_s as f64 + tick.seconds();
-    let visibility_m = env.visibility_km * 1000.0;
     let mut cands: Vec<usize> = Vec::new();
     for (oi, obs) in all.iter().enumerate() {
         for s in &obs.sensors.0 {
@@ -151,6 +151,24 @@ pub(crate) fn optical_pass(
                     ) {
                         continue;
                     }
+                    // Low cloud between them hides the target from the eye and from EO/IR.
+                    if sim_events::weather::cloud_between(
+                        &env,
+                        zones,
+                        obs.position.point,
+                        h_s + obs.ground_m,
+                        tgt.position.point,
+                        h_t + tgt.ground_m,
+                    ) {
+                        continue;
+                    }
+                    // The least visibility along the line of sight.
+                    let visibility_m = sim_events::weather::path_visibility_km(
+                        &env,
+                        zones,
+                        obs.position.point,
+                        tgt.position.point,
+                    ) * 1000.0;
                     let size = size_factor(s.kind, tgt.domain == Domain::Air, tgt.length_m);
                     let r50 = optical_r50_m(s.kind, s.max_range_m, size, lt, visibility_m);
                     let pd = pd_per_scan(range, r50);

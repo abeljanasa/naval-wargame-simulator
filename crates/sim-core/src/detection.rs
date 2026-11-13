@@ -446,6 +446,24 @@ pub(crate) fn terrain_masks(
     terrain.is_some_and(|t| t.masks(a, h_a, b, h_b, distance_m))
 }
 
+/// The weather zones in force (`docs/models/weather.md`); empty: the scenario-wide weather only.
+#[derive(Debug, Clone, Default, Resource)]
+pub struct Weather(pub Vec<sim_events::WeatherZone>);
+
+/// The scenario-wide environment with the sea state and visibility of the weather at `p`.
+#[must_use]
+pub fn local_env(env: Environment, zones: &[sim_events::WeatherZone], p: GeoPoint) -> Environment {
+    if zones.is_empty() {
+        return env;
+    }
+    let w = sim_events::weather_at(&env, zones, p);
+    Environment {
+        sea_state: w.sea_state,
+        visibility_km: w.visibility_km,
+        ..env
+    }
+}
+
 pub(crate) struct Observed<'a> {
     pub(crate) id: UnitId,
     pub(crate) side: SideId,
@@ -480,6 +498,7 @@ pub(crate) fn detection_system(
     mut bearings: ResMut<BearingTable>,
     library: Res<EmitterLibrary>,
     terrain: Res<crate::sim::TerrainRes>,
+    weather: Res<Weather>,
     units: Query<(
         &Unit,
         &Position,
@@ -495,6 +514,7 @@ pub(crate) fn detection_system(
         return;
     }
     let terrain = terrain.0.as_deref();
+    let zones = weather.0.as_slice();
     let mut all: Vec<Observed<'_>> = units
         .iter()
         .map(|(u, p, s, sig, j, k)| Observed {
@@ -643,16 +663,24 @@ pub(crate) fn detection_system(
                 } else {
                     0.0
                 };
+                // Sea clutter from the sea where the target is; rain loss along the path.
                 let clutter_db = clutter_loss_db(
                     clutter_background(
                         tgt.domain,
                         tgt.position.altitude_m - ground_below,
                         ground_below > 0.0,
                     ),
-                    env.sea_state,
+                    local_env(env, zones, tgt.position.point).sea_state,
                     clutter_per_step,
                 );
-                let weather_db = env.weather_loss_db;
+                let weather_db = env.weather_loss_db
+                    + sim_events::weather::path_rain_loss_db(
+                        &env,
+                        zones,
+                        obs.position.point,
+                        tgt.position.point,
+                        range,
+                    );
                 let r50 = detection_range_with_loss_m(
                     ref_range,
                     ref_rcs,
@@ -756,6 +784,7 @@ pub(crate) fn detection_system(
         &mut log,
         &mut bearings,
         &mut fresh,
+        zones,
     );
     optical_pass(
         &all,
@@ -768,6 +797,7 @@ pub(crate) fn detection_system(
         &mut bearings,
         &mut fresh,
         terrain,
+        zones,
     );
     resolve_bearings(fresh, &all, tick, &mut contacts, &mut log, &mut bearings);
     for (side, number, target) in contacts.expire(tick) {

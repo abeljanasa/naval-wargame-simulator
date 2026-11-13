@@ -148,6 +148,9 @@ pub struct Snapshot {
     pub postures: Vec<PostureView>,
     /// Sea state and weather, known to every side.
     pub environment: Environment,
+    /// Weather zones, known to every side (empty: the scenario-wide weather only).
+    #[serde(default)]
+    pub weather_zones: Vec<sim_events::WeatherZone>,
     /// Side viewer: that side's recent ESM bearing lines. White cell: every side's.
     pub bearings: Vec<BearingView>,
     /// Side viewer: its own weapons in flight. White cell: every weapon in flight.

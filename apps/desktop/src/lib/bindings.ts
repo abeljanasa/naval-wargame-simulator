@@ -118,6 +118,8 @@ export const commands = {
 	chokeDepths: () => typedError<ChokeDepths_Serialize[], string>(__TAURI_INVOKE("choke_depths")),
 	/**  The imagery packs on this machine (`imagery.rs`). */
 	imageryStatus: () => __TAURI_INVOKE<ImageryStatus_Serialize>("imagery_status"),
+	/**  Replaces the weather zones (white cell only). */
+	orderWeather: (zones: WeatherZone_Deserialize[]) => typedError<null, string>(__TAURI_INVOKE("order_weather", { zones })),
 	/**  Reads the imagery folder again (after packs were copied into it by hand). */
 	rescanImagery: () => __TAURI_INVOKE<ImageryStatus_Serialize>("rescan_imagery"),
 };
@@ -809,15 +811,20 @@ export type EventAction_Deserialize =
 	type: "message",
 } & {
 	text: string,
-} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Deserialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Deserialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission?: Mission_Deserialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never; zones?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Deserialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | ({ type: "set_environment"; environment: Environment_Deserialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
+/**
+ *  Replaces the weather zones (`docs/models/weather.md`); an empty list leaves only the
+ *  scenario-wide weather.
+ */
+({ type: "set_weather"; zones: WeatherZone_Deserialize[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never; zones?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; zones?: never } | ({ type: "assign_mission"; unit: number; mission?: Mission_Deserialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never; zones?: never } | 
 /**  Brings a reserve unit (declared in the scenario, held off the board) into play. */
-({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never; zones?: never } | 
 /**  Turns an event on or off. */
-({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
 /**  Delivers an inject from the scenario's library. */
-({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
 /**  A Lua script whose `sim.*` requests become actions (`docs/models/lua-scripting.md`). */
-({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never };
+({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never };
 
 /**  What a fired event does. */
 export type EventAction_Serialize = 
@@ -826,15 +833,20 @@ export type EventAction_Serialize =
 	type: "message",
 } & {
 	text: string,
-} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Serialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_environment"; environment: Environment_Serialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never } | ({ type: "assign_mission"; unit: number; mission: Mission_Serialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+} & Audience | ({ type: "set_posture"; side: number; toward: number; posture: Posture }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; scope?: never; script?: never; speed_mps?: never; unit?: never; waypoints?: never; zones?: never } | ({ type: "set_doctrine"; scope: DoctrineTarget; doctrine: Doctrine_Serialize }) & { enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | ({ type: "set_environment"; environment: Environment_Serialize }) & { doctrine?: never; enabled?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
+/**
+ *  Replaces the weather zones (`docs/models/weather.md`); an empty list leaves only the
+ *  scenario-wide weather.
+ */
+({ type: "set_weather"; zones: WeatherZone_Serialize[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | ({ type: "set_speed"; unit: number; speed_mps: number | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; toward?: never; waypoints?: never; zones?: never } | ({ type: "set_route"; unit: number; waypoints: GeoPoint[] }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; zones?: never } | ({ type: "assign_mission"; unit: number; mission: Mission_Serialize | null }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never; zones?: never } | 
 /**  Brings a reserve unit (declared in the scenario, held off the board) into play. */
-({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never } | 
+({ type: "spawn_reserve"; unit: number }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; waypoints?: never; zones?: never } | 
 /**  Turns an event on or off. */
-({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+({ type: "enable_event"; event: string; enabled: boolean }) & { doctrine?: never; environment?: never; inject?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
 /**  Delivers an inject from the scenario's library. */
-({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never } | 
+({ type: "send_inject"; inject: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; mission?: never; posture?: never; scope?: never; script?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never } | 
 /**  A Lua script whose `sim.*` requests become actions (`docs/models/lua-scripting.md`). */
-({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never };
+({ type: "lua"; script: string }) & { doctrine?: never; enabled?: never; environment?: never; event?: never; inject?: never; mission?: never; posture?: never; scope?: never; side?: never; speed_mps?: never; toward?: never; unit?: never; waypoints?: never; zones?: never };
 
 /**  An event as the white cell sees it. */
 export type EventStatus = {
@@ -1688,6 +1700,8 @@ export type Scenario_Deserialize = {
 	minefields?: ScenarioMinefield[],
 	/**  Sea state and weather loss for the whole scenario (default: calm, clear). */
 	environment?: Environment_Deserialize,
+	/**  Weather zones over the scenario-wide weather (Phase 4 slice 7, `docs/models/weather.md`). */
+	weather_zones?: WeatherZone_Deserialize[],
 	units: ScenarioUnit_Deserialize[],
 	/**  Scenario events, checked every tick (`docs/models/events.md`). */
 	events?: ScenarioEvent_Deserialize[],
@@ -1727,6 +1741,8 @@ export type Scenario_Serialize = {
 	minefields?: ScenarioMinefield[],
 	/**  Sea state and weather loss for the whole scenario (default: calm, clear). */
 	environment?: Environment_Serialize,
+	/**  Weather zones over the scenario-wide weather (Phase 4 slice 7, `docs/models/weather.md`). */
+	weather_zones?: WeatherZone_Serialize[],
 	units: ScenarioUnit_Serialize[],
 	/**  Scenario events, checked every tick (`docs/models/events.md`). */
 	events?: ScenarioEvent_Serialize[],
@@ -1922,6 +1938,8 @@ export type SnapshotUpdate_Deserialize = {
 	contacts: ContactView_Deserialize[],
 	/**  Sea state and weather (small; sent every frame). */
 	environment: Environment_Deserialize,
+	/**  Weather zones (small; sent every frame). */
+	weather_zones: WeatherZone_Deserialize[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -1964,6 +1982,8 @@ export type SnapshotUpdate_Serialize = {
 	contacts: ContactView_Serialize[],
 	/**  Sea state and weather (small; sent every frame). */
 	environment: Environment_Serialize,
+	/**  Weather zones (small; sent every frame). */
+	weather_zones: WeatherZone_Serialize[],
 	/**  The viewer's recent ESM bearing lines (sent whole, like contacts). */
 	bearings: BearingView[],
 	/**  The viewer's weapons in flight (sent whole). */
@@ -2315,6 +2335,45 @@ export type WeaponView = {
 	heading_deg: number | null,
 	/**  The seeker has acquired its target. */
 	homing: boolean,
+};
+
+/**  An area with its own weather. */
+export type WeatherZone = WeatherZone_Serialize | WeatherZone_Deserialize;
+
+/**  An area with its own weather. */
+export type WeatherZone_Deserialize = {
+	id: number,
+	name: string,
+	area: Area,
+	/**  Douglas sea state, 0–9. */
+	sea_state: number,
+	/**  Mean wind, knots, and the direction it blows from, degrees true. */
+	wind_kn?: number | null,
+	wind_from_deg?: number | null,
+	/**  Meteorological visibility, km. */
+	visibility_km?: number | null,
+	/**  Rain rate, mm/h (0: dry). */
+	rain_mm_h?: number | null,
+	/**  Cloud base, metres above sea level (`None`: no low cloud). */
+	cloud_base_m?: number | null,
+};
+
+/**  An area with its own weather. */
+export type WeatherZone_Serialize = {
+	id: number,
+	name: string,
+	area: Area,
+	/**  Douglas sea state, 0–9. */
+	sea_state: number,
+	/**  Mean wind, knots, and the direction it blows from, degrees true. */
+	wind_kn: number | null,
+	wind_from_deg: number | null,
+	/**  Meteorological visibility, km. */
+	visibility_km: number | null,
+	/**  Rain rate, mm/h (0: dry). */
+	rain_mm_h: number | null,
+	/**  Cloud base, metres above sea level (`None`: no low cloud). */
+	cloud_base_m: number | null,
 };
 
 /**  A sense or engage zone of one side. */

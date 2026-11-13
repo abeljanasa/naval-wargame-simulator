@@ -26,6 +26,7 @@
   import { bearing, distance, gameTime, knots, latLon, n, MPS_PER_KNOT } from "./lib/format";
   import { commands } from "./lib/bindings";
   import { lanesFromGeoJson, navigableWidthM, type Lane } from "./lib/lanes";
+  import { weatherAt, weatherLayers, weatherText, type WeatherZone } from "./lib/weather";
   import {
     imageryCredit,
     imageryStatus,
@@ -184,6 +185,40 @@
       imageryError = `${file.name} was not installed: ${String(e)}`;
     }
   }
+
+  // Weather zones (slice 7): the white cell edits them in the Planning tab.
+  let newWeatherKm = $state(40);
+
+  function editWeather(change: (z: WeatherZone[]) => void) {
+    const zones = structuredClone($state.snapshot(sim.weatherZones)) as WeatherZone[];
+    change(zones);
+    void commands.orderWeather(zones).then((r) => {
+      if (r.status === "error") sim.error = r.error;
+    });
+  }
+
+  function addWeatherOnMap() {
+    sim.pick("Click the centre of the weather zone", (p) => {
+      editWeather((zs) => {
+        const id = Math.max(0, ...zs.map((z) => z.id)) + 1;
+        zs.push({
+          id,
+          name: `Weather ${id}`,
+          area: { shape: "circle", centre: p, radius_m: Math.max(1, newWeatherKm) * 1000 },
+          sea_state: Math.min(9, (sim.environment?.sea_state ?? 3) + 2),
+          wind_kn: 30,
+          wind_from_deg: 0,
+          visibility_km: 10,
+          rain_mm_h: 4,
+          cloud_base_m: null,
+        });
+      });
+    });
+  }
+
+  /** A number from a weather field, kept within limits. */
+  const fieldNum = (v: string, lo: number, hi: number) =>
+    Math.min(hi, Math.max(lo, Number(v) || 0));
 
   // Shipping lanes and choke points (slice 5), for the white cell's Planning tab.
   let laneInput = $state<HTMLInputElement>();
@@ -620,6 +655,7 @@
           hiddenLabels,
           symbolStyle,
         }),
+        ...weatherLayers(sim.weatherZones),
         ...laneLayers(sim.session?.lanes ?? [], hiddenLabels),
         ...referenceLayers(sim.session?.reference_points ?? [], undefined, hiddenLabels),
         ...outcomeLayers(sim.outcomes, n(clock?.game_time_s ?? 0)),
@@ -1131,6 +1167,15 @@
                     none
                   {/if}
                 </dd>
+                {#if sim.weatherZones.length > 0}
+                  {@const w = weatherAt(sim.environment, sim.weatherZones, u.position)}
+                  <dt>Weather</dt>
+                  <dd>
+                    {w.zone
+                      ? `${w.zone.name}: ${weatherText(w.zone)}`
+                      : `sea state ${w.sea_state} (outside the weather zones)`}
+                  </dd>
+                {/if}
                 {#if water && (u.domain === "surface" || u.domain === "subsurface")}
                   <dt>Water</dt>
                   <dd class:hurt={waterTight(water)}>
@@ -1574,6 +1619,148 @@
                 <li class="empty">No facilities.</li>
               {/each}
             </ul>
+          </section>
+          <section>
+            <h3>Weather</h3>
+            <ul class="zones" aria-label="Weather zones">
+              {#each sim.weatherZones as z, i (z.id)}
+                <li class="stacked">
+                  <span>
+                    <input
+                      class="lane-name"
+                      value={z.name}
+                      aria-label="Weather zone name"
+                      onchange={(e) => {
+                        const v = e.currentTarget.value.trim();
+                        editWeather((zs) => {
+                          const x = zs[i];
+                          if (x && v) x.name = v;
+                        });
+                      }}
+                    />
+                    <span class="dim">{weatherText(z)}</span>
+                  </span>
+                  <span class="row tight weather-fields">
+                    <label class="inline"
+                      >Sea state <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        max="9"
+                        value={z.sea_state}
+                        onchange={(e) => {
+                          const v = Math.round(fieldNum(e.currentTarget.value, 0, 9));
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.sea_state = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Wind (kn) <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        value={n(z.wind_kn)}
+                        onchange={(e) => {
+                          const v = fieldNum(e.currentTarget.value, 0, 200);
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.wind_kn = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >from (°) <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        max="359"
+                        value={n(z.wind_from_deg)}
+                        onchange={(e) => {
+                          const v = fieldNum(e.currentTarget.value, 0, 359);
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.wind_from_deg = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Visibility (km) <input
+                        class="depth"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        value={n(z.visibility_km)}
+                        onchange={(e) => {
+                          const v = fieldNum(e.currentTarget.value, 0.1, 100);
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.visibility_km = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Rain (mm/h) <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        value={n(z.rain_mm_h)}
+                        onchange={(e) => {
+                          const v = fieldNum(e.currentTarget.value, 0, 500);
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.rain_mm_h = v;
+                          });
+                        }}
+                      /></label
+                    >
+                    <label class="inline"
+                      >Cloud base (m) <input
+                        class="depth"
+                        type="number"
+                        min="0"
+                        placeholder="none"
+                        value={z.cloud_base_m ?? ""}
+                        onchange={(e) => {
+                          const raw = e.currentTarget.value.trim();
+                          editWeather((zs) => {
+                            const x = zs[i];
+                            if (x) x.cloud_base_m = raw === "" ? null : fieldNum(raw, 0, 20000);
+                          });
+                        }}
+                      /></label
+                    >
+                    <button
+                      type="button"
+                      onclick={() => editWeather((zs) => void zs.splice(i, 1))}
+                      aria-label={`Remove ${z.name}`}>Remove</button
+                    >
+                  </span>
+                </li>
+              {:else}
+                <li class="empty">
+                  No weather zones: sea state {sim.environment?.sea_state ?? 0} everywhere.
+                </li>
+              {/each}
+            </ul>
+            <div class="row tight">
+              <label class="inline"
+                >Radius
+                <input
+                  type="number"
+                  min="1"
+                  bind:value={newWeatherKm}
+                  aria-label="Radius of the weather zone to add, km"
+                  style="width: 4.5em"
+                /> km</label
+              >
+              <button type="button" onclick={addWeatherOnMap}>Add on the map</button>
+            </div>
           </section>
           <section>
             <h3>Shipping lanes</h3>
@@ -2490,6 +2677,9 @@
   }
   input.lane-name {
     width: 12em;
+  }
+  .weather-fields {
+    flex-wrap: wrap;
   }
   .choke {
     margin: 6px 0;

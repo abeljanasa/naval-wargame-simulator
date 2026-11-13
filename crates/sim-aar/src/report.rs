@@ -331,6 +331,18 @@ impl<'a> Builder<'a> {
                 "set sea state {} and weather loss {:.1} dB",
                 environment.sea_state, environment.weather_loss_db
             ),
+            CommandPayload::SetWeather { zones } => match zones.len() {
+                0 => "cleared the weather zones".into(),
+                n => format!(
+                    "set {n} weather zone{} ({})",
+                    if n == 1 { "" } else { "s" },
+                    zones
+                        .iter()
+                        .map(|z| format!("{}: sea state {}", z.name, z.sea_state))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            },
             CommandPayload::SetEmitterLibrary { .. } => "set the emitter library".into(),
             CommandPayload::SetWeaponCatalog { .. } => "set the weapon catalogue".into(),
             CommandPayload::Engage {

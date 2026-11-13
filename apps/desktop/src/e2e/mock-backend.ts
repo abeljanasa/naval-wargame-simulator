@@ -461,6 +461,7 @@ const frame = (): FrameEvent => {
         start_unix_s: 1794268800,
         visibility_km: 40,
       },
+      weather_zones: [],
       bearings,
       weapons: [],
       minefields: [],

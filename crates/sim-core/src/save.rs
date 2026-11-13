@@ -71,7 +71,8 @@ pub const SAVE_MAGIC: &str = "NWS-SAVE";
 ///   keyframe shows the same hit and miss markers as a straight run. Older saves load with none.
 /// * 26: a route records whether it was charted (planned deep enough for the unit's draft).
 ///   Older saves load with uncharted routes.
-pub const SAVE_FORMAT_VERSION: u32 = 26;
+/// * 27: weather zones. Older saves load with none.
+pub const SAVE_FORMAT_VERSION: u32 = 27;
 
 /// Every component of one unit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,6 +124,9 @@ pub struct SaveGame {
     pub c2: C2State,
     #[serde(default)]
     pub environment: Environment,
+    /// Weather zones (format 27). Older saves load with none.
+    #[serde(default)]
+    pub weather: Vec<sim_events::WeatherZone>,
     #[serde(default)]
     pub bearings: BearingTable,
     #[serde(default)]
@@ -175,7 +179,7 @@ impl SaveGame {
                 supported: SAVE_FORMAT_VERSION,
             }),
             // v1 and v2: the newer fields take their serde defaults (see the history above).
-            1..=16 | 25 | SAVE_FORMAT_VERSION => {
+            1..=16 | 25 | 26 | SAVE_FORMAT_VERSION => {
                 let mut save: SaveGame = rmp_serde::from_slice(bytes)?;
                 if !save.rng.is_complete() {
                     return Err(SimError::CorruptSave("missing RNG stream".into()));

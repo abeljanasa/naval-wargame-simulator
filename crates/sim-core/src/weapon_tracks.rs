@@ -162,6 +162,7 @@ pub(crate) fn weapon_tracks_system(world: &mut World) {
     }
     let catalog = world.resource::<WeaponCatalog>().0.clone();
     let env = world.resource::<EnvState>().0;
+    let zones = world.resource::<crate::detection::Weather>().0.clone();
     #[allow(clippy::cast_precision_loss)]
     let unix_s = env.start_unix_s as f64 + tick.seconds();
     let c2 = world.resource::<C2State>().clone();
@@ -228,7 +229,9 @@ pub(crate) fn weapon_tracks_system(world: &mut World) {
                             s.max_range_m,
                             size_factor(s.kind, true, MISSILE_LENGTH_M),
                             light(sun),
-                            env.visibility_km * 1000.0,
+                            crate::detection::local_env(env, &zones, o.position.point)
+                                .visibility_km
+                                * 1000.0,
                         );
                         range <= r50.min(horizon)
                     }
@@ -245,7 +248,8 @@ pub(crate) fn weapon_tracks_system(world: &mut World) {
                                     s.active,
                                     s.max_range_m,
                                     o.speed,
-                                    env.sea_state,
+                                    crate::detection::local_env(env, &zones, o.position.point)
+                                        .sea_state,
                                 )
                     }
                     _ => false,

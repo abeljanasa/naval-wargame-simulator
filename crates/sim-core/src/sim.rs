@@ -163,6 +163,7 @@ impl Simulation {
         world.insert_resource(ContactTable::default());
         world.insert_resource(C2State::default());
         world.insert_resource(EnvState::default());
+        world.insert_resource(crate::detection::Weather::default());
         world.insert_resource(BearingTable::default());
         world.insert_resource(WeaponCatalog::default());
         world.insert_resource(WeaponsInFlight::default());
@@ -503,6 +504,7 @@ impl Simulation {
                 })
                 .collect(),
             environment: self.world.resource::<EnvState>().0,
+            weather_zones: self.world.resource::<crate::detection::Weather>().0.clone(),
             outcomes: crate::outcomes::visible(
                 self.world.resource::<crate::outcomes::OutcomeFeed>(),
                 tick,
@@ -836,6 +838,17 @@ impl Simulation {
                 }
             }
         }
+        // Weather zones only when there are any, so runs without them keep their hashes.
+        let zones = &self.world.resource::<crate::detection::Weather>().0;
+        if !zones.is_empty() {
+            h.str("weather");
+            if let Ok(bytes) = rmp_serde::to_vec(zones) {
+                h.u64(bytes.len() as u64);
+                for b in bytes {
+                    h.u8(b);
+                }
+            }
+        }
         let env = self.world.resource::<EnvState>().0;
         h.u8(env.sea_state);
         h.f64(env.weather_loss_db);
@@ -918,6 +931,7 @@ impl Simulation {
             next_contact_numbers: self.world.resource::<ContactTable>().next_numbers(),
             c2: self.world.resource::<C2State>().clone(),
             environment: self.world.resource::<EnvState>().0,
+            weather: self.world.resource::<crate::detection::Weather>().0.clone(),
             bearings: self.world.resource::<BearingTable>().clone(),
             emitter_library: self.world.resource::<EmitterLibrary>().clone(),
             weapon_catalog: self.world.resource::<WeaponCatalog>().clone(),
@@ -964,6 +978,8 @@ impl Simulation {
         sim.world.insert_resource(log);
         sim.world.insert_resource(save.c2);
         sim.world.insert_resource(EnvState(save.environment));
+        sim.world
+            .insert_resource(crate::detection::Weather(save.weather.clone()));
         sim.world.insert_resource(save.bearings);
         sim.world.insert_resource(save.emitter_library);
         sim.world.insert_resource(save.weapon_catalog);
@@ -1384,6 +1400,15 @@ pub(crate) fn apply_command(world: &mut World, cmd: &Command) -> Result<(), Stri
                 return Err("only the scenario or white cell may set the environment".into());
             }
             world.insert_resource(EnvState(*environment));
+            Ok(())
+        }
+        CommandPayload::SetWeather { zones } => {
+            if !cmd.issuer.is_privileged() {
+                return Err("only the scenario or white cell may set the weather".into());
+            }
+            let mut zones = zones.clone();
+            zones.sort_by_key(|z| z.id);
+            world.insert_resource(crate::detection::Weather(zones));
             Ok(())
         }
         CommandPayload::SetDoctrine { scope, doctrine } => match scope {

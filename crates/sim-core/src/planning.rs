@@ -1453,6 +1453,21 @@ fn fits(f: &Facility, draft_m: Option<f64>) -> bool {
 }
 
 /// Whether the sea state exceeds the facility's holding limit.
+/// The sea state at `p`: its weather zone's, else `default` (the scenario-wide one).
+fn sea_at(world: &World, p: GeoPoint, default: u8) -> u8 {
+    let zones = &world.resource::<crate::detection::Weather>().0;
+    if zones.is_empty() {
+        return default;
+    }
+    let env = world.resource::<crate::detection::EnvState>().0;
+    crate::detection::local_env(env, zones, p).sea_state
+}
+
+/// Whether the sea state at the facility exceeds its holding limit.
+fn over_limit_at(world: &World, f: &Facility, sea_state: u8) -> bool {
+    over_limit(f, sea_at(world, f.position, sea_state))
+}
+
 fn over_limit(f: &Facility, sea_state: u8) -> bool {
     f.max_sea_state.is_some_and(|m| sea_state > m)
 }
@@ -1483,6 +1498,9 @@ fn threatened(world: &World, e: Entity, sea_state: u8) -> bool {
     let length = sig
         .length_m
         .unwrap_or_else(|| crate::optical::default_length_m(u.domain));
+    let sea_state = world
+        .get::<Position>(e)
+        .map_or(sea_state, |p| sea_at(world, p.point, sea_state));
     u.domain == crate::components::Domain::Surface && sea_state >= weather_limit(length)
 }
 
@@ -1533,7 +1551,8 @@ fn weather_changes(world: &mut World, tick: Tick, sea: u8) {
                     .push(tick, SimEventKind::WeatherEased { unit: id });
             }
             DivertReason::Staging
-                if threatened(world, e, sea) || f.as_ref().is_some_and(|f| over_limit(f, sea)) =>
+                if threatened(world, e, sea)
+                    || f.as_ref().is_some_and(|f| over_limit_at(world, f, sea)) =>
             {
                 world.resource_mut::<PlanningLayer>().diverted.remove(&id);
             }
@@ -1548,7 +1567,7 @@ fn divert_for(world: &mut World, tick: Tick, reason: DivertReason, sea: u8) {
         layer
             .facilities
             .iter()
-            .filter(|f| f.kind != FacilityKind::CommandPost && !over_limit(f, sea))
+            .filter(|f| f.kind != FacilityKind::CommandPost && !over_limit_at(world, f, sea))
             .filter(|f| match reason {
                 DivertReason::Repair => f.services.repair,
                 DivertReason::Fuel => f.services.refuel && layer.fuel_left(f) != Some(0.0),
