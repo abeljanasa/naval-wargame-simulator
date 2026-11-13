@@ -307,6 +307,31 @@ describe("map layers", () => {
     expect(keys).toEqual(["u:1:1000", "f:Port:300", "p:RV:100"]);
   });
 
+  it("lays figures flat so they keep their heading in a rotated view; the badge is separate", () => {
+    const flat = (layers: ReturnType<typeof scene>) =>
+      (layers.find((l) => l.id === "units") as unknown as { props: { billboard: boolean } }).props
+        .billboard;
+    const layers = scene([unit(1), unit(2)]);
+    // Plan views lie on the map (turned with it and tilted with it), not facing the screen.
+    expect(flat(layers)).toBe(false);
+    // One affiliation badge per unit, drawn beside the name rather than inside the figure.
+    expect(layer(layers, "unit-badges").props.data).toHaveLength(2);
+    expect(decodeURIComponent(figureUrl("frigate", "friend", false))).not.toContain("scale(");
+    // APP-6 frames still face the screen, and carry their own frame.
+    const frames = buildLayers({
+      units: [unit(1)],
+      contacts: [],
+      gameTimeS: 0,
+      viewer: { kind: "white_cell" },
+      selected: null,
+      draft: null,
+      onPickUnit: () => {},
+      symbolStyle: "frames",
+    });
+    expect(flat(frames)).toBe(true);
+    expect(layer(frames, "unit-badges").props.data).toHaveLength(0);
+  });
+
   it("labels only the selected unit above the limit, but draws every symbol", () => {
     const units = Array.from({ length: LABEL_LIMIT + 1 }, (_, i) => unit(i + 1));
     const layers = scene(units, 7);

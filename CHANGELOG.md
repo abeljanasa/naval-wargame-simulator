@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed (map)
+
+- **Unit figures keep their heading when the map is rotated or tilted.** Ship, submarine, aircraft and weapon figures were drawn facing the screen, so after a right-drag they still pointed up the screen, not along their heading. They now lie flat on the map, turned to the heading.
+- **The affiliation badge is drawn beside the unit's name.** It was a tiny frame in the corner of each figure that read as a stray dot, and would have orbited the ship once figures turned with the map. It is now a screen-facing APP-6 frame, 13 px, at the start of the label.
+
 ### Added (Gate 4 fixes)
 
 - **Single-observer target motion analysis** ([DL-0050](docs/design-log/DL-0050-single-observer-tma.md), [tma.md](docs/models/tma.md)): a submarine, or any unit with passive sonar, now ranges a target from its own bearings over time once it has manoeuvred.

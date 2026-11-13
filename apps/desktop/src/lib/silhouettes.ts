@@ -539,12 +539,22 @@ function rgb([r, g, b]: [number, number, number]) {
   return `rgb(${r},${g},${b})`;
 }
 
-/** A small APP-6 frame in the corner: affiliation by shape, not only by colour. */
-function badge(aff: Affiliation, x: number, y: number, scale: number): string {
-  return `<g transform="translate(${x} ${y}) scale(${scale})" fill="${rgb(AFFILIATION_COLOUR[aff])}" stroke="#0b1b2b" stroke-width="6">${frameSvg(aff, "surface")}</g>`;
-}
-
 const cache = new Map<string, string>();
+
+/**
+ * The affiliation badge: the APP-6 frame for the affiliation and domain, so a unit's side reads
+ * by shape as well as colour. The map draws it beside the unit's label, facing the screen; it is
+ * not part of the figure, which turns with the heading.
+ */
+export function badgeUrl(aff: Affiliation, domain: Domain): string {
+  const key = `b-${aff}-${domain}`;
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><g fill="${rgb(AFFILIATION_COLOUR[aff])}" stroke="#0b1b2b" stroke-width="5">${frameSvg(aff, domain)}</g></svg>`;
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  cache.set(key, url);
+  return url;
+}
 
 /** Canvas size of a figure's icon, px (every figure is drawn on 64 × 64). */
 export function figureCanvas(kind: FigureKind): [number, number] {
@@ -567,7 +577,7 @@ export function figureUrl(kind: FigureKind, aff: Affiliation, selected: boolean)
       : LAND[kind as LandKind];
   const stroke = selected ? "#ffffff" : "#0b1b2b";
   const sw = selected ? 2 : 1.2;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><g fill="${rgb(AFFILIATION_COLOUR[aff])}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round">${body}</g>${badge(aff, 0, 0, 0.22)}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><g fill="${rgb(AFFILIATION_COLOUR[aff])}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round">${body}</g></svg>`;
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   cache.set(key, url);
   return url;
